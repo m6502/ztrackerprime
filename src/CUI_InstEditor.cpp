@@ -1,4 +1,6 @@
 #include "zt.h"
+#include "InstEditor.h"
+#include "Button.h"
 
 
 void InitInstruments(void) {
@@ -90,7 +92,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     ie->x = 5;
     ie->y = 13;
     ie->xsize = 29;
-    int s = 39 + ((CONSOLE_HEIGHT-480)/8);
+    int s = 39 + ((RESOLUTION_Y-480)/8);
     if (s>100) s = 100;
     ie->ysize = s;
 
@@ -104,12 +106,17 @@ CUI_InstEditor::CUI_InstEditor(void) {
     UI->add_gfx(fm,gfxindex++);
     fm->x=35; fm->y=13; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
+
+
     vso = new ValueSliderOFF(1); // Patch (ID: 2)
     UI->add_element(vso,tabindex++);
     vso->x = 58;    vso->y = 16;    vso->xsize = 16;    vso->ysize = 1; vso->min = -1;  vso->max = 127; vso->value = -1;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
     fm->x=57; fm->y=13; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+
+
+
 
     vs = new ValueSlider(1); // Default Volume (ID: 3)
     UI->add_element(vs,tabindex++);
@@ -118,6 +125,9 @@ CUI_InstEditor::CUI_InstEditor(void) {
     UI->add_gfx(fm,gfxindex++);
     fm->x=35; fm->y=18; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
+
+
+
     vsd = new ValueSliderDL(1); // Default Length (ID: 4)
     UI->add_element(vsd,tabindex++);
     vsd->x = 58;    vsd->y = 21;    vsd->xsize = 16;    vsd->ysize = 1; vsd->min = 1;   vsd->max = 1000;    vsd->value = 0;
@@ -125,6 +135,9 @@ CUI_InstEditor::CUI_InstEditor(void) {
     UI->add_gfx(fm,gfxindex++);
     fm->x=57; fm->y=18; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
+    
+
+    
     vs = new ValueSlider(1); // Global Volume (ID: 5)
     UI->add_element(vs,tabindex++);
     vs->x = 36; vs->y = 26; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
@@ -132,12 +145,18 @@ CUI_InstEditor::CUI_InstEditor(void) {
     UI->add_gfx(fm,gfxindex++);
     fm->x=35; fm->y=23; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
     
+
+
+
     vs = new ValueSlider(1); // Transpose (ID: 6)
     UI->add_element(vs,tabindex++);
     vs->x = 58; vs->y = 26; vs->xsize = 16; vs->ysize = 1;  vs->min = -127; vs->max = 127;  vs->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
     fm->x=57; fm->y=23; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+
+
+
 
     vs = new ValueSlider(1); // Channel (ID: 7)
     UI->add_element(vs,tabindex++);
@@ -174,6 +193,8 @@ CUI_InstEditor::CUI_InstEditor(void) {
     b->ysize = 1;
     b->caption = "    Tracker Mode";
     b->OnClick = (ActFunc)BTNCLK_ToggleTrackerMode; 
+    
+
     trackerModeButton = b;
 
     fm = new Frame;  //frame for buttons
@@ -255,12 +276,35 @@ void CUI_InstEditor::update() {
     InstEditor *ie;
 
     UI->update();
+
     ie = (InstEditor *)UI->get_element(0);
-    if (Keys.size() || midiInQueue.size()) {
+
+    
+    
+    // <Manu> Refrescamos la pantalla cuando cambia la línea -----------
+
+    if(!ztPlayer->playing) ie->last_cur_row = -1 ;
+    else {
+
+      if( ztPlayer->cur_row != ie->last_cur_row ) {
+
+        ie->last_cur_row = ztPlayer->cur_row ;
+
+        need_refresh = 1;
+        UI->full_refresh();
+      }
+    }
+
+    // -----------------------------------------------------------------
+
+      if(Keys.size() || midiInQueue.size()) {
+
         if (Keys.size()) {
+
             key = Keys.getkey();
             kstate = Keys.getstate();
         }
+
         /*if (kstate & KS_ALT && kstate & KS_CTRL) {
             switch(key) {
                 case DIK_T: break;
@@ -358,8 +402,11 @@ void CUI_InstEditor::update() {
                 }
             break;
         }
+
         int pvol = -1;
+
 keepgoing:
+
         if (midiInQueue.size()>0) {
             int dw;
             dw = midiInQueue.pop();
@@ -411,6 +458,7 @@ keepgoing:
         if (ie->list_start<0) ie->list_start = 0;
         if (ie->list_start>=MAX_INSTS-ie->ysize) ie->list_start=MAX_INSTS-ie->ysize;
     }
+
 }
 
 

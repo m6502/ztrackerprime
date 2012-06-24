@@ -56,135 +56,158 @@
  ******/
 
 /* these should be phased out from zt.h and put here */
-#define ZTM_MAX_TRACKS    MAX_TRACKS
-#define ZTM_MAX_INSTS     MAX_INSTS
-#define ZTM_MAX_PATTERNS  256
 
-#define ZTM_ORDERLIST_LEN    256
-#define ZTM_SONGTITLE_MAXLEN 26
-#define ZTM_INSTTITLE_MAXLEN 26
-#define ZTM_FILENAME_MAXLEN  256
+#define ZTM_MAX_TRACKS                      MAX_TRACKS
+#define ZTM_MAX_INSTS                       MAX_INSTS
+#define ZTM_MAX_PATTERNS                    256
 
-#define ZTM_SONGMESSAGE_MAXLEN  2048
+#define ZTM_ORDERLIST_LEN                   256
+#define ZTM_SONGTITLE_MAXLEN                26
+#define ZTM_INSTTITLE_MAXLEN                26
+#define ZTM_FILENAME_MAXLEN                 256
+
+#define ZTM_SONGMESSAGE_MAXLEN              2048
 
 #ifdef USE_ARPEGGIOS
-#define ZTM_ARPEGGIONAME_MAXLEN 40
-#define ZTM_MAX_ARPEGGIOS    256
-#define ZTM_ARPEGGIO_NUM_CC  4
-#define ZTM_ARPEGGIO_LEN     256
+#define ZTM_ARPEGGIONAME_MAXLEN             40
+#define ZTM_MAX_ARPEGGIOS                   256
+#define ZTM_ARPEGGIO_NUM_CC                 4
+#define ZTM_ARPEGGIO_LEN                    256
 #endif /* USE_ARPEGGIOS */
 
 #ifdef USE_MIDIMACROS
-#define ZTM_MIDIMACRONAME_MAXLEN 40
-#define ZTM_MAX_MIDIMACROS    256
-#define ZTM_MIDIMACRO_MAXLEN  64
+#define ZTM_MIDIMACRONAME_MAXLEN            40
+#define ZTM_MAX_MIDIMACROS                  256
+#define ZTM_MIDIMACRO_MAXLEN                64
 #endif /* USE_MIDIMACRO */
 
 /* max length of the status string returned from I/O functions */
-#define ZTM_STATUSSTR_MAXLEN   256
+#define ZTM_STATUSSTR_MAXLEN                256
 
-#define ZT_MODULE_VERSION 7
+#define ZT_MODULE_VERSION                   7
 
-#define ZT_BANK_CHANGE_MODULE_VERSION 7
-#define ZT_ROWSIZE_CHANGE_VERSION 5
+#define ZT_BANK_CHANGE_MODULE_VERSION       7
+#define ZT_ROWSIZE_CHANGE_VERSION           5
 
-#define ZT_MODULE_SUPPORTED_VERSION 5
+#define ZT_MODULE_SUPPORTED_VERSION         5
 
 #define INSTFLAGS_NONE                      0x00
 #define INSTFLAGS_REGRIGGER_NOTE_ON_UNMUTE  0x01
 #define INSTFLAGS_CHANVOL                   0x02
 #define INSTFLAGS_TRACKERMODE               0x04
 
-#define LEN_INF 1000
+#define LEN_INF                             1000
 
-class instrument {
-    public:
 
-        signed char patch;
-        unsigned char midi_device;
-        unsigned char channel;
-        unsigned char flags;
-        signed char transpose;
-        unsigned char global_volume;
-        unsigned char default_volume;
-        unsigned char title[ZTM_INSTTITLE_MAXLEN];
-        signed short int bank;
 
-        unsigned short int default_length;
+class instrument
+{
+public:
 
-        instrument(int p);
-        ~instrument(void);
+  instrument(int p);
+  ~instrument(void);
 
-        int isempty(void);
+  int isempty(void);
 
-        void load(CDataBuf *buf);
-        void save(CDataBuf *buf, unsigned char inum);
+  void load(CDataBuf *buf);
+  void save(CDataBuf *buf, unsigned char inum);
+
+  // <Manu> 
+  void MarkAsUsed() { bHasBeenUsed = true ; }
+  void MarkAsUnused() { bHasBeenUsed = false ; }
+  bool IsUsed() { return bHasBeenUsed ; }
+
+public:
+
+  // <Manu> Flag que indica si el instrumento se ha utilizado en la última reproducción
+  bool bHasBeenUsed ;
+
+  signed char patch;
+  unsigned char midi_device;
+  unsigned char channel;
+  unsigned char flags;
+  signed char transpose;
+  unsigned char global_volume;
+  unsigned char default_volume;
+  unsigned char title[ZTM_INSTTITLE_MAXLEN];
+  signed short int bank;
+
+  unsigned short int default_length;
+
+} ;
+
+
+
+class event
+{
+public:
+
+  unsigned char note;
+  unsigned char inst;
+  unsigned char vol;
+  unsigned char effect;
+  unsigned short int row;
+  unsigned short int length;
+  unsigned short int effect_data;
+  event *next_event;
+  event(void);
+  event(event *e);
+  ~event(void);
+  int blank(void);
 };
 
-class event{
-    public:
-        unsigned char note;
-        unsigned char inst;
-        unsigned char vol;
-        unsigned char effect;
-        unsigned short int row;
-        unsigned short int length;
-        unsigned short int effect_data;
-        event *next_event;
-        event(void);
-        event(event *e);
-        ~event(void);
-        int blank(void);
-};
+class track
+{
+public:
 
-class track {
-    public:
-        unsigned char default_inst;
-        unsigned char last_note,last_inst;
-        unsigned char default_controller;
+  unsigned char default_inst;
+  unsigned char last_note,last_inst;
+  unsigned char default_controller;
 
-        unsigned short int default_length,default_fxp,default_delay;;
-        unsigned short int default_data;
-        short int pitch_slide;
+  unsigned short int default_length, default_fxp, default_delay ;
+  unsigned short int default_data;
+  short int pitch_slide;
 
-        short int length;
+  short int length;
 
-        signed int pitch_setting;
-        event *event_list;
+  signed int pitch_setting;
+  event *event_list;
 
-        void update_event_safe(unsigned short int row, int note, int inst, int vol, int length, int effect, int effect_data);
-        void update_event(unsigned short int row, int note, int inst, int vol, int length, int effect, int effect_data);
-        void update_event(unsigned short int row, event *src);
-        event *get_event(unsigned short int row);
-        event *get_next_event(unsigned short int row);
+  void update_event_safe(unsigned short int row, int note, int inst, int vol, int length, int effect, int effect_data);
+  void update_event(unsigned short int row, int note, int inst, int vol, int length, int effect, int effect_data);
+  void update_event(unsigned short int row, event *src);
+  event *get_event(unsigned short int row);
+  event *get_next_event(unsigned short int row);
 
-        track(short int len);
-        ~track(void);
-        void reset(void);
-        void del_event(unsigned short int row, int needlock=1);
-        void del_row(unsigned short int which);
-        void ins_row(unsigned short int which);
-
-
+  track(short int len);
+  ~track(void);
+  void reset(void);
+  void del_event(unsigned short int row, int needlock=1);
+  void del_row(unsigned short int which);
+  void ins_row(unsigned short int which);
 };
  
-class pattern {
-    public:
-        track *tracks[ZTM_MAX_TRACKS];
-        short int length;
+class pattern
+{
+public:
 
-        pattern(void);
-        pattern(int len);
-        ~pattern(void);
+  track *tracks[ZTM_MAX_TRACKS];
+  short int length;
 
-        void resize(int newsize);
-        int isempty(void);
+  pattern(void);
+  pattern(int len);
+  ~pattern(void);
+
+  void resize(int newsize);
+  int isempty(void);
 };
 
 #ifdef USE_ARPEGGIOS
+
 #define ZTM_ARP_EMPTY_PITCH 0x8000
 #define ZTM_ARP_EMPTY_CCVAL 0x80
 #define ZTM_ARP_EMPTY_CC    0x80
+
 class arpeggio {
     public:
         char     name[ZTM_ARPEGGIONAME_MAXLEN];
@@ -200,11 +223,15 @@ class arpeggio {
 
         int isempty(void);
 };
+
 #endif /* USE_ARPEGGIOS */
 
+
 #ifdef USE_MIDIMACROS
+
 #define ZTM_MIDIMAC_END    0x100
 #define ZTM_MIDIMAC_PARAM1 0x101
+
 class midimacro {
     public:
         char     name[ZTM_MIDIMACRONAME_MAXLEN];
@@ -227,8 +254,10 @@ class songmsg {
 };
 */
 
-class songmsg {
+class songmsg
+{
     public:
+
         CDataBuf *songmessage;
         songmsg();
         ~songmsg();
@@ -236,15 +265,18 @@ class songmsg {
 };
 
 
-class zt_module {
+class zt_module
+{
     public:
         unsigned char version;
         unsigned char title[ZTM_SONGTITLE_MAXLEN];
         unsigned char filename[ZTM_FILENAME_MAXLEN];
         int tpb,bpm;
+
 #ifdef USE_ARPEGGIOS
         arpeggio *arpeggios[ZTM_MAX_ARPEGGIOS];
 #endif /* USE_ARPEGGIOS */
+
 #ifdef USE_MIDIMACROS
         midimacro *midimacros[ZTM_MAX_MIDIMACROS];
 #endif /* USE_MIDIMACROS */
@@ -301,7 +333,7 @@ class zt_module {
         //void build_OLST(CDataBuf *buf);  /* OLST - order list */
         //void build_ZTHD(CDataBuf *buf, int compr); /* ZTHD - .zt header */
 
-        int read_ZThd(CDataBuf *buf, ifstream &ifs); /* ZThd - .zt header */
+        int read_ZThd(CDataBuf *buf, std::ifstream &ifs); /* ZThd - .zt header */
         void load_ZTtm(CDataBuf *buf); /* ZTtm - track mutes */
         void load_ZTpl(CDataBuf *buf); /* ZTpl - pattern lengths */
         void load_ZTol(CDataBuf *buf); /* ZTol - order list */
@@ -315,11 +347,11 @@ class zt_module {
         //void load_TMUT(CDataBuf *buf);  /* TMUT - track mutes */
         //void load_OLST(CDataBuf *buf);  /* OLST - order list */
 
-        void writedata(char *data, int size, int compressed, ofstream &of, DeflateStream *o);
-        int readdata(char *data, int size, int compressed, ifstream &ifs, InflateStream *i);
+        void writedata(char *data, int size, int compressed, std::ofstream &of, DeflateStream *o);
+        int readdata(char *data, int size, int compressed, std::ifstream &ifs, InflateStream *i);
 
-        void writeblock(char *headid, CDataBuf *buf, int compressed, ofstream &of, DeflateStream *o);
-        int readblock(char headid[5], CDataBuf *buf, int compressed, ifstream &ifs, InflateStream *i);
+        void writeblock(char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o);
+        int readblock(char headid[5], CDataBuf *buf, int compressed, std::ifstream &ifs, InflateStream *i);
 
         // high level, safe editing methods
         inline int set_note(unsigned char pattern, unsigned char track, unsigned short row, int note, int instrument=-1, int volume=-1, int length=-1) {

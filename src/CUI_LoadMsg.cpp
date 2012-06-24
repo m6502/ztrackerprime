@@ -38,6 +38,8 @@
  *
  ******/
 #include "zt.h"
+#include "FileList.h"
+
 
 int load_finished = 0;
 int load_lock = 0;
@@ -120,27 +122,37 @@ void CUI_LoadMsg::update() {
 
 }
 
-void CUI_LoadMsg::draw(Drawable *S) {
-    int i;
+void CUI_LoadMsg::draw(Drawable *S)
+{
+  int i;
 
-    char *str[] = { "Please wait, loading... |",
-                    "Please wait, loading... /",
-                    "Please wait, loading... -",
-                    "Please wait, loading... \\"
-    };
+  char *str[] = { 
 
-    if (S->lock()==0) {
-        S->fillRect(col(15),row(20),640-col(15)-1,row(25)-1,COLORS.Background);
-        printline(col(15),row(24),148,50,COLORS.Lowlight,S);
-        for (i=20;i<25;i++) {
-            printchar(col(15),row(i),145,COLORS.Highlight,S);
-            printchar(col(64),row(i),146,COLORS.Lowlight,S);
-        }
-        printline(col(15),row(20),143,50,COLORS.Highlight,S);
-        print(col(textcenter(str[strselect],40)),row(22),str[strselect],COLORS.Text,S);
-        S->unlock();
-        need_refresh = 0;
-        updated++;
+                  "Please wait, loading... |",
+                  "Please wait, loading... /",
+                  "Please wait, loading... -",
+                  "Please wait, loading... \\"
+  };
+
+  if (S->lock() == 0) {
+
+    S->fillRect(col(15),row(20), 640-col(15)-1, row(25)-1, COLORS.Background);
+    printline(col(15),row(24),148,50,COLORS.Lowlight,S);
+
+    for (i=20;i<25;i++) {
+
+      printchar(col(15),row(i),145,COLORS.Highlight,S);
+      printchar(col(64),row(i),146,COLORS.Lowlight,S);
     }
+
+    printline(col(15),row(20),143,50,COLORS.Highlight,S);
+    print(col(textcenter(str[strselect],40)),row(22),str[strselect],COLORS.Text,S);
+
+    S->unlock();
+
+    need_refresh = 0;
+    updated++;
+  }
 }
+
 /* eof */

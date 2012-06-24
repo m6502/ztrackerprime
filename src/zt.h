@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream.h>
+#include <iostream>
 #include <io.h>
 #include <direct.h>
 
@@ -27,54 +27,69 @@
 #include <SDL_main.h>
 //#include "sdl_mixer.h"  // this is for audio testing
 
-#define VER_MAJ 0
-#define VER_MIN 98
+//#define VER_MAJ 0
+
+// <Manu> antes era 98
+
+//#define VER_MIN 986
+
+
+#define ZTRACKER_VERSION                "zTracker' v20120622"
  
-//#define _ENABLE_AUDIO 1  // this enables audio init and audio plugins
+//#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
-#define CONSOLE_WIDTH zt_globals.screen_width
-#define CONSOLE_HEIGHT zt_globals.screen_height
+#define RESOLUTION_X                    (zt_config_globals.screen_width)
+#define RESOLUTION_Y                    (zt_config_globals.screen_height)
 
-#define CONSOLE_DEPTH 32
+#define SCREEN_BPP                      32
 
-#define EDIT_LOCK_TIMEOUT 800 // ms
+#define BASE_OCTAVE_MIN                 0
+#define BASE_OCTAVE_MAX                 9
+#define BASE_OCTAVE_DEFAULT             4
 
-//#define PATTERN_EDIT_ROWS (32+4)
+#define DEFAULT_CURSOR_STEP             1
+
+
+
+#define EDIT_LOCK_TIMEOUT               800 // ms
+
+//#define PATTERN_EDIT_ROWS               (32+4)
 extern int PATTERN_EDIT_ROWS;
 
-#define DIK_MOUSE_1_ON  0xF1
-#define DIK_MOUSE_1_OFF 0xF2
-#define DIK_MOUSE_2_ON  0xF3
-#define DIK_MOUSE_2_OFF 0xF4
+#define DIK_MOUSE_1_ON                  0xF1
+#define DIK_MOUSE_1_OFF                 0xF2
+#define DIK_MOUSE_2_ON                  0xF3
+#define DIK_MOUSE_2_OFF                 0xF4
 
-#define GET_LOW_BYTE(x)  ((unsigned char)(x & 0x00FF))
-#define GET_HIGH_BYTE(x) ((unsigned char)((x & 0xFF00)>>8))
+#define GET_LOW_BYTE(x)                 ((unsigned char)(x & 0x00FF))
+#define GET_HIGH_BYTE(x)                ((unsigned char)((x & 0xFF00)>>8))
 
-#define LOW_MIDI_BYTE(x)  ((x) & 0x007F)
-#define HIGH_MIDI_BYTE(x) ((x) & 0x3F80)
+#define LOW_MIDI_BYTE(x)                ((x) & 0x007F)
+#define HIGH_MIDI_BYTE(x)               ((x) & 0x3F80)
 
 #ifdef RGB
-#undef RGB
+  #undef RGB
 #endif
-#define RGB(r,g,b) (long)((r)+((g)<<8)+((b)<<16))
+
+#define RGB(r,g,b)                      (long)((r)+((g)<<8)+((b)<<16))
 
 //// Some hacks
-#define mutetrack(t) song->track_mute[t] = 1; MidiOut->mute_track(t)
-#define unmutetrack(t) song->track_mute[t] = 0; MidiOut->unmute_track(t)
-#define toggle_track_mute(t) song->track_mute[t] = !song->track_mute[t];    if (song->track_mute[t]) MidiOut->mute_track(t); else MidiOut->unmute_track(t)
+#define mutetrack(t)                    song->track_mute[t] = 1; MidiOut->mute_track(t)
+#define unmutetrack(t)                  song->track_mute[t] = 0; MidiOut->unmute_track(t)
+#define toggle_track_mute(t)            song->track_mute[t] = !song->track_mute[t];    if (song->track_mute[t]) MidiOut->mute_track(t); else MidiOut->unmute_track(t)
 ////
 
 
-#define MAX_MIDI_DEVS 64 // Max midi devices in lists
+#define MAX_MIDI_DEVS                   64 // Max midi devices in lists
 
-#define MAX_MIDI_OUTS MAX_MIDI_DEVS
-#define MAX_MIDI_INS  MAX_MIDI_DEVS
+#define MAX_MIDI_OUTS                   MAX_MIDI_DEVS
+#define MAX_MIDI_INS                    MAX_MIDI_DEVS
 
-#define MAX_TRACKS 64 // Max # of tracks
-#define MAX_INSTS 100 // Max # of instruments
+#define MAX_TRACKS                      64 // Max # of tracks
+#define MAX_INSTS                       100 // Max # of instruments
 
 
-#include "resource.h"            // resource includes for win32 icon
+#include "../resource.h"         // resource includes for win32 icon
 
 #include "fxml.h"
 #include "lc_sdl_wrapper.h"      // libCON wrapper 
@@ -94,11 +109,12 @@ extern int PATTERN_EDIT_ROWS;
 #include "import_export.h"       // file import/export
 #include "img.h"                 // image loading/scaling
 
-extern ZTConf zt_globals;
+extern ZTConf zt_config_globals;
 
 class colorset {
 
 public:
+
     TColor Background;     // Background of the ztracker "panel"
     TColor Highlight;      // highlight of the ztracker "panel"
     TColor Lowlight;       // lowlight of the ztracker "panel"
@@ -156,11 +172,19 @@ public:
         LCDHigh =        get_color_from_hex("LCDHigh",&ColorsFile);
         CursorRowHigh =  get_color_from_hex("CursorRowHigh",&ColorsFile);
         CursorRowLow =   get_color_from_hex("CursorRowLow",&ColorsFile);
+
+//        setDefaultColors() ;
+
         return 1;
     }
     
     void setDefaultColors() {
-        Background =     getColor(0xA4,0x90,0x54);
+
+        // <Manu> El color del Scream Tracker era ligeramente distinto
+        //Background =     getColor(0xA4,0x90,0x54);
+        Background =     getColor(0xA1,0x91,0x55);
+        //Background =     getColor(0x7F,0x00,0x00);
+
         Highlight=       getColor(0xFF,0xDC,0x84);
         Lowlight =       getColor(0x50,0x44,0x28);
         Text =           getColor(0x00,0x00,0x00);
@@ -187,94 +211,143 @@ public:
 
 
 
-enum state { STATE_PEDIT, STATE_IEDIT, STATE_PLAY, STATE_LOGO, 
-             STATE_ABOUT, STATE_SONG_CONFIG, STATE_SYSTEM_CONFIG,
-             STATE_CONFIG, STATE_ORDER, STATE_PEDIT_WIN, STATE_HELP,
-             STATE_LOAD, STATE_SAVE, STATE_STATUS, STATE_SLIDER_INPUT,
-             STATE_SONG_MESSAGE, STATE_ARPEDIT, STATE_MIDIMACEDIT
+enum state { 
+  
+  STATE_PEDIT, STATE_IEDIT, STATE_PLAY, STATE_LOGO, 
+  STATE_ABOUT, STATE_SONG_CONFIG, STATE_SYSTEM_CONFIG,
+  STATE_CONFIG, STATE_ORDER, STATE_PEDIT_WIN, STATE_HELP,
+  STATE_LOAD, STATE_SAVE, STATE_STATUS, STATE_SLIDER_INPUT,
+  STATE_SONG_MESSAGE, STATE_ARPEDIT, STATE_MIDIMACEDIT
 
 };
-#define DEFAULT_STATE STATE_PEDIT
-#define DEFAULT_STATE_UIP UIP_Patterneditor
 
-#define MAX_UPDATE_RECTS 512
+#define DEFAULT_STATE               STATE_PEDIT
+#define DEFAULT_STATE_UIP           UIP_Patterneditor
 
-class CScreenUpdateManager {
-    public: 
-        SDL_Rect r[MAX_UPDATE_RECTS];
-        int updated_rects;
-        bool update_all;
+#define MAX_UPDATE_RECTS            512
 
-        CScreenUpdateManager() {
-            updated_rects = 0;
-            update_all = false;
-        }
-        ~CScreenUpdateManager() {
-        }
-        void Update(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2) {
-            if (update_all) return;
-            if (updated_rects < MAX_UPDATE_RECTS-1) {
-                if (x1<0) x1=0; if (y1<0) y1=0;
-                if (x2>CONSOLE_WIDTH-1) x2 = CONSOLE_WIDTH-1;
-                if (y2>CONSOLE_HEIGHT-1) y2 = CONSOLE_HEIGHT-1;
-                r[updated_rects].x = x1;
-                r[updated_rects].y = y1;
-                r[updated_rects].w = x2-x1;
-                r[updated_rects].h = y2-y1;
-                int i = updated_rects;
-//                if (r[i].x<0 || r[i].y<0 || r[i].x>CONSOLE_WIDTH-1 || r[i].y>CONSOLE_HEIGHT-1)
-//                    SDL_Delay(1);
-                updated_rects++;
-            }
-        }
-        void UpdateWH(Sint16 x1, Sint16 y1, Uint16 w, Uint16 h) {
-            if (update_all) return;
-            if (updated_rects < MAX_UPDATE_RECTS-1) {
-                r[updated_rects].x = x1;
-                r[updated_rects].y = y1;
-                r[updated_rects].w = w;
-                r[updated_rects].h = h;
-            /*
-                int i = updated_rects;
+
+class CScreenUpdateManager 
+{
+
+public: 
+
+  SDL_Rect r[MAX_UPDATE_RECTS];
+  int updated_rects;
+  bool update_all;
+
+  CScreenUpdateManager() 
+  {
+
+    updated_rects = 0;
+    update_all = false;
+  }
+  
+  ~CScreenUpdateManager() 
+  {
+  
+  }
+
+  // <Manu 06 de Julio de 2005> He optimizado ligeramente esto y he limpiado el codigo
+
+  void Update(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2) 
+  {
+    SDL_Rect *rect ;
+
+    if (update_all) return;
+    if (updated_rects < MAX_UPDATE_RECTS-1) {
+
+      if (x1<0) x1=0; 
+      if (y1<0) y1=0;
+      if (x2>RESOLUTION_X-1) x2 = RESOLUTION_X-1;
+      if (y2>RESOLUTION_Y-1) y2 = RESOLUTION_Y-1;
+
+      rect=&r[updated_rects] ;
+
+      rect->x = x1;
+      rect->y = y1;
+      rect->w = x2-x1 ;
+      rect->h = y2-y1 ;
+        
+      updated_rects++ ;
+    }
+  }
+
+
+
+  void UpdateWH(Sint16 x1, Sint16 y1, Uint16 w, Uint16 h) 
+  {
+    SDL_Rect *rect ;
     
-                if (r[i].x<0 || r[i].y<0 || r[i].x>CONSOLE_WIDTH-1 || r[i].y>CONSOLE_HEIGHT-1)
-                    SDL_Delay(1);               
-            */
-                updated_rects++;
-            }
-        }
-        void UpdateAll(void) {
-            update_all = true;
-        }
-        void Reset(void) {
-            updated_rects = 0;
-        }
-        void Refresh(Drawable *S) {
-            if (update_all) {
-                SDL_UpdateRect(S->surface,0,0,0,0);
-                update_all = false;
-                updated_rects = 0;
-            } else
-            if (updated_rects > 0) {
+    if (update_all) return;
+    if (updated_rects < MAX_UPDATE_RECTS-1) {
+      
+      rect=&r[updated_rects] ;
+      
+      rect->x = x1 ;
+      rect->y = y1 ;
+      rect->w = w ;
+      rect->h = h ;
+      
+      updated_rects++ ;
+    }
+  }
+
+
+
+
+  void UpdateAll(void) 
+  {
+    update_all = true;
+  }
+
+
+
+  void Reset(void) 
+  {
+    updated_rects = 0;
+  }
+
+
+
+
+  void Refresh(Drawable *S) 
+  {
+    if (update_all) {
+
+      SDL_UpdateRect(S->surface,0,0,0,0);
+      update_all = false;
+      updated_rects = 0;
+    } 
+    else {
+      
+      if (updated_rects > 0) {
+        
 #ifdef DEBUG_SCREENMANAGER
-                for (int i=0;i < updated_rects; i++)
-                    SDL_FillRect(S->surface,&r[i], rand() );
+        for (int i=0;i < updated_rects; i++)
+          SDL_FillRect(S->surface,&r[i], rand() );
 #endif
-                /*
-                for (int i=0;i<updated_rects;i++)
-                    if (r[i].x<0 || r[i].y<0 || r[i].x>CONSOLE_WIDTH-1 || r[i].y>CONSOLE_HEIGHT-1)
-                        SDL_Delay(1);
-                    */
-                SDL_UpdateRects(S->surface, updated_rects, &r[0]);
-                updated_rects = 0;
-            }
-        }
-        bool NeedRefresh(void) {
-            return (updated_rects > 0);
-        }
+          /*
+          for (int i=0;i<updated_rects;i++)
+          if (r[i].x<0 || r[i].y<0 || r[i].x>RESOLUTION_X-1 || r[i].y>RESOLUTION_Y-1)
+          SDL_Delay(1);
+        */
+        SDL_UpdateRects(S->surface, updated_rects, &r[0]);
+        updated_rects = 0;
+      }
+    }
+  }
+
+
+  bool NeedRefresh(void) 
+  {
+    return (updated_rects > 0);
+  }
 };
+
 
 extern CScreenUpdateManager screenmanager;
+
 
 class CClipboard {
     public:

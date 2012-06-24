@@ -39,7 +39,7 @@
  ******/
 
 #include "zt.h"
-#include <png.h>
+#include "png.h"
 
     Bitmap* newBitmap(int Width, int Height, int Flags) {
         return (Bitmap*)new Drawable(Width, Height);
@@ -142,7 +142,7 @@
 
     void Drawable::drawHLine(int y, int x, int x2, TColor c) {
         TColor *screen = (TColor *)surface->pixels;
-        screen += y*CONSOLE_WIDTH + x;
+        screen += y*RESOLUTION_X + x;
         TColor *end;
         end = screen + (x2-x);
         for(;screen<end;screen++)

@@ -1,4 +1,6 @@
 #include "zt.h"
+#include "Button.h"
+
 
 void close_newsong_window(void) {
     Keys.flush();

@@ -7,9 +7,9 @@ CUI_PEParms::CUI_PEParms(void) {
 
     int window_width = 54 * col(1);
     int window_height = 20 * row(1);
-    int start_x = (CONSOLE_WIDTH / 2) - (window_width / 2);
+    int start_x = (RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--);
-    int start_y = (CONSOLE_HEIGHT / 2) - (window_height / 2);
+    int start_y = (RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
     
     /* Initialize BPM Slider */
@@ -41,7 +41,7 @@ CUI_PEParms::CUI_PEParms(void) {
         vs->xsize=window_width/8 - 20;
         vs->min = 1;
         vs->max = 32;
-        vs->value = zt_globals.highlight_increment;
+        vs->value = zt_config_globals.highlight_increment;
 
         vs = new ValueSlider;
         UI->add_element(vs,3);
@@ -51,7 +51,7 @@ CUI_PEParms::CUI_PEParms(void) {
         vs->xsize=window_width/8 - 20;
         vs->min = 1;
         vs->max = 32;
-        vs->value = zt_globals.lowlight_increment;
+        vs->value = zt_config_globals.lowlight_increment;
 
         cb = new CheckBox;
         UI->add_element(cb,4);
@@ -59,7 +59,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb->x = (start_x / 8) + 14;
         cb->y = (start_y / 8) + 14;
         cb->xsize = 5;
-        cb->value = &zt_globals.centered_editing;
+        cb->value = &zt_config_globals.centered_editing;
         cb->frame = 1;
 
         cb = new CheckBox;
@@ -68,7 +68,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb->x = (start_x / 8) + 14 + 16;
         cb->y = (start_y / 8) + 14;
         cb->xsize = 5;
-        cb->value = &zt_globals.step_editing;
+        cb->value = &zt_config_globals.step_editing;
         cb->frame = 1;
 
         cb = new CheckBox;
@@ -77,7 +77,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb->x = (start_x / 8) + 14 + 32;
         cb->y = (start_y / 8) + 14;
         cb->xsize = 5;
-        cb->value = &zt_globals.record_velocity;
+        cb->value = &zt_config_globals.record_velocity;
         cb->frame = 1;
 
         vs = new ValueSlider;
@@ -88,7 +88,7 @@ CUI_PEParms::CUI_PEParms(void) {
         vs->xsize=window_width/8 - 20;
         vs->min=1;
         vs->max = 32;
-        vs->value = zt_globals.control_navigation_amount;
+        vs->value = zt_config_globals.control_navigation_amount;
 
 }
 
@@ -109,17 +109,17 @@ void CUI_PEParms::enter(void) {
     vs = (ValueSlider *)UI->get_element(1);
     vs->value = song->patterns[cur_edit_pattern]->length;
     vs = (ValueSlider *)UI->get_element(2);
-    vs->value = zt_globals.highlight_increment;
+    vs->value = zt_config_globals.highlight_increment;
     vs = (ValueSlider *)UI->get_element(3);
-    vs->value = zt_globals.lowlight_increment;
+    vs->value = zt_config_globals.lowlight_increment;
 	cb = (CheckBox *)UI->get_element(4);
-	cb->value = &zt_globals.centered_editing;
+	cb->value = &zt_config_globals.centered_editing;
 	cb = (CheckBox *)UI->get_element(5);
-	cb->value = &zt_globals.step_editing;
+	cb->value = &zt_config_globals.step_editing;
 	cb = (CheckBox *)UI->get_element(6);
-	cb->value = &zt_globals.record_velocity;
+	cb->value = &zt_config_globals.record_velocity;
     vs = (ValueSlider *)UI->get_element(7);
-    vs->value = zt_globals.control_navigation_amount;
+    vs->value = zt_config_globals.control_navigation_amount;
 }
 
 void CUI_PEParms::leave(void) {
@@ -149,23 +149,23 @@ void CUI_PEParms::update() {
     }
     vs = (ValueSlider *)UI->get_element(2);
     if(vs->changed)
-        zt_globals.highlight_increment = vs->value;
+        zt_config_globals.highlight_increment = vs->value;
     vs = (ValueSlider *)UI->get_element(3);
     if(vs->changed)
-        zt_globals.lowlight_increment = vs->value;
+        zt_config_globals.lowlight_increment = vs->value;
 	cb = (CheckBox *)UI->get_element(4);
 	if(cb->changed)
-		zt_globals.centered_editing = *(cb->value);
+		zt_config_globals.centered_editing = *(cb->value);
 	cb = (CheckBox *)UI->get_element(5);
 	if(cb->changed)
-		zt_globals.step_editing = *(cb->value);
+		zt_config_globals.step_editing = *(cb->value);
 	cb = (CheckBox *)UI->get_element(6);
 	if(cb->changed)
-		zt_globals.record_velocity = *(cb->value);
+		zt_config_globals.record_velocity = *(cb->value);
 
     vs = (ValueSlider *)UI->get_element(7);
     if(vs->changed)
-        zt_globals.control_navigation_amount = vs->value;
+        zt_config_globals.control_navigation_amount = vs->value;
 
 }
 
@@ -173,9 +173,9 @@ void CUI_PEParms::draw(Drawable *S) {
     int i;
     int window_width = 54 * col(1);
     int window_height = 20 * row(1);
-    int start_x = (CONSOLE_WIDTH / 2) - (window_width / 2);
+    int start_x = (RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--);
-    int start_y = (CONSOLE_HEIGHT / 2) - (window_height / 2);
+    int start_y = (RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
 
     if (S->lock()==0) {

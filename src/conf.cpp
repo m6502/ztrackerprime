@@ -42,6 +42,15 @@
 #include "stdafx.h"
 #include "zt.h"
 
+
+
+#define MINIMUM_SCREEN_WIDTH        1024
+#define MINIMUM_SCREEN_HEIGHT       700
+
+
+
+
+
 conf::conf() {
     filename = NULL;
     hash = new list;
@@ -212,7 +221,14 @@ ZTConf::ZTConf() {
     auto_send_panic = 1; // flag_autosendpanic
     highlight_increment = 8;
     lowlight_increment = 8;
-    pattern_length = 128;
+
+    // <Manu> Por  defecto siempre tamaño 64!! ----------------
+
+    //    pattern_length = 128;
+    pattern_length = 64;
+
+    // --------------------------------------------------------
+
     key_repeat_time = 30;
     key_wait_time = 250;
     midi_clock = 1; // default_midiclock;
@@ -224,8 +240,10 @@ ZTConf::ZTConf() {
     prebuffer_rows = 8;
     step_editing = 1;
     centered_editing = 1;
-    screen_width = 640;
-    screen_height = 480;
+
+    screen_width  = MINIMUM_SCREEN_WIDTH ;
+    screen_height = MINIMUM_SCREEN_HEIGHT ;
+
     autoload_ztfile = 0;
     autoload_ztfile_filename[0] = '\0';
     control_navigation_amount = 2;
@@ -238,67 +256,70 @@ ZTConf::~ZTConf() {
         delete Config;
 }
 
-int ZTConf::load() {
-    if (!Config->load(conf_filename))
-        return -1;
-//    colorfile = Config->get("color_file");
-//    strcpy(COLORFILE,colorfile);
-    char *temp = Config->get("skin");
-    if(temp)
-        strcpy(skin,temp);
-    ////////////////////////////////////////////////
-    // here we load some new options
-    
-    if(Config->get("screen_width"))
-        screen_width = atoi(Config->get("screen_width"));
-    if(Config->get("screen_height"))
-        screen_height = atoi(Config->get("screen_height"));
 
 
-    if(Config->get("control_navigation_amount"))
-        control_navigation_amount = atoi(Config->get("control_navigation_amount"));
-    if(Config->get("default_pattern_length"))
-        pattern_length = atoi(Config->get("default_pattern_length"));
-    if(Config->get("default_instrument_global_volume"))
-        instrument_global_volume = atoi(Config->get("default_instrument_global_volume"));
-    if(Config->get("default_highlight_increment"))
-        highlight_increment = atoi(Config->get("default_highlight_increment"));
-    if(Config->get("default_lowlight_increment"))
-        lowlight_increment = atoi(Config->get("default_lowlight_increment"));
-	if(Config->get("default_view_mode"))
-		cur_edit_mode = atoi(Config->get("default_view_mode"));
-    
-    ////////////////////////////////////////////////
-    
-    if (Config->get("key_repeat"))
-        key_repeat_time = atoi(Config->get("key_repeat"));
-    if (Config->get("key_wait"))
-        key_wait_time = atoi(Config->get("key_wait"));
-    if (Config->get("prebuffer_rows"))
-        prebuffer_rows = atoi(Config->get("prebuffer_rows"));
-//    if (Config->get("do_fade"))
-//        do_fade = atoi(Config->get("do_fade"));
-//    FADEINOUT = do_fade;
+// ------------------------------------------------------------------------------------------------
+//
+//
+int ZTConf::load() 
+{
+  char *temp ;
+  
+  if (!Config->load(conf_filename)) return -1;
 
-    if (Config->get("send_panic_on_stop"))
-        auto_send_panic = getFlag("send_panic_on_stop");
-    if (Config->get("midi_in_sync"))
-        midi_in_sync = getFlag("midi_in_sync");
+  
+  //    colorfile = Config->get("color_file");
+  //    strcpy(COLORFILE,colorfile);
+  
+  temp = Config->get("skin") ;
 
-    full_screen = getFlag("fullscreen");
-    step_editing = getFlag("step_editing");
-    auto_open_midi = getFlag("auto_open_midi");
-    autoload_ztfile = getFlag("autoload_ztfile");
-	centered_editing = getFlag("centered_edit");
-    record_velocity = getFlag("record_velocity");
-    if(Config->get("default_directory"))
-        strcpy(default_directory, Config->get("default_directory"));
-    if(Config->get("autoload_ztfile_filename"))
-        strcpy(autoload_ztfile_filename, Config->get("autoload_ztfile_filename"));
+  if(temp) strcpy(skin,temp) ;
 
-    return(0);
+  ////////////////////////////////////////////////
+  // here we load some new options
+  
+  if(Config->get("screen_width"))                     screen_width = atoi(Config->get("screen_width"));
+  if(Config->get("screen_height"))                    screen_height = atoi(Config->get("screen_height"));
+
+  if(screen_width < MINIMUM_SCREEN_WIDTH) screen_width = MINIMUM_SCREEN_WIDTH ;
+  if(screen_height < MINIMUM_SCREEN_HEIGHT) screen_height = MINIMUM_SCREEN_HEIGHT ;
+
+  if(Config->get("control_navigation_amount"))        control_navigation_amount = atoi(Config->get("control_navigation_amount"));
+  if(Config->get("default_pattern_length"))           pattern_length = atoi(Config->get("default_pattern_length"));
+  if(Config->get("default_instrument_global_volume")) instrument_global_volume = atoi(Config->get("default_instrument_global_volume"));
+  if(Config->get("default_highlight_increment"))      highlight_increment = atoi(Config->get("default_highlight_increment"));
+  if(Config->get("default_lowlight_increment"))       lowlight_increment = atoi(Config->get("default_lowlight_increment"));
+  if(Config->get("default_view_mode"))                cur_edit_mode = atoi(Config->get("default_view_mode"));
+  
+  ////////////////////////////////////////////////
+  
+  if (Config->get("key_repeat"))                      key_repeat_time = atoi(Config->get("key_repeat"));
+  if (Config->get("key_wait"))                        key_wait_time = atoi(Config->get("key_wait"));
+  if (Config->get("prebuffer_rows"))                  prebuffer_rows = atoi(Config->get("prebuffer_rows"));
+  //    if (Config->get("do_fade"))                         do_fade = atoi(Config->get("do_fade"));
+  //    FADEINOUT = do_fade;
+  
+  if (Config->get("send_panic_on_stop"))              auto_send_panic = getFlag("send_panic_on_stop");
+  if (Config->get("midi_in_sync"))                    midi_in_sync = getFlag("midi_in_sync");
+  
+  full_screen = getFlag("fullscreen");                
+  step_editing = getFlag("step_editing");
+  auto_open_midi = getFlag("auto_open_midi");
+  autoload_ztfile = getFlag("autoload_ztfile");
+  centered_editing = getFlag("centered_edit");
+  record_velocity = getFlag("record_velocity");
+  
+  if(Config->get("default_directory"))                strcpy(default_directory, Config->get("default_directory"));
+  if(Config->get("autoload_ztfile_filename"))         strcpy(autoload_ztfile_filename, Config->get("autoload_ztfile_filename"));
+  
+  return(0) ;
 }
 
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 int ZTConf::getFlag(char *key) {
     char *a = Config->get(key);
     if (a) {

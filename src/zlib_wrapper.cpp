@@ -38,6 +38,7 @@
  ******/
 #include "zt.h"
 
+
 /*************************************************************************
  *
  * NAME  InflateStream::InflateStream()
@@ -59,7 +60,7 @@
  *   none
  *           
  ******/     
-InflateStream::InflateStream(ifstream &ifs)
+InflateStream::InflateStream(std::ifstream *ifs)
 {
     int status;
     this->errornum=0;
@@ -129,16 +130,26 @@ InflateStream::~InflateStream()
  ******/     
 void InflateStream::read(char *data, int size)
 {
-    int status=0,pos;
+    int status = 0, pos ;
 
     this->zstrm.next_out = (unsigned char *)data;
     this->zstrm.avail_out = size;
+    
     while (!( this->zstrm.avail_out == 0)) {
-        if ( !this->ifs.eof() && this->zstrm.avail_in == 0 ) {
+
+        if ( !this->ifs->eof() && this->zstrm.avail_in == 0 ) {
+
             this->zstrm.next_in = this->input_buffer;
-            pos = this->ifs.tellg();
-            this->ifs.read( this->input_buffer, BUFFER_SIZE );
-            this->zstrm.avail_in = this->ifs.tellg() - pos;
+            pos = this->ifs->tellg();
+            this->ifs->read( (char *)this->input_buffer, BUFFER_SIZE );
+            
+
+            // this->zstrm.avail_in = this->ifs.tellg() - pos; // Pre-VS2008
+
+            int current_pos = this->ifs->tellg() ;
+            this->zstrm.avail_in = current_pos - pos;
+
+
         }   
         status = inflate( &this->zstrm, Z_SYNC_FLUSH );
         if (status!=Z_OK )
@@ -227,7 +238,7 @@ int InflateStream::fail()
  *   none
  *           
  ******/     
-DeflateStream::DeflateStream(ofstream &ofs)
+DeflateStream::DeflateStream(std::ofstream *ofs)
 {
     int status;
     this->errornum=0;
@@ -284,7 +295,7 @@ void DeflateStream::write(char *data, int size)
     this->zstrm.avail_in = size;
     while (this->zstrm.avail_in != 0 || flush==Z_FINISH) {
         if ( this->zstrm.avail_out == 0 ) {
-            this->ofs.write( this->output_buffer, BUFFER_SIZE );
+            this->ofs->write( (char *)this->output_buffer, BUFFER_SIZE );
             this->zstrm.next_out=this->output_buffer;
             this->zstrm.avail_out=BUFFER_SIZE;
         }   
@@ -293,7 +304,7 @@ void DeflateStream::write(char *data, int size)
             break;
     }    
     if (status==Z_STREAM_END) {
-        this->ofs.write( this->output_buffer,
+        this->ofs->write( (char *)this->output_buffer,
                          BUFFER_SIZE - this->zstrm.avail_out ); // does this work with 0?
     } else if (status!=Z_OK) {
         this->errornum=1;

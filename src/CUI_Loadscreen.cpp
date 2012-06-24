@@ -38,36 +38,69 @@
  *
  ******/
 #include "zt.h"
+#include "FileList.h"
+#include "CUI_FileLists_Common.hpp"
 
 char load_filename[256];
 char szSearch[256];
 
 extern int is_loading;
 
-void do_nothing(void) {
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void do_nothing(void) 
+{
 
 }
 
-void do_load(void) {
-    popup_window(UIP_LoadMsg);
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void do_load(void) 
+{
+//  <Manu> Si la cancion esta sonando la paramos --
+  if(ztPlayer->playing) {
+    
+    ztPlayer->stop() ;
+    MidiOut->panic();
+  }
+// ------------------------------------------------
+  popup_window(UIP_LoadMsg) ;
 }
 
-void filelist_onEnter(UserInterfaceElement *b) {
-    if(ztPlayer->playing)
-    {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void filelist_onEnter(UserInterfaceElement *b)
+{
+//  <Manu> Desactivamos el requester de si estas loco, al cargar 
+//         la cancion se comprueba si se esta playeando y la parara
+  
+/*  if(ztPlayer->playing) {
         UIP_RUSure->str = " You crazy?";
         popup_window(UIP_RUSure);
         return;
     }
-    UIP_RUSure->str = " Load file?";
-    UIP_RUSure->OnYes = (VFunc)do_load;
-    FileList *f = (FileList *)b;
-    strcpy(load_filename,f->getCurrentItem());
-    if (file_changed)
-        popup_window(UIP_RUSure);
-    else
-        popup_window(UIP_LoadMsg);
+*/
+  UIP_RUSure->str = " Load file?";
+  UIP_RUSure->OnYes = (VFunc)do_load;
+  FileList *f = (FileList *)b;
+  strcpy(load_filename,f->getCurrentItem());
+  
+  if (file_changed) popup_window(UIP_RUSure);
+  else popup_window(UIP_LoadMsg);
 }
+
+
+
+
 /*
 void BTNCLK_Toggle(UserInterfaceElement *b) {
     Button *btn;
@@ -81,126 +114,191 @@ void BTNCLK_Toggle(UserInterfaceElement *b) {
     need_refresh++;     
 }
 */
-CUI_Loadscreen::CUI_Loadscreen(void) {
-    FileList *fl;
-    DirList *dl;
-//  TextInput *ti;
-    DriveList *dr;
 
-//  Button *b;  
+// ------------------------------------------------------------------------------------------------
+//
+//
+CUI_Loadscreen::CUI_Loadscreen(void)
+{
+  FileList *fl;
+  DirList *dl;
+  DriveList *dr;
 
-    UI = new UserInterface;
-
-    fl = new FileList;
-    UI->add_element(fl,0);
-    fl->x = 2;
-    fl->y = 13;
-    fl->xsize = 30;
-    fl->ysize = 30;
-//  fl->str = &load_filename[0]; 
-    fl->OnChange();
-    fl->onEnter = (ActFunc)filelist_onEnter;
-//    strcpy(fl->filepattern,"*.zt");
-
-    dl = new DirList;
-    UI->add_element(dl,1);
-    dl->x = 34;
-    dl->y = 13;
-    dl->xsize = 20;
-    dl->ysize = 19;
-
-    dr = new DriveList;
-    UI->add_element(dr,2);
-    dr->x = 56;
-    dr->y = 13;
-    dr->xsize=20;
-    dr->ysize=19;
-    
+  //  TextInput *ti;
+  //  Button *b;  
 
 
+  UI = new UserInterface;
 
-//  b->OnClick = (ActFunc)BTNCLK_ToggleNoteRetrig;
-    
+  fl = new FileList ;
+  UI->add_element(fl,0) ;
 
-/*
-    ti = new TextInput;
-    UI->add_element(ti,3);
-    ti->x = 2;
-    ti->y = 45;
-    ti->ysize = 1; ti->xsize=30; ti->length=30; //ti->xsize = 50; ti->length=50;
-//  ti->str = (unsigned char *)&load_filename[0];
-    ti->str = (unsigned char *)&szSearch[0];
-*/
-    clear = 1;
+  fl->x     = FILE_LIST_POS_X ;
+  fl->y     = FILE_LIST_POS_Y ;
+
+  fl->xsize = FILE_LIST_SIZE_X ;
+  fl->ysize = LOAD_FILE_LIST_SIZE_Y ;
+
+  //fl->str = &load_filename[0]; 
+  fl->OnChange();
+  fl->onEnter = (ActFunc)filelist_onEnter;
+  //    strcpy(fl->filepattern,"*.zt");
+
+  dl = new DirList;
+  UI->add_element(dl,1);
+
+  dl->x     = DIRECTORY_LIST_POS_X ;
+  dl->y     = DIRECTORY_LIST_POS_Y ;
+  
+  dl->xsize = DIRECTORY_LIST_SIZE_X ;
+  dl->ysize = DIRECTORY_LIST_SIZE_Y ;
+
+  dr = new DriveList;
+  UI->add_element(dr,2);
+
+  dr->x     = DRIVE_LIST_POS_X ;
+  dr->y     = DRIVE_LIST_POS_Y;
+  
+  dr->xsize = DRIVE_LIST_SIZE_X ;
+  dr->ysize = DRIVE_LIST_SIZE_Y ;
+
+
+
+
+  //  b->OnClick = (ActFunc)BTNCLK_ToggleNoteRetrig;
+
+
+  /*
+  ti = new TextInput;
+  UI->add_element(ti,3);
+  ti->x = 2;
+  ti->y = 45;
+  ti->ysize = 1; ti->xsize=30; ti->length=30; //ti->xsize = 50; ti->length=50;
+  //  ti->str = (unsigned char *)&load_filename[0];
+  ti->str = (unsigned char *)&szSearch[0];
+  */
+  clear = 1;
 }
 
-CUI_Loadscreen::~CUI_Loadscreen(void) {
-    if (UI) delete UI; UI = NULL;
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+CUI_Loadscreen::~CUI_Loadscreen(void) 
+{
+  if (UI) {
+    
+    delete UI; 
+    UI = NULL;
+  }
 }
 
-void CUI_Loadscreen::enter(void) {
-    need_refresh = 1;
-    is_loading = 0;
-    cur_state = STATE_LOAD;
-    FileList *fl;
-    DirList *dl;
-    fl = (FileList *)UI->get_element(0);
-    dl = (DirList *)UI->get_element(1);
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CUI_Loadscreen::enter(void) 
+{
+  need_refresh = 1;
+  is_loading = 0;
+  cur_state = STATE_LOAD;
+  FileList *fl;
+  DirList *dl;
+  fl = (FileList *)UI->get_element(0);
+  dl = (DirList *)UI->get_element(1);
+  dl->OnChange();
+  fl->OnChange();
+  if (song->filename[0] && song->filename[0]!=' ') strcpy(load_filename, (const char *)song->filename);
+//    fl->set_cursor(load_filename);
+  fl->setCursor(fl->findItem(load_filename));
+}
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CUI_Loadscreen::leave(void) 
+{
+
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CUI_Loadscreen::update() 
+{
+  FileList *fl ;
+  DirList *dl ;
+  DriveList *dr ;
+  int key ;
+  
+  key=0;
+  
+  UI->update();
+  
+  fl = (FileList *)UI->get_element(0);
+  dl = (DirList *)UI->get_element(1);
+  dr = (DriveList *)UI->get_element(2);
+  
+  if (dl->updated || dr->updated) {
+
     dl->OnChange();
     fl->OnChange();
-    if (song->filename[0] && song->filename[0]!=' ')
-        strcpy(load_filename, (const char *)song->filename);
-//    fl->set_cursor(load_filename);
-    fl->setCursor(fl->findItem(load_filename));
+  }
+  
+  if (Keys.size()) {
+
+    key = Keys.getkey();
+
+    switch(key) 
+    {
+    case DIK_RETURN:
+      need_refresh++;
+      break;
+
+    default:
+    
+      break ;
+    } ;
+  }
 }
 
-void CUI_Loadscreen::leave(void) {
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CUI_Loadscreen::draw(Drawable *S) 
+{
+  if (clear) {
+
+    if (S->lock() == 0) {
+
+      S->fillRect(col(1),row(12),RESOLUTION_X,424,COLORS.Background);
+      S->unlock();
+      clear=0;
+    }
+  }
+
+  S->copy(CurrentSkin->bmLoad, LOADORSAVE_IMAGE_X, LOADORSAVE_IMAGE_Y);
+
+  if (S->lock()==0) {
+
+    UI->draw(S); 
+
+    if (!is_loading) draw_status(S);
+
+    printtitle(11,"File Load",COLORS.Text,COLORS.Background,S) ;
+    need_refresh = 0; updated=2;
+    S->unlock();
+  }
 }
 
-void CUI_Loadscreen::update() {
-    FileList *fl;
-    DirList *dl;
-    DriveList *dr;
-    int key=0;
 
-    UI->update();
-
-    fl = (FileList *)UI->get_element(0);
-    dl = (DirList *)UI->get_element(1);
-    dr = (DriveList *)UI->get_element(2);
-
-    if (dl->updated || dr->updated) {
-        dl->OnChange();
-        fl->OnChange();
-    }
-
-    if (Keys.size()) {
-        key = Keys.getkey();
-        switch(key) {
-            case DIK_RETURN:
-                need_refresh++;
-                break;
-        }
-    }
-}
-
-void CUI_Loadscreen::draw(Drawable *S) {
-    if (clear) {
-        if (S->lock() == 0) {
-            S->fillRect(col(1),row(12),CONSOLE_WIDTH,424,COLORS.Background);
-            S->unlock();
-            clear=0;
-        }
-    }
-    S->copy(CurrentSkin->bmLoad, 275, 267);
-    if (S->lock()==0) {
-        UI->draw(S); 
-        if (!is_loading)
-            draw_status(S);
-        printtitle(11,"File Load",COLORS.Text,COLORS.Background,S);
-        need_refresh = 0; updated=2;
-        S->unlock();
-    }
-}
 /* eof */

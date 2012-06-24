@@ -39,7 +39,8 @@
 #ifndef _ZLIB_WRAPPER_H
 #define _ZLIB_WRAPPER_H
 #include "zt.h"
-#include <fstream.h>
+#include <fstream>
+
 
 /* these must be present to get the win32 dll linkage working */
 #define ZLIB_DLL
@@ -47,33 +48,37 @@
 #define _WINDOWS
 #endif
 #include <zlib.h>
+#include <fstream>
 
 /* buffer size */
 #define BUFFER_SIZE 1024
 
-class InflateStream {
+
+class InflateStream
+{
     public:
-        InflateStream(ifstream &ifs);
+      InflateStream(std::ifstream *ifs);
         ~InflateStream();
         void read(char *data, int size);
         int eof(void);
         int fail(void);
     private:
-        ifstream ifs;
+        std::ifstream *ifs;
         int errornum;
         int eofflag;
         z_stream zstrm;
         unsigned char input_buffer[BUFFER_SIZE];
 };
 
-class DeflateStream {
+class DeflateStream
+{
     public:
-        DeflateStream(ofstream &ofs);
+        DeflateStream(std::ofstream *ofs);
         ~DeflateStream();
         void write(char *data, int size);
         int fail(void);
     private:
-        ofstream ofs;
+        std::ofstream *ofs;
         int errornum;
         z_stream zstrm;
         unsigned char output_buffer[BUFFER_SIZE];

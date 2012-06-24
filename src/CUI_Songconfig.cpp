@@ -1,5 +1,6 @@
 
 #include "zt.h"
+#include "OrderEditor.h"
 
 CUI_Songconfig::CUI_Songconfig(void) {
     ValueSlider *vs;
@@ -104,7 +105,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         UI->add_element(oe,5);
         oe->x = 59;
         oe->y = 15;
-        oe->ysize = 32 + ((CONSOLE_HEIGHT-480)/8);
+        oe->ysize = 32 + ((RESOLUTION_Y-480)/8);
         oe->xsize = 9;
 
 
@@ -125,10 +126,10 @@ void CUI_Songconfig::enter(void) {
 
     vs->force_f=1; vs->force_v = song->tpb;
 
-    if(!zt_globals.highlight_increment)
-        zt_globals.highlight_increment = song->tpb;
-    if(!zt_globals.lowlight_increment)
-        zt_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
+    if(!zt_config_globals.highlight_increment)
+        zt_config_globals.highlight_increment = song->tpb;
+    if(!zt_config_globals.lowlight_increment)
+        zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
     
     cur_state = STATE_SONG_CONFIG;
     Keys.flush();
@@ -154,10 +155,10 @@ void CUI_Songconfig::update() {
         song->bpm = vs->value; 
         ztPlayer->set_speed();
 
-        if(!zt_globals.highlight_increment)
-            zt_globals.highlight_increment = song->tpb;
-        if(!zt_globals.lowlight_increment)
-            zt_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
+        if(!zt_config_globals.highlight_increment)
+            zt_config_globals.highlight_increment = song->tpb;
+        if(!zt_config_globals.lowlight_increment)
+            zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
        
         file_changed++;
     }
@@ -167,10 +168,10 @@ void CUI_Songconfig::update() {
         ztPlayer->set_speed();
         vs->force_f=1; vs->force_v = song->tpb;
 
-        if(!zt_globals.highlight_increment)
-            zt_globals.highlight_increment = song->tpb;
-        if(!zt_globals.lowlight_increment)
-            zt_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
+        if(!zt_config_globals.highlight_increment)
+            zt_config_globals.highlight_increment = song->tpb;
+        if(!zt_config_globals.lowlight_increment)
+            zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
         
         file_changed++;
     }

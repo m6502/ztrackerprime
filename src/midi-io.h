@@ -8,7 +8,7 @@
 
 #define MIDI_MSG( cmd, chan, data1, data2) ( (cmd+chan) + (data1<<8) + (data2<<16)) 
 
-extern int midi_in_clocks_recieved;
+extern int g_midi_in_clocks_received;
 
 class miq {
     public:

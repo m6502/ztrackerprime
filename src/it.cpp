@@ -189,7 +189,9 @@ bool ITHeader::SaveOffsets(FILE* outfile, long offset) {
 
 
     
-void ITHeader::Print(void) {
+void ITHeader::Print(void) 
+{
+  int i ;
 
     printf("header ID: %s\n", headerID);
     printf("songName: %s\n", songName);
@@ -211,36 +213,40 @@ void ITHeader::Print(void) {
     printf("\n");
 
     printf("channelPan: ");
-    for (int i = 0; i < 64; i++)
     
-    printf("%d ", channelPan[i]);
+    for (i = 0; i < 64; i++) printf("%d ", channelPan[i]);
+    
     printf("\n\n");
 
     printf("channelVolume: ");
-    for (i = 0; i < 64; i++)
-        printf("%d ", channelVolume[i]);
+    
+    for (i = 0; i < 64; i++) printf("%d ", channelVolume[i]);
+    
     printf("\n\n");
 
     printf("orders: ");
-    for (i = 0; i < numOrders; i++)
-            printf("%d ", orders[i]);
+    
+    for (i = 0; i < numOrders; i++) printf("%d ", orders[i]);
+    
     printf("\n\n");
 
     printf("instrumentOffset: ");
-    for (i = 0; i < numIns; i++)
-        printf("%d ", instrumentOffset[i]);
+    
+    for (i = 0; i < numIns; i++) printf("%d ", instrumentOffset[i]);
+    
     printf("\n\n");
 
     printf("sampleOffset: ");
-    for (i = 0; i < numSamples; i++)
-        printf("%d ", sampleOffset[i]);
+    
+    for (i = 0; i < numSamples; i++) printf("%d ", sampleOffset[i]);
+    
     printf("\n\n");
 
     printf("patternOffset: ");
-    for (i = 0; i < numPatterns; i++)
-        printf("%d ", patternOffset[i]);
+    
+    for (i = 0; i < numPatterns; i++) printf("%d ", patternOffset[i]);
+    
     printf("\n\n");
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

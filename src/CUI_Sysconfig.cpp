@@ -1,4 +1,5 @@
 #include "zt.h"
+#include "Button.h"
 
 MidiOutDeviceOpener *midioutdevlist;
 MidiInDeviceOpener *midiindevlist;
@@ -51,7 +52,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs->y = 14;
         vs->xsize = 15+1;
         vs->ysize = 1;
-        vs->value = zt_globals.prebuffer_rows;
+        vs->value = zt_config_globals.prebuffer_rows;
         vs->min = 1;
         vs->max = 32;
 
@@ -60,7 +61,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->x = 4 + 15;
         cb->y = 16;
         cb->xsize = 5;
-        cb->value = &zt_globals.auto_send_panic;
+        cb->value = &zt_config_globals.auto_send_panic;
         cb->frame = 1;
 
         cb = new CheckBox;
@@ -68,7 +69,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->x = 4 + 15;
         cb->y = 18;
         cb->xsize = 5;
-        cb->value = &zt_globals.midi_in_sync;
+        cb->value = &zt_config_globals.midi_in_sync;
         cb->frame = 1;
 
         cb = new CheckBox;
@@ -76,7 +77,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->x = 4 + 15;
         cb->y = 20;
         cb->xsize = 5;
-        cb->value = &zt_globals.auto_open_midi;
+        cb->value = &zt_config_globals.auto_open_midi;
         cb->frame = 1;
     
         cb = new CheckBox;
@@ -85,7 +86,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->x = 4+15;
         cb->y = 22;
         cb->xsize = 5;
-        cb->value = &zt_globals.full_screen;
+        cb->value = &zt_config_globals.full_screen;
         cb->frame = 1;
 
         vs = new ValueSlider;
@@ -94,7 +95,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs->y = 24;
         vs->xsize = 15+4;
         vs->ysize = 1;
-        vs->value = zt_globals.key_repeat_time;
+        vs->value = zt_config_globals.key_repeat_time;
         vs->min = 1;
         vs->max = 32;
 
@@ -104,7 +105,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs->y = 26;
         vs->xsize = 15+4;
         vs->ysize = 1;
-        vs->value = zt_globals.key_wait_time;
+        vs->value = zt_config_globals.key_wait_time;
         vs->min = 1;
         vs->max = 1000;
 
@@ -224,9 +225,9 @@ void CUI_Sysconfig::update() {
     vs = (ValueSlider *)UI->get_element(0);
     cb = (CheckBox*)UI->get_element(4);
     if (vs->changed) {
-        zt_globals.prebuffer_rows = vs->value;
-        ztPlayer->prebuffer = (96/song->tpb) * zt_globals.prebuffer_rows; // 96ppqn, so look ahead is 1 beat
-        sprintf(val,"%d",zt_globals.prebuffer_rows);
+        zt_config_globals.prebuffer_rows = vs->value;
+        ztPlayer->prebuffer = (96/song->tpb) * zt_config_globals.prebuffer_rows; // 96ppqn, so look ahead is 1 beat
+        sprintf(val,"%d",zt_config_globals.prebuffer_rows);
 //        Config.set("prebuffer_rows",&val[0],0);
     }
     int i = 0;

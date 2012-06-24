@@ -1,4 +1,7 @@
 #include "zt.h"
+#include "OrderEditor.h"
+
+
 
 CUI_Ordereditor::CUI_Ordereditor(void) {
     OrderEditor *oe;

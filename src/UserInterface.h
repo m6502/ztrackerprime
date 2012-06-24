@@ -3,6 +3,7 @@
 
 #include "zt.h"
 
+
 void midi_sel(int dev);
 
 class UserInterfaceElement {
@@ -77,56 +78,6 @@ class CheckBox : public UserInterfaceElement {
 };
 
 
-class ValueSlider : public UserInterfaceElement {
-    public:
-        int min;
-        int max;
-        int value;
-        int force_f;
-        int force_v;
-        int changed;
-        int clear;
-        int newclick;
-        int focus;  // new value here
-        ValueSlider();
-        ValueSlider(int fset); // new constructor
-        ~ValueSlider();
-        int mouseupdate(int cur_element);
-        virtual int update();
-        void draw(Drawable *S, int active);
-};
- 
-
-class ValueSliderDL : public UserInterfaceElement {
-    public:
-        int min;
-        int max;
-        int value;
-        int changed;
-        int newclick;
-        int focus;  // new value here
-        ValueSliderDL();
-        ValueSliderDL(int fset); // new constructor
-        ~ValueSliderDL();
-        int mouseupdate(int cur_element);
-        int update();
-        void draw(Drawable *S, int active);
-};
-class ValueSliderOFF : public UserInterfaceElement {
-    public:
-        int min;
-        int max;
-        signed int value;
-        int changed;
-        int newclick;
-        int focus;  // new value here
-        ValueSliderOFF();
-        ValueSliderOFF(int fset); // new constructor
-        ~ValueSliderOFF();
-        int mouseupdate(int cur_element);
-        int update();
-        void draw(Drawable *S, int active);
-};
 class TextInput : public UserInterfaceElement {
     public:
         int cursor;
@@ -138,57 +89,13 @@ class TextInput : public UserInterfaceElement {
         void draw(Drawable *S, int active);
 };
 
-class InstEditor : public UserInterfaceElement {
-    public:
-        Frame *frm;
-        int cursor,text_cursor;
-        int list_start;
-//      int length;
-        unsigned char *str;
-        InstEditor();
-        ~InstEditor();
 
-        void strc(char *dst, char *src);
-        int update();
-        void draw(Drawable *S, int active);
-        int mouseupdate(int cur_element);
-};
-
-class OrderEditor : public UserInterfaceElement {
-    public:
-        Frame *frm;
-        int cursor_y,cursor_x;
-        int list_start;
-        int old_playing_ord;
-
-        OrderEditor();
-        ~OrderEditor();
-        int mouseupdate(int cur_element);
-        int update();
-        void draw(Drawable *S, int active);
-};
 
 #define LSFILE_NONE 0
 #define LSFILE_ZT 1
 #define LSFILE_IT 2
 
 
-class Button : public UserInterfaceElement {
-    public:
-        char *caption;
-        int state;
-        int updown;
-        ActFunc OnClick;
-
-        Button();
-        ~Button();
-
-        int update();
-        void draw(Drawable *S, int active);
-        void setOnClick(ActFunc func);
-        int mouseupdate(int cur_element);
-
-};
 
 class GfxButton : public UserInterfaceElement {
     public:
@@ -240,34 +147,6 @@ class VUPlay : public UserInterfaceElement {
 
 };
 
-class PatternDisplay : public UserInterfaceElement {
-
-    public:
-
-        Frame *frm;
-        int disp_row;
-        int cur_pat_view;
-        int starttrack;
-        int tracks,tracksize;
-        int clear;
-
-        int cur_track;
-
-
-        PatternDisplay();
-        ~PatternDisplay();
-
-        int update();
-        void draw(Drawable *S, int active);
-
-        int next_order(void);
-        void disp_playing_row(int x,int y, int pattern, int row, Drawable *S, TColor bg);
-        void update_frame(void);
-        void disp_playing_pattern(Drawable *S);
-        char* printNote(char *str, event *r);
-        void disp_track_headers(Drawable *S);
-
-};
 
 class BarGraph : public UserInterfaceElement {
 
@@ -448,54 +327,6 @@ class MidiInDeviceOpener : public ListBox {
 
 };
 
-class DriveList : public ListBox {
-    public:
-
-        int updated;
-        
-        DriveList();
-        ~DriveList();
-        virtual void draw(Drawable *S, int active);
-        virtual void OnChange();
-        virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
-        virtual void enter(void);
-
-};
-
-
-class DirList : public ListBox {
-    public:
-
-        int updated;
-        
-        DirList();
-        ~DirList();
-        virtual int update();
-        virtual void draw(Drawable *S, int active);
-        virtual void OnChange();
-        virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
-        virtual void enter(void);
-
-};
-
-class FileList: public ListBox {
-    public:
-
-        int updated;
-        ActFunc onEnter;
-        
-        FileList();
-        ~FileList();
-        virtual int update();
-        virtual void draw(Drawable *S, int active);
-        virtual void OnChange();
-        virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
-        virtual void enter(void);
-        void AddFiles(char *pattern, TColor c);
-};
 void dev_sel(int dev, MidiOutDeviceSelector *mds );
 
 
@@ -518,6 +349,13 @@ class MidiOutDeviceOpener : public ListBox {
         virtual int update(void);
 
 };
+
+
+
+#include "Sliders.h"  // <Manu> Un poco feo poner esto aqui, pero asi puedo ir separando en modulos esto
+
+
+
 
 class LatencyValueSlider : public ValueSlider {
     public:

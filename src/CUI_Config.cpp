@@ -3,7 +3,7 @@
 void BTNCLK_SaveSettings(UserInterfaceElement *b) {
 
     //Config.save("zt.conf");
-    zt_globals.save();
+    zt_config_globals.save();
     need_refresh++; 
 }
 
@@ -31,7 +31,7 @@ CUI_Config::CUI_Config(void) {
     cb->x = 17;
     cb->y = 14;
     cb->xsize = 5;
-    cb->value = &zt_globals.full_screen;
+    cb->value = &zt_config_globals.full_screen;
     cb->frame = 1;
 
     vs = new ValueSlider;
@@ -40,7 +40,7 @@ CUI_Config::CUI_Config(void) {
     vs->y = 16;
     vs->xsize = 15;
     vs->ysize = 1;
-    vs->value = zt_globals.key_repeat_time;
+    vs->value = zt_config_globals.key_repeat_time;
     vs->min = 1;
     vs->max = 32;
 
@@ -50,7 +50,7 @@ CUI_Config::CUI_Config(void) {
     vs->y = 18;
     vs->xsize = 15;
     vs->ysize = 1;
-    vs->value = zt_globals.key_wait_time;
+    vs->value = zt_config_globals.key_wait_time;
     vs->min = 1;
     vs->max = 1000;
 
@@ -68,7 +68,7 @@ CUI_Config::CUI_Config(void) {
     cb->x = 17;
     cb->y = 16;
     cb->xsize = 5;
-    cb->value = &zt_globals.do_fade;
+    cb->value = &zt_config_globals.do_fade;
 */
 
 /*
@@ -80,7 +80,7 @@ CUI_Config::CUI_Config(void) {
     ti->y = 20;
     ti->xsize=50;
     ti->length=50;
-    ti->str = (unsigned char*)zt_globals.skin;
+    ti->str = (unsigned char*)zt_config_globals.skin;
     ti = new TextInput;
     UI->add_element(ti,4);
     ti->frame = 1;
@@ -98,7 +98,7 @@ CUI_Config::CUI_Config(void) {
     ti->y = 26;
     ti->xsize=50;
     ti->length=50;
-    ti->str = (unsigned char*)zt_globals.work_directory;
+    ti->str = (unsigned char*)zt_config_globals.work_directory;
     b = new Button;
     UI->add_element(b,7);
     b->caption = " Save instance";
@@ -152,11 +152,11 @@ void CUI_Config::draw(Drawable *S) {
             free(tb->text);
             tb->text = NULL;
         }
-        sprintf(buf+strlen(buf),"\n|U|    Full Screen |L|[|H|%s|L|]",zt_globals.full_screen?"On":"Off");
-//        sprintf(buf+strlen(buf),"\n|U|    Fade In/Out |L|[|H|%s|L|]",zt_globals.do_fade?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI |L|[|H|%s|L|]",zt_globals.auto_open_midi?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U|    Full Screen |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
+//        sprintf(buf+strlen(buf),"\n|U|    Fade In/Out |L|[|H|%s|L|]",zt_config_globals.do_fade?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
 
-        tb->text = strdup(buf);
+        tb->text = _strdup(buf);
         UI->draw(S);
         draw_status(S);
         status(S);

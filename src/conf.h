@@ -4,6 +4,10 @@
 #include "list.h"
 
 
+#define DEFAULT_RESOLUTION_X       1360
+#define DEFAULT_RESOLUTION_Y       710
+
+
 //  New class ZTConf puts all global variables in one place
 //  with convenient high level functions to handle I/O
 
@@ -64,7 +68,7 @@ class ZTConf {
         int default_bpm;
         int prebuffer_rows;
         int step_editing;
-	int centered_editing;
+        int centered_editing;
         int screen_width;
         int screen_height;
         int control_navigation_amount;

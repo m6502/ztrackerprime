@@ -11,15 +11,15 @@ CUI_Help::CUI_Help(void) {
     UI->add_element(tb, 0);
     tb->x = 1;
     tb->y = 14;
-    tb->xsize = 78 + ((CONSOLE_WIDTH-640)/8);
-    tb->ysize = 36+ ((CONSOLE_HEIGHT-480)/8);
+    tb->xsize = 78 + ((RESOLUTION_X-640)/8);
+    tb->ysize = 36+ ((RESOLUTION_Y-480)/8);
     //tb->text = "This is a test of the textbox reader\n\nit is supposed to work";
 
     FILE *fp;
     int fs=0;
     char *help_file;
-    help_file = (char*)malloc(strlen(zt_directory) + strlen("\\help.txt") + 1);
-    sprintf(help_file,"%s\\help.txt",zt_directory);
+    help_file = (char*)malloc(strlen(zt_directory) + strlen("/doc/help.txt") + 1);
+    sprintf(help_file,"%s/doc/help.txt",zt_directory);
     if (fp = fopen(help_file,"rt")) {
         while(!feof(fp)) {
             fgetc(fp);
@@ -33,7 +33,7 @@ CUI_Help::CUI_Help(void) {
         needfree = 1;
     } else {
         needfree = 0;
-        tb->text = "\n\n  i couldnt find help.txt.  no help for you :[";
+        tb->text = "\n\n  i couldnt find doc/help.txt.  no help for you :[";
     }
     free(help_file);
 }

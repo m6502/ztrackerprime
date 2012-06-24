@@ -16,10 +16,10 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "fxml.h"
 #include <string>
 #include <fstream>
-#include <iostream.h>
+#include <iostream>
+#include "fxml.h"
 
 
 ///////////////////////////////////////////////////////
@@ -387,7 +387,9 @@ int FXMLParser::ReadFile(const char *cFilename, std::string &Str)
 
   if (strlen(cFilename) > 256) return -1;
 
-  std::ifstream File(cFilename, ios::in | ios::nocreate);
+  //std::ifstream File(cFilename, std::ios::in | std::ios::nocreate); // Pre-VS2008
+  std::ifstream File(cFilename, std::ios::in); //<VS2008>
+
   //open the file
   if(File)
   {

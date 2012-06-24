@@ -78,7 +78,7 @@ Skin *CurrentSkin = NULL;
 
 bool bScrollLock;
 
-ZTConf zt_globals;
+ZTConf zt_config_globals;
 char* zt_directory;
 int postAction ();
 int preAction ();
@@ -94,7 +94,11 @@ int light_pos = 0, need_update_lights = 0;
 
 player *ztPlayer;
 
-UserInterface *UI = NULL, *InstEditorUI = NULL;
+UserInterface *UI = NULL ;
+UserInterface *InstEditorUI = NULL;
+
+
+
 /*
 ResourceStream *Skin = NULL;
 BitmapCache *BM_Cache = NULL;
@@ -145,8 +149,8 @@ int cur_inst = 0;
 
 char *col_desc[41];
 
-int base_octave = 4;
-int cur_step = 1;
+int base_octave = BASE_OCTAVE_DEFAULT ;
+int cur_step = DEFAULT_CURSOR_STEP ;
 
 int keypress=0;
 int keywait = 0;
@@ -241,7 +245,13 @@ CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 
-int check_ext(const char *str, const char *ext) {
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int check_ext(const char *str, const char *ext) 
+{
     int i,j,k=0;
     i=strlen(str); j=strlen(ext);
     i-=j;
@@ -257,12 +267,26 @@ int check_ext(const char *str, const char *ext) {
         return 0;
 }
 
-void reset_editor(void) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void reset_editor(void) 
+{
     cur_edit_col = cur_edit_column = cur_edit_row = cur_edit_pattern = 0;
     cur_edit_row_disp = cur_edit_pattern = cur_edit_track = cur_edit_track_disp = 0;
 }
 
-int lock_mutex(HANDLE hMutex, int timeout) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int lock_mutex(HANDLE hMutex, int timeout) 
+{
     int result;
     result = WaitForSingleObject(hMutex, timeout);
     if (result == WAIT_OBJECT_0)
@@ -270,19 +294,38 @@ int lock_mutex(HANDLE hMutex, int timeout) {
     return 0;
 }
 
-int unlock_mutex(HANDLE hMutex) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int unlock_mutex(HANDLE hMutex) 
+{
     return ReleaseMutex(hMutex);
 }
 
 
-void popup_window(CUI_Page *page) {
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void popup_window(CUI_Page *page) 
+{
     if (page->UI)
         page->UI->full_refresh();
     window_stack.push(page);
     screenmanager.UpdateAll();
     modal++;
 }
-void close_popup_window(void) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void close_popup_window(void) 
+{
     if (!window_stack.isempty()) {
         window_stack.pop();
         clear_popup = 1;
@@ -294,7 +337,14 @@ void close_popup_window(void) {
     doredraw++;
     need_refresh++;
 }
-void switch_page(CUI_Page *page) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void switch_page(CUI_Page *page) 
+{
     LastPage = ActivePage;
     if (LastPage)
         LastPage->leave();
@@ -306,7 +356,14 @@ void switch_page(CUI_Page *page) {
     need_refresh++;
 }
 
-int zcmp(char *s1, char *s2) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int zcmp(char *s1, char *s2) 
+{
     int i=0;
     if (!s1 || !s2) return 0;
     while (s1[i]!=0 && s2[i]!=0)
@@ -317,7 +374,15 @@ int zcmp(char *s1, char *s2) {
     return -1;
 }
 
-int zcmpi(char *s1, char *s2) {
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int zcmpi(char *s1, char *s2) 
+{
     int i=0;
     if (!s1 || !s2) return 0;
     while (s1[i]!=0 && s2[i]!=0)
@@ -329,41 +394,98 @@ int zcmpi(char *s1, char *s2) {
 }
 
 
-int checkclick(int x1, int y1, int x2, int y2) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int checkclick(int x1, int y1, int x2, int y2) 
+{
     if (MousePressX>=x1 && MousePressX<=x2 &&
         MousePressY>=y1 && MousePressY<=y2
        )
        return 1;
     return 0;
 }
-int checkmousepos(int x1, int y1, int x2, int y2) {
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int checkmousepos(int x1, int y1, int x2, int y2) 
+{
     if (LastX>=x1 && LastX<=x2 &&
         LastY>=y1 && LastY<=y2
        )
        return 1;
     return 0;
 }
-Bitmap *load_cached_bitmap(char *name) {
-    return NULL;
-}
-Bitmap *load_bitmap(char *name) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+Bitmap *load_cached_bitmap(char *name) 
+{
     return NULL;
 }
 
-WStackNode::WStackNode(CUI_Page *p) {
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+Bitmap *load_bitmap(char *name) 
+{
+    return NULL;
+}
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+WStackNode::WStackNode(CUI_Page *p) 
+{
     page = p;
     p->enter();
     next = NULL;
 }
 
-WStackNode::~WStackNode() {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+WStackNode::~WStackNode() 
+{
     page->leave();
 }
 
-WStack::WStack() {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+WStack::WStack() 
+{
     head = NULL;
 }
-WStack::~WStack() {
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+WStack::~WStack() 
+{
     WStackNode *t;
     if (!UI) return; // UI Gets deteled before UIP_*, so safe to check for that 
     while(head) {
@@ -373,11 +495,25 @@ WStack::~WStack() {
     }
 }
 
-bool WStack::isempty(void) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+bool WStack::isempty(void) 
+{
     return (head == NULL);
 }
 
-void WStack::push(CUI_Page *p) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void WStack::push(CUI_Page *p) 
+{
     WStackNode *t = new WStackNode(p);
     if (head) {
         WStackNode *p=head;
@@ -387,7 +523,14 @@ void WStack::push(CUI_Page *p) {
         head = t;
     }
 }
-CUI_Page *WStack::pop(void) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+CUI_Page *WStack::pop(void) 
+{
     WStackNode *p = head;
     CUI_Page *c = NULL;
     if (head) {
@@ -404,7 +547,17 @@ CUI_Page *WStack::pop(void) {
     }
     return c;
 }
-void WStack::update(void) {
+
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void WStack::update(void) 
+{
     WStackNode *p = head;
     if (head) {
         if (!p->next) {
@@ -416,7 +569,14 @@ void WStack::update(void) {
     }
 }
 
-void WStack::draw(Drawable *S) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void WStack::draw(Drawable *S) 
+{
     if (!head) return;
     WStackNode *p = head;
     while(p) {
@@ -425,20 +585,45 @@ void WStack::draw(Drawable *S) {
     }
 }
 
+
+
+
+
 /* Clipboard */
 
-CClipboard::CClipboard() {
+// ------------------------------------------------------------------------------------------------
+//
+//
+CClipboard::CClipboard() 
+{
     int i;
     for (i=0;i<MAX_TRACKS;i++) {
         this->event_list[i] = NULL;
     }
     tracks = rows = full = 0;
 }
-CClipboard::~CClipboard() {
+
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+CClipboard::~CClipboard() 
+{
     this->clear();
 }
 
-void CClipboard::copy(void) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CClipboard::copy(void) 
+{
     int i;
     event *h,*t;
     this->clear();
@@ -475,7 +660,17 @@ void CClipboard::copy(void) {
     }
 }
 
-void CClipboard::paste(int start_track, int start_row, int mode) {  // 0 = insert, 1 = overwrite, 2 = merge
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CClipboard::paste(int start_track, int start_row, int mode) 
+{  // 0 = insert, 1 = overwrite, 2 = merge
+
+
+
     int i,j,target_row;
     event *h;//,*t;
 
@@ -508,7 +703,14 @@ void CClipboard::paste(int start_track, int start_row, int mode) {  // 0 = inser
     }
 }
 
-void CClipboard::clear(void) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void CClipboard::clear(void) 
+{
     int i;
     event *head,*t;
     for (i=0;i<MAX_TRACKS;i++) {
@@ -522,6 +724,7 @@ void CClipboard::clear(void) {
     }
 }
 
+
 /* End Clipboard */
 
 /*
@@ -533,28 +736,54 @@ int loadconf(void) {
 }
 */
 
-char *hex2note(char *str,unsigned char note) {   /* Thanks to FSM for great ideas!! */
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+char *hex2note(char *str,unsigned char note) 
+{   /* Thanks to FSM for great ideas!! */
+
     char szLetters[] = "C-C#D-D#E-F-F#G-G#A-A#B-";  
+
     if (note<0x80) {                                
         str[0]=szLetters[2*(note%12)];              
         str[1]=szLetters[2*(note%12)+1];            
         str[2]='0'+(note/12);                       
-    } else {
+    } 
+    else {
+
         switch(note) {
+
             case 0x81:
                 str[0]=str[1]=str[2]='^'; /* Note cut */
                 break;
             case 0x82:
                 str[0]=str[1]=str[2]='='; /* Note off */
                 break;
+
             default:                      /* Unknown or blank */
                 str[0]=str[1]=str[2]='.';
+
+//                str[0]='B' ;
+//                str[1]='U' ;
+//                str[2]='G' ;
                 break;
         }
     }
     return str;
 }
-void fadeOut(float step, Screen *S) {
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void fadeOut(float step, Screen *S) 
+{
 /*
     for (float f=1;f>0;f-=step) {
         S->setGammaFade(f,f,f);
@@ -562,7 +791,14 @@ void fadeOut(float step, Screen *S) {
     }
 */
 }
-void fadeIn(float step, Screen *S) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void fadeIn(float step, Screen *S) 
+{
 /*
     for (float f=0;f<=1;f+=step) {
         S->setGammaFade(f,f,f);
@@ -570,58 +806,108 @@ void fadeIn(float step, Screen *S) {
     }
 */
 }
-void setGamma(float f, Screen *S) {
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void setGamma(float f, Screen *S) 
+{
 //    S->setGammaFade(f,f,f);
 }
 
-void status(char *msg,Drawable *S) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void status(char *msg,Drawable *S) 
+{
     printBG(col(3),row(9),"                                                                            ",COLORS.Text,COLORS.Background,S);
     printBGCC(col(3),row(9),msg,COLORS.Text,COLORS.Background,S);
     screenmanager.Update(col(3),row(9),col(80)-1,row(10));
 }
-void status(Drawable *S) {
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void status(Drawable *S) 
+{
     status(statusmsg,S);
 }
-void update_status(Drawable *S) {
-    int i,o=0;
-    char str[10];
-    if (ztPlayer->playing) {
-        if (ztPlayer->playmode) {
-            char time[64],time2[64];
-            int sec;
-            sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
-            sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
-            sec = calcSongSeconds();
-            sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
-            sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time);
-        } else
-            sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length);
-        statusmsg = szStatmsg;
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void update_status(Drawable *S) 
+{
+  int i,o=0;
+  char str[10];
+
+  if (ztPlayer->playing) {
+
+    if (ztPlayer->playmode) {
+
+      char time[64],time2[64];
+      int sec;
+      sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
+      sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
+      sec = calcSongSeconds();
+      sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
+      sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time);
+    } 
+    else {
+
+      sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length);
     }
-    if (S->lock()==0) {
-        status(S);
-        if (cur_state == STATE_PEDIT) {
-            if (cur_edit_pattern == ztPlayer->playing_cur_pattern) {
-                for(i=cur_edit_row_disp;i<(cur_edit_row_disp+PATTERN_EDIT_ROWS);i++) {
-                    sprintf(str,"%.3d",i);
-                    if (i == ztPlayer->playing_cur_row) 
-                        printBG(col(1),row(15+o),str,COLORS.Highlight,COLORS.Background,S); 
-                    else
-                        printBG(col(1),row(15+o),str,COLORS.Text,COLORS.Background,S); 
-                    o++;
-                }
-            }
+
+    statusmsg = szStatmsg;
+  }
+
+  if (S->lock() == 0) {
+
+    status(S);
+
+    if (cur_state == STATE_PEDIT) {
+
+      if (cur_edit_pattern == ztPlayer->playing_cur_pattern) {
+
+        //<Manu> Hecho así este bucle pintaba números de línea sin comprobar cuántas tenía el pattern actual
+//        for(i = cur_edit_row_disp; i < (cur_edit_row_disp + PATTERN_EDIT_ROWS); i++) {
+
+        for(i = cur_edit_row_disp; i < song->patterns[cur_edit_pattern]->length; i++) {
+
+          TColor line_number_color ;
+
+          if (i == ztPlayer->playing_cur_row) line_number_color = COLORS.Highlight ;
+          else line_number_color = COLORS.Text ;
+            
+          sprintf(str,"%.3d", i) ;
+          printBG(col(1), row(15+o), str, line_number_color, COLORS.Background, S) ;
+
+          o++;
         }
-        if (ztPlayer->playing_cur_row == 1 ) {
-            if(cur_state == STATE_ORDER)
-                need_refresh++;
-            draw_status_vars(S);
-        }
-        status_change = 0; 
-        //updated++;
-        screenmanager.UpdateWH(col(1), row(15),3*8,PATTERN_EDIT_ROWS*8);
-        S->unlock();
+      }
     }
+
+    if (ztPlayer->playing_cur_row == 1 ) {
+
+      if(cur_state == STATE_ORDER) need_refresh++;
+      draw_status_vars(S);
+    }
+
+    status_change = 0; 
+    //updated++;
+    screenmanager.UpdateWH(col(1), row(15),3*8,PATTERN_EDIT_ROWS*8);
+    S->unlock();
+  }
 }
 
 
@@ -650,8 +936,8 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
         return -1;
     }
     Skin->freeStream(is);
-    if (!S->isModeAvailable(CONSOLE_WIDTH,CONSOLE_HEIGHT)) {
-        sprintf(str,"Fatal: Screen mode (%dx%dx16) is not support by your gfx card",CONSOLE_WIDTH, CONSOLE_HEIGHT);
+    if (!S->isModeAvailable(RESOLUTION_X,RESOLUTION_Y)) {
+        sprintf(str,"Fatal: Screen mode (%dx%dx16) is not support by your gfx card",RESOLUTION_X, RESOLUTION_Y);
         MessageBox(NULL,str,"zt: error",MB_OK | MB_ICONERROR);
         return -1;
     }
@@ -688,8 +974,8 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     HICON icon=(HICON)LoadImage(GetModuleHandle(NULL),MAKEINTRESOURCE(IDI_ZTICON),IMAGE_ICON,0,0,0);
     setWindowIcon(icon);
     setWindowTitle("zt");
-    Width=CONSOLE_WIDTH;
-    Height=CONSOLE_HEIGHT;
+    Width=RESOLUTION_X;
+    Height=RESOLUTION_Y;
 
     if (zcmp(Config.get("fullscreen"),"yes")) {
         GUIMODE = 0;
@@ -736,7 +1022,13 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
 */
 
 
-void draw_status_vars(Drawable *S) {
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void draw_status_vars(Drawable *S) 
+{
     char s[64];
     sprintf(s,"%.2d",song->instruments[cur_inst]->channel+1);
     printBG(col(50),row(5),s,COLORS.Data,COLORS.Black,S); // Channel
@@ -763,8 +1055,11 @@ void draw_status_vars(Drawable *S) {
     
 }
 
-void draw_status(Drawable *S) { /* S MUST BE LOCKED! */
-    char fn[256];;
+void draw_status(Drawable *S) 
+{ /* S MUST BE LOCKED! */
+    char fn[256] ;
+    int i ;
+
 #ifdef USE_BG_IMAGE
     S->unlock();
     S->copy(BG_IMAGE,0,0);
@@ -797,7 +1092,7 @@ void draw_status(Drawable *S) { /* S MUST BE LOCKED! */
     
     printline(col(12),row(8),0x81,7,COLORS.Highlight,S);        
 
-    for (int i=3;i<=7;i++)
+    for (i=3;i<=7;i++)
         printchar(col(11),row(i),0x84,COLORS.Lowlight,S);
     for (i=5;i<=7;i++)
         printchar(col(19),row(i),0x83,COLORS.Highlight,S);
@@ -826,17 +1121,40 @@ void draw_status(Drawable *S) { /* S MUST BE LOCKED! */
 }
 
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void doquit() {
   do_exit = 1;
 }
 
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void quit() {
   UIP_RUSure->str = " Sure to quit?";
   UIP_RUSure->OnYes = (VFunc)doquit;
   popup_window(UIP_RUSure);
 }
 
-void global_keys(Drawable *S) {
+
+
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void global_keys(Drawable *S) 
+{
+  int i ;
+
     KBKey key,clear=0,kstate;
     int command = CMD_NONE,full=0;
     key = Keys.checkkey();
@@ -928,25 +1246,31 @@ void global_keys(Drawable *S) {
                         cur_edit_order = ztPlayer->cur_order;
                     }
                     else {
-                        for(int i = 0; i < 255; i++) {
+
+                        for(i = 0; i < 255; i++) {
                             if(song->orderlist[i] == cur_edit_pattern) {
                                 i = -1;
                                 break;
                             }
                         }
-                        if (i == -1)
-                        for(int i = cur_edit_order+1;; i++) {
-                            if(i == cur_edit_order)
-                                break;
-                            if(i == 255) {
-                                i = 0;
-                            }
-                            if(song->orderlist[i] == cur_edit_pattern) {
-                                cur_edit_order = i;
-                                draw_status_vars(S);
-                                break;
-                            }
-                        }
+                        
+                        if (i == -1) {
+
+                          for(i = cur_edit_order+1;; i++) {
+
+                              if(i == cur_edit_order) break;
+
+                              if(i == 255) {
+                                  i = 0;
+                              }
+
+                              if(song->orderlist[i] == cur_edit_pattern) {
+                                  cur_edit_order = i;
+                                  draw_status_vars(S);
+                                  break;
+                              }
+                          }
+                       }
                     }
                 }
                 break;
@@ -1103,19 +1427,25 @@ void global_keys(Drawable *S) {
 
 
 
-void redrawscreen(Drawable *S) {
-    char header[80];
-    sprintf(header,"ztracker v%d.%d by Christopher Micali 2000-2001",VER_MAJ,VER_MIN);
+// ------------------------------------------------------------------------------------------------
+//
+//
+void redrawscreen(Drawable *S) 
+{
+  // <Manu> header era 80 y he cambiado el texto del sprintf
+  
+  char header[180];
+    sprintf(header,"%s", ZTRACKER_VERSION) ;
     if (S->lock()==0) {
 
-        S->fillRect(0,0,CONSOLE_WIDTH-1,CONSOLE_HEIGHT-1/*410*/,COLORS.Background);
+        S->fillRect(0,0,RESOLUTION_X-1,RESOLUTION_Y-1/*410*/,COLORS.Background);
 
-//      S->fillRect(0,465,CONSOLE_WIDTH,479,COLORS.LCDLow);
+//      S->fillRect(0,465,RESOLUTION_X,479,COLORS.LCDLow);
 
-        printline(0,0,0x81,CONSOLE_WIDTH/8,COLORS.Highlight,S);      
+        printline(0,0,0x81,RESOLUTION_X/8,COLORS.Highlight,S);      
         printchar(0,0,0x80,COLORS.Highlight,S);
 
-        for(int y=0;y<CONSOLE_HEIGHT/8;y++)
+        for(int y=0;y<RESOLUTION_Y/8;y++)
             printchar(0,row(y),131,COLORS.Highlight,S);
 
         print(col(textcenter(header)),row(1),header,COLORS.Text,S);
@@ -1132,10 +1462,10 @@ void redrawscreen(Drawable *S) {
         }
         S->unlock();
     }
-    S->copy(CurrentSkin->bmToolbar, 0,CONSOLE_HEIGHT-55/*425*/,0,0,640,55);
-    int remblk = (CONSOLE_WIDTH-640)/80;
+    S->copy(CurrentSkin->bmToolbar, 0,RESOLUTION_Y-55/*425*/,0,0,640,55);
+    int remblk = (RESOLUTION_X-640)/80;
     for(int cx = 0; cx<remblk;cx++)
-        S->copy(bmToolbarRepeater, 640+(cx*80), CONSOLE_HEIGHT-55,0,0,80,55);
+        S->copy(bmToolbarRepeater, 640+(cx*80), RESOLUTION_Y-55,0,0,80,55);
     UI_Toolbar->full_refresh();
     doredraw=0;
     //updated=2;
@@ -1144,7 +1474,11 @@ void redrawscreen(Drawable *S) {
 
 
 
-void make_toolbar(void) {
+// ------------------------------------------------------------------------------------------------
+//
+//
+void make_toolbar(void) 
+{
 
     Bitmap *BUTTONS;
     GfxButton *gb;
@@ -1173,20 +1507,67 @@ void make_toolbar(void) {
     BUTTONS = CurrentSkin->bmButtons;//load_bitmap("buttons.bmp");
 
     delete bmToolbarRepeater;
-    bmToolbarRepeater = newBitmap(80,55);
-    bmToolbarRepeater->copy(BUTTONS,0,0, 165,0, 165+80,55);
+
+
+#define TOOLBAR_SIZE_X               80
+#define TOOLBAR_SIZE_Y               55
+
+#define NORMAL_BUTTONS_SIZE_X        28
+#define NORMAL_BUTTONS_SIZE_Y        16
+
+#define TOOLBAR_BUTTONS_BASE_X       (RESOLUTION_X  - 170)
+#define TOOLBAR_BUTTONS_BASE_Y       (RESOLUTION_Y - (480 - 442))
+
+
+#define PLAY_BUTTON_POS_X            (TOOLBAR_BUTTONS_BASE_X + 0)
+#define PLAY_BUTTON_POS_Y            (TOOLBAR_BUTTONS_BASE_Y + 0)
+
+#define LOAD_BUTTON_POS_X            (TOOLBAR_BUTTONS_BASE_X + NORMAL_BUTTONS_SIZE_X + BUTTON_INTERSPACE)
+#define LOAD_BUTTON_POS_Y            (TOOLBAR_BUTTONS_BASE_Y + 0)
+
+#define CONF_BUTTON_POS_X            (TOOLBAR_BUTTONS_BASE_X + NORMAL_BUTTONS_SIZE_X + BUTTON_INTERSPACE + NORMAL_BUTTONS_SIZE_X + BUTTON_INTERSPACE)
+#define CONF_BUTTON_POS_Y            (TOOLBAR_BUTTONS_BASE_Y + 0)
+
+
+#define STOP_BUTTON_POS_X            (TOOLBAR_BUTTONS_BASE_X + 0)
+#define STOP_BUTTON_POS_Y            (TOOLBAR_BUTTONS_BASE_Y + NORMAL_BUTTONS_SIZE_Y + BUTTON_INTERSPACE)
+
+#define SAVE_BUTTON_POS_X            (TOOLBAR_BUTTONS_BASE_X + NORMAL_BUTTONS_SIZE_X + BUTTON_INTERSPACE)
+#define SAVE_BUTTON_POS_Y            (TOOLBAR_BUTTONS_BASE_Y + NORMAL_BUTTONS_SIZE_Y + BUTTON_INTERSPACE)
+
+#define EXIT_BUTTON_POS_X            (TOOLBAR_BUTTONS_BASE_X + NORMAL_BUTTONS_SIZE_X + BUTTON_INTERSPACE + NORMAL_BUTTONS_SIZE_X + BUTTON_INTERSPACE)
+#define EXIT_BUTTON_POS_Y            (TOOLBAR_BUTTONS_BASE_Y + NORMAL_BUTTONS_SIZE_Y + BUTTON_INTERSPACE)
+
+
+#define ABOUT_BUTTON_POS_X           (RESOLUTION_X - ABOUT_BUTTON_SIZE_X)//(TOOLBAR_BUTTONS_BASE_X - ABOUT_BUTTON_SIZE_X)//(TOOLBAR_BUTTONS_BASE_X + 0)
+#define ABOUT_BUTTON_POS_Y           (RESOLUTION_Y - ABOUT_BUTTON_SIZE_Y)//(TOOLBAR_BUTTONS_BASE_Y + 0)
+
+#define ABOUT_BUTTON_SIZE_X          80
+#define ABOUT_BUTTON_SIZE_Y          55
+
+#define BUTTON_INTERSPACE            2
+
+
+    bmToolbarRepeater = newBitmap(TOOLBAR_SIZE_X, TOOLBAR_SIZE_Y);
+    bmToolbarRepeater->copy(BUTTONS, 0, 0, 165, 0, 165+TOOLBAR_SIZE_X, TOOLBAR_SIZE_Y);
     
 
     /* Play */
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-640+476;    gb->y = CONSOLE_HEIGHT-(480-442);    gb->xsize = 28; gb->ysize = 16;
+    gb->x = PLAY_BUTTON_POS_X ;
+    gb->y = PLAY_BUTTON_POS_Y ;
+    gb->xsize = NORMAL_BUTTONS_SIZE_X ;
+    gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,0,0);
     gb->StuffKey = DIK_F5;
     UI_Toolbar->add_element(gb,id++);
 
     /* Load */
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-640+505;    gb->y = CONSOLE_HEIGHT-(480-442);    gb->xsize = 28; gb->ysize = 16;
+    gb->x = LOAD_BUTTON_POS_X ;
+    gb->y = LOAD_BUTTON_POS_Y ;
+    gb->xsize = NORMAL_BUTTONS_SIZE_X ;
+    gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,29,0);
     gb->StuffKey = DIK_F9;
     gb->StuffKeyState = KMOD_CTRL;
@@ -1194,21 +1575,30 @@ void make_toolbar(void) {
     
     /* Conf */
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-640+533;    gb->y = CONSOLE_HEIGHT-(480-442);    gb->xsize = 28; gb->ysize = 16;
+    gb->x = CONF_BUTTON_POS_X ;
+    gb->y = CONF_BUTTON_POS_Y ;
+    gb->xsize = NORMAL_BUTTONS_SIZE_X ;
+    gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,0);
     gb->StuffKey = DIK_F11;
     UI_Toolbar->add_element(gb,id++);
     
     /* Stop */
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-640+476;    gb->y = CONSOLE_HEIGHT-(480-459);    gb->xsize = 28; gb->ysize = 16;
+    gb->x = STOP_BUTTON_POS_X ;
+    gb->y = STOP_BUTTON_POS_Y ;
+    gb->xsize = NORMAL_BUTTONS_SIZE_X ;
+    gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,0,17);
     gb->StuffKey = DIK_F8;
     UI_Toolbar->add_element(gb,id++);
     
     /* Save */
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-640+505;    gb->y = CONSOLE_HEIGHT-(480-459);    gb->xsize = 28; gb->ysize = 16;
+    gb->x = SAVE_BUTTON_POS_X ;
+    gb->y = SAVE_BUTTON_POS_Y ;
+    gb->xsize = NORMAL_BUTTONS_SIZE_X ; 
+    gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,29,17);
     // gb->StuffKey = DIK_S;         // bugfix #3, tlr
     // gb->StuffKeyState = KS_CTRL;  // bugfix #3, tlr
@@ -1216,19 +1606,29 @@ void make_toolbar(void) {
     gb->StuffKeyState = KMOD_CTRL;     // bugfix #3, tlr
     UI_Toolbar->add_element(gb,id++);
     
-    /* Quit */
+    /* Exit */
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-640+533;    gb->y = CONSOLE_HEIGHT-(480-459);    gb->xsize = 28; gb->ysize = 16;
+    gb->x = EXIT_BUTTON_POS_X ;
+    gb->y = EXIT_BUTTON_POS_Y ;
+    gb->xsize = NORMAL_BUTTONS_SIZE_X ;
+    gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,17);
     gb->StuffKey = DIK_Q;
     gb->StuffKeyState = KMOD_CTRL | KMOD_ALT;
     UI_Toolbar->add_element(gb,id++);
 
 
+
     /* ZT About */
 
     gb = new GfxButton();
-    gb->x = CONSOLE_WIDTH-80; gb->y = CONSOLE_HEIGHT-55; gb->xsize = 80; gb->ysize = 55;
+    
+    gb->x = ABOUT_BUTTON_POS_X ;
+    gb->y = ABOUT_BUTTON_POS_Y ;
+    
+    gb->xsize = ABOUT_BUTTON_SIZE_X ;
+    gb->ysize = ABOUT_BUTTON_SIZE_Y ;
+
     make_button(gb,85,0,80,55)
     // gb->StuffKey = DIK_F1;                 // bugfix #2, tlr 
     // gb->StuffKeyState = KS_CTRL | KS_ALT;  // bugfix #2, tlr
@@ -1265,6 +1665,13 @@ void make_toolbar(void) {
     */
 }
 
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void encode(char *str, char w[256])
 {
     char *q, *r;
@@ -1282,9 +1689,18 @@ void encode(char *str, char w[256])
     //return(w);
 }
 
-void setup_midi() {
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void setup_midi() 
+{
     char *name, *temp, szKey[256], tt[256];
-    conf *Config = zt_globals.Config;
+    conf *Config = zt_config_globals.Config;
     unsigned int i,j;
 
 //	tt = NULL;
@@ -1317,39 +1733,63 @@ void setup_midi() {
     }
 //	if(tt != NULL)
 //		free(tt);
+  
+  if (zt_config_globals.auto_open_midi) {
+    
+    for (i=0;i<MAX_MIDI_OUTS;i++){ 
 
-    if (zt_globals.auto_open_midi) {
-        for (i=0;i<MAX_MIDI_OUTS;i++){ 
-            sprintf(szKey,"open_out_device_%d",i);
-            name = zt_globals.Config->get(szKey);
-            if (name) {
-                for (j=0;j<MidiOut->numOuputDevices;j++) {
-                    if (zcmp(MidiOut->outputDevices[j]->szName,name)) {
-                        MidiOut->AddDevice(j);
-                    }
-                }
-            }
+      sprintf(szKey,"open_out_device_%d",i);
+      name = zt_config_globals.Config->get(szKey);
+      
+      if (name) {
+      
+        for (j=0;j<MidiOut->numOuputDevices;j++) {
+        
+          if (zcmp(MidiOut->outputDevices[j]->szName,name)) {
+          
+            MidiOut->AddDevice(j);
+          }
         }
-        for (i=0;i<MAX_MIDI_INS;i++){ 
-            sprintf(szKey,"open_in_device_%d",i);
-            name = Config->get(&szKey[0]);
-            if (name) {
-                for (j=0;j<MidiIn->numMidiDevs;j++) { 
-                    if (zcmp(MidiIn->midiInDev[j]->szName,name)) {
-                        MidiIn->AddDevice(j);
-                    }
-                }
-            }
-        }
+      }
     }
+    
+    
+    
+    for (i=0;i<MAX_MIDI_INS;i++){ 
+    
+      sprintf(szKey,"open_in_device_%d",i);
+      name = Config->get(&szKey[0]);
+      
+      if (name) {
+      
+        for (j=0;j<MidiIn->numMidiDevs;j++) { 
+        
+          if (zcmp(MidiIn->midiInDev[j]->szName,name)) {
+          
+            MidiIn->AddDevice(j);
+          }
+        }
+      }
+    }
+  }
 }
 
-int initGFX () {  // Init functions
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int initGFX () 
+{  // Init functions
+
+
 //    TOOLBAR = load_cached_bitmap("toolbar.bmp");
 #ifdef USE_BG_IMAGE
 //    BG_IMAGE = load_cached_bitmap("bgimage.bmp");
 #endif 
-    // Preload to avoid wierd crashes 
+    // Preload to avoid weird crashes 
 //    Bitmap *img = load_cached_bitmap("save.bmp");
 //    img = load_cached_bitmap("load.bmp");
 //    img = load_cached_bitmap("about.bmp");
@@ -1358,7 +1798,7 @@ int initGFX () {  // Init functions
     
 /*    
     MOUSEBACK=newBitmap(12,20,0);
-    VS = newBitmap(CONSOLE_WIDTH,CONSOLE_HEIGHT);
+    VS = newBitmap(RESOLUTION_X,RESOLUTION_Y);
     VS->clear(0);
     MOUSEBACK->clear(0);
     LastX=C->getMouse()->getX();
@@ -1368,12 +1808,22 @@ int initGFX () {  // Init functions
 
     make_toolbar();
 
-    switch_page(UIP_Logoscreen);
+//    switch_page(UIP_Logoscreen);
+    switch_page(UIP_Patterneditor) ;
+
+
 //	UIP_Sysconfig = new CUI_Sysconfig;
     return 0;
 }
 
-int postAction () {  // Deinit functions
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int postAction () 
+{  // Deinit functions
 
     SDL_Quit();
     
@@ -1389,11 +1839,11 @@ int postAction () {  // Deinit functions
     chdir(cur_dir);
     for (i=0;i<MAX_MIDI_OUTS;i++) {
         sprintf(name,"open_out_device_%d",i);
-        zt_globals.Config->remove(&name[0]);
+        zt_config_globals.Config->remove(&name[0]);
     }
     for (i=0;i<MAX_MIDI_INS;i++) {
         sprintf(name,"open_in_device_%d",i);
-        zt_globals.Config->remove(&name[0]);
+        zt_config_globals.Config->remove(&name[0]);
     }
 	//tt = NULL;
     for (int j=0;j<MidiOut->numOuputDevices;j++) {
@@ -1402,27 +1852,27 @@ int postAction () {  // Deinit functions
 //		if(tt != NULL)
 //			free(tt);
 		encode(m->szName, tt);
-//        zt_globals.Config->set(&m->szName[0], (m->alias != NULL)?m->alias:"",0);
+//        zt_config_globals.Config->set(&m->szName[0], (m->alias != NULL)?m->alias:"",0);
 	sprintf(blah,"latency_%s",tt);
 	sprintf(val,"%d",m->delay_ticks);
-	zt_globals.Config->set(&blah[0], val);
+	zt_config_globals.Config->set(&blah[0], val);
 	sprintf(blah,"bank_%s",tt);
-	zt_globals.Config->set(&blah[0], ( ((MidiOutputDevice*)m )->reverse_bank_select)?"Yes":"No");
+	zt_config_globals.Config->set(&blah[0], ( ((MidiOutputDevice*)m )->reverse_bank_select)?"Yes":"No");
         if(m->alias != NULL && strlen(m->alias) > 1) {
             sprintf(blah,"alias_%s",tt);
-            zt_globals.Config->set(&blah[0], m->alias);
+            zt_config_globals.Config->set(&blah[0], m->alias);
         }
     }
 	//if(tt != NULL)
 	//	free(tt);
     if (MidiOut && MidiIn) {
-        if (zt_globals.auto_open_midi) {
+        if (zt_config_globals.auto_open_midi) {
             i=0;
             mod = MidiOut->devlist_head;
             while(mod) {
                 m = MidiOut->outputDevices[mod->key];
                 sprintf(name,"open_out_device_%d",i);
-				zt_globals.Config->set(&name[0], m->szName,0);
+				zt_config_globals.Config->set(&name[0], m->szName,0);
                 mod = mod->next; i++;
             }
             i=0;
@@ -1430,22 +1880,20 @@ int postAction () {  // Deinit functions
             while(mod) {
                 mi = MidiIn->midiInDev[mod->key];
                 sprintf(name,"open_in_device_%d",i);
-                zt_globals.Config->set(&name[0], mi->szName,0);
+                zt_config_globals.Config->set(&name[0], mi->szName,0);
                 mod = mod->next; i++;
             }
         }
     }
-    zt_globals.save();
+    zt_config_globals.save();
 
-    if (cur_dir)
-        free(cur_dir);
-    if (ztPlayer)
-        ztPlayer->stop();
-    if (MidiOut)
-        MidiOut->panic();
-    if (clipboard)
-        delete clipboard;
+    if (cur_dir) free(cur_dir);
+    if (ztPlayer) ztPlayer->stop();
+    if (MidiOut) MidiOut->panic();
+    if (clipboard) delete clipboard;
+    
     KillTimer(NULL,keytimer);
+    
     if (UI_Toolbar) {
 #ifdef DEBUG
         playbuff1_bg = NULL;
@@ -1453,6 +1901,7 @@ int postAction () {  // Deinit functions
 #endif
         delete UI_Toolbar;
     }
+
     delete InstEditorUI;
     delete UI; UI=NULL;
     delete UIP_About;
@@ -1489,12 +1938,18 @@ int postAction () {  // Deinit functions
     return 0;
 }
 
-void update_lights(Drawable *S) {
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void update_lights(Drawable *S) 
+{
     if (ztPlayer->playing) {
         if (need_update_lights) {
             need_update_lights = 0;
             if (S->lock() == 0) {
-                int addy = CONSOLE_HEIGHT-480;
+                int addy = RESOLUTION_Y-480;
                 for (int x=0;x<4;x++) {
                     TColor c;
                     if (x==light_pos && x==0) {
@@ -1533,7 +1988,7 @@ VOID CALLBACK TP_Keyboard_Repeat(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD d
     if (keywait == 1) {
         keywait = 0;
         KillTimer(NULL,keytimer);
-        keytimer = SetTimer(NULL,keytimer,zt_globals.key_repeat_time,(TIMERPROC)TP_Keyboard_Repeat);
+        keytimer = SetTimer(NULL,keytimer,zt_config_globals.key_repeat_time,(TIMERPROC)TP_Keyboard_Repeat);
     }
 }
 
@@ -1571,7 +2026,7 @@ void keyhandler(SDL_KeyboardEvent *e) {
         } else  {
             Keys.insert(id,e->keysym.mod,actual_ch);
             if (!(id == DIK_RETURN && e->keysym.mod&KMOD_ALT)) {
-                keytimer = SetTimer(NULL,keytimer,zt_globals.key_wait_time,(TIMERPROC)TP_Keyboard_Repeat);
+                keytimer = SetTimer(NULL,keytimer,zt_config_globals.key_wait_time,(TIMERPROC)TP_Keyboard_Repeat);
                 keywait = 1;
                 keyID = id;
             }
@@ -1665,7 +2120,7 @@ int action(Screen *S) {
             ActivePage->update();
         if (clear_popup) {
             if (S->lock()==0) {
-                S->fillRect(col(1),row(12),CONSOLE_WIDTH,424,COLORS.Background);
+                S->fillRect(col(1),row(12),RESOLUTION_X,424,COLORS.Background);
                 S->unlock();
                 screenmanager.UpdateAll();
             }
@@ -1702,59 +2157,81 @@ int action(Screen *S) {
 
 extern HWND SDL_Window;
 
-SDL_Surface *initSDL(void) {
-    char errstr[2048];
-//  char *errstr;
-    if(zt_globals.default_directory[0] != '\0')
-        SetCurrentDirectory((LPCTSTR)zt_globals.default_directory);
-    cur_dir = (LPSTR)malloc(256);
-    GetCurrentDirectory(256,(LPSTR)cur_dir);
-    if (zt_globals.load()) {
-        MessageBox(NULL,"Fatal: Unable to load zt.conf","zt: error",MB_OK | MB_ICONERROR);
-        return NULL;
-    }
-/*
-    if (zcmp(Config.get("fullscreen"),"yes")) {
-        //FULLSCREEN=1;
-        zt_globals.full_screen = 1;
-    } else {
-        //FULLSCREEN=0;
-        zt_globals.full_screen = 0;
-    }
-*/
-    CurrentSkin = new Skin;
-    if (! CurrentSkin->load(zt_globals.skin) ) {
 
-        return NULL;
-    }
 
-    if((SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)==-1)) {         
-        sprintf(errstr,"Could not initialize SDL: %s.\n", SDL_GetError());
-        MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-        return(NULL);
-    }
+// ------------------------------------------------------------------------------------------------
+//
+//
+SDL_Surface *initSDL(void) 
+{
+  char errstr[2048];
+  Uint32 flags ;
+  //  char *errstr;
+  
+  if(zt_config_globals.default_directory[0] != '\0') SetCurrentDirectory((LPCTSTR)zt_config_globals.default_directory);
+  
+  cur_dir = (LPSTR)malloc(256);
+  GetCurrentDirectory(256,(LPSTR)cur_dir);
+  
+  if (zt_config_globals.load()) {
     
-    Uint32 flags = SDL_SWSURFACE;//SDL_HWSURFACE;
-    if (zt_globals.full_screen) {
-        flags = SDL_FULLSCREEN; //SDL_SWSURFACE | SDL_FULLSCREEN;
-        bIsFullscreen = true;
-    }
+    MessageBox(NULL,"Fatal: Unable to load zt.conf","zt: error",MB_OK | MB_ICONERROR);
+    return NULL;
+  }
+  /*
+  if (zcmp(Config.get("fullscreen"),"yes")) {
+  //FULLSCREEN=1;
+  zt_config_globals.full_screen = 1;
+  } else {
+  //FULLSCREEN=0;
+  zt_config_globals.full_screen = 0;
+  }
+  */
+  CurrentSkin = new Skin;
+  if (! CurrentSkin->load(zt_config_globals.skin) ) {
+    
+    return NULL;
+  }
+  
+  
+  if((SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)==-1)) {
+    
+    sprintf(errstr,"Could not initialize SDL: %s.\n", SDL_GetError());
+    MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
+    return(NULL);
+  }
+  
+  
+  flags = SDL_SWSURFACE ;
+  //flags = SDL_HWSURFACE ;
+  
+  if (zt_config_globals.full_screen) {
+    
+    flags|= SDL_FULLSCREEN; //SDL_SWSURFACE | SDL_FULLSCREEN;
+    bIsFullscreen = true;
+  }
+  
+  SDL_Surface *screen = SDL_SetVideoMode(RESOLUTION_X, RESOLUTION_Y, SCREEN_BPP, flags);
+  
+  if ( screen == NULL ) {
+    
+    // <Manu> El mensaje de error estaba mal
 
-    SDL_Surface *screen = SDL_SetVideoMode(CONSOLE_WIDTH, CONSOLE_HEIGHT, CONSOLE_DEPTH, flags);
-
-    if ( screen == NULL ) {
-        sprintf(errstr, "Couldn't set 640x480x32 video mode: %s\n",
-                        SDL_GetError());
-        MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-        return NULL;
-    } else {
-        if (screen->w != CONSOLE_WIDTH || screen->h != CONSOLE_HEIGHT || screen->format->BitsPerPixel != CONSOLE_DEPTH) {
-            sprintf(errstr, "Set mode, but it wasn't what i wanted: %s\n", SDL_GetError());
-            MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-            return NULL;
-        }
-        
+    //sprintf(errstr, "Couldn't set 640x480x32 video mode: %s\n", SDL_GetError());
+    sprintf(errstr, "Couldn't set %dx%dx%d video mode: %s\n", RESOLUTION_X, RESOLUTION_Y, SCREEN_BPP, SDL_GetError());
+    
+    MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
+    return NULL;
+  } 
+  else {
+    
+    if (screen->w != RESOLUTION_X || screen->h != RESOLUTION_Y || screen->format->BitsPerPixel != SCREEN_BPP) {
+      
+      sprintf(errstr, "Set mode, but it wasn't what i wanted: %s\n", SDL_GetError());
+      MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
+      return NULL;
     }
+  }
 
 //    char str[80];
 //    istream *is;
@@ -1767,8 +2244,8 @@ SDL_Surface *initSDL(void) {
     }
     is = Skin->getStream("font.fnt");
     Skin->freeStream(is);
-    if (!S->isModeAvailable(CONSOLE_WIDTH,CONSOLE_HEIGHT)) {
-        sprintf(str,"Fatal: Screen mode (%dx%dx16) is not support by your gfx card",CONSOLE_WIDTH, CONSOLE_HEIGHT);
+    if (!S->isModeAvailable(RESOLUTION_X,RESOLUTION_Y)) {
+        sprintf(str,"Fatal: Screen mode (%dx%dx16) is not support by your gfx card",RESOLUTION_X, RESOLUTION_Y);
         MessageBox(NULL,str,"zt: error",MB_OK | MB_ICONERROR);
         return -1;
     }
@@ -1782,31 +2259,30 @@ SDL_Surface *initSDL(void) {
     }
 */
 
-    MidiOut = new midiOut;
-    MidiIn  = new midiIn;
+  MidiOut = new midiOut;
+  MidiIn  = new midiIn;
 	setup_midi();
 
+  UI = new UserInterface;
+  UI_Toolbar = new UserInterface;
+  UI_Toolbar->dontmess = 1;
+  init_edit_cols();
+  clipboard = new CClipboard;
 
-    UI = new UserInterface;
-    UI_Toolbar = new UserInterface;
-    UI_Toolbar->dontmess = 1;
-    init_edit_cols();
-    clipboard = new CClipboard;
+  song = new zt_module(zt_config_globals.default_tpb, zt_config_globals.default_bpm);
 
-    song = new zt_module(zt_globals.default_tpb, zt_globals.default_bpm);
-
-    ztPlayer = new player(1,zt_globals.prebuffer_rows, song); // 1ms resolution;
+  ztPlayer = new player(1,zt_config_globals.prebuffer_rows, song); // 1ms resolution;
 
     ///////////////////////////////////////////////////////////////////////
     // Here we set the highlight and lowlight according to either specific
     // zt.conf parameters or ticks per beat (default)
     
-//    if(zt_globals.highlight_increment)
-  //      highlight_count = zt_globals.highlight_increment;
+//    if(zt_config_globals.highlight_increment)
+  //      highlight_count = zt_config_globals.highlight_increment;
 //    else
   //      highlight_count = song->tpb;
-//    if(zt_globals.lowlight_increment)
-  //      lowlight_count = zt_globals.lowlight_increment;
+//    if(zt_config_globals.lowlight_increment)
+  //      lowlight_count = zt_config_globals.lowlight_increment;
 //    else
   //      lowlight_count = song->tpb >> 1 / song->tpb / 2;
     
@@ -1851,47 +2327,73 @@ SDL_Surface *initSDL(void) {
     return screen;
 
 }
+
+
+
 #ifdef _ENABLE_AUDIO
 
-    void audio_mixer(void *udata, Uint8 *stream, int len) {
-        MidiOut->MixAudio(udata,stream,len);
-    }
+// ------------------------------------------------------------------------------------------------
+//
+//
+void audio_mixer(void *udata, Uint8 *stream, int len) 
+{
+  MidiOut->MixAudio(udata,stream,len);
+}
 
 #endif
 
 
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 // did i mention how much i love SDL?
+
 SDL_Surface *scrn_surface ;
 Screen *thescreen = NULL;
-main(int argc, char *argv[]) {
-    char *w;
 
-    // Get the zt directory and store it globally
 
-    if(argc > 1)
-    {
-        if(argv[1] != NULL && argv[1][0] != '\0')
-        {
-            // store current directory
-            GetCurrentDirectory(1024,zt_filename);
-            strcat(zt_filename,"\\");
-            strcat(zt_filename,argv[1]);
-        }
+// ------------------------------------------------------------------------------------------------
+//
+//
+int main(int argc, char *argv[]) 
+{
+  char *w;
+  
+  // Get the zt directory and store it globally
+  
+  if(argc > 1) {
+    
+    if(argv[1] != NULL && argv[1][0] != '\0') {
+      
+      // store current directory
+      GetCurrentDirectory(1024,zt_filename);
+      strcat(zt_filename,"\\");
+      strcat(zt_filename,argv[1]);
     }
-    if(strstr(argv[0],"\\"))
-    {
-        for(w = argv[0] + strlen(argv[0]); w != argv[0] && *w != '\\'; w--);
-        if(w != argv[0])
-        {
-            *w = '\0';
-            zt_directory = strdup(argv[0]);
-            SetCurrentDirectory(argv[0]);
-            *w = '\\';
-        }
+  }
+  if(strstr(argv[0],"\\")) {
+    
+    for(w = argv[0] + strlen(argv[0]); w != argv[0] && *w != '\\'; w--);
+    
+    if(w != argv[0]) {
+      
+      *w = '\0';
+      zt_directory = strdup(argv[0]);
+      SetCurrentDirectory(argv[0]);
+      *w = '\\';
     }
-    else zt_directory = strdup("");
-
-    doredraw++;
+  }
+  else zt_directory = strdup("");
+  
+  doredraw++;
 
 /*
     FXMLParser fxml;
@@ -1905,29 +2407,38 @@ main(int argc, char *argv[]) {
     }
     delete xmlconfig;
 */  
-    scrn_surface = initSDL();
-    if(scrn_surface == NULL) {
+  scrn_surface = initSDL();
 
-        // Error opening the skin !
-        exit(1);
-    }
-    Screen scrn(scrn_surface,false);
-    thescreen = &scrn;
-    if (scrn_surface != NULL) {
-        scrn.surface = scrn_surface; 
-        S = RealScreen = &scrn;
-        initGFX();
-        if(argc > 0) {
-            song->load(argv[1]);
-        }
-        else
-        if (zt_globals.autoload_ztfile)
-            if (strlen(zt_globals.autoload_ztfile_filename))
-                song->load(zt_globals.autoload_ztfile_filename);
-        SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-        SDL_EventState(SDL_ACTIVEEVENT, SDL_ENABLE);
+  if(scrn_surface == NULL) {
 
+    // Error opening the skin !
+    exit(1);
+  }
+
+  Screen scrn(scrn_surface,false);
+  thescreen = &scrn;
+  
+  if (scrn_surface != NULL) {
     
+    scrn.surface = scrn_surface; 
+    S = RealScreen = &scrn;
+    initGFX();
+    
+    if(argc > 0) song->load(argv[1]);
+    
+    else {
+      
+      if (zt_config_globals.autoload_ztfile) {
+        
+        if (strlen(zt_config_globals.autoload_ztfile_filename)) {
+          
+          song->load(zt_config_globals.autoload_ztfile_filename);
+          SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
+          SDL_EventState(SDL_ACTIVEEVENT, SDL_ENABLE);
+        }
+      }
+    }
+  
 #ifdef _ENABLE_AUDIO
 
     SDL_AudioSpec wanted;
@@ -1943,76 +2454,99 @@ main(int argc, char *argv[]) {
 
     /* Open the audio device, forcing the desired format */
     if ( SDL_OpenAudio(&wanted, NULL) < 0 ) {
-        fprintf(stderr, "Couldn't open audio: %s\n", SDL_GetError());
-        return(-1);
+
+      fprintf(stderr, "Couldn't open audio: %s\n", SDL_GetError());
+      return(-1);
     }
+
 //    int ret = Mix_OpenAudio(wanted.freq, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, wanted.samples);
      SDL_PauseAudio(0);
     
 #endif
 
-
      while(!action(&scrn)) {
-            SDL_Delay(1);
-            SDL_Event e;
-            while(SDL_PollEvent(&e)){  /* Loop until there are no events left on the queue */
-                switch(e.type){  /* Process the appropiate event type */
-                    case SDL_KEYDOWN:  /* Handle a KEYDOWN event */         
-                    case SDL_KEYUP:
-                        keyhandler(&e.key);
-                        break;
-                    case SDL_MOUSEMOTION:
-                        mousemotionhandler(&e.motion);
-                        break;
-                    case SDL_MOUSEBUTTONDOWN:
-                        mousedownbuttonhandler(&e.button);
-                        break;
-                    case SDL_MOUSEBUTTONUP:
-                        mouseupbuttonhandler(&e.button);
-                        break;
-                    case SDL_QUIT:
-                        quit();
-                        break;
-                    case SDL_ACTIVEEVENT:
-
-    {
-                        int p = e.active.state;
-                        switch(p) {
-                            case SDL_APPMOUSEFOCUS:
-                                if (!bIsFullscreen)
-                                    break;
-                            case SDL_APPINPUTFOCUS:
-                            case SDL_APPACTIVE:
-                                //SDL_WM_SetCaption(sr,sr);
-                                //if (e.active.gain) {
-                                    if (UI) UI->full_refresh();
-                                    if (UI_Toolbar) UI_Toolbar->full_refresh();
-                                    doredraw++;
-                                    need_refresh++;
-                                    screenmanager.UpdateAll();                                 
-                                //}
-                                break;
-                        }
-    }
-                        break;
-                    case SDL_SYSWMEVENT:
-                        //SDL_Delay(1);//e.syswm;                        
-                        switch(e.syswm.msg->msg) {
-                            case WM_SETFOCUS:
-                                if (UI) UI->full_refresh();
-                                if (UI_Toolbar) UI_Toolbar->full_refresh();
-                                doredraw++;
-                                need_refresh++;
-                                screenmanager.UpdateAll();                                 
-                                break;
-                        }
-                        break;
-                    default: /* Report an unhandled event */
-                        break;
-                }
-
-                }    //      SDL_PumpEvents(); // Dont need this if we are using SDL_PollEvents from the action() loop
-        }
+       
+       SDL_Delay(1);
+       SDL_Event e;
+       
+       while(SDL_PollEvent(&e)){  /* Loop until there are no events left on the queue */
+         
+         switch(e.type){  /* Process the appropiate event type */
+           
+           case SDL_KEYDOWN:  /* Handle a KEYDOWN event */         
+           case SDL_KEYUP:
+           
+             keyhandler(&e.key);
+             
+             break;
+             
+           case SDL_MOUSEMOTION:
+             
+             mousemotionhandler(&e.motion);
+             
+             break;
+             
+           case SDL_MOUSEBUTTONDOWN:
+             mousedownbuttonhandler(&e.button);
+             break;
+           case SDL_MOUSEBUTTONUP:
+             mouseupbuttonhandler(&e.button);
+             break;
+           case SDL_QUIT:
+             quit();
+             break;
+           case SDL_ACTIVEEVENT:
+             
+             {
+               int p = e.active.state;
+               
+               switch(p) {
+                 
+               case SDL_APPMOUSEFOCUS:
+                 
+                 if (!bIsFullscreen) break;
+                 
+               case SDL_APPINPUTFOCUS:
+               case SDL_APPACTIVE:
+                 
+                 //SDL_WM_SetCaption(sr,sr);
+                 //if (e.active.gain) {
+                 if (UI) UI->full_refresh();
+                 if (UI_Toolbar) UI_Toolbar->full_refresh();
+                 doredraw++;
+                 need_refresh++;
+                 screenmanager.UpdateAll();                                 
+                 //}
+                 
+                 break;
+               }
+             }
+             break;
+             
+           case SDL_SYSWMEVENT:
+             //SDL_Delay(1);//e.syswm;                        
+             switch(e.syswm.msg->msg) {
+               
+             case WM_SETFOCUS:
+               
+               if (UI) UI->full_refresh();
+               if (UI_Toolbar) UI_Toolbar->full_refresh();
+               
+               doredraw++;
+               need_refresh++;
+               screenmanager.UpdateAll();
+               
+               break;
+             }
+             
+             break;
+             
+             default: /* Report an unhandled event */
+               break;
+         } ;
+         
+       }    //      SDL_PumpEvents(); // Dont need this if we are using SDL_PollEvents from the action() loop
+     }
 
 #ifdef _ENABLE_AUDIO
      //    Mix_CloseAudio();
@@ -2027,6 +2561,14 @@ main(int argc, char *argv[]) {
 }
 
 
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
 {
     long framesize = 0;
@@ -2104,11 +2646,11 @@ static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
     if ((*flags) & SDL_FULLSCREEN) {
         *flags = SDL_HWSURFACE;
         bIsFullscreen = false;
-        zt_globals.full_screen = false;
+        zt_config_globals.full_screen = false;
     } else {
         *flags = SDL_SWSURFACE | SDL_FULLSCREEN;
         bIsFullscreen = true;
-        zt_globals.full_screen = true;
+        zt_config_globals.full_screen = true;
     }
 
     SDL_Surface *surf = SDL_SetVideoMode(w, h, bpp, (*flags));
@@ -2154,9 +2696,24 @@ static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
 
     return(1);
 } /* attempt_fullscreen_toggle */
+
+
+
+
+
+
 int baba=0;
 
-int attempt_fullscreen_toggle() {
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int attempt_fullscreen_toggle() 
+{
     int r;
     if (baba==1) {
         baba=0;

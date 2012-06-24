@@ -281,7 +281,7 @@ void miq::clear(void) {
     qhead = qtail = 0;
     qelems = 0;
 }
-int midi_in_clocks_recieved = 0;
+int g_midi_in_clocks_received = 0;
 
 void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2) {
 
@@ -344,10 +344,10 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD 
                   break;
           }
 
-          if (zt_globals.midi_in_sync)
+          if (zt_config_globals.midi_in_sync)
               switch(msg) {
                 case 0xF8: // MIDI CLOCK
-                    midi_in_clocks_recieved++;
+                    g_midi_in_clocks_received++;
 /*                  sprintf(szStatmsg, "Midi CLOCK");
                     statusmsg = szStatmsg;
                     status_change = 1;
@@ -375,7 +375,7 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD 
                 case 0xFB: // MIDI CONTINUE
                     if (ztPlayer->playing)
                         ztPlayer->stop();
-                    midi_in_clocks_recieved = 0;
+                    g_midi_in_clocks_received = 0;
                     if (queued_row || queued_order) {
                         // we have a queued row and order, play from that position.
                         ztPlayer->play(queued_row,queued_order,3);
@@ -391,7 +391,7 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD 
                     }
                     break;
                 case 0xFC: // MIDI STOP
-                    midi_in_clocks_recieved=0;
+                    g_midi_in_clocks_received=0;
                     ztPlayer->stop();
                     break;
                 default:

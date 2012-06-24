@@ -38,6 +38,7 @@
  *
  ******/
 #include "zt.h"
+#include "FileList.h"
 
 int save_finished = 0;
 int is_saving = 0;

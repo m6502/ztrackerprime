@@ -1,4 +1,5 @@
 #include "zt.h"
+#include "Button.h"
 
 void BTNCLK_close_songduration(void) {
     Keys.flush();
@@ -42,8 +43,8 @@ CUI_SongDuration::CUI_SongDuration(void) {
     int tabindex=0;
     UI = new UserInterface;
 
-    this->x = 30 + ((CONSOLE_WIDTH-640)/16);
-    this->y = 20 + ((CONSOLE_HEIGHT-480)/16);
+    this->x = 30 + ((RESOLUTION_X-640)/16);
+    this->y = 20 + ((RESOLUTION_Y-480)/16);
     this->xsize = 20;
     this->ysize = 7;
 

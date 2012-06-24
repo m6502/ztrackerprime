@@ -46,7 +46,7 @@ int textcenter(char *str, int local) {
     if (local != -1) {
         return ((local) -(strlen((char *)str)/2));
     } else
-    return ((CONSOLE_WIDTH/16) -(strlen((char *)str)/2));
+    return ((RESOLUTION_X/16) -(strlen((char *)str)/2));
 }
 
 int printtitle(int y, char *str, TColor col,TColor bg,Drawable *S) {
@@ -56,25 +56,30 @@ int printtitle(int y, char *str, TColor col,TColor bg,Drawable *S) {
     x = textcenter(str2);
     printBG(col(x),row(y),str2,col,bg,S);
     printlineBG(col(1),row(y),154,x-1,col,bg,S);
-    printlineBG(col(x+strlen(str2)),row(y),154, (CONSOLE_WIDTH/8)-x-strlen(str2)-2  ,col,bg,S);
+    printlineBG(col(x+strlen(str2)),row(y),154, (RESOLUTION_X/8)-x-strlen(str2)-2  ,col,bg,S);
     return 0;
 }
 
-int font_load(char *filename) {
+int font_load(char *filename)
+{
     FILE *fp;
     char c;
     int i;
-    if (!(fp = fopen(filename,"rb")))
-        return 1;
+
+    if (!(fp = fopen(filename,"rb"))) return 1;
+
     for (i=0;i<256*8;i++) {
+
         c = fgetc(fp);
         font[i] = c;
     }
+
     fclose(fp);
+    
     return 0;
 }
 
-int font_load(istream *is) {
+int font_load(std::istream *is) {
     char c;
     int i;
     if (!is)
@@ -85,6 +90,8 @@ int font_load(istream *is) {
     }
     return 0;
 }
+
+
 void print(int x, int y, char *str, TColor col, Drawable *S) {
     TColor *buf;
     unsigned char byte;
@@ -116,38 +123,66 @@ void fillline(int y, char c, TColor col, TColor bg, Drawable *S) {
     printBG(0,y,str,col,bg,S);
 }
 
-#define Screen_Pitch (CONSOLE_WIDTH*1)
 
-void printBG(int x, int y, char *str,TColor col, TColor bg, Drawable *S) {
-    TColor *buf,*start;
-    unsigned char byte;
-    int c=0,i,j,fontptr;
-    //adjust = S->getLine(y) + x;
-    start = S->getLine(y) + x + 7;
-    while(str[c]) {
-        fontptr = str[c]<<3;
-        buf = start + (c<<3);
-        for(i=0;i<8;i++) {
-            byte = font[fontptr++];
-            for(j=0;j<8;j++) {
-                if (byte & 1)
-                    *buf = col;
-                else
-                    *buf = bg;
-                buf--;
-                byte >>= 1;
-            }
-            buf += Screen_Pitch+8;// - 8;
-        }
-        c++;
+
+
+
+#define Screen_Pitch (RESOLUTION_X*1)
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void printBG(int x, int y, char *str,TColor col, TColor bg, Drawable *S)
+{
+  TColor *buf,*start;
+  unsigned char byte;
+  int c,i,j,fontptr;
+
+  c = 0 ;
+
+  //adjust = S->getLine(y) + x;
+
+  start = S->getLine(y) + x + 7;
+
+  while(str[c]) {
+
+    fontptr = str[c]<<3;
+    buf = start + (c<<3);
+
+    for(i=0; i<8; i++) {
+
+      byte = font[fontptr++];
+
+      for(j=0;j<8;j++) {
+
+        if (byte & 1) *buf = col;              // <Manu> Este if se puede sacar del for(;;) y hacer dos bucles en su lugar
+        else *buf = bg;
+        
+        buf--;
+        byte >>= 1;
+      }
+
+      buf += Screen_Pitch + 8 ; // - 8;
     }
+
+    c++ ;
+  }
+
 }
+
+
+
+
+
 int hex2dec(char c) {
     if (toupper(c) >= 'A' && toupper(c)<='F')
         return (toupper(c)-'A'+10);
     else
         return (toupper(c)-'0');
 }
+
+
 void printBGCC(int x, int y, char *str, TColor col, TColor bg, Drawable *S) {
     TColor *buf,use;
     unsigned char byte;
@@ -182,7 +217,8 @@ void printBGCC(int x, int y, char *str, TColor col, TColor bg, Drawable *S) {
                 byte >>= 1;
             }
         }
-        c++; pos++;
+        c++;
+        pos++;
     }
 }
 

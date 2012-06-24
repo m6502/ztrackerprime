@@ -51,155 +51,227 @@
 
 extern int load_lock;
 
-#define FILEFLAG_SEND_MIDI_CLOCK 1
-#define FILEFLAG_SEND_MIDI_STOP_START 2
-#define FILEFLAG_COMPRESSED 4
-#define FILEFLAG_SLIDEONSUBTICK 8
-#define FILEFLAG_SLIDEPRECISION 16
+#define FILEFLAG_SEND_MIDI_CLOCK        1
+#define FILEFLAG_SEND_MIDI_STOP_START   2
+#define FILEFLAG_COMPRESSED             4
+#define FILEFLAG_SLIDEONSUBTICK         8
+#define FILEFLAG_SLIDEPRECISION         16
 
 
-void zt_module::writedata(char *data, int size, int compressed, ofstream &of, DeflateStream *o) {
-    if (compressed) {
-        if (o)
-            o->write(data,size);
-    } else {
-        of.write(data,size);
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::writedata(char *data, int size, int compressed, std::ofstream &of, DeflateStream *o) 
+{
+  if(compressed) {
+    if (o) o->write(data,size);
+  } 
+  else of.write(data,size);
+}
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int zt_module::readdata(char *data, int size, int compressed, std::ifstream &ifs, InflateStream *i) 
+{
+  if (compressed) {
+
+    if (i) {
+
+      i->read(data,size);
+      if (i->eof()) return -1;
     }
-}
-
-int zt_module::readdata(char *data, int size, int compressed, ifstream &ifs, InflateStream *i) {
-    if (compressed) {
-        if (i) {
-            i->read(data,size);
-            if (i->eof())
-                return -1;
-        }
-    } else {
-        ifs.read(data,size);
-        if (ifs.eof())
-            return -1;
-    }
-    return 0;
-}
-
-void zt_module::writeblock(char *headid, CDataBuf *buf, int compressed, ofstream &of, DeflateStream *o) {
-    int size;
-    writedata(headid,4,compressed,of,o); 
-    size = buf->getsize();
-    writedata((char *)&size,sizeof(int),compressed,of,o);
-    writedata((char *)buf->getbuffer(),size,compressed,of,o);
-    buf->flush();
-}
-
-int zt_module::readblock(char headid[5], CDataBuf *buf, int compressed, ifstream &ifs, InflateStream *is) {
-    int size,ret;
-    char *lpBuf;
-    buf->flush();
-    ret = readdata(headid,4,compressed,ifs,is); headid[4]=0;
-    if (ret == -1)
-        return -1;
-    ret = readdata((char *)&size,sizeof(int),compressed,ifs,is);
-    if (ret == -1)
-        return -1;
-    buf->setbufsize(size);
-    lpBuf = buf->getbuffer();
-    if (!lpBuf)
-        return -1; // fail if no buffer
-    readdata(lpBuf,size,compressed,ifs,is);
+  }
+  else {
     
-    buf->reset_read();
-    return size;
+    ifs.read(data,size);
+    if (ifs.eof()) return -1;
+  }
+
+  return(0) ;
 }
 
-int zt_module::read_ZThd(CDataBuf *buf, ifstream &ifs) {
-    int size;
-    int compressed;
-    char c,headid[5],*lpBuf;
 
-    buf->flush();
-    readdata(headid,4,0,ifs,NULL); headid[4]=0;
-    if (!cmp_hd(headid,"ZThd")) {
-        if (cmp_hd(headid,"ZTM\x0"))
-            return -2;
-        else
-            return -1;
-    }
-    readdata((char *)&size,sizeof(int),0,ifs,NULL);
-    buf->setbufsize(size);
-    lpBuf = buf->getbuffer();
-    ifs.read(lpBuf,size);
-    buf->reset_read();
-    this->bpm = buf->getuch();
-    this->tpb = buf->getuch();
-    c = buf->getuch(); // ignore the max_tracks
-    c = buf->getuch(); // get the flags
-    for(int i=0;i<26;i++)
-        this->title[i] = buf->getch();
-    this->title[25]=0;
-    buf->flush();
 
-    flag_SendMidiClock     = (c&FILEFLAG_SEND_MIDI_CLOCK)?1:0;
-    flag_SendMidiStopStart = (c&FILEFLAG_SEND_MIDI_STOP_START)?1:0;
-    flag_SlideOnSubtick    = (c&FILEFLAG_SLIDEONSUBTICK)?1:0;
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::writeblock(char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o) 
+{
+  int size;
+  
+  writedata(headid,4,compressed,of,o); 
+  size = buf->getsize();
+  writedata((char *)&size,sizeof(int),compressed,of,o);
+  writedata((char *)buf->getbuffer(),size,compressed,of,o);
+  buf->flush();
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int zt_module::readblock(char headid[5], CDataBuf *buf, int compressed, std::ifstream &ifs, InflateStream *is)
+{
+  int size,ret;
+  char *lpBuf;
+  
+  buf->flush();
+
+  ret = readdata(headid,4,compressed,ifs,is); headid[4]=0;
+  if (ret == -1) return -1;
+
+  ret = readdata((char *)&size,sizeof(int),compressed,ifs,is);
+  if (ret == -1) return -1;
+
+  buf->setbufsize(size);
+  lpBuf = buf->getbuffer();
+  
+  if (!lpBuf) return -1; // fail if no buffer
+  readdata(lpBuf,size,compressed,ifs,is);
+  
+  buf->reset_read() ;
+  return(size) ;
+}
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int zt_module::read_ZThd(CDataBuf *buf, std::ifstream &ifs) 
+{
+  int size;
+  int compressed;
+  char c,headid[5],*lpBuf;
+  
+  buf->flush();
+  readdata(headid,4,0,ifs,NULL); headid[4]=0;
+
+  if (!cmp_hd(headid,"ZThd")) {
+
+    if (cmp_hd(headid,"ZTM\x0")) return -2;
+    else return -1;
+  }
+
+  readdata((char *)&size,sizeof(int),0,ifs,NULL);
+  buf->setbufsize(size);
+  lpBuf = buf->getbuffer();
+  ifs.read(lpBuf,size);
+  buf->reset_read();
+  this->bpm = buf->getuch();
+  this->tpb = buf->getuch();
+  c = buf->getuch(); // ignore the max_tracks
+  c = buf->getuch(); // get the flags
+
+
+  for (int i=0; i < ZTM_SONGTITLE_MAXLEN; i++) {
+    
+    this->title[i] = buf->getch();
+  }
+
+  this->title[ZTM_SONGTITLE_MAXLEN - 1] = '\0' ;
+
+  buf->flush();
+  
+  flag_SendMidiClock     = (c&FILEFLAG_SEND_MIDI_CLOCK)?1:0;
+  flag_SendMidiStopStart = (c&FILEFLAG_SEND_MIDI_STOP_START)?1:0;
+  flag_SlideOnSubtick    = (c&FILEFLAG_SLIDEONSUBTICK)?1:0;
 #ifdef CONVERT_SLIDEPRECISION
-    flag_SlidePrecision    = (c&FILEFLAG_SLIDEPRECISION)?1:0;
+  flag_SlidePrecision    = (c&FILEFLAG_SLIDEPRECISION)?1:0;
 #endif /* CONVERT_SLIDEPRECISION */
-    compressed = (c&FILEFLAG_COMPRESSED)?1:0;
-
-    return compressed;
+  compressed = (c&FILEFLAG_COMPRESSED)?1:0;
+  
+  return(compressed) ;
 }
 
-void zt_module::build_ZThd(CDataBuf *buf, int compr) {
-    unsigned char t,b,tracks=ZTM_MAX_TRACKS;
-    t = this->tpb;
-    b = this->bpm;
-    buf->write((const char *)&b, sizeof(unsigned char));
-    buf->write((const char *)&t, sizeof(unsigned char));
-    buf->write((const char *)&tracks, sizeof(unsigned char));
-    t=0;
-    if (flag_SendMidiClock)
-        t|=FILEFLAG_SEND_MIDI_CLOCK;
-    if (flag_SendMidiStopStart)
-        t|=FILEFLAG_SEND_MIDI_STOP_START;
-    if (compr)
-        t|=FILEFLAG_COMPRESSED;
-    if (flag_SlideOnSubtick)
-        t|=FILEFLAG_SLIDEONSUBTICK;
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::build_ZThd(CDataBuf *buf, int compr) 
+{
+  unsigned char t,b,tracks=ZTM_MAX_TRACKS;
+
+  t = this->tpb;
+  b = this->bpm;
+  buf->write((const char *)&b, sizeof(unsigned char));
+  buf->write((const char *)&t, sizeof(unsigned char));
+  buf->write((const char *)&tracks, sizeof(unsigned char));
+  
+  t=0;
+  
+  if(flag_SendMidiClock) t|=FILEFLAG_SEND_MIDI_CLOCK;
+  if(flag_SendMidiStopStart) t|=FILEFLAG_SEND_MIDI_STOP_START;
+  if(compr) t|=FILEFLAG_COMPRESSED;
+  if(flag_SlideOnSubtick) t|=FILEFLAG_SLIDEONSUBTICK;
+
 #ifdef CONVERT_SLIDEPRECISION
-    if (flag_SlidePrecision)
-        t|=FILEFLAG_SLIDEPRECISION;
+  if (flag_SlidePrecision) t|=FILEFLAG_SLIDEPRECISION;
 #endif /* CONVERT_SLIDEPRECISION */
-    buf->write((const char *)&t, sizeof(unsigned char));
-    buf->write((const char *)&this->title[0],26);
+
+  buf->write((const char *)&t, sizeof(unsigned char));
+  buf->write((const char *)&this->title[0], ZTM_SONGTITLE_MAXLEN);
 }
 
-void zt_module::build_ZTol(CDataBuf *buf) {
-    unsigned short int o[ZTM_ORDERLIST_LEN];
-    for (int i=0;i<ZTM_ORDERLIST_LEN;i++)
-        o[i] = this->orderlist[i];
-    buf->write((char *)&o[0],sizeof(unsigned short int)*ZTM_ORDERLIST_LEN);
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::build_ZTol(CDataBuf *buf) 
+{
+  unsigned short int o[ZTM_ORDERLIST_LEN];
+
+  for (int i=0;i<ZTM_ORDERLIST_LEN;i++) o[i] = this->orderlist[i];
+  buf->write((char *)&o[0],sizeof(unsigned short int)*ZTM_ORDERLIST_LEN);
 }
 
-void zt_module::build_ZTpl(CDataBuf *buf) {
-    unsigned short int o[ZTM_MAX_PATTERNS];
-    for (int i=0;i<ZTM_MAX_PATTERNS;i++)
-        o[i] = this->patterns[i]->length;
-    buf->write((char *)&o[0],sizeof(unsigned short int)*ZTM_MAX_PATTERNS);
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::build_ZTpl(CDataBuf *buf) 
+{
+  unsigned short int o[ZTM_MAX_PATTERNS];
+
+  for (int i=0;i<ZTM_MAX_PATTERNS;i++) o[i] = this->patterns[i]->length;
+  buf->write((char *)&o[0],sizeof(unsigned short int)*ZTM_MAX_PATTERNS);
 }
 
-void zt_module::build_ZTtm(CDataBuf *buf) {
-    unsigned char tm[ZTM_MAX_TRACKS/8];
-    unsigned char p,mask;
-    for (int i=0;i<ZTM_MAX_TRACKS/8;i++) {
-        mask = 0x1;
-        tm[i] = 0;
-        for (p=0;p<8;p++) {
-            if (this->track_mute[(i*8)+p])
-                tm[i] |= mask;
-            mask <<= 1;
-        }
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::build_ZTtm(CDataBuf *buf) 
+{
+  unsigned char tm[ZTM_MAX_TRACKS/8];
+  unsigned char p,mask;
+  
+  for (int i=0;i<ZTM_MAX_TRACKS/8;i++) {
+    
+    mask = 0x1;
+    tm[i] = 0;
+
+    for (p=0;p<8;p++) {
+
+      if (this->track_mute[(i*8)+p]) tm[i] |= mask;
+      mask <<= 1;
     }
-    buf->write((char *)&tm[0],sizeof(unsigned char)*(ZTM_MAX_TRACKS/8));
+  }
+
+  buf->write((char *)&tm[0],sizeof(unsigned char)*(ZTM_MAX_TRACKS/8));
 }
 
 /*************************************************************************
@@ -238,6 +310,7 @@ void zt_module::build_SMSG(CDataBuf *buf) {
     //buf->write(smsg->getbuffer(), len); 
     buf->write(smsg->songmessage->getbuffer(),len);
 }
+
 
 /*************************************************************************
  *
@@ -538,9 +611,14 @@ void instrument::save(CDataBuf *buf, unsigned char inum) {
     buf->write((const char *)this->title,25);                                  // byte x 25
 }
 
-int zt_module::save(char *fn, int compressed) {
 
+
+
+int zt_module::save(char *fn, int compressed) 
+{
     char ls_filename[256];
+    int i ;
+
     DeflateStream *lpDS=NULL;
 #ifdef SAVE_UNCOMPRESSED
     compressed = 0;
@@ -554,7 +632,9 @@ int zt_module::save(char *fn, int compressed) {
 //      strcpy((char *)&this->filename[0],ls_filename);
     }
     fn = (char*)&this->filename[0];
-    ofstream f(fn,ios::out|ios::binary);
+    
+    std::ofstream f(fn, std::ios::out | std::ios::binary);
+    
     if (f.fail()) {
         setstatusstr("Error saving %s (Could not open file)",fn);
         return -1;  
@@ -566,7 +646,7 @@ int zt_module::save(char *fn, int compressed) {
 
     if (compressed) {
 //      DeflateStream ds(f); // passing the file stream as a parameter
-        lpDS = new DeflateStream(f);//&ds;
+        lpDS = new DeflateStream(&f);//&ds;
     }
 
     /* write song message if not empty */
@@ -580,32 +660,38 @@ int zt_module::save(char *fn, int compressed) {
     writeblock("ZTpl",&buffer,compressed,f,lpDS);
     build_ZTtm(&buffer);
     writeblock("ZTtm",&buffer,compressed,f,lpDS);
-    for(int i=0;i<ZTM_MAX_INSTS;i++) {
+
+    for(i=0;i<ZTM_MAX_INSTS;i++) {
         if (!this->instruments[i]->isempty()) {
             this->instruments[i]->save(&buffer,i);
             writeblock("ZTin",&buffer,compressed,f,lpDS);
         }
     }
+    
     for(i=0;i<ZTM_MAX_ARPEGGIOS;i++) {
         if (this->arpeggios[i] && !this->arpeggios[i]->isempty()) {
             build_ARPG(&buffer,i);
             writeblock("ARPG",&buffer,compressed,f,lpDS);
         }
     }
+    
     for(i=0;i<ZTM_MAX_MIDIMACROS;i++) {
         if (this->midimacros[i] && !this->midimacros[i]->isempty()) {
             build_MMAC(&buffer,i);
             writeblock("MMAC",&buffer,compressed,f,lpDS);
         }
     }
+    
     build_ZTev(&buffer);
     writeblock("ZTev",&buffer,compressed,f,lpDS);
     
     if (compressed) {
+
         delete lpDS;
         setstatusstr("Saved %s (compressed)",fn);
-    } else
-        setstatusstr("Saved %s (uncompressed)",fn);
+    } 
+    else setstatusstr("Saved %s (uncompressed)",fn);
+
     file_changed = 0;
     return 0;
 }
@@ -834,6 +920,9 @@ int zt_module::load_MMAC(CDataBuf *buf) {
     return 0;
 }
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 void zt_module::load_ZTtm(CDataBuf *buf) {
     unsigned char tm[MAX_TRACKS/8];
     unsigned char p,mask;
@@ -850,6 +939,9 @@ void zt_module::load_ZTtm(CDataBuf *buf) {
     }
 }
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 void zt_module::load_ZTpl(CDataBuf *buf) {
     unsigned short int size;
     for (int i=0;i<256;i++) {
@@ -858,6 +950,9 @@ void zt_module::load_ZTpl(CDataBuf *buf) {
     }
 }
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 void zt_module::load_ZTol(CDataBuf *buf) {
     unsigned short int order;
     for (int i=0;i<ZTM_ORDERLIST_LEN;i++) {
@@ -866,6 +961,9 @@ void zt_module::load_ZTol(CDataBuf *buf) {
     }
 }
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 void zt_module::load_ZTin(CDataBuf *buf) {
     unsigned char inst;
     inst = buf->getuch();
@@ -873,13 +971,43 @@ void zt_module::load_ZTin(CDataBuf *buf) {
         this->instruments[inst]->load(buf);
 }
 
-void instrument::load(CDataBuf *buf) {
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void instrument::load(CDataBuf *buf) 
+{
     unsigned char c;
     c = this->channel + (this->flags<<4);
 
     this->bank = buf->getsi();
     this->patch = buf->getuch();
+    
     this->midi_device = buf->getuch();
+
+    // <Manu> Aqui es donde se puede hacer un parche que ponga el primer dispositivo
+    //        MIDI que este abierto en los instrumentos que quieran usar uno que
+    //        no este disponible
+    
+/*    
+    if(MidiOut->outputDevices[this->midi_device]->handle==NULL) {
+    
+      int a ;
+
+      a=5 ;
+    }
+    else {
+    
+      int b ;
+
+      b=5 ;
+    }
+
+
+*/
+
+
     this->channel = buf->getuch();
     this->flags = this->channel;
     this->channel &= 0x0F;
@@ -888,12 +1016,21 @@ void instrument::load(CDataBuf *buf) {
     this->global_volume = buf->getuch();
     this->default_length = buf->getsi();
     this->transpose = buf->getch();
-    for (int i=0;i<26;i++)
-        this->title[i] = buf->getch();
-    this->title[25] = 0;
+    
+    for (int i=0; i < ZTM_INSTTITLE_MAXLEN; i++) {
+        
+      this->title[i] = buf->getch() ;
+    }
+
+    this->title[ZTM_INSTTITLE_MAXLEN - 1] = '\0' ;
 }
 
-int zt_module::load(char *fn) {
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int zt_module::load(char *fn)
+{
 //  unsigned char buf[10];
 
     char ls_filename[256];
@@ -902,7 +1039,7 @@ int zt_module::load(char *fn) {
     ZTImportExport *zti;
     CDataBuf buffer;
     int itpb,ibpm;
-    char ititle[26];
+    char ititle[ZTM_SONGTITLE_MAXLEN];
     int imidiclock, imidistopstart;
     int islideonsubtick;
 #ifdef CONVERT_SLIDEPRECISION
@@ -958,7 +1095,7 @@ int zt_module::load(char *fn) {
     }
 
 
-    ifstream f(fn,ios::in|ios::binary);
+    std::ifstream f(fn, std::ios::in | std::ios::binary);
     if (f.fail()) {
         setstatusstr("Error loading %s (Unable to read file)",fn);
         load_lock = 0;
@@ -993,7 +1130,7 @@ int zt_module::load(char *fn) {
 
     imidiclock = flag_SendMidiClock;
     imidistopstart = flag_SendMidiStopStart;
-    memcpy(ititle,this->title,26);
+    memcpy(ititle, this->title, ZTM_SONGTITLE_MAXLEN);
     islideonsubtick = flag_SlideOnSubtick;
 #ifdef CONVERT_SLIDEPRECISION
     islideprecision = flag_SlidePrecision;
@@ -1007,7 +1144,7 @@ int zt_module::load(char *fn) {
 
     flag_SendMidiClock = imidiclock;
     flag_SendMidiStopStart = imidistopstart;
-    memcpy(this->title,ititle,26);
+    memcpy(this->title,ititle,ZTM_SONGTITLE_MAXLEN);
     flag_SlideOnSubtick = islideonsubtick;
 #ifdef CONVERT_SLIDEPRECISION
     flag_SlidePrecision = islideprecision;
@@ -1020,7 +1157,7 @@ int zt_module::load(char *fn) {
 
     if (compressed) {
 //      InflateStream is(f);
-        input = new InflateStream(f);   //&is;
+        input = new InflateStream(&f);   //&is;
     }
 
     int ret = 0;

@@ -54,23 +54,31 @@ int default_instrument_global_volume=0x7F;
 #define ZTM_INST_DEFAULT_TRANSPOSE       0x0
 #define ZTM_INST_DEFAULT_DEFAULT_VOLUME  0x7f
 #define ZTM_INST_DEFAULT_DEFAULT_LENGTH  24
-#define ZTM_INST_DEFAULT_FLAGS           INSTFLAGS_NONE
 
-instrument::instrument(int p) {
-    patch = ZTM_INST_DEFAULT_PATCH;
-    bank = ZTM_INST_DEFAULT_BANK;
-    midi_device = ZTM_INST_DEFAULT_MIDI_DEVICE;
-    channel = ZTM_INST_DEFAULT_CHANNEL;
-    transpose = ZTM_INST_DEFAULT_TRANSPOSE;
-    default_volume = ZTM_INST_DEFAULT_DEFAULT_VOLUME;
-    global_volume = default_instrument_global_volume;
-    default_length = ZTM_INST_DEFAULT_DEFAULT_LENGTH;
-    flags = ZTM_INST_DEFAULT_FLAGS;
+// <Manu>
+//#define ZTM_INST_DEFAULT_FLAGS           INSTFLAGS_NONE
+#define ZTM_INST_DEFAULT_FLAGS           INSTFLAGS_TRACKERMODE
 
-    // this is not good!  The default ought to be a 0 in the first position,
-    // but the ui expects this to be all spaces!
-    memset(title,' ',ZTM_INSTTITLE_MAXLEN);
-    title[ZTM_INSTTITLE_MAXLEN-1]=0;
+
+instrument::instrument(int p) 
+{
+  patch          = ZTM_INST_DEFAULT_PATCH ;
+  bank           = ZTM_INST_DEFAULT_BANK ;
+  midi_device    = ZTM_INST_DEFAULT_MIDI_DEVICE ;
+  channel        = ZTM_INST_DEFAULT_CHANNEL ;
+  transpose      = ZTM_INST_DEFAULT_TRANSPOSE ;
+  default_volume = ZTM_INST_DEFAULT_DEFAULT_VOLUME ;
+  global_volume  = default_instrument_global_volume ;
+  default_length = ZTM_INST_DEFAULT_DEFAULT_LENGTH ;
+  flags          = ZTM_INST_DEFAULT_FLAGS ;
+  
+  // this is not good!  The default ought to be a 0 in the first position,
+  // but the ui expects this to be all spaces!
+  memset(title,' ',ZTM_INSTTITLE_MAXLEN);
+  title[ZTM_INSTTITLE_MAXLEN-1]=0;
+
+  // <Manu>
+  MarkAsUnused() ;
 }
     
 instrument::~instrument(void) {
@@ -436,7 +444,7 @@ int pattern::isempty(void) {
 
 pattern::pattern(void) {
     int i;
-    length = zt_globals.pattern_length;
+    length = zt_config_globals.pattern_length;
     for(i=0;i<ZTM_MAX_TRACKS;i++)
         tracks[i] = new track(length);
 }
@@ -733,8 +741,8 @@ void zt_module::init(void) {
     for(i=0;i<ZTM_MAX_MIDIMACROS; i++)
         midimacros[i]=NULL;
 #endif /* USE_MIDIMACROS */
-    flag_SendMidiClock = zt_globals.midi_clock;
-    flag_SendMidiStopStart = zt_globals.midi_stop_start;
+    flag_SendMidiClock = zt_config_globals.midi_clock;
+    flag_SendMidiStopStart = zt_config_globals.midi_stop_start;
     flag_SlideOnSubtick = 1;
     version = ZT_MODULE_VERSION;
 }

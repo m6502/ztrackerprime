@@ -267,6 +267,8 @@ enum { MD_VOL=0, MD_FX, MD_FX_SIGNED, MD_END};
 class CUI_Patterneditor : public CUI_Page {
     public:
         int tracks_shown, field_size, cols_shown, clear, mode, md_mode, mousedrawing;
+        int last_cur_pattern ;
+        int last_pattern_size ;
 
         CUI_Patterneditor();
         ~CUI_Patterneditor();

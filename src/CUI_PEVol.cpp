@@ -5,9 +5,9 @@ CUI_PEVol::CUI_PEVol(void) {
     UI = new UserInterface;
     int window_width = 40 * col(1);
     int window_height = 12 * row(1);
-    int start_x = (CONSOLE_WIDTH / 2) - (window_width / 2);
+    int start_x = (RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--);
-    int start_y = (CONSOLE_HEIGHT / 2) - (window_height / 2);
+    int start_y = (RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
     
     /* Initialize Volume percent Slider */
@@ -86,9 +86,9 @@ void CUI_PEVol::draw(Drawable *S) {
     if (S->lock()==0) {
         int window_width = 40 * col(1);
         int window_height = 12 * row(1);
-        int start_x = (CONSOLE_WIDTH / 2) - (window_width / 2);
+        int start_x = (RESOLUTION_X / 2) - (window_width / 2);
         for(;start_x % 8;start_x--);
-        int start_y = (CONSOLE_HEIGHT / 2) - (window_height / 2);
+        int start_y = (RESOLUTION_Y / 2) - (window_height / 2);
         for(;start_y % 8;start_y--);
 
         S->fillRect(start_x,start_y,start_x + window_width,start_y + window_height,COLORS.Background);

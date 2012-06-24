@@ -1,223 +1,286 @@
-#include "zt.h"
 #include <png.h>
+#include "zt.h"
 
 // This was lifted from the SDL_Image package
 // www.libsdl.org
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 static void png_read_data(png_structp ctx, png_bytep area, png_size_t size)
 {
 	SDL_RWops *src;
 	src = (SDL_RWops *)png_get_io_ptr(ctx);
 	SDL_RWread(src, area, size, 1);
 }
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
 {
-	SDL_Surface *volatile surface;
-	png_structp png_ptr;
-	png_infop info_ptr;
-	png_uint_32 width, height;
-	int bit_depth, color_type, interlace_type;
-	Uint32 Rmask;
-	Uint32 Gmask;
-	Uint32 Bmask;
-	Uint32 Amask;
-	SDL_Palette *palette;
-	png_bytep *volatile row_pointers;
-	int row, i;
-	volatile int ckey = -1;
-	png_color_16 *transv;
+  SDL_Surface *volatile surface;
+  png_structp png_ptr;
+  png_infop info_ptr;
+  png_uint_32 width, height;
+  int bit_depth, color_type, interlace_type;
+  Uint32 Rmask;
+  Uint32 Gmask;
+  Uint32 Bmask;
+  Uint32 Amask;
+  png_bytep *volatile row_pointers;
+  int row ;
+  volatile int ckey ;
+  png_color_16 *transv;
 
-	/* Initialize the data we will clean up when we're done */
-	png_ptr = NULL; info_ptr = NULL; row_pointers = NULL; surface = NULL;
+  //<Manu> Variables sin usar
+  //SDL_Palette *palette;
+  //int i;
 
-	/* Check to make sure we have something to do */
-	if ( ! src ) {
-		goto done;
-	}
+  
+  ckey = -1;
+  
+  /* Initialize the data we will clean up when we're done */
+  png_ptr = NULL; 
+  info_ptr = NULL; 
+  row_pointers = NULL; 
+  surface = NULL;
+  
+  /* Check to make sure we have something to do */
+  if ( ! src ) goto done;
+  
+  /* Create the PNG loading context structure */
+  png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL,NULL,NULL) ;
+  
+  if (png_ptr == NULL){
+    //		IMG_SetError("Couldn't allocate memory for PNG file");
+    goto done;
+  }
+  
+  /* Allocate/initialize the memory for image information.  REQUIRED. */
+  info_ptr = png_create_info_struct(png_ptr);
+  if (info_ptr == NULL) {
+    //		IMG_SetError("Couldn't create image information for PNG file");
+    goto done;
+  }
+  
+//NEWPNG  /* Set error handling if you are using setjmp/longjmp method (this is
+//NEWPNG  * the normal method of doing things with libpng).  REQUIRED unless you
+//NEWPNG  * set up your own error handlers in png_create_read_struct() earlier.
+//NEWPNG  */
+//NEWPNG  if ( setjmp(png_ptr->jmpbuf) ) {
+//NEWPNG    //		IMG_SetError("Error reading the PNG file.");
+//NEWPNG    goto done;
+//NEWPNG  }
+  
+  /* Set up the input control */
+  png_set_read_fn(png_ptr, src, png_read_data);
+  
+  /* Read PNG header info */
+  png_read_info(png_ptr, info_ptr);
+  png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth,
+               &color_type, &interlace_type, NULL, NULL);
+  
+  /* tell libpng to strip 16 bit/color files down to 8 bits/color */
+  png_set_strip_16(png_ptr) ;
+  
+  /* Extract multiple pixels with bit depths of 1, 2, and 4 from a single
+  * byte into separate bytes (useful for paletted and grayscale images).
+  */
+  png_set_packing(png_ptr);
+  
+  /* scale greyscale values to the range 0..255 */
+  if(color_type == PNG_COLOR_TYPE_GRAY)
+    png_set_expand(png_ptr);
+  
+    /* For images with a single "transparent colour", set colour key;
+  if more than one index has transparency, use full alpha channel */
+  if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) {
+    int num_trans;
+    //		Uint8 *trans;         // <MANU> No compilaba, asi que he tenido que cambiarle el tipo ¿?
+    unsigned char *trans;
+    
+    num_trans=sizeof(Uint8) ;
+    
+    png_get_tRNS(png_ptr, info_ptr, &trans, &num_trans, &transv);
+    
+    if(color_type == PNG_COLOR_TYPE_PALETTE) {
+      
+      if(num_trans == 1) ckey = trans[0] ;          // exactly one transparent value: set colour key
+      else png_set_expand(png_ptr);
+      
+    } 
+    else ckey = 0; // actual value will be set later
+  }
+  
+  if ( color_type == PNG_COLOR_TYPE_GRAY_ALPHA ) png_set_gray_to_rgb(png_ptr) ;
+  
+  png_read_update_info(png_ptr, info_ptr);
+  
+  png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth,
+    &color_type, &interlace_type, NULL, NULL);
+  
+  /* Allocate the SDL surface to hold the image */
+  
+  Rmask = Gmask = Bmask = Amask = 0 ;
 
-	/* Create the PNG loading context structure */
-	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-					  NULL,NULL,NULL);
-	if (png_ptr == NULL){
-//		IMG_SetError("Couldn't allocate memory for PNG file");
-		goto done;
-	}
+  if ( color_type != PNG_COLOR_TYPE_PALETTE ) {
+    
+    if ( SDL_BYTEORDER == SDL_LIL_ENDIAN ) {
+      
+      Rmask = 0x000000FF;
+      Gmask = 0x0000FF00;
+      Bmask = 0x00FF0000;
+      Amask = (png_get_channels(png_ptr, info_ptr) == 4) ? 0xFF000000 : 0;
+    } 
+    else {
+      
+      int s = (png_get_channels(png_ptr, info_ptr) == 4) ? 0 : 8;
 
-	 /* Allocate/initialize the memory for image information.  REQUIRED. */
-	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL) {
-//		IMG_SetError("Couldn't create image information for PNG file");
-		goto done;
-	}
+      Rmask = 0xFF000000 >> s;
+      Gmask = 0x00FF0000 >> s;
+      Bmask = 0x0000FF00 >> s;
+      Amask = 0x000000FF >> s;
+    }
+  }
+  
+  surface = SDL_AllocSurface(SDL_SWSURFACE, width, height,
+    bit_depth*png_get_channels(png_ptr, info_ptr), Rmask,Gmask,Bmask,Amask);
+  
+  if ( surface == NULL ) {
+    //		IMG_SetError("Out of memory");
+    goto done;
+  }
+  
+  if(ckey != -1) {
+    
+    if(color_type != PNG_COLOR_TYPE_PALETTE) {
 
-	/* Set error handling if you are using setjmp/longjmp method (this is
-	 * the normal method of doing things with libpng).  REQUIRED unless you
-	 * set up your own error handlers in png_create_read_struct() earlier.
-	 */
-	if ( setjmp(png_ptr->jmpbuf) ) {
-//		IMG_SetError("Error reading the PNG file.");
-		goto done;
-	}
+      /* FIXME: Should these be truncated or shifted down? */
+      ckey = SDL_MapRGB(surface->format, (Uint8)transv->red, (Uint8)transv->green, (Uint8)transv->blue) ;
+      SDL_SetColorKey(surface, SDL_SRCCOLORKEY, ckey);
+    }
+  }
+  
+  /* Create the array of pointers to image data */
 
-	/* Set up the input control */
-	png_set_read_fn(png_ptr, src, png_read_data);
+  row_pointers = (png_bytep*) malloc(sizeof(png_bytep)*height);
+  
+  if ( (row_pointers == NULL) ) {
 
-	/* Read PNG header info */
-	png_read_info(png_ptr, info_ptr);
-	png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth,
-			&color_type, &interlace_type, NULL, NULL);
+    //		IMG_SetError("Out of memory");
+    SDL_FreeSurface(surface);
+    surface = NULL;
+    goto done;
+  }
 
-	/* tell libpng to strip 16 bit/color files down to 8 bits/color */
-	png_set_strip_16(png_ptr) ;
+  for (row = 0; row < (int)height; row++) {
 
-	/* Extract multiple pixels with bit depths of 1, 2, and 4 from a single
-	 * byte into separate bytes (useful for paletted and grayscale images).
-	 */
-	png_set_packing(png_ptr);
+    row_pointers[row] = (png_bytep) (Uint8 *)surface->pixels + row*surface->pitch;
+  }
+  
+  /* Read the entire image in one go */
+  png_read_image(png_ptr, row_pointers);
+  
+  /* read rest of file, get additional chunks in info_ptr - REQUIRED */
+  png_read_end(png_ptr, info_ptr);
 
-	/* scale greyscale values to the range 0..255 */
-	if(color_type == PNG_COLOR_TYPE_GRAY)
-		png_set_expand(png_ptr);
+#ifdef ___DESACTIVADO_
 
-	/* For images with a single "transparent colour", set colour key;
-	   if more than one index has transparency, use full alpha channel */
-	if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) {
-	        int num_trans;
-		Uint8 *trans;
-		png_get_tRNS(png_ptr, info_ptr, &trans, &num_trans,
-			     &transv);
-		if(color_type == PNG_COLOR_TYPE_PALETTE) {
-		    if(num_trans == 1) {
-			/* exactly one transparent value: set colour key */
-			ckey = trans[0];
-		    } else
-			png_set_expand(png_ptr);
-		} else
-		    ckey = 0; /* actual value will be set later */
-	}
+  /* Load the palette, if any */
+  palette = surface->format->palette;
+  if ( palette ) {
+    if(color_type == PNG_COLOR_TYPE_GRAY) {
+      palette->ncolors = 256;
+      
+      for(i = 0; i < 256; i++) {
+        palette->colors[i].r = i;
+        palette->colors[i].g = i;
+        palette->colors[i].b = i;
+      }
+      
+    } 
+    else {
+      
+      if (info_ptr->num_palette > 0 ) {
 
-	if ( color_type == PNG_COLOR_TYPE_GRAY_ALPHA )
-		png_set_gray_to_rgb(png_ptr);
+        palette->ncolors = info_ptr->num_palette; 
+      
+        for( i=0; i<info_ptr->num_palette; ++i ) {
+        
+          palette->colors[i].b = info_ptr->palette[i].blue;
+          palette->colors[i].g = info_ptr->palette[i].green;
+          palette->colors[i].r = info_ptr->palette[i].red;
+        }
+      }      
+    }
+  }
 
-	png_read_update_info(png_ptr, info_ptr);
-
-	png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth,
-			&color_type, &interlace_type, NULL, NULL);
-
-	/* Allocate the SDL surface to hold the image */
-	Rmask = Gmask = Bmask = Amask = 0 ; 
-	if ( color_type != PNG_COLOR_TYPE_PALETTE ) {
-		if ( SDL_BYTEORDER == SDL_LIL_ENDIAN ) {
-			Rmask = 0x000000FF;
-			Gmask = 0x0000FF00;
-			Bmask = 0x00FF0000;
-			Amask = (info_ptr->channels == 4) ? 0xFF000000 : 0;
-		} else {
-		        int s = (info_ptr->channels == 4) ? 0 : 8;
-			Rmask = 0xFF000000 >> s;
-			Gmask = 0x00FF0000 >> s;
-			Bmask = 0x0000FF00 >> s;
-			Amask = 0x000000FF >> s;
-		}
-	}
-	surface = SDL_AllocSurface(SDL_SWSURFACE, width, height,
-			bit_depth*info_ptr->channels, Rmask,Gmask,Bmask,Amask);
-	if ( surface == NULL ) {
-//		IMG_SetError("Out of memory");
-		goto done;
-	}
-
-	if(ckey != -1) {
-	        if(color_type != PNG_COLOR_TYPE_PALETTE)
-			/* FIXME: Should these be truncated or shifted down? */
-		        ckey = SDL_MapRGB(surface->format,
-			                 (Uint8)transv->red,
-			                 (Uint8)transv->green,
-			                 (Uint8)transv->blue);
-	        SDL_SetColorKey(surface, SDL_SRCCOLORKEY, ckey);
-	}
-
-	/* Create the array of pointers to image data */
-	row_pointers = (png_bytep*) malloc(sizeof(png_bytep)*height);
-	if ( (row_pointers == NULL) ) {
-//		IMG_SetError("Out of memory");
-		SDL_FreeSurface(surface);
-		surface = NULL;
-		goto done;
-	}
-	for (row = 0; row < (int)height; row++) {
-		row_pointers[row] = (png_bytep)
-				(Uint8 *)surface->pixels + row*surface->pitch;
-	}
-
-	/* Read the entire image in one go */
-	png_read_image(png_ptr, row_pointers);
-
-	/* read rest of file, get additional chunks in info_ptr - REQUIRED */
-	png_read_end(png_ptr, info_ptr);
-
-	/* Load the palette, if any */
-	palette = surface->format->palette;
-	if ( palette ) {
-	    if(color_type == PNG_COLOR_TYPE_GRAY) {
-		palette->ncolors = 256;
-		for(i = 0; i < 256; i++) {
-		    palette->colors[i].r = i;
-		    palette->colors[i].g = i;
-		    palette->colors[i].b = i;
-		}
-	    } else if (info_ptr->num_palette > 0 ) {
-		palette->ncolors = info_ptr->num_palette; 
-		for( i=0; i<info_ptr->num_palette; ++i ) {
-		    palette->colors[i].b = info_ptr->palette[i].blue;
-		    palette->colors[i].g = info_ptr->palette[i].green;
-		    palette->colors[i].r = info_ptr->palette[i].red;
-		}
-	    }
-	}
+#endif
 
 done:	/* Clean up and return */
-	png_destroy_read_struct(&png_ptr, info_ptr ? &info_ptr : (png_infopp)0,
-								(png_infopp)0);
-	if ( row_pointers ) {
-		free(row_pointers);
-	}
-	return(surface); 
+
+  png_destroy_read_struct(&png_ptr, info_ptr ? &info_ptr : (png_infopp)0, (png_infopp)0) ;
+  
+  if ( row_pointers ) {
+    
+    free(row_pointers);
+  }
+  
+  return(surface); 
 }
 
 
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 SDL_Surface *IMG_DoLoad(SDL_RWops *src, int freesrc, char *type)
 {
 	int start;
-	SDL_Surface *image;
+  SDL_Surface *image;
+
 	/* Make sure there is something to do.. */
-	if ( src == NULL ) {
-		return(NULL);
-	}
-	/* See whether or not this data source can handle seeking */
-	if ( SDL_RWseek(src, 0, SEEK_CUR) < 0 ) {
+	if ( src == NULL ) return(NULL);
+
+  /* See whether or not this data source can handle seeking */
+	
+  if ( SDL_RWseek(src, 0, SEEK_CUR) < 0 ) {
 //		IMG_SetError("Can't seek in this data source");
 		return(NULL);
 	}
-	/* Detect the type of image being loaded */
+
+  /* Detect the type of image being loaded */
 	start = SDL_RWtell(src);
 	image = NULL;
-    SDL_RWseek(src, start, SEEK_SET);
-    image = IMG_LoadPNG_RW(src);    
+  
+  SDL_RWseek(src, start, SEEK_SET);
+  image = IMG_LoadPNG_RW(src);
+
 	/* Clean up, check for errors, and return */
-	if ( freesrc ) {
-		SDL_RWclose(src);
-	}
-	return(image);
+	if ( freesrc ) SDL_RWclose(src);
+
+  return(image);
 }
 
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 SDL_Surface *SDL_LoadPNG(const char *file)
 {
-    SDL_RWops *src = SDL_RWFromFile(file, "rb");
-    char *ext = strrchr(file, '.');
-    if(ext)
-	ext++;
-    return IMG_DoLoad(src, 1, ext);
+  SDL_RWops *src =SDL_RWFromFile(file, "rb") ;
+  char *ext = (char *)strrchr(file, '.') ;
+
+  if(ext) ext++ ;
+
+  return(IMG_DoLoad(src, 1, ext)) ;
 }
 
 
@@ -235,6 +298,9 @@ SDL_Surface *SDL_LoadPNG(const char *file)
 
 #define VALUE_LIMIT	0.001
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 int zoomSurfaceRGBA (SDL_Surface *src, SDL_Surface *dst, int smooth)
 {
  int x, y, sx, sy, *sax, *say, *csax, *csay, csx, csy, ex, ey, t1, t2, sstep;
@@ -400,6 +466,9 @@ int zoomSurfaceRGBA (SDL_Surface *src, SDL_Surface *dst, int smooth)
  
 */  
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 int zoomSurfaceY (SDL_Surface *src, SDL_Surface *dst)
 {
  Uint32 x, y, sx, sy, *sax, *say, *csax, *csay, csx, csy;
@@ -484,6 +553,12 @@ int zoomSurfaceY (SDL_Surface *src, SDL_Surface *dst)
 
  return(0);
 }
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 SDL_Surface * zoomSurface (SDL_Surface *src, double zoomx, double zoomy, int smooth) 
 {
  SDL_Surface *rz_src;
@@ -566,3 +641,5 @@ SDL_Surface * zoomSurface (SDL_Surface *src, double zoomx, double zoomy, int smo
  /* Return destination surface */
  return(rz_dst);
 }
+
+

@@ -34,29 +34,40 @@ void InitializePlugins(midiOut *mout) {
 // TestTone plugin - Plays a square wave at fixed freq
 //
 
-TestToneOutputDevice::TestToneOutputDevice() {
+TestToneOutputDevice::TestToneOutputDevice()
+{
+  int i ;
+
     type = OUTPUTDEVICE_TYPE_AUDIO;
     strcpy(szName, "TestTone Audio Plugin");
     reset();
     wavec = 0;
-    for(int i=0;i<128;i++)
+    for(i=0;i<128;i++)
         wave[i]=0;
     for(i=128;i<256;i++)
         wave[i]=0x7F;
     //smp = NULL;
- }
+}
+
+
 TestToneOutputDevice::~TestToneOutputDevice() {
 }
+
+
 int TestToneOutputDevice::open(void) {
     //smp = Mix_LoadWAV("sound.wav");
     opened = 1;
     return 0;
 }
+
+
 int TestToneOutputDevice::close(void) {
     //Mix_FreeChunk(smp);
     opened = 0;
     return 0;
 }
+
+
 void TestToneOutputDevice::reset(void) {
     makenoise = 0;
     OutputDevice::reset(); // dont forget this
@@ -187,39 +198,69 @@ int MidiOutputDevice::close(void) {
     }
     return -1;
 }
-void MidiOutputDevice::reset(void) {
-    if (this->opened) {
-        for(int i=0;i<128;i++) {
-            for (int j=0;j<16;j++)
-                if (this->notestates[i][j] & NB_ON)
-					midiOutMsg( 0x80 + j, i, 0);
-        }
-        for (i=0;i<16;i++) {   
-			midiOutMsg(0xE0 + i, 0x0, 0x40);
-//            midiOutShortMsg(this->handle,(0xE0+i) + (0x40<<16)); // reset pitchwheel
-/*
-            midiOutShortMsg(this->handle,(0xB0+i) + (0x79<<8) + (0<<16));     // Reset ctrl
-            midiOutShortMsg(this->handle,(0xB0+i) + (0x40<<8) + (0<<16));     // Sustain
-            midiOutShortMsg(this->handle,(0xB0+i) + (0x01<<8) + (0<<16));     // Modulation
-*/
-        }
+
+
+void MidiOutputDevice::reset(void) 
+{
+  int i, j ;
+
+  if (this->opened) {
+    
+    for(i=0;i<128;i++) {
+
+      for (j=0;j<16;j++) {
+
+        if (this->notestates[i][j] & NB_ON) midiOutMsg( 0x80 + j, i, 0);
+      }
     }
-	m_runningStatus = 0;
-    OutputDevice::reset(); // dont forget this
+    
+    for (i=0;i<16;i++) {
+
+      midiOutMsg(0xE0 + i, 0x0, 0x40);
+      //            midiOutShortMsg(this->handle,(0xE0+i) + (0x40<<16)); // reset pitchwheel
+      /*
+      midiOutShortMsg(this->handle,(0xB0+i) + (0x79<<8) + (0<<16));     // Reset ctrl
+      midiOutShortMsg(this->handle,(0xB0+i) + (0x40<<8) + (0<<16));     // Sustain
+      midiOutShortMsg(this->handle,(0xB0+i) + (0x01<<8) + (0<<16));     // Modulation
+      */
+    }
+  }
+  
+  m_runningStatus = 0;
+  OutputDevice::reset(); // dont forget this
 }
+
+
 void MidiOutputDevice::hardpanic(void) {
     panic();
     if (this->opened)
         midiOutReset(handle);
 	m_runningStatus = 0;
 }
-void MidiOutputDevice::send(unsigned int msg) {
-    if (this->opened) {
-        midiOutShortMsg(handle, msg);
-		if (msg&0xFF >= 0xF0 && msg&0xFF < 0xF8)
-			m_runningStatus = 0; // Clear running status if not system realtime or data bytes
-    } 
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void MidiOutputDevice::send(unsigned int msg)
+{
+  if (this->opened) {
+    
+    midiOutShortMsg(handle, msg);
+
+    if ((msg & 0xFF) >= 0xF0 && 
+        (msg & 0xFF) < 0xF8) {
+      
+      m_runningStatus = 0; // Clear running status if not system realtime or data bytes
+    }
+  } 
 }
+
+
+
+
 void MidiOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
 	midiOutMsg( 0x90 + chan, note, vol);
 }

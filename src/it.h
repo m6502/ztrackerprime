@@ -113,8 +113,15 @@ public:
     }
 
     void Init(void) { // init with default info.
+
+        int i ;
+
         strcpy(headerID, "IMPM");
-        for (int i = 0; i < 26; i++) songName[i] = 0;
+        
+        for (i = 0; i < 26; i++) {
+          
+          songName[i] = 0;
+        }
 
         extra = 0;
         numOrders = numIns = numSamples = numPatterns = 0;
@@ -137,8 +144,15 @@ public:
 
         reserved = 0;
 
-        for (i = 0; i < 64; i++) channelPan[i] = 32;
-        for (i = 0; i < 64; i++) channelVolume[i] = 64;
+        for (i = 0; i < 64; i++) {
+          
+          channelPan[i] = 32;
+        }
+
+        for (i = 0; i < 64; i++) {
+          
+          channelVolume[i] = 64;
+        }
 
         orders = NULL;
         instrumentOffset = sampleOffset = patternOffset = NULL;
