@@ -20,19 +20,12 @@ Everyone does have his own tastes, routines and circumstances. zTracker' behaves
 for me and I like it better than the original. But in your case could be a different history. It is
 a good idea to check the following list to understand what this fork is about.
 
-There's also the possibility that I misunderstood how something worked and "fixing" it I broke it.
+There's also the possibility that I misunderstood how something worked and "fixing" it I broke it,
+or that I have changed the way something works that could have been activated by just pressing a 
+key. Who knows?
 
-I'm open to your feedback. I love this software and I will try to fix all the bugs I could have
-introduced with my changes, plus the bugs from the 2002 version I didn't catch. Please, don't 
-hesitate to contact me about this matter!
 
-So, what's new / different from the original ZTracker?
-
-Well, this is a nearly complete list of changes from the original program. It is not perfect though, 
-because it's been a lot of years since I started tinkering with the source code. I can't be sure if 
-I really documented ALL the changes I performed. In fact, I know that, at least, I forgot to write 
-one of them, so there can be more!
-
+So, what's new / different from the original zTracker?
 
 Program behavior changes:
 
@@ -95,3 +88,12 @@ Other changes:
 - Directory tree has been changed.
 - Version number scheme and program name have been changed, too.
 
+
+Well, this is a nearly complete list of changes from the original program. It is not perfect though, 
+because it's been a lot of years since I started playing with the source code. I can't be sure if 
+I really documented ALL the changes I performed. In fact, I know that, at least, I forgot to write 
+one of them, so there can be more!
+
+I'm open to your feedback. I love this software and I will try to fix all the bugs I could have
+introduced with my changes, plus the bugs from the 2002 version I didn't catch. Please, don't 
+hesitate to contact me about this matter!
