@@ -135,6 +135,10 @@
 
  A..xx      : Set TPB (ticks per beat)
  
+ B  00      : Set "[" in the midi file.
+ 
+ B  01      : Set "]" in the midi file.
+ 
  Cxxxx      : Pattern break - setting the C marker denotes the end of a 
               pattern.  ex: C0000 will skip to the next pattern, row 0
  
