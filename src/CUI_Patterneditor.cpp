@@ -752,7 +752,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
   
   
-  printchar(col(5), row(80), 'P', COLORS.Highlight, S) ;
+  //printchar(col(5), row(80), 'P', COLORS.Highlight, S) ;
 }
 
 

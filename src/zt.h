@@ -34,7 +34,7 @@
 //#define VER_MIN 986
 
 
-#define ZTRACKER_VERSION                "zTracker' v20120622"
+#define ZTRACKER_VERSION                "zTracker' v20120624"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
