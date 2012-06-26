@@ -2571,6 +2571,12 @@ int main(int argc, char *argv[])
 //
 static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
 {
+#ifndef __ENABLE_FULL_SCREEN
+
+  return 0 ;
+
+#else
+
     long framesize = 0;
     void *pixels = NULL;
     SDL_Rect clip;
@@ -2695,6 +2701,8 @@ static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
     SDL_ShowCursor(showmouse);
 
     return(1);
+
+#endif
 } /* attempt_fullscreen_toggle */
 
 
