@@ -117,7 +117,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="copy doc\help.txt program"
+				CommandLine=""
 			/>
 		</Configuration>
 		<Configuration
@@ -220,7 +220,7 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
-				CommandLine="copy doc\help.txt program"
+				CommandLine=""
 			/>
 		</Configuration>
 	</Configurations>
