@@ -21,11 +21,18 @@ CUI_Playsong::CUI_Playsong(void)
 
     p = new PatternDisplay;
     p->x = 1;
-    p->y = 20 ;
+
+    clear = 0 ;
+
+    // <Manu> ¿Por qué 20?
+    //p->y = 20 ;
+    p->y = 14 ;
     
-    // <Manu> ARREGLAR: Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
-    //p->ysize = 30;
-    p->ysize = 62;
+    // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
+    //p->ysize = 30 ;
+
+    p->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - p->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+    //p->ysize = 62;
 
     UI_PatternDisplay->add_element(p,0);
 
@@ -193,9 +200,14 @@ void CUI_Playsong::draw(Drawable *S)
   //  char str[256];
   if (S->lock()==0) {
     
-    if (clear) {
+    if (clear > 0) {
       
-      S->fillRect(0,row(15),RESOLUTION_X,row(50)/*410*/,COLORS.Background);
+
+                                                    // <Manu> cambio res
+      //S->fillRect(0,row(15),INTERNAL_RESOLUTION_X,row(50)/*410*/,COLORS.Background);
+      S->fillRect(0, row(15), INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y - (640 - row(50))/*410*/,COLORS.Background);
+
+      clear = 0 ;
     }
     
     printtitle(11,"Play Song",COLORS.Text,COLORS.Background,S);
@@ -205,7 +217,7 @@ void CUI_Playsong::draw(Drawable *S)
     UI->draw(S);
     
     S->unlock();
-    clear=0;
+    
   }
 }
 

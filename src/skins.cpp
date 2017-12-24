@@ -120,11 +120,13 @@ int Skin::load(char *name, bool quiet)
   pngLoad("toolbar.png");
   bmToolbar = new Bitmap( s , true );
 
+#ifdef _ENABLE_LOAD_SAVE_DECORATION
   pngLoad("load.png");
   bmLoad = new Bitmap( s , true );
 
   pngLoad("save.png");
   bmSave = new Bitmap( s , true );
+#endif
 
   pngLoad("buttons.png");
   bmButtons = new Bitmap( s , true );
@@ -132,10 +134,10 @@ int Skin::load(char *name, bool quiet)
   pngLoad("about.png");
   bmAbout = new Bitmap( s , true );
 
-  if (640 != RESOLUTION_X && 480 != RESOLUTION_Y) {
+  if (640 != INTERNAL_RESOLUTION_X && 480 != INTERNAL_RESOLUTION_Y) {
     
-    double xscale = (double)RESOLUTION_X / 640;
-    double yscale = (double)RESOLUTION_Y / 480;
+    double xscale = (double)INTERNAL_RESOLUTION_X / 640;
+    double yscale = (double)INTERNAL_RESOLUTION_Y / 480;
     Drawable ss( zoomSurface(bmAbout->surface, xscale, yscale ,SMOOTHING_ON) , false );
     //        S->copy(&ss,5,row(12));
     SDL_FreeSurface( bmAbout->surface );
@@ -147,6 +149,7 @@ int Skin::load(char *name, bool quiet)
   bmLogo = NULL;
   
   makepath(d,"font.fnt");
+  //makepath(d,"cour.ttf");
 
   if (font_load(d)) {
     sprintf(d, "Skin[%s]: Cannot load font.fnt", name); 
@@ -193,8 +196,12 @@ void Skin::freeLogo(void)
 void Skin::unload() 
 {
   delete bmToolbar;
+
+#ifdef _ENABLE_LOAD_SAVE_DECORATION
   delete bmLoad;
   delete bmSave;
+#endif
+
   delete bmButtons;
   delete bmAbout;
   delete bmLogo;
@@ -218,7 +225,7 @@ extern void make_toolbar(void); // This is defined in main.cpp
 // ------------------------------------------------------------------------------------------------
 //
 //
-Skin * Skin::switchskin(char *newskintitle) 
+Skin *Skin::switchskin(char *newskintitle) 
 {
   Skin *newskin ;
   
@@ -232,6 +239,7 @@ Skin * Skin::switchskin(char *newskintitle)
     status_change = 1;  
     return newskin;
   }
+
   doredraw++;
   need_refresh++;
   CurrentSkin = newskin;

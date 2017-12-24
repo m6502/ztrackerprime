@@ -230,12 +230,12 @@ ZTConf::ZTConf() {
     midi_clock = 1; // default_midiclock;
     midi_stop_start = 1; // default_midistopstart;
     instrument_global_volume = 127;
-    cur_edit_mode = VIEW_REGULAR;
+    cur_edit_mode = VIEW_BIG;
     default_tpb = 8;
     default_bpm = 138;
     prebuffer_rows = 8;
     step_editing = 1;
-	centered_editing = 1;
+	  centered_editing = 1;
     screen_width = 640;
     screen_height = 480;
     autoload_ztfile = 0;
@@ -272,8 +272,12 @@ int ZTConf::load() {
         highlight_increment = atoi(Config->get("default_highlight_increment"));
     if(Config->get("default_lowlight_increment"))
         lowlight_increment = atoi(Config->get("default_lowlight_increment"));
-	if(Config->get("default_view_mode"))
-		cur_edit_mode = atoi(Config->get("default_view_mode"));
+
+    if(Config->get("default_view_mode")) {
+		  cur_edit_mode = atoi(Config->get("default_view_mode"));
+      if(cur_edit_mode < 0 || cur_edit_mode > 3) cur_edit_mode = VIEW_BIG ;
+    }
+
     
     ////////////////////////////////////////////////
     

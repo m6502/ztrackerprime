@@ -117,21 +117,26 @@
         SDL_Rect dstrect;
         dstrect.x = x;
         dstrect.y = y;
+
+        // <Manu> ?
+        //dstrect.w = ? ;
+        //dstrect.h = ? ;
+
         if (Source)
             return SDL_BlitSurface(Source->surface, NULL, this->surface, &dstrect);
         else
             return -1;
     }
-    long Drawable::copy(Drawable* Source, int x, int y,
-                      int x1, int y1, int x2, int y2
+    long Drawable::copy(Drawable* Source, int dest_x, int dest_y,
+                      int source_x1, int source_y1, int source_x2, int source_y2
                       ) {
         SDL_Rect srcrect, dstrect;
-        srcrect.x = x1;
-        srcrect.y = y1;
-        srcrect.w = x2 - x1+1;
-        srcrect.h = y2 - y1+1;
-        dstrect.x = x;
-        dstrect.y = y;
+        srcrect.x = source_x1;
+        srcrect.y = source_y1;
+        srcrect.w = source_x2 - (source_x1 + 1) ;
+        srcrect.h = source_y2 - (source_y1 + 1);
+        dstrect.x = dest_x;
+        dstrect.y = dest_y;
         if (Source)
             return SDL_BlitSurface(Source->surface, &srcrect, this->surface, &dstrect);
         else
@@ -142,7 +147,7 @@
 
     void Drawable::drawHLine(int y, int x, int x2, TColor c) {
         TColor *screen = (TColor *)surface->pixels;
-        screen += y*RESOLUTION_X + x;
+        screen += y*INTERNAL_RESOLUTION_X + x;
         TColor *end;
         end = screen + (x2-x);
         for(;screen<end;screen++)

@@ -92,7 +92,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     ie->x = 5;
     ie->y = 13;
     ie->xsize = 29;
-    int s = 39 + ((RESOLUTION_Y-480)/8);
+    int s = 39 + ((INTERNAL_RESOLUTION_Y-480)/8);
     if (s>100) s = 100;
     ie->ysize = s;
 

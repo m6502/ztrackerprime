@@ -26,7 +26,9 @@ public:
   long fillRect (int x1, int y1, int x2, int y2, TColor color);
   void release(void);
   void Release(void);
-  long copy(Drawable* Source, int x, int y, int x1, int y1, int x2, int y2);
+  long copy(Drawable* Source, 
+            int dest_x, int dest_y, 
+            int source_x1, int source_y1, int source_x2, int source_y2) ;
 
   long copy(Drawable* Source, int x, int y);
   void flip(void);
@@ -336,18 +338,6 @@ Bitmap* newBitmap(int Width, int Height, int Flags=0);
 #define DIK_RIGHTARROW      DIK_RIGHT           // RightArrow on arrow keypad 
 #define DIK_DOWNARROW       DIK_DOWN            // DownArrow on arrow keypad 
 #define DIK_PGDN            DIK_NEXT            // PgDn on arrow keypad 
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

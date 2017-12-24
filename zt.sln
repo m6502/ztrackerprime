@@ -1,13 +1,15 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual C++ Express 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zt", "zt.vcproj", "{4864983A-C625-4447-B2F1-C0FCF882458A}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zt", "zt.vcxproj", "{4864983A-C625-4447-B2F1-C0FCF882458A}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zt_manual", "doc\manual\zt_manual.vcproj", "{9EEDFB58-5EFA-4BD3-9E87-59F8795B1EAB}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zt_manual", "doc\manual\zt_manual.vcxproj", "{9EEDFB58-5EFA-4BD3-9E87-59F8795B1EAB}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ztconf", "ztconf\ztconf.vcproj", "{E2FAE786-155A-4C01-9AA2-E5A535FE4117}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ztconf", "ztconf\ztconf.vcxproj", "{E2FAE786-155A-4C01-9AA2-E5A535FE4117}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ztskin", "ztskin\ztskin.vcproj", "{F8956B71-5787-4CBE-8158-6CC45352F80A}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ztskin", "ztskin\ztskin.vcxproj", "{F8956B71-5787-4CBE-8158-6CC45352F80A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

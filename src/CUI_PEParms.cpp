@@ -7,9 +7,9 @@ CUI_PEParms::CUI_PEParms(void) {
 
     int window_width = 54 * col(1);
     int window_height = 20 * row(1);
-    int start_x = (RESOLUTION_X / 2) - (window_width / 2);
+    int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--);
-    int start_y = (RESOLUTION_Y / 2) - (window_height / 2);
+    int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
     
     /* Initialize BPM Slider */
@@ -173,9 +173,9 @@ void CUI_PEParms::draw(Drawable *S) {
     int i;
     int window_width = 54 * col(1);
     int window_height = 20 * row(1);
-    int start_x = (RESOLUTION_X / 2) - (window_width / 2);
+    int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--);
-    int start_y = (RESOLUTION_Y / 2) - (window_height / 2);
+    int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
 
     if (S->lock()==0) {

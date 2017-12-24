@@ -116,7 +116,11 @@ public:
 
         int i ;
 
-        strcpy(headerID, "IMPM");
+        //<Manu> headerID[5] = NULL ; <- :-(
+        headerID[0] = 'I' ;
+        headerID[0] = 'M' ;
+        headerID[0] = 'P' ;
+        headerID[0] = 'M' ;
         
         for (i = 0; i < 26; i++) {
           

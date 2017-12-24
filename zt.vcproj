@@ -544,10 +544,6 @@
 				>
 			</File>
 			<File
-				RelativePath="src\resource.h"
-				>
-			</File>
-			<File
 				RelativePath="src\skins.cpp"
 				>
 				<FileConfiguration
@@ -1447,31 +1443,6 @@
 						PreprocessorDefinitions=""
 					/>
 				</FileConfiguration>
-			</File>
-		</Filter>
-		<Filter
-			Name="Documents"
-			Filter="*.txt"
-			>
-			<File
-				RelativePath="Cambios.txt"
-				>
-			</File>
-			<File
-				RelativePath="docs\CHANGELOG.txt"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="docs\help.txt"
-				>
 			</File>
 		</Filter>
 		<Filter

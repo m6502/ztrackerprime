@@ -62,7 +62,8 @@ void fix_short_cols(void) {
     col_desc[2] = col_desc[3] = "Instrument (0-7F)";
 }
 
-void init_fx_cols(void) {
+void init_fx_cols(void)
+{
 	init_short_cols();
     edit_cols[4].startx = 7;
     edit_cols[4].type   = T_FX;

@@ -34,7 +34,7 @@ SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
   png_bytep *volatile row_pointers;
   int row ;
   volatile int ckey ;
-  png_color_16 *transv;
+  png_color_16 *transv = NULL ;
 
   //<Manu> Variables sin usar
   //SDL_Palette *palette;
@@ -159,6 +159,8 @@ SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
     
     if(color_type != PNG_COLOR_TYPE_PALETTE) {
 
+      _ASSERT(transv) ;
+
       /* FIXME: Should these be truncated or shifted down? */
       ckey = SDL_MapRGB(surface->format, (Uint8)transv->red, (Uint8)transv->green, (Uint8)transv->blue) ;
       SDL_SetColorKey(surface, SDL_SRCCOLORKEY, ckey);
@@ -179,7 +181,9 @@ SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
 
   for (row = 0; row < (int)height; row++) {
 
-    row_pointers[row] = (png_bytep) (Uint8 *)surface->pixels + row*surface->pitch;
+    // <Manu> 
+    //row_pointers[row] = (png_bytep) (Uint8 *)surface->pixels + row*surface->pitch;
+    row_pointers[row] = (png_bytep) (((Uint8 *)surface->pixels) + (row * surface->pitch));
   }
   
   /* Read the entire image in one go */

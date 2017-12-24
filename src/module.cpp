@@ -712,12 +712,19 @@ zt_module::zt_module(int t,int b) {
     init();
 }
 
+
+
+
 zt_module::~zt_module() {
     de_init();
     
 }
 
-void zt_module::init(void) {
+
+
+
+void zt_module::init(void)
+{
     int i;
     memset(title,0,ZTM_SONGTITLE_MAXLEN);
     memset(filename,0,ZTM_FILENAME_MAXLEN);
@@ -727,25 +734,40 @@ void zt_module::init(void) {
     
     for(i=0;i<ZTM_MAX_PATTERNS;i++)
         patterns[i] = new pattern;
+
     for(i=0;i<ZTM_MAX_INSTS;i++)
         instruments[i] = new instrument(i);
+
     for(i=0;i<ZTM_MAX_TRACKS;i++)
         track_mute[i] = 0;
+
     for(i=0;i<ZTM_ORDERLIST_LEN;i++)
         orderlist[i] = 0x100; // 0x100 = Break, 0x101 = Skip
+
 #ifdef USE_ARPEGGIOS
     for(i=0;i<ZTM_MAX_ARPEGGIOS;i++)
         arpeggios[i]=NULL;
 #endif /* USE_ARPEGGIOS */
+
 #ifdef USE_MIDIMACROS
     for(i=0;i<ZTM_MAX_MIDIMACROS; i++)
         midimacros[i]=NULL;
 #endif /* USE_MIDIMACROS */
+
     flag_SendMidiClock = zt_config_globals.midi_clock;
     flag_SendMidiStopStart = zt_config_globals.midi_stop_start;
     flag_SlideOnSubtick = 1;
+
     version = ZT_MODULE_VERSION;
 }
+
+
+
+
+
+
+
+
 
 void zt_module::de_init(void) {
     int i;
@@ -794,15 +816,19 @@ void zt_module::init_pattern(int which) {
 }
 
 void zt_module::reset(void) {
+
     int i,j;
     for(i=0;i<ZTM_MAX_PATTERNS;i++) {
         if (patterns[i]) {
+
             for(j=0;j<ZTM_MAX_TRACKS;j++)
                 if (patterns[i]->tracks[j])
                     patterns[i]->tracks[j]->reset();
         }
     }
-    file_changed++;
+
+
+    //file_changed++;
 }
 /* eof */
 

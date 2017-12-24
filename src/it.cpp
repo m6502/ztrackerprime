@@ -1110,7 +1110,7 @@ int ITPackedPatternList::Load(FILE* infile, ITHeader* header) {
     // returns number of packed patterns successfully loaded
     int numLoaded = 0;
 
-    if ((header == NULL) || (infile == NULL) || (header-numPatterns <= 0))
+    if ((header == NULL) || (infile == NULL) || (header->numPatterns <= 0))
         return 0;
 
     delete [] packedPatterns;

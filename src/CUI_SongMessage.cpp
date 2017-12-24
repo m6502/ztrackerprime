@@ -49,8 +49,8 @@ CUI_SongMessage::CUI_SongMessage(void) {
     UI->add_element(tb, 0);
     tb->x = 1;
     tb->y = 14;
-    tb->xsize = 78 + ((RESOLUTION_X-640)/8);
-    tb->ysize = 36+ ((RESOLUTION_Y-480)/8);
+    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    tb->ysize = 36+ ((INTERNAL_RESOLUTION_Y-480)/8);
     tb->text = NULL;//"\n\n  This is the song comment.  Edit me!";
     needfree = 0;
     buffer = NULL;

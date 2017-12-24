@@ -350,8 +350,8 @@ void UserInterface::update()
 void UserInterface::draw(Drawable *S) {
     UserInterfaceElement *e = UIEList;
     if (needaclear) {
-        S->fillRect(col(1),row(12),RESOLUTION_X,424,COLORS.Background);
-        screenmanager.Update(col(1),row(12),RESOLUTION_X,424);
+        S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,424,COLORS.Background);
+        screenmanager.Update(col(1),row(12),INTERNAL_RESOLUTION_X,424);
     }
     needaclear=0;
     while(e) {
@@ -838,7 +838,9 @@ int Frame::update() {
 //
 void Frame::draw(Drawable *S, int active) {
     int cy;
+
     if (type) {
+
         printline(col(x),row(y-1),0x81,xsize,COLORS.Lowlight,S);
         printline(col(x),row(y+ysize),0x86,xsize,COLORS.Highlight,S);
         for (cy=y;cy<y+ysize;cy++) {
@@ -846,6 +848,7 @@ void Frame::draw(Drawable *S, int active) {
             printchar(col(x+xsize),row(cy),0x84,COLORS.Highlight,S);
         }
     } else {
+
         printline(col(x),row(y-1),0x86,xsize,COLORS.Lowlight,S);
         printline(col(x),row(y+ysize),0x81,xsize,COLORS.Highlight,S);
         for (cy=y;cy<y+ysize;cy++) {
@@ -1558,9 +1561,11 @@ int TextBox::mouseupdate(int cur_element)
     } ;
   }
 
-  if(act) key=Keys.getkey() ;
+
 
   if(act) {
+
+    key=Keys.getkey() ;
 
     need_refresh++;
     need_redraw++;
@@ -1911,9 +1916,11 @@ int ListBox::mouseupdate(int cur_element)
   }
 
   if (cur_sel != old_cur_sel || y_start != old_y_start) OnSelectChange() ;
-  if (act)  key = Keys.getkey() ;
-  
+
+
   if (act) {
+
+    key = Keys.getkey() ;
 
     need_refresh++;
     need_redraw++;

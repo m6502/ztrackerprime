@@ -1,4 +1,4 @@
-/*************************************************************************
+ï»¿/*************************************************************************
  *
  * FILE  import_export.cpp
  * $Id: import_export.cpp,v 1.18 2002/04/15 21:17:41 zonaj Exp $
@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -55,7 +55,7 @@ ZTImportExport::~ZTImportExport() {
 #define MID_SEQNAME    0x3
 #define MID_INSTRUMENT 0x4
 #define MID_MARKER     0x6
-// <MANU> Añado este define de arriba
+// <MANU> AÃ±ado este define de arriba
 
 
 
@@ -107,7 +107,7 @@ void push_marker(CDataBuf *buf, unsigned char type, char *str, int len=-1)
 {
   len=1 ;
 
-  //push_varlen(buf, 0);          // El delta time es de tamaño variable, aunque sea lo mismo parece peligroso ponerlo a pelo
+  //push_varlen(buf, 0);          // El delta time es de tamaÃ±o variable, aunque sea lo mismo parece peligroso ponerlo a pelo
 
   buf->pushc(0);                  // Delta time
   buf->pushc(0xFF);               // Meta-Evento
@@ -126,7 +126,7 @@ void push_text(CDataBuf *buf, unsigned char type, char *str, int len=-1)
 {
   if (len==-1) len = strlen(str) ;
   
-  //push_varlen(buf, 0);          // El delta time es de tamaño variable, aunque sea lo mismo parece peligroso ponerlo a pelo
+  //push_varlen(buf, 0);          // El delta time es de tamaÃ±o variable, aunque sea lo mismo parece peligroso ponerlo a pelo
 
   buf->pushc(0);                  // Delta time
   buf->pushc(0xFF);               // Meta-Evento
@@ -217,11 +217,16 @@ int ZTImportExport::ExportMID(char *fn, int format)
           
             midiOutName=MidiOut->outputDevices[song->instruments[i]->midi_device]->szName ;
           }
+          
+          
         }
         else midiOutName = NULL;
 
         
-        sprintf(str,"%s (%s)",song->instruments[i]->title, midiOutName) ;
+        if(midiOutName == NULL) sprintf(str,"%s (%s)",song->instruments[i]->title, "") ;
+        else                    sprintf(str,"%s (%s)",song->instruments[i]->title, midiOutName) ;
+        
+        
         push_text( &mtrk[total_mtrks], MID_SEQNAME, (char *) &str[0] ) ;
         
         mtrk[total_mtrks].pushc(0); 
@@ -293,7 +298,7 @@ int ZTImportExport::ExportMID(char *fn, int format)
 
       if(0 && e->type == ET_LOOP) {     // <Manu> Por ahora lo dejo asi para evitar problemas
       
-        // ¿Esto no puede estar abajo porque no tiene nota?
+        // Â¿Esto no puede estar abajo porque no tiene nota?
       
           // ------------------------------------------------------------------
           // ------------------------------------------------------------------
@@ -409,7 +414,7 @@ int ZTImportExport::ExportMID(char *fn, int format)
           
         case ET_PITCH:
           
-          // <Manu> Añado llaves para que compile al poner el case de abajo ¿?
+          // <Manu> AÃ±ado llaves para que compile al poner el case de abajo Â¿?
           
           { 
             unsigned short int usi ; 
@@ -641,7 +646,7 @@ int ZTImportExport::ExportMID(char *fn, int format) {
                         mp->pushuc((unsigned char)e->data1);
                         break;
                     case ET_PITCH:
-                      { // <Manu> Añado llaves para que compile al poner el case de abajo ¿?
+                      { // <Manu> AÃ±ado llaves para que compile al poner el case de abajo Â¿?
                         unsigned short int usi = (unsigned short int)e->data1<<8; usi+=e->data2;
                         unsigned char d1,d2;
                         usi &= 0x3FFF;
@@ -727,7 +732,7 @@ int ZTImportExport::ImportIT(char *fn, zt_module* zt)
   int note, ins, volpan, cmnd, cmndvalue, deflength ;
   int i ;
 
-  sprintf(szStatmsg,"Loading IT ",fn);
+  sprintf(szStatmsg,"Loading IT %s",fn);
   statusmsg = szStatmsg;
   status_change = 1;
   

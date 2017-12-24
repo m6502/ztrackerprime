@@ -105,7 +105,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         UI->add_element(oe,5);
         oe->x = 59;
         oe->y = 15;
-        oe->ysize = 32 + ((RESOLUTION_Y-480)/8);
+        oe->ysize = 32 + ((INTERNAL_RESOLUTION_Y-480)/8);
         oe->xsize = 9;
 
 

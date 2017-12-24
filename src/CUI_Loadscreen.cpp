@@ -133,11 +133,11 @@ CUI_Loadscreen::CUI_Loadscreen(void)
   fl = new FileList ;
   UI->add_element(fl,0) ;
 
-  fl->x     = FILE_LIST_POS_X ;
-  fl->y     = FILE_LIST_POS_Y ;
+  fl->x     = FILE_LIST_POS_X_CHARS ;
+  fl->y     = FILE_LIST_POS_Y_CHARS ;
 
-  fl->xsize = FILE_LIST_SIZE_X ;
-  fl->ysize = LOAD_FILE_LIST_SIZE_Y ;
+  fl->xsize = FILE_LIST_SIZE_X_CHARS ;
+  fl->ysize = LOAD_FILE_LIST_SIZE_Y_CHARS ;
 
   //fl->str = &load_filename[0]; 
   fl->OnChange();
@@ -150,8 +150,8 @@ CUI_Loadscreen::CUI_Loadscreen(void)
   dl->x     = DIRECTORY_LIST_POS_X ;
   dl->y     = DIRECTORY_LIST_POS_Y ;
   
-  dl->xsize = DIRECTORY_LIST_SIZE_X ;
-  dl->ysize = DIRECTORY_LIST_SIZE_Y ;
+  dl->xsize = DIRECTORY_LIST_SIZE_X_CHARS ;
+  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
 
   dr = new DriveList;
   UI->add_element(dr,2);
@@ -280,13 +280,15 @@ void CUI_Loadscreen::draw(Drawable *S)
 
     if (S->lock() == 0) {
 
-      S->fillRect(col(1),row(12),RESOLUTION_X,424,COLORS.Background);
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,424,COLORS.Background);
       S->unlock();
       clear=0;
     }
   }
 
+#ifdef _ENABLE_LOAD_SAVE_DECORATION
   S->copy(CurrentSkin->bmLoad, LOADORSAVE_IMAGE_X, LOADORSAVE_IMAGE_Y);
+#endif
 
   if (S->lock()==0) {
 

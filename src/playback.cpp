@@ -1,4 +1,4 @@
-/*************************************************************************
+ï»¿/*************************************************************************
  *
  * FILE  playback.cpp
  * $Id: playback.cpp,v 1.30 2002/06/15 17:08:25 cmicali Exp $
@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -395,6 +395,10 @@ int player::seek_order(int pattern) {
 int player::calc_pos(int midi_songpos, int *rowptr, int *orderptr) {
 
     int i,rowspassed,lastrowspassed,pat,row,order,found;
+    
+    // <Manu> Por si acaso
+    row = 0 ;
+    order = 0 ;
 
     /* Safety first! Return if orderlist is empty. */
     if (song->orderlist[0] >= 0x100) 
@@ -408,7 +412,7 @@ int player::calc_pos(int midi_songpos, int *rowptr, int *orderptr) {
     while (!found) {
         /* loop thru song as many times as required to achive the desired position */
         i=0;
-        while (pat=song->orderlist[i] < 0x100) {
+        while ((pat = song->orderlist[i]) < 0x100) {
             lastrowspassed=rowspassed;
             rowspassed += song->patterns[pat]->length;
             if ((4*rowspassed / song->tpb) > midi_songpos) {
@@ -454,7 +458,13 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
     patt_memory.tracks[t]->reset();
   }
 
-  if (lock_mutex(song->hEditMutex)) {
+  // <Manu> A veces no entraba abajo?
+  while (!lock_mutex(song->hEditMutex)) {
+  
+    SDL_Delay(1) ;
+  }
+
+  /*if (lock_mutex(song->hEditMutex))*/ {
 
     for(int var_instrument = 0; var_instrument < ZTM_MAX_INSTS; var_instrument++) {
 
@@ -472,7 +482,6 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
 
     cur_subtick = 0;        
     counter = 0;
-    cur_order = 0;
     clock_count = 0;
 
     mctr = 0;
@@ -534,7 +543,6 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
 //
 void player::play(int row, int pattern,int pm, int loopmode)
 {
-
 // <Manu> esta comprobacion no es necesaria ?
 
 /*    if (song->orderlist[pattern] == 0x100) 
@@ -555,6 +563,7 @@ void player::play(int row, int pattern,int pm, int loopmode)
   }
 
   prepare_play(row,pattern,pm,loopmode);
+
 
   //  play_buffer[cur_buf]->reset();
   //  play_buffer[cur_buf]->insert(0,ET_MSTART,0); // First event is MIDI Start
@@ -600,7 +609,8 @@ void player::play_current_row()
           p1 /= 0x7f;
         }
         
-        if (pEvent=song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(cur_edit_row)) {
+        // <Manu> if(A = B) ?
+        /*if (pEvent = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(cur_edit_row))*/ {
           
           if (pEvent->vol<0x80) p1 = pEvent->vol ;
         }
@@ -608,7 +618,7 @@ void player::play_current_row()
         set_note = pEvent->note;
         set_note += song->instruments[pEvent->inst]->transpose; 
 
-        // <Manu> Transposición
+        // <Manu> TransposiciÃ³n
 
 
         if (set_note>0x7f) set_note = 0x7f;
@@ -648,7 +658,9 @@ void player::play_current_note()
       p1 /= 0x7f;
     }
 
-    if (e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)) {
+    // <Manu> if(A = B) ?
+
+    /*if (e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row))*/ {
       
       if (e->vol<0x80) p1 = e->vol;
     }
@@ -656,7 +668,7 @@ void player::play_current_note()
     set_note = e->note;
     set_note += song->instruments[e->inst]->transpose;
 
-    // <Manu> Transposición
+    // <Manu> TransposiciÃ³n
 
 
     if (set_note>0x7f) set_note = 0x7f;
@@ -688,7 +700,7 @@ void player::stop(void)
     if (zt_config_globals.auto_send_panic)
         MidiOut->hardpanic();
     MidiOut->panic();
-    sprintf(szStatmsg,"Stopped",ztPlayer->cur_pattern,ztPlayer->cur_row,song->patterns[cur_pattern]->length);
+    sprintf(szStatmsg,"Stopped"/*,ztPlayer->cur_pattern,ztPlayer->cur_row,song->patterns[cur_pattern]->length*/);
     statusmsg = szStatmsg;
     status_change = 1;
     play_buffer[0]->reset();
@@ -1111,43 +1123,43 @@ void player::playback(midi_buf *buffer, int ticks)
           if (song->flag_SendMidiClock) buffer->insert(p_tick,ET_CLOCK,0x0); //MidiOut->clock();
         }
 
-        if (clock_count == 0 && song->flag_SlideOnSubtick) {   // feature 419820, tlr
+        if (clock_count == 0 && song->flag_SlideOnSubtick) {    // feature 419820, tlr
 
-          /* run pitchslides on clock_count. */              // feature 419820, tlr
+          /* run pitchslides on clock_count. */                 // feature 419820, tlr
 
-          for(t=0;t<MAX_TRACKS;t++) {                        // feature 419820, tlr
-            //                    Track = song->patterns[cur_pattern]->tracks[t];   // feature 419820, tlr
+          for(t=0;t<MAX_TRACKS;t++) {                           // feature 419820, tlr
+            //Track = song->patterns[cur_pattern]->tracks[t];   // feature 419820, tlr
             Track = patt_memory.tracks[t];
 
-            if (Track->pitch_slide) {                         // feature 419820, tlr
+            if (Track->pitch_slide) {                           // feature 419820, tlr
 
-              Track->pitch_setting += Track->pitch_slide;      // feature 419820, tlr
+              Track->pitch_setting += Track->pitch_slide;       // feature 419820, tlr
 
-              if (Track->pitch_setting<0)                   // feature 419820, tlr
-                Track->pitch_setting = 0;                 // feature 419820, tlr
+              if (Track->pitch_setting<0)                       // feature 419820, tlr
+                Track->pitch_setting = 0;                       // feature 419820, tlr
 
-              if (Track->pitch_setting>0x3FFF)              // feature 419820, tlr
-                Track->pitch_setting = 0x3FFF;            // feature 419820, tlr
+              if (Track->pitch_setting>0x3FFF)                  // feature 419820, tlr
+                Track->pitch_setting = 0x3FFF;                  // feature 419820, tlr
 
-              inst = Track->default_inst;                   // feature 419820, tlr
+              inst = Track->default_inst;                       // feature 419820, tlr
 
               if (inst<MAX_INSTS) {
 
-                i = song->instruments[inst];               // feature 419820, tlr
+                i = song->instruments[inst];                    // feature 419820, tlr
 
-                buffer->insert(p_tick,                     // feature 419820, tlr
-                  ET_PITCH,                   // feature 419820, tlr
-                  i->midi_device,i->channel,  // feature 419820, tlr
-                  GET_HIGH_BYTE(Track->pitch_setting), // feature 419820, tlr
-                  GET_LOW_BYTE(Track->pitch_setting),  // feature 419820, tlr
-                  t,                          // feature 419820, tlr
-                  inst);                      // feature 419820, tlr
+                buffer->insert(p_tick,                          // feature 419820, tlr
+                  ET_PITCH,                                     // feature 419820, tlr
+                  i->midi_device,i->channel,                    // feature 419820, tlr
+                  GET_HIGH_BYTE(Track->pitch_setting),          // feature 419820, tlr
+                  GET_LOW_BYTE(Track->pitch_setting),           // feature 419820, tlr
+                  t,                                            // feature 419820, tlr
+                  inst);                                        // feature 419820, tlr
               }
-            }                                              // feature 419820, tlr
-          }                                                  // feature 419820, tlr
-        }                                                      // feature 419820, tlr
+            }                                                   // feature 419820, tlr
+          }                                                     // feature 419820, tlr
+        }                                                       // feature 419820, tlr
 
-        //clock_count++;  // feature 419820, tlr
+        //clock_count++;                                        // feature 419820, tlr
 
         if (cur_subtick >= tick_len_ms)
           cur_subtick = 0;
@@ -1214,6 +1226,10 @@ void player::playback(midi_buf *buffer, int ticks)
               Track = patt_memory.tracks[t];
               evento = real_tr->get_event(cur_row);
 
+
+
+              inst = Track->default_inst ;
+
               if (evento) {
 
                 if(evento->effect<0xFF) { 
@@ -1244,22 +1260,18 @@ void player::playback(midi_buf *buffer, int ticks)
                     break;
                   }
                 }
+
+
+                if (evento->inst < MAX_INSTS) Track->default_inst = inst = evento->inst;
               }
 
-              //              if (!song->track_mute[t]) {
-              inst = Track->default_inst;  //Track->default_inst;
-              if (evento) {
-
-                if (evento->inst<MAX_INSTS) Track->default_inst = inst = evento->inst;
-                //                            Track->default_inst = inst = evento->inst;
-              }
 
               if (inst < MAX_INSTS) i = song->instruments[inst];
               else i = &blank_instrument;
 
-              vol = i->default_volume;
-              chan = i->channel;
-              len = i->default_length;
+              vol   = i->default_volume;
+              chan  = i->channel;
+              len   = i->default_length;
               flags = i->flags;
 
               //if (Track->default_length > 0)
@@ -1267,6 +1279,7 @@ void player::playback(midi_buf *buffer, int ticks)
               if (Track->default_length > 0) len = Track->default_length;
 
               if (i->flags & INSTFLAGS_TRACKERMODE) len = LEN_INF;
+
               if (evento) {
 
                 if (evento->vol < 0x80) vol = evento->vol;

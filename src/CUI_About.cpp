@@ -5,15 +5,15 @@
 CUI_About::CUI_About(void) {
     UI = new UserInterface();
 
-    double xscale = (double)RESOLUTION_X / 640;
-    double yscale = (double)RESOLUTION_Y / 480;
+    double xscale = (double)INTERNAL_RESOLUTION_X / 640;
+    double yscale = (double)INTERNAL_RESOLUTION_Y / 480;
     
     TextBox *l = new TextBox();
     UI->add_element(l,0);
     l->x = 2;
     l->xsize = (int)((double)(38+3)*xscale);
     l->ysize = (int)((double)26*yscale);
-    l->y = 25 + ((RESOLUTION_Y-480)/8) - (l->ysize-26);
+    l->y = 25 + ((INTERNAL_RESOLUTION_Y-480)/8) - (l->ysize-26);
     l->text = "\n"
 
 "|H|About|U|                          \n"
@@ -36,6 +36,7 @@ CUI_About::CUI_About(void) {
 "    Austin Luminais                    " "\n"
 "    Christopher Micali                 " "\n"
 "    Daniel Kahlin                      " "\n"
+"    Manuel Montoto                     " "\n"
 "    Nic Soudee                         " "\n"
 "                                       " "\n"
 "  |H|Support|U|                        " "\n"
@@ -102,11 +103,11 @@ void CUI_About::update() {
 void CUI_About::draw(Drawable *S) {
         S->copy(CurrentSkin->bmAbout,5,row(12));
     /*
-    if (640 == RESOLUTION_X && 480 == RESOLUTION_Y) {
+    if (640 == INTERNAL_RESOLUTION_X && 480 == INTERNAL_RESOLUTION_Y) {
         S->copy(CurrentSkin->bmAbout,5,row(12));
     } else {
-        double xscale = (double)RESOLUTION_X / 640;
-        double yscale = (double)RESOLUTION_Y / 480;
+        double xscale = (double)INTERNAL_RESOLUTION_X / 640;
+        double yscale = (double)INTERNAL_RESOLUTION_Y / 480;
         Drawable ss( zoomSurface(CurrentSkin->bmAbout->surface, xscale, yscale ,SMOOTHING_ON) , true );
         S->copy(&ss,5,row(12));
     }

@@ -30,11 +30,11 @@ void CUI_Logoscreen::update() {
 }
 
 void CUI_Logoscreen::draw(Drawable *S) {
-    if (CurrentSkin->bmLogo->surface->w == RESOLUTION_X && CurrentSkin->bmLogo->surface->h == RESOLUTION_Y) {
+    if (CurrentSkin->bmLogo->surface->w == INTERNAL_RESOLUTION_X && CurrentSkin->bmLogo->surface->h == INTERNAL_RESOLUTION_Y) {
         S->copy(CurrentSkin->bmLogo, 0,0);
     } else {
-        double xscale = (double)RESOLUTION_X / (double)CurrentSkin->bmLogo->surface->w;
-        double yscale = (double)RESOLUTION_Y / (double)CurrentSkin->bmLogo->surface->h;
+        double xscale = (double)INTERNAL_RESOLUTION_X / (double)CurrentSkin->bmLogo->surface->w;
+        double yscale = (double)INTERNAL_RESOLUTION_Y / (double)CurrentSkin->bmLogo->surface->h;
         Drawable s( zoomSurface(CurrentSkin->bmLogo->surface, xscale, yscale ,SMOOTHING_ON) , true );
         S->copy(&s,0,0);
     }

@@ -39,6 +39,7 @@
  ******/
 #include "zt.h"
 
+
 /*
 
 midiOutDevice::midiOutDevice(int i) {
@@ -106,9 +107,11 @@ midiOut::midiOut() {
 }
 
 midiOut::~midiOut() {
-    intlist *t=devlist_head,*tm;
+
+    intlist *t = devlist_head ;
+
     while(t) {
-        tm = t->next;
+        intlist *tm = t->next;
         outputDevices[t->key]->close();
         delete t;
         t = tm;
@@ -508,6 +511,12 @@ UINT midiIn::AddDevice(int dev) {
     if (error != MMSYSERR_NOERROR)
         return error;
     t = devlist_head;
+
+    if(devlist_head != NULL) {
+      
+      delete(devlist_head) ;
+    }
+
     devlist_head = new intlist(dev,t);
     return 0;
 }

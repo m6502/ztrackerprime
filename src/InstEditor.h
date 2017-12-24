@@ -11,8 +11,6 @@ class InstEditor : public UserInterfaceElement {
         Frame *frm;
         int cursor,text_cursor;
         int list_start;
-//      int length;
-        unsigned char *str;
 
         int last_cur_row ;
 

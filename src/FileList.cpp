@@ -298,43 +298,42 @@ void FileList::enter(void) {
 void FileList::draw(Drawable *S, int active) 
 {
   int cy;
-  TColor f,b;
   unsigned char *str;
 
   str = (unsigned char *)malloc(xsize+1+2);
+  _ASSERT(str) ;
+
   LBNode *node = getNode(y_start);
 
   for (cy=0; cy <= ysize; cy++) {
 
-    memset(str,0,xsize+1);
-    memset(str,' ',xsize);
+    memset(str, ' ', xsize) ;
+    str[xsize] = NULL ;
+
+    TColor foreground_color = COLORS.EditText;
+    TColor background_color = COLORS.EditBG;
 
     if (node) {
+
       strc((char *)str, node->caption);
-      f = node->int_data;
+      foreground_color = node->int_data;
       node = node->next;
     } 
 
     if (cy == cur_sel) {
 
-      if (active) b = COLORS.Highlight;
-      else b = COLORS.EditText;
+      if (active) background_color = COLORS.Highlight;
+      else        background_color = COLORS.EditText;
 
-      f = COLORS.EditBG;
+      foreground_color = COLORS.EditBG;
     } 
-    else {
-
-      b = COLORS.EditBG;
-    }
 
     if (num_elements == 0 && cy==0) {
 
-      f = COLORS.EditText;
-      b = COLORS.EditBG;
       if (empty_message) strc((char*)str, empty_message);
     }
 
-    printBGu(col(x),row(cy+y),str,f,b,S);
+    printBGu(col(x), row(cy+y), str, foreground_color, background_color, S) ;
   }
 
   frm.type=0;

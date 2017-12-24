@@ -297,7 +297,7 @@ void PatternDisplay::update_frame(void)
     
     // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto)
     //tracks = 10;
-    tracks = (RESOLUTION_X / (tracksize * DEFAULT_FONT_SIZE_X)) - 1 ;
+    tracks = (INTERNAL_RESOLUTION_X / (tracksize * FONT_SIZE_X)) - 1 ;
 
     break ;
 
@@ -498,7 +498,8 @@ char *PatternDisplay::printNote(char *str, event *r)
   switch(this->cur_pat_view) 
   {
   case 0:
-    sprintf(str,"%.3s",note,vol); // 2 cols
+    //sprintf(str,"%.3s",note,vol); // 2 cols
+    sprintf(str,"%.3s %.2s",note,vol); // 2 cols
     break;
   case 1:
   

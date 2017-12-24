@@ -420,13 +420,13 @@ class midiOut {
 */
 class midiInDevice {
     public:
-        HMIDIIN handle;
+        HMIDIIN handle;                       // Handle to the MIDI input device.
         char *szName;
         int devNum;
-        MIDIINCAPS caps;
+        MIDIINCAPS caps;                      // The MIDIINCAPS structure describes the capabilities of a MIDI input device.
         int opened;     
 
-        MIDIHDR         midiHdr;
+        MIDIHDR         midiHdr;              // The MIDIHDR structure defines the header used to identify a MIDI system-exclusive or stream buffer.
         unsigned char SysXBuffer[256];
         unsigned char SysXFlag;
 

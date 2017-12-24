@@ -5,7 +5,7 @@ int PATTERN_EDIT_ROWS = 100;
 int m_upd = 0;
 event *upd_e = NULL;
 
-
+int max_displayable_rows = 0 ;
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -33,7 +33,7 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
         effect_data == 24 ||
         effect_data == 48 
         )            
-        sprintf(str,"Effect: Set TPB to ",effect_data);
+        sprintf(str,"Effect: Set TPB to %d",effect_data);
       else
         sprintf(str,"Effect: Set TPB (invalid TPB: %d) ",effect_data);
       break;
@@ -118,7 +118,7 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
 //
 char *printNote(char *str, event *r, int cur_edit_mode) 
 {
-  char note[4],in[3],vol[3],len[4],fx[3],fxd[5];
+  char note[4],ins[3],vol[3],len[4],fx[3],fxd[5];
 
   hex2note(note,r->note);
   
@@ -133,11 +133,11 @@ char *printNote(char *str, event *r, int cur_edit_mode)
   
   if (r->inst<MAX_INSTS) {
 
-    sprintf(in,"%.2d",r->inst);
-    in[0] = toupper(in[0]);
-    in[1] = toupper(in[1]);
+    sprintf(ins,"%.2d",r->inst);
+    ins[0] = toupper(ins[0]);
+    ins[1] = toupper(ins[1]);
   } 
-  else strcpy(in,"..");
+  else strcpy(ins,"..");
   
   
   if (r->length>0x0) {
@@ -162,15 +162,16 @@ char *printNote(char *str, event *r, int cur_edit_mode)
   fxd[2] = toupper(fxd[2]);
   fxd[3] = toupper(fxd[3]);
 
-  switch(cur_edit_mode) {
+  switch(cur_edit_mode)
+  {
   case VIEW_SQUISH:
     sprintf(str,"%.3s %.2s",note,vol); // 2 cols
     break;
   case VIEW_REGULAR:
-    sprintf(str,"%.3s %.2s %.2s %.3s",note,in,vol,len); // 4 cols
+    sprintf(str,"%.3s %.2s %.2s %.3s",note,ins,vol,len); // 4 cols
     break;
   case VIEW_BIG:
-    sprintf(str,"%.3s %.2s %.2s %.3s %s%.4s",note,in,vol,len,fx,fxd); // 7 cols
+    sprintf(str,"%.3s %.2s %.2s %.3s %s%.4s",note,ins,vol,len,fx,fxd); // 7 cols
     // NOT IN VL CH LEN fx PARM 
     break;
   case VIEW_FX:
@@ -178,7 +179,7 @@ char *printNote(char *str, event *r, int cur_edit_mode)
     break;
     /*
     case VIEW_EXTEND:
-    sprintf(str,"%.3s %.2s %.2s %.2s ... .. .... .. .... .. .... .. .... .. ....",note,in,vol,ch); // 15 cols
+    sprintf(str,"%.3s %.2s %.2s %.2s ... .. .... .. .... .. .... .. .... .. ....",note,ins,vol,ch); // 15 cols
     // NOT IN VL CH LEN fx PARM*5 
     break;
     */
@@ -295,8 +296,6 @@ void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor 
 
 
 
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
@@ -361,6 +360,7 @@ void draw_signed_bar(int x, int y, int xsize, int ysize, int value, int maxval, 
 //
 void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S, int upd_one=0,event *which_e=NULL) 
 {
+
   int var_row,var_track,num_displayed_tracks,num_displayed_rows,data,datamax;
   TColor bg;
   event *e;
@@ -439,7 +439,9 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
         break;
       } 
 
-      switch(UIP_Patterneditor->md_mode) {
+
+      switch(UIP_Patterneditor->md_mode)
+      {
 
       case MD_FX_SIGNED:
         
@@ -486,23 +488,20 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   int var_row, var_track ;
   int num_displayed_rows, num_displayed_tracks, clear=0, step=0, noplay=0, special ;
   TColor bg,fg;
-  char str[256] ;    // <Manu> ¿Seguro que esto no dará problemas con resoluciones muy grandes?
+  char str[512] ;    // <Manu> ¿Seguro que esto no dará problemas con resoluciones muy grandes?
   event *e;
   
   int posx_current_track ;
   int posy_current_row ;
   //  char note[4];
 
-  int max_displayable_rows = PATTERN_EDIT_ROWS ;
+  max_displayable_rows = PATTERN_EDIT_ROWS ;
   if(max_displayable_rows > song->patterns[cur_edit_pattern]->length) max_displayable_rows = song->patterns[cur_edit_pattern]->length ;
 
   int first_row = cur_edit_row_disp ;
 
   int last_row = first_row + max_displayable_rows ;
   if(last_row > song->patterns[cur_edit_pattern]->length) last_row = song->patterns[cur_edit_pattern]->length ;
-
-
-
 
   int blank_rows = PATTERN_EDIT_ROWS - max_displayable_rows /*- 1*/ ;
   int first_blank_row = first_row + max_displayable_rows ;
@@ -612,7 +611,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 int x2 = x1 + col(field_size + 1) + 1  ;
 
                 int y1 = posy_current_row ;
-                int y2 = y1 + DEFAULT_FONT_SIZE_Y ;
+                int y2 = y1 + FONT_SIZE_Y ;
 
                 S->fillRect(x1, y1, x2, y2, /*COLORS.Highlight*/COLORS.Background) ;
               }
@@ -714,7 +713,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   if(blank_rows > 0) {
 
     int x1 = col(1) ;
-    int x2 = RESOLUTION_X - 1 ;
+    int x2 = INTERNAL_RESOLUTION_X - 1 ;
 
     int y1 = TRACKS_POS_Y + row(first_blank_row + 1) ;
     int y2 = TRACKS_POS_Y + row(PATTERN_EDIT_ROWS + 1) ;
@@ -791,12 +790,12 @@ void CUI_Patterneditor::enter(void)
   need_refresh = 1;
   cur_state = STATE_PEDIT;
   mousedrawing=0;
-  //PATTERN_EDIT_ROWS = 32 + 4 + (RESOLUTION_Y - 480) / 8;
+  //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
   
   // <Manu> 180 es el espacio que queda más o menos para las notas descontando dónde empiezan los tracks, la toolbar, etc.
   //        No sería mala idea calcular esto de una manera un poco más clara.
 
-  PATTERN_EDIT_ROWS = (RESOLUTION_Y - 180) / 8 ;
+  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y - 180) / 8 ;
   
 
   //  this->mode = PEM_REGULARKEYS;
@@ -830,11 +829,11 @@ void CUI_Patterneditor::update()
   int i,j,o=0,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
   int key;
-  int temp,oktogo=0,keyed=0,dontc=0;
+  int temp,oktogo=0,keyed=0/*,dontc=0*/;
   short int p1,p2,p3;
   //  char str[256];
   event *e;
-  char note[4];
+  //char note[4];
   unsigned char val,pval;
   float istart,iend,istep,iadd;   
   int amount, con;
@@ -843,7 +842,7 @@ void CUI_Patterneditor::update()
   
   clear = 0;
   keypress = 0;
-  memset(note,0,4);
+  //memset(note,0,4);
 
 //  int pattern_visible ;
 //
@@ -880,7 +879,7 @@ void CUI_Patterneditor::update()
   //  need_refresh++ ;
   //}
 
-
+#define _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
 
   if (Keys.size()) {
@@ -889,11 +888,21 @@ void CUI_Patterneditor::update()
     kstate = Keys.getstate();
     keyed++;
 
-    if ((kstate==KS_CTRL) && key==DIK_TAB) {
+    if((kstate & KS_CTRL) && (key == DIK_TAB)) {
 
-      zt_config_globals.cur_edit_mode++;
+      if(kstate & KS_SHIFT) {
+        
+        zt_config_globals.cur_edit_mode-- ;
+        if(zt_config_globals.cur_edit_mode < VIEW_SQUISH) zt_config_globals.cur_edit_mode = VIEW_BIG ;
+      }
+      else {
+        
+        zt_config_globals.cur_edit_mode++ ;
+        if (zt_config_globals.cur_edit_mode > VIEW_BIG) zt_config_globals.cur_edit_mode = VIEW_SQUISH ;
+      }
+      
 
-      if (zt_config_globals.cur_edit_mode > VIEW_BIG) zt_config_globals.cur_edit_mode = VIEW_SQUISH ;
+      
 
       need_refresh++;
       
@@ -920,7 +929,7 @@ void CUI_Patterneditor::update()
 
     if(need_refresh) statusmsg = "View mode: Squish";
 
-    tracks_shown = (RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (8*6) ;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 6) ;
     field_size = 6;
     cols_shown = 4 ;
     init_short_cols();
@@ -934,7 +943,7 @@ void CUI_Patterneditor::update()
 
     if (need_refresh) statusmsg = "View mode: Regular";
 
-    tracks_shown = (RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (8*14) ;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 14) ;
     field_size = 13;
     cols_shown = 9;
     fix_cols();
@@ -948,7 +957,7 @@ void CUI_Patterneditor::update()
 
     if (need_refresh) statusmsg = "View mode: Big";
 
-    tracks_shown = (RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / 160 ;    // 160 es lo que mide cada columna; dejamos 80 pixels extras de margen
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / 160 ;    // 160 es lo que mide cada columna; dejamos 80 pixels extras de margen
     field_size = 19;
     cols_shown = 14;
     fix_cols();
@@ -962,9 +971,9 @@ void CUI_Patterneditor::update()
 
     if (need_refresh) statusmsg = "View mode: FX";
 
-    tracks_shown = (RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (8*13) ;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 13) ;
     
-//    if((((RESOLUTION_X-640)/8) % 13) > .5) tracks_shown++;
+//    if((((INTERNAL_RESOLUTION_X-640)/8) % 13) > .5) tracks_shown++;
 
     field_size = 12;
     cols_shown = 9;
@@ -997,13 +1006,13 @@ void CUI_Patterneditor::update()
     
     cur_edit_row = ztPlayer->playing_cur_row;
     
-    if (cur_edit_row < 0) cur_edit_row=0;
+    if (cur_edit_row < 0) cur_edit_row = 0 ;
 
-    if (cur_edit_row<cur_edit_row_disp) cur_edit_row_disp=cur_edit_row;
+    if (cur_edit_row < cur_edit_row_disp) cur_edit_row_disp = cur_edit_row ;
 
-    if(ztPlayer->playing_cur_row >= (PATTERN_EDIT_ROWS)/2 ) {
+    if(ztPlayer->playing_cur_row >= (PATTERN_EDIT_ROWS / 2) ) {
       
-      cur_edit_row_disp = ztPlayer->playing_cur_row-(PATTERN_EDIT_ROWS)/2 + 1;
+      cur_edit_row_disp = ztPlayer->playing_cur_row - (PATTERN_EDIT_ROWS / 2) + 1 ;
     }
     
     //    if (ztPlayer->playing_cur_row>song->patterns[cur_edit_pattern]->length-1)
@@ -1173,12 +1182,12 @@ void CUI_Patterneditor::update()
           break;
 
         case DIK_PGDN:
-          cur_edit_row_disp+=16;
+          cur_edit_row_disp+= zt_config_globals.highlight_increment * 4 ;
           need_refresh++;
           break;
 
         case DIK_PGUP:
-          cur_edit_row_disp-=16;    // <Manu> ¿Esto no debería ser un múltiplo del step?
+          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> ¿Esto no debería ser un múltiplo del step?
           need_refresh++;
           break;
 
@@ -1213,7 +1222,7 @@ void CUI_Patterneditor::update()
       
       if (cur_edit_track_disp<0) cur_edit_track_disp = 0;
       
-      if (need_refresh && !dontc) {
+      if (need_refresh/* && !dontc*/) {
 
         switch(md_mode)
         {
@@ -1308,7 +1317,7 @@ void CUI_Patterneditor::update()
                   
                 case DIK_PGDN:
                   
-                  effective=16;
+                  effective=zt_config_globals.highlight_increment * 4;
                 
                 case DIK_DOWN:
                 
@@ -1346,7 +1355,8 @@ void CUI_Patterneditor::update()
                         }
                         else{
                             
-                          select_row_start = cur_edit_row+effective;
+                          // <Manu> if y else eran iguales ¿?
+                          select_row_start = song->patterns[cur_edit_pattern]->length-1;
                         }
                       }
                     }
@@ -1366,7 +1376,7 @@ void CUI_Patterneditor::update()
                   
                 case DIK_PGUP:
 
-                  effective=16;
+                  effective=zt_config_globals.highlight_increment * 4;
                   
                   if(cur_edit_row-effective < cur_edit_row_disp && cur_edit_row != cur_edit_row_disp) {
                     effective = cur_edit_row - cur_edit_row_disp;
@@ -1424,9 +1434,28 @@ void CUI_Patterneditor::update()
                   
             }
         }
+
+
+
+
         if (kstate == KS_CTRL ) {
-          switch(key) {
-            
+
+
+          switch(key)
+          {
+
+
+
+          } ;
+
+
+        }
+
+        if (kstate == KS_ALT ) {
+        
+          switch(key)
+          {
+
           case DIK_1: cur_step=1;  need_refresh++; statusmsg = "Step set to 1"; break;
           case DIK_2: cur_step=2;  need_refresh++; statusmsg = "Step set to 2"; break;
           case DIK_3: cur_step=3;  need_refresh++; statusmsg = "Step set to 3"; break;
@@ -1437,6 +1466,7 @@ void CUI_Patterneditor::update()
           case DIK_8: cur_step=8;  need_refresh++; statusmsg = "Step set to 8"; break;
           case DIK_9: cur_step=9;  need_refresh++; statusmsg = "Step set to 9"; break;
           case DIK_0: cur_step=0;  need_refresh++; statusmsg = "Step set to 0"; break;
+
             
           case DIK_P: // copy to new pattern
             // select all of current pattern
@@ -1748,11 +1778,17 @@ void CUI_Patterneditor::update()
           case DIK_Z:
             if (selected) {
               if (zclear_presscount) {
-                for(i=select_track_start;i<=select_track_end;i++)
-                  for(j=select_row_start;j<=select_row_end;j++)
+
+
+                for(i=select_track_start;i<=select_track_end;i++) {
+                  for(j=select_row_start;j<=select_row_end;j++) {
                     song->patterns[cur_edit_pattern]->tracks[i]->update_event(j,0x80,MAX_INSTS,0x80,0x0,0xff,0x0);
-                  zclear_presscount=0;
-                  need_refresh++;
+                  }
+                }
+
+                zclear_presscount=0;
+                need_refresh++;
+
               } else {
                 zclear_presscount++;
                 zclear_flag++;
@@ -1951,16 +1987,16 @@ void CUI_Patterneditor::update()
             break;
             
             
-          case DIK_1: toggle_track_mute(0); need_refresh++; break;
-          case DIK_2: toggle_track_mute(1); need_refresh++; break;
-          case DIK_3: toggle_track_mute(2); need_refresh++; break;
-          case DIK_4: toggle_track_mute(3); need_refresh++; break;
-          case DIK_5: toggle_track_mute(4); need_refresh++; break;
-          case DIK_6: toggle_track_mute(5); need_refresh++; break;
-          case DIK_7: toggle_track_mute(6); need_refresh++; break;
-          case DIK_8: toggle_track_mute(7); need_refresh++; break;
-          case DIK_9: toggle_track_mute(8); need_refresh++; break;
-          case DIK_0: toggle_track_mute(9); need_refresh++; break;
+          case DIK_F1: toggle_track_mute(0); 
+            need_refresh++; 
+            break;
+          case DIK_F2: toggle_track_mute(1); need_refresh++; break;
+          case DIK_F3: toggle_track_mute(2); need_refresh++; break;
+          case DIK_F4: toggle_track_mute(3); need_refresh++; break;
+          case DIK_F5: toggle_track_mute(4); need_refresh++; break;
+          case DIK_F6: toggle_track_mute(5); need_refresh++; break;
+          case DIK_F7: toggle_track_mute(6); need_refresh++; break;
+          case DIK_F8: toggle_track_mute(7); need_refresh++; break;
           case DIK_F9: toggle_track_mute(cur_edit_track); need_refresh++; break;
           case DIK_F10: 
             
@@ -2605,7 +2641,7 @@ wrap:;
         if (key == DIK_PGUP) {
           if(zt_config_globals.centered_editing) {
             if ((cur_edit_row-cur_edit_row_disp) > (PATTERN_EDIT_ROWS / 2) || (cur_edit_row == cur_edit_row_disp))
-              cur_edit_row-=16;
+              cur_edit_row-=zt_config_globals.highlight_increment * 4;
             else
               cur_edit_row=cur_edit_row_disp;
             
@@ -2613,17 +2649,17 @@ wrap:;
               cur_edit_row = 0;
             if (cur_edit_row < cur_edit_row_disp)
               cur_edit_row_disp = cur_edit_row;
-            if(cur_edit_row > (PATTERN_EDIT_ROWS / 2) - 16) {
+            if(cur_edit_row > (PATTERN_EDIT_ROWS / 2) - (zt_config_globals.highlight_increment * 4)) {
               cur_edit_row_disp = cur_edit_row - (PATTERN_EDIT_ROWS / 2) + 2;
               if(cur_edit_row_disp < 0) cur_edit_row_disp = 0;
             }
-            if(cur_edit_row <= 16)
+            if(cur_edit_row <= (zt_config_globals.highlight_increment * 4))
               cur_edit_row_disp = 0;
             need_refresh++;
           }
           else {
             if ((cur_edit_row-cur_edit_row_disp)>(PATTERN_EDIT_ROWS/2) || (cur_edit_row==cur_edit_row_disp))
-              cur_edit_row-=16;
+              cur_edit_row-=(zt_config_globals.highlight_increment * 4);
             else
               cur_edit_row=cur_edit_row_disp;
             if (cur_edit_row<0)
@@ -2637,14 +2673,14 @@ wrap:;
           if(zt_config_globals.centered_editing) {
             if (cur_edit_row < (cur_edit_row_disp+PATTERN_EDIT_ROWS) ||
               cur_edit_row == (cur_edit_row_disp + (PATTERN_EDIT_ROWS - 1)))
-              cur_edit_row += 16;
+              cur_edit_row += (zt_config_globals.highlight_increment * 4);
             else
               cur_edit_row = cur_edit_row_disp+PATTERN_EDIT_ROWS + 1;
             if (cur_edit_row > song->patterns[cur_edit_pattern]->length - 1)
               cur_edit_row = song->patterns[cur_edit_pattern]->length - 1;
             if (cur_edit_row > cur_edit_row_disp + (PATTERN_EDIT_ROWS - 1))
               cur_edit_row_disp = cur_edit_row - (PATTERN_EDIT_ROWS - 1);
-            if(cur_edit_row < (song->patterns[cur_edit_pattern]->length-1 - (PATTERN_EDIT_ROWS / 2) + 16))
+            if(cur_edit_row < (song->patterns[cur_edit_pattern]->length-1 - (PATTERN_EDIT_ROWS / 2) + (zt_config_globals.highlight_increment * 4)))
             {
               cur_edit_row_disp = cur_edit_row - (PATTERN_EDIT_ROWS / 2) + 2;
               if(cur_edit_row_disp < 0)
@@ -2657,7 +2693,7 @@ wrap:;
           }
           else {
             if (cur_edit_row<(cur_edit_row_disp+PATTERN_EDIT_ROWS) || cur_edit_row==(cur_edit_row_disp+(PATTERN_EDIT_ROWS-1)))
-              cur_edit_row+=16;
+              cur_edit_row+=(zt_config_globals.highlight_increment * 4);
             else
               cur_edit_row=cur_edit_row_disp+PATTERN_EDIT_ROWS+1;
             if (cur_edit_row>song->patterns[cur_edit_pattern]->length-1)
@@ -2857,7 +2893,7 @@ wrap:;
           FU_dx = LastX+((field_size+1)*8);//FU_x + (field_size+1)*8;
           FU_dy = LastY+16;//row(15+PATTERN_EDIT_ROWS);
           if (FU_x<0) FU_x = 0;
-          if (FU_dx > RESOLUTION_X) FU_dx = RESOLUTION_X-1;
+          if (FU_dx > INTERNAL_RESOLUTION_X) FU_dx = INTERNAL_RESOLUTION_X-1;
           //x -= (field_size+1)*track;
           if (mousedrawing==1) {
             //  if (x<field_size) {
@@ -2957,7 +2993,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     if (clear) {
 
-      S->fillRect(col(1),row(12),RESOLUTION_X,RESOLUTION_Y - (480-424),COLORS.Background);
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),COLORS.Background);
       clear=0;
     }
 
@@ -3064,7 +3100,7 @@ void CUI_Patterneditor::draw(Drawable *S)
 
       // <Manu> Clarificar un poco esta fórmula, porque con row(52 se comía la última línea 
 
-      screenmanager.Update(0, row(11), RESOLUTION_X, row(53+((RESOLUTION_Y-480)/8))) ;
+      screenmanager.Update(0, row(11), INTERNAL_RESOLUTION_X, row(53+((INTERNAL_RESOLUTION_Y-480)/8))) ;
     }
   }
 }

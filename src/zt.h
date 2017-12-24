@@ -1,15 +1,11 @@
 #ifndef _ZT_H
 #define _ZT_H
 
-#define WIN32_LEAN_AND_MEAN
-
-
 // This adds some debugging stuff and some on-screen debug indicators
 //#define DEBUG
 
 // This makes every updated rect appear randomly colored so you can see what gets updated
 //#define DEBUG_SCREENMANAGER
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +14,9 @@
 #include <io.h>
 #include <direct.h>
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
 #include <mmsystem.h>
 #include <math.h>
 
@@ -27,19 +25,33 @@
 #include <SDL_main.h>
 //#include "sdl_mixer.h"  // this is for audio testing
 
+
+
+// ------------------------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------------------------
+
 //#define VER_MAJ 0
 
 // <Manu> antes era 98
-
 //#define VER_MIN 986
 
-
-#define ZTRACKER_VERSION                "zTracker' v20120626"
+#define ZTRACKER_VERSION                "zTracker' v20171224"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
+#define ZOOM                            2.0f
+
+#define INTERNAL_RESOLUTION_X           ((int)(zt_config_globals.screen_width  * (1.0f / (float)ZOOM)))
+#define INTERNAL_RESOLUTION_Y           ((int)(zt_config_globals.screen_height * (1.0f / (float)ZOOM)))
+
 #define RESOLUTION_X                    (zt_config_globals.screen_width)
 #define RESOLUTION_Y                    (zt_config_globals.screen_height)
+
+#define FACTOR_ESCALAX                  ((float)INTERNAL_RESOLUTION_X / (float)RESOLUTION_X)
+#define FACTOR_ESCALAY                  ((float)INTERNAL_RESOLUTION_Y / (float)RESOLUTION_Y)
+
+
 
 #define SCREEN_BPP                      32
 
@@ -48,8 +60,6 @@
 #define BASE_OCTAVE_DEFAULT             4
 
 #define DEFAULT_CURSOR_STEP             1
-
-
 
 #define EDIT_LOCK_TIMEOUT               800 // ms
 
@@ -213,13 +223,26 @@ public:
 
 enum state { 
   
-  STATE_PEDIT, STATE_IEDIT, STATE_PLAY, STATE_LOGO, 
-  STATE_ABOUT, STATE_SONG_CONFIG, STATE_SYSTEM_CONFIG,
-  STATE_CONFIG, STATE_ORDER, STATE_PEDIT_WIN, STATE_HELP,
-  STATE_LOAD, STATE_SAVE, STATE_STATUS, STATE_SLIDER_INPUT,
-  STATE_SONG_MESSAGE, STATE_ARPEDIT, STATE_MIDIMACEDIT
+  STATE_PEDIT, 
+  STATE_IEDIT, 
+  STATE_PLAY, 
+  STATE_LOGO, 
+  STATE_ABOUT, 
+  STATE_SONG_CONFIG, 
+  STATE_SYSTEM_CONFIG,
+  STATE_CONFIG, 
+  STATE_ORDER, 
+  STATE_PEDIT_WIN, 
+  STATE_HELP,
+  STATE_LOAD, 
+  STATE_SAVE, 
+  STATE_STATUS, 
+  STATE_SLIDER_INPUT,
+  STATE_SONG_MESSAGE, 
+  STATE_ARPEDIT, 
+  STATE_MIDIMACEDIT
+} ;
 
-};
 
 #define DEFAULT_STATE               STATE_PEDIT
 #define DEFAULT_STATE_UIP           UIP_Patterneditor
@@ -227,9 +250,12 @@ enum state {
 #define MAX_UPDATE_RECTS            512
 
 
+// ------------------------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------------------------
+
 class CScreenUpdateManager 
 {
-
 public: 
 
   SDL_Rect r[MAX_UPDATE_RECTS];
@@ -248,26 +274,27 @@ public:
   
   }
 
-  // <Manu 06 de Julio de 2005> He optimizado ligeramente esto y he limpiado el codigo
 
+
+  // ----------------------------------------------------------------------------------------------
+  // <Manu 06 de Julio de 2005> He optimizado ligeramente esto y he limpiado el codigo
+  //
   void Update(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2) 
   {
-    SDL_Rect *rect ;
-
     if (update_all) return;
     if (updated_rects < MAX_UPDATE_RECTS-1) {
 
-      if (x1<0) x1=0; 
-      if (y1<0) y1=0;
-      if (x2>RESOLUTION_X-1) x2 = RESOLUTION_X-1;
-      if (y2>RESOLUTION_Y-1) y2 = RESOLUTION_Y-1;
+      if (x1 < 0) x1 = 0 ; 
+      if (y1 < 0) y1 = 0 ;
+      if (x2 > (INTERNAL_RESOLUTION_X - 1)) x2 = INTERNAL_RESOLUTION_X - 1 ;
+      if (y2 > (INTERNAL_RESOLUTION_Y - 1)) y2 = INTERNAL_RESOLUTION_Y - 1 ;
 
-      rect=&r[updated_rects] ;
+      SDL_Rect *rect = &r[updated_rects] ;
 
-      rect->x = x1;
-      rect->y = y1;
-      rect->w = x2-x1 ;
-      rect->h = y2-y1 ;
+      rect->x = x1 ;
+      rect->y = y1 ;
+      rect->w = x2 - x1 ;
+      rect->h = y2 - y1 ;
         
       updated_rects++ ;
     }
@@ -275,14 +302,15 @@ public:
 
 
 
+  // ----------------------------------------------------------------------------------------------
+  //
+  //
   void UpdateWH(Sint16 x1, Sint16 y1, Uint16 w, Uint16 h) 
   {
-    SDL_Rect *rect ;
-    
     if (update_all) return;
     if (updated_rects < MAX_UPDATE_RECTS-1) {
       
-      rect=&r[updated_rects] ;
+      SDL_Rect *rect=&r[updated_rects] ;
       
       rect->x = x1 ;
       rect->y = y1 ;
@@ -296,6 +324,9 @@ public:
 
 
 
+  // ----------------------------------------------------------------------------------------------
+  //
+  //
   void UpdateAll(void) 
   {
     update_all = true;
@@ -303,6 +334,10 @@ public:
 
 
 
+
+  // ----------------------------------------------------------------------------------------------
+  //
+  //
   void Reset(void) 
   {
     updated_rects = 0;
@@ -311,6 +346,9 @@ public:
 
 
 
+  // ----------------------------------------------------------------------------------------------
+  //
+  //
   void Refresh(Drawable *S) 
   {
     if (update_all) {
@@ -320,7 +358,7 @@ public:
       updated_rects = 0;
     } 
     else {
-      
+
       if (updated_rects > 0) {
         
 #ifdef DEBUG_SCREENMANAGER
@@ -329,16 +367,21 @@ public:
 #endif
           /*
           for (int i=0;i<updated_rects;i++)
-          if (r[i].x<0 || r[i].y<0 || r[i].x>RESOLUTION_X-1 || r[i].y>RESOLUTION_Y-1)
+          if (r[i].x<0 || r[i].y<0 || r[i].x>INTERNAL_RESOLUTION_X-1 || r[i].y>INTERNAL_RESOLUTION_Y-1)
           SDL_Delay(1);
         */
         SDL_UpdateRects(S->surface, updated_rects, &r[0]);
         updated_rects = 0;
       }
     }
+
   }
 
 
+
+  // ----------------------------------------------------------------------------------------------
+  //
+  //
   bool NeedRefresh(void) 
   {
     return (updated_rects > 0);
@@ -348,6 +391,17 @@ public:
 
 extern CScreenUpdateManager screenmanager;
 
+
+
+
+
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------------------------
 
 class CClipboard {
     public:
@@ -363,6 +417,11 @@ class CClipboard {
         void clear(void);
 };
 
+
+// ------------------------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------------------------
+
 class WStackNode {
     public:
         CUI_Page *page;
@@ -371,6 +430,11 @@ class WStackNode {
         WStackNode(CUI_Page *p);
         ~WStackNode();
 };
+
+
+// ------------------------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------------------------
 
 class WStack {  // The window stack.. used for showing popup windows
     private:
@@ -384,6 +448,11 @@ class WStack {  // The window stack.. used for showing popup windows
         void draw(Drawable *S);
         bool isempty(void);
 };
+
+// ------------------------------------------------------------------------------------------------
+//
+// ------------------------------------------------------------------------------------------------
+
 
 extern WStack window_stack;
 
