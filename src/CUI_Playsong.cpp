@@ -19,7 +19,7 @@ CUI_Playsong::CUI_Playsong(void)
     UI_PatternDisplay = new UserInterface;
     UI_VUMeters = new UserInterface;
 
-    p = new PatternDisplay;
+    p = new PatternDisplay() ;
     p->x = 1;
 
     clear = 0 ;

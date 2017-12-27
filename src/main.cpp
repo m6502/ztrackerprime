@@ -1037,32 +1037,52 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
 //
 void draw_status_vars(Drawable *S) 
 {
-    char s[64];
-    sprintf(s,"%.2d",song->instruments[cur_inst]->channel+1);
-    printBG(col(50),row(5),s,COLORS.Data,COLORS.Black,S); // Channel
-    sprintf(s,"%.1d",base_octave);
-    printBG(col(50),row(6),s,COLORS.Data,COLORS.Black,S); // Octave
-    sprintf(s,"%.3d/255",cur_edit_order);
-    printBG(col(12),row(5),s,COLORS.Data,COLORS.Black,S); // ORDER
-    sprintf(s,"%.3d/255",cur_edit_pattern);
-    printBG(col(12),row(6),s,COLORS.Data,COLORS.Black,S); // PATTERN
-    sprintf(s,"%.3d/%.3d",cur_edit_row,song->patterns[cur_edit_pattern]->length-1);
-    printBG(col(12),row(7),s,COLORS.Data,COLORS.Black,S); // ROW
-    sprintf(s,"%.3d/%.3d",song->tpb,song->bpm);
-    if (ztPlayer)
-        if (ztPlayer->playing)
-            sprintf(s,"%.3d/%.3d",ztPlayer->tpb,ztPlayer->bpm);
-    printBG(col(50),row(4),s,COLORS.Data,COLORS.Black,S); // ORDER
-    sprintf(s,"%.2d:                       ",cur_inst);
-    printBG(col(50),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
+  char s[64];
 
-    sprintf(s,"%.2d: %.24s",cur_inst,song->instruments[cur_inst]->title);
-    printBG(col(50),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
+  int posx_columna2 = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 30 ;
 
-    screenmanager.Update( col(10), row(2), col(79), row(10) );
+
+  sprintf(s,"%.2d",song->instruments[cur_inst]->channel+1);
+  printBG(col(posx_columna2),row(5),s,COLORS.Data,COLORS.Black,S); // Channel
+
+  sprintf(s,"%.1d",base_octave);
+  printBG(col(posx_columna2),row(6),s,COLORS.Data,COLORS.Black,S); // Octave
+
+  sprintf(s,"%.3d/255",cur_edit_order);
+  printBG(col(12),row(5),s,COLORS.Data,COLORS.Black,S); // ORDER
+
+  sprintf(s,"%.3d/255",cur_edit_pattern);
+  printBG(col(12),row(6),s,COLORS.Data,COLORS.Black,S); // PATTERN
+
+  sprintf(s,"%.3d/%.3d",cur_edit_row,song->patterns[cur_edit_pattern]->length-1);
+  printBG(col(12),row(7),s,COLORS.Data,COLORS.Black,S); // ROW
+
+  sprintf(s,"%.3d/%.3d",song->tpb,song->bpm);
+
+  if (ztPlayer) {
+    if (ztPlayer->playing) {
+      sprintf(s,"%.3d/%.3d",ztPlayer->tpb,ztPlayer->bpm);
+    }
+  }
+
+  printBG(col(posx_columna2),row(4),s,COLORS.Data,COLORS.Black,S); // ORDER
+
+  sprintf(s,"%.2d:                       ",cur_inst);
+  printBG(col(posx_columna2),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
+
+  sprintf(s,"%.2d: %.24s",cur_inst,song->instruments[cur_inst]->title);
+  printBG(col(posx_columna2),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
+
+  screenmanager.Update( col(10), row(2), col(79), row(10) );
     
 }
 
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void draw_status(Drawable *S) 
 { /* S MUST BE LOCKED! */
     char fn[256] ;
@@ -1079,10 +1099,13 @@ void draw_status(Drawable *S)
     print(col(2),row(6),"  Pattern",COLORS.Text,S);
     print(col(2),row(7),"      Row",COLORS.Text,S);
 
-    print(col(38),row(3)," Instrument",COLORS.Text,S);
-    print(col(38),row(4),"    TPB/BPM",COLORS.Text,S);
-    print(col(38),row(5),"    Channel",COLORS.Text,S);
-    print(col(38),row(6),"     Octave",COLORS.Text,S);
+
+    int posx_columna2 = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 30 - 12 ;
+
+    print(col(posx_columna2),row(3)," Instrument",COLORS.Text,S);
+    print(col(posx_columna2),row(4),"    TPB/BPM",COLORS.Text,S);
+    print(col(posx_columna2),row(5),"    Channel",COLORS.Text,S);
+    print(col(posx_columna2),row(6),"     Octave",COLORS.Text,S);
     
     printline(col(12),row(2),0x86,25,COLORS.Lowlight,S);        
     printline(col(19),row(5),0x81,18,COLORS.Highlight,S);       
@@ -1107,25 +1130,40 @@ void draw_status(Drawable *S)
     for (i=3;i<=4;i++)
         printchar(col(37),row(i),0x83,COLORS.Highlight,S);
 
-    printline(col(50),row(2),0x86,28,COLORS.Lowlight,S);         // Over inst
 
-    printchar(col(78),row(3),0x83,COLORS.Highlight,S); // end of inst
+
+
+    posx_columna2 += 12 ;
+
+    printline(col(posx_columna2),row(2),0x86,28,COLORS.Lowlight,S);         // Over inst
+
+    printchar(col(posx_columna2 + 28),row(3),0x83,COLORS.Highlight,S); // end of inst
     
-    printchar(col(57),row(4),0x83,COLORS.Highlight,S);
-    printchar(col(52),row(5),0x83,COLORS.Highlight,S);
-    printchar(col(51),row(6),0x83,COLORS.Highlight,S);
-    printchar(col(51),row(6),0x81,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 7),row(4),0x83,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 2),row(5),0x83,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 1),row(6),0x83,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 1),row(6),0x81,COLORS.Highlight,S);
 
-    printchar(col(50),row(7),0x81,COLORS.Highlight,S);
+    printchar(col(posx_columna2),row(7),0x81,COLORS.Highlight,S);
     
-    printline(col(57),row(4),0x81,21,COLORS.Highlight,S);       // Under inst
+    printline(col(posx_columna2 + 7),row(4),0x81,21,COLORS.Highlight,S);       // Under inst
 
-    printline(col(52),row(5),0x81,5,COLORS.Highlight,S);        
+    printline(col(posx_columna2 + 2),row(5),0x81,5,COLORS.Highlight,S);        
 
     for (i=3;i<7;i++)
-        printchar(col(49),row(i),0x84,COLORS.Lowlight,S);
+        printchar(col(posx_columna2 - 1),row(i),0x84,COLORS.Lowlight,S);
 
-    screenmanager.Update( col(10), row(2), col(79), row(10) );
+    /*
+    {
+      char texto_debug[] = "012345678910        20        30        40        50        60        70        80        90       100       110       120" ;
+      int resx_chars = INTERNAL_RESOLUTION_X / FONT_SIZE_X ;
+      texto_debug[resx_chars] = '\0' ;
+
+      print(col(0),row(0),texto_debug,COLORS.Text,S);
+    }
+    */
+
+    screenmanager.Update( col(10), row(2), col(INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 2, row(10) );
 }
 
 

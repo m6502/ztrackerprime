@@ -6,6 +6,7 @@ int m_upd = 0;
 event *upd_e = NULL;
 
 int max_displayable_rows = 0 ;
+int g_posx_tracks = 0 ;
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -253,8 +254,8 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(str," Track %.2d ",j+1);
     else sprintf(str," %.2d ",j+1);
 
-    if (song->track_mute[j]) printBG(col(5+(p*(field_size+1))),row(14),str,COLORS.Text,COLORS.Lowlight,S);
-    else printBG(col(5+(p*(field_size+1))),row(14),str,COLORS.Brighttext,COLORS.Lowlight,S);
+    if (song->track_mute[j]) printBG(col(g_posx_tracks + (p*(field_size+1))),row(14),str,COLORS.Text,COLORS.Lowlight,S);
+    else printBG(col(g_posx_tracks + (p*(field_size+1))),row(14),str,COLORS.Brighttext,COLORS.Lowlight,S);
     
     p++;
   }
@@ -533,7 +534,11 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
+  int poscharx_tracks = ((INTERNAL_RESOLUTION_X / FONT_SIZE_X) - (tracks_shown*(field_size+1))) >> 1 ;
+  g_posx_tracks = poscharx_tracks ;
+
   num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1
+  
   
   for(var_row = first_row; var_row < (last_row + blank_rows); var_row++) {
 
@@ -558,10 +563,10 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
         sprintf(str,"%.3d",var_row);
       
         // Línea vertical izquierda del marco de los tracks
-        printchar(col(4),                               posy_current_row, 146, COLORS.Lowlight,S) ;
+        printchar(col(poscharx_tracks - 1),                               posy_current_row, 146, COLORS.Lowlight,S) ;
 
         // Línea vertical derecha del marco de los tracks
-        printchar(col(4+(tracks_shown*(field_size+1))), posy_current_row, 145, COLORS.Highlight,S) ;
+        printchar(col((poscharx_tracks - 1) + (tracks_shown*(field_size+1))), posy_current_row, 145, COLORS.Highlight,S) ;
       }
       
     }
@@ -571,17 +576,26 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
       if (var_row==ztPlayer->playing_cur_row && ztPlayer->playing_cur_pattern==cur_edit_pattern) {
         
-        printBG(col(1),posy_current_row,str,COLORS.Highlight,COLORS.Background,S);
+        printBG(col(poscharx_tracks - 4),posy_current_row,str,COLORS.Highlight,COLORS.Background,S);
       }
       else {
         
-        printBG(col(1),posy_current_row,str,COLORS.Text,COLORS.Background,S);
+        printBG(col(poscharx_tracks - 4),posy_current_row,str,COLORS.Text,COLORS.Background,S);
       }
     } 
     else {
       
-      printBG(col(1),posy_current_row,str,COLORS.Text,COLORS.Background,S);
+      printBG(col(poscharx_tracks - 4),posy_current_row,str,COLORS.Text,COLORS.Background,S);
     }
+
+
+
+
+
+
+    
+
+
 
     
     {
@@ -593,7 +607,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
             for(var_track = cur_edit_track_disp; var_track < (cur_edit_track_disp + tracks_shown); var_track++) {
 
-              posx_current_track = col(5) + col(num_displayed_tracks * (field_size + 1)) ;
+              posx_current_track = col(poscharx_tracks) + col(num_displayed_tracks * (field_size + 1)) ;
 
               // <Manu> Si esta línea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo
 
@@ -603,7 +617,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 //bg = COLORS.EditBG;
 
                 //printBlankNote(str, zt_config_globals.cur_edit_mode) ;
-                //printBG(col(5+(num_displayed_tracks*(field_size+1))), row(15+num_displayed_rows), str, fg, bg, S) ;
+                //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(15+num_displayed_rows), str, fg, bg, S) ;
 
                 // Lo dibujamos un píxel a la izquierda y un píxel más largo para comernos la posible línea del marco de los tracks
 
@@ -623,8 +637,8 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 else bg = COLORS.EditBG ;
 
 
-                if (!(var_row%zt_config_globals.lowlight_increment))  bg = special ? COLORS.CursorRowHigh : COLORS.EditBGlow ;
-                if (!(var_row%zt_config_globals.highlight_increment)) bg = special ? COLORS.CursorRowHigh : COLORS.EditBGhigh ;
+                if (!(var_row % zt_config_globals.lowlight_increment))  bg = special ? COLORS.CursorRowHigh : COLORS.EditBGlow ;
+                if (!(var_row % zt_config_globals.highlight_increment)) bg = special ? COLORS.CursorRowHigh : COLORS.EditBGhigh ;
 
                 if (!(e = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(var_row))) e = &blank_event;
 
@@ -653,7 +667,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
                 printNote(str, e, zt_config_globals.cur_edit_mode) ;
-                printBG(col(5+(num_displayed_tracks*(field_size+1))), posy_current_row, str, fg, bg, S) ;
+                printBG(col(poscharx_tracks + (num_displayed_tracks*(field_size+1))), posy_current_row, str, fg, bg, S) ;
 
                 str[ edit_cols[cur_edit_col].startx + 1 ] = 0 ;
 
@@ -663,7 +677,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 if (var_row == cur_edit_row && var_track == cur_edit_track) {
 
                   printBG(
-                          col(5 + edit_cols[cur_edit_col].startx + (num_displayed_tracks * (field_size + 1))),
+                          col(poscharx_tracks + edit_cols[cur_edit_col].startx + (num_displayed_tracks * (field_size + 1))),
                           posy_current_row,
                           &str[ edit_cols[cur_edit_col].startx ],
                           COLORS.EditBG,
@@ -680,7 +694,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 if (var_track < (cur_edit_track_disp + (tracks_shown - 1)) ) {
                   
                   printchar(
-                            col( 5 + ((num_displayed_tracks + 1) * (field_size + 1)) - 1), 
+                            col( poscharx_tracks + ((num_displayed_tracks + 1) * (field_size + 1)) - 1), 
                             posy_current_row, 
                             168, 
                             COLORS.Lowlight, 
@@ -731,27 +745,27 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
   // Línea superior de los tracks
-  printline(col(5),TRACKS_POS_Y, 148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
+  printline(col(poscharx_tracks),TRACKS_POS_Y, 148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
 
   // Línea inferior de los tracks
-  printline(col(5),TRACKS_POS_Y + row((PATTERN_EDIT_ROWS - blank_rows) + 1), 143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
+  printline(col(poscharx_tracks),TRACKS_POS_Y + row((PATTERN_EDIT_ROWS - blank_rows) + 1), 143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
   
   // Etiquetas de los tracks
   draw_track_markers(tracks_shown, field_size, S);
 
   // Puntos que cierran la parte alta del marco de los tracks
 
-  printchar(col(4),                               TRACKS_POS_Y,                                 153, COLORS.Lowlight, S) ;
-  printchar(col(4+(tracks_shown*(field_size+1))), TRACKS_POS_Y,                                 152, COLORS.Lowlight, S) ;
+  printchar(col((poscharx_tracks - 1)),                               TRACKS_POS_Y,                                 153, COLORS.Lowlight, S) ;
+  printchar(col((poscharx_tracks - 1)+(tracks_shown*(field_size+1))), TRACKS_POS_Y,                                 152, COLORS.Lowlight, S) ;
 
   // Puntos que cierran la parte baja del marco de los tracks
 
-  printchar(col(4),                               TRACKS_POS_Y + row(max_displayable_rows + 1), 151, COLORS.Lowlight,  S) ;
-  printchar(col(4+(tracks_shown*(field_size+1))), TRACKS_POS_Y + row(max_displayable_rows + 1), 150, COLORS.Highlight, S) ;
+  printchar(col((poscharx_tracks - 1)),                               TRACKS_POS_Y + row(max_displayable_rows + 1), 151, COLORS.Lowlight,  S) ;
+  printchar(col((poscharx_tracks - 1)+(tracks_shown*(field_size+1))), TRACKS_POS_Y + row(max_displayable_rows + 1), 150, COLORS.Highlight, S) ;
 
   
   
-  //printchar(col(5), row(80), 'P', COLORS.Highlight, S) ;
+  //printchar(col(poscharx_tracks), row(80), 'P', COLORS.Highlight, S) ;
 }
 
 
