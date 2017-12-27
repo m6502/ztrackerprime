@@ -1443,6 +1443,41 @@ void CUI_Patterneditor::update()
 
           switch(key)
           {
+          case DIK_A:
+            if(selected) {
+              popup_window(UIP_PENature);
+              Keys.flush();
+              key = Keys.checkkey();
+              kstate = Keys.getstate();
+              need_refresh++;
+            }
+            break;
+            
+          case DIK_W:
+            if (selected) {
+              for(i=select_track_start;i<=select_track_end;i++) {
+                for(j=select_row_start;j<=select_row_end;j++) {         
+                  e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j);
+                  if (e)
+                    if (e->note > 0x7F)
+                      e->vol = 0x80;
+                }
+              }
+              need_refresh++;
+            }
+            break;
+            
+          case DIK_N: /* Set length of first note to length of selection */
+            if (selected && 
+              (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
+              ) {
+              j = (select_row_end+1 - select_row_start)*(96/song->tpb);
+              for(i=select_track_start;i<=select_track_end;i++)
+                song->patterns[cur_edit_pattern]->tracks[i]->update_event(select_row_start,-1,-1,-1,j,-1,-1);
+              file_changed++;
+              need_refresh++;
+            }
+            break;
 
 
 
@@ -1679,48 +1714,19 @@ void CUI_Patterneditor::update()
               need_refresh++;
             }
             break;
+
+
+          // ------------------------------------------------------------------------
+          // <Manu> Copy paste commands
+          // ------------------------------------------------------------------------
             
-          case DIK_A:
-            if(selected) {
-              popup_window(UIP_PENature);
-              Keys.flush();
-              key = Keys.checkkey();
-              kstate = Keys.getstate();
-              need_refresh++;
-            }
-            break;
-            
-          case DIK_W:
-            if (selected) {
-              for(i=select_track_start;i<=select_track_end;i++) {
-                for(j=select_row_start;j<=select_row_end;j++) {         
-                  e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j);
-                  if (e)
-                    if (e->note > 0x7F)
-                      e->vol = 0x80;
-                }
-              }
-              need_refresh++;
-            }
-            break;
-            
-          case DIK_N: /* Set length of first note to length of selection */
-            if (selected && 
-              (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
-              ) {
-              j = (select_row_end+1 - select_row_start)*(96/song->tpb);
-              for(i=select_track_start;i<=select_track_end;i++)
-                song->patterns[cur_edit_pattern]->tracks[i]->update_event(select_row_start,-1,-1,-1,j,-1,-1);
-              file_changed++;
-              need_refresh++;
-            }
-            break;
           case DIK_C:
             if (selected) {
               clipboard->copy(); 
               SDL_Delay(50);
             }
             break;
+
           case DIK_X:
             if (!last_cmd_keyjazz && selected) {
               clipboard->copy();

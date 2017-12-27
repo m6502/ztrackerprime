@@ -27,6 +27,8 @@ Program behavior changes:
 
 - Channel enable / disable controls work with F keys row instead of the numbers row.
 
+- The first 16 instruments get that MIDI channel assigned instead of defaulting to 0.
+
 - Song play view shows more information per note.
 
 - Starts in "Tracker Mode" by default.

@@ -65,7 +65,12 @@ instrument::instrument(int p)
   patch          = ZTM_INST_DEFAULT_PATCH ;
   bank           = ZTM_INST_DEFAULT_BANK ;
   midi_device    = ZTM_INST_DEFAULT_MIDI_DEVICE ;
-  channel        = ZTM_INST_DEFAULT_CHANNEL ;
+
+  // <Manu>
+  
+  if(p < 16) channel = p ;
+  else       channel = ZTM_INST_DEFAULT_CHANNEL ;
+
   transpose      = ZTM_INST_DEFAULT_TRANSPOSE ;
   default_volume = ZTM_INST_DEFAULT_DEFAULT_VOLUME ;
   global_volume  = default_instrument_global_volume ;

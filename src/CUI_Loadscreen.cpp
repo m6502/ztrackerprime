@@ -47,14 +47,6 @@ char szSearch[256];
 extern int is_loading;
 
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-void do_nothing(void) 
-{
-
-}
-
 
 
 // ------------------------------------------------------------------------------------------------
@@ -62,7 +54,7 @@ void do_nothing(void)
 //
 void do_load(void) 
 {
-//  <Manu> Si la cancion esta sonando la paramos --
+//  <Manu> Si la cancion está sonando la paramos --
   if(ztPlayer->playing) {
     
     ztPlayer->stop() ;
@@ -80,7 +72,7 @@ void do_load(void)
 //
 void filelist_onEnter(UserInterfaceElement *b)
 {
-//  <Manu> Desactivamos el requester de si estas loco, al cargar 
+//  <Manu> Desactivamos el requester de si estas loco; al cargar 
 //         la cancion se comprueba si se esta playeando y la parara
   
 /*  if(ztPlayer->playing) {
