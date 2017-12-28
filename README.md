@@ -29,6 +29,8 @@ Program behavior changes:
 
 - The first 16 instruments get that MIDI channel assigned instead of defaulting to 0.
 
+- BPM/TPB changes are now applied in real-time while playing a song or pattern.
+
 - Song play view shows more information per note.
 
 - Starts in "Tracker Mode" by default.

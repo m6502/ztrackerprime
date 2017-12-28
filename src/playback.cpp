@@ -339,6 +339,11 @@ void player::set_speed() {
 //int t,int b) {
     __int64 a;
 //  tpb = t; bpm = b;
+
+    // <Manu> Apply changes in real-time :-)
+    this->bpm = song->bpm ;
+    this->tpb = song->tpb ;
+
     a = 1000000 / wTimerRes;
     subtick_len_ms = (int)(60 * a /(96*this->bpm));
     subtick_len_mms = subtick_len_ms % 1000;
@@ -351,6 +356,13 @@ void player::set_speed() {
     clock_len_ms = 4;
     tick_len_ms = 96 / this->tpb;
 }
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 int player::seek_order(int pattern) {
     int o;
     for (o=0;o<256;o++)

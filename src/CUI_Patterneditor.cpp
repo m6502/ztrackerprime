@@ -27,13 +27,13 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
 
     case 'A':
       if (effect_data == 2  || 
-        effect_data == 4  ||
-        effect_data == 6  ||
-        effect_data == 8  ||
-        effect_data == 12 ||
-        effect_data == 24 ||
-        effect_data == 48 
-        )            
+          effect_data == 4  ||
+          effect_data == 6  ||
+          effect_data == 8  ||
+          effect_data == 12 ||
+          effect_data == 24 ||
+          effect_data == 48 
+          )            
         sprintf(str,"Effect: Set TPB to %d",effect_data);
       else
         sprintf(str,"Effect: Set TPB (invalid TPB: %d) ",effect_data);
@@ -893,8 +893,11 @@ void CUI_Patterneditor::update()
   //  need_refresh++ ;
   //}
 
-#define _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-#ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
+//#define _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
+
+#ifndef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
+  zt_config_globals.cur_edit_mode = VIEW_BIG ;
+#else
 
   if (Keys.size()) {
 
