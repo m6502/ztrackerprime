@@ -843,6 +843,8 @@ void status(Drawable *S)
 
 
 extern int max_displayable_rows ;
+extern int g_posx_tracks ;
+
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -898,7 +900,7 @@ void update_status(Drawable *S)
           else line_number_color = COLORS.Text ;
             
           sprintf(str,"%.3d", i) ;
-          printBG(col(1), row(15+o), str, line_number_color, COLORS.Background, S) ;
+          printBG(col(g_posx_tracks - 4), row(15+o), str, line_number_color, COLORS.Background, S) ;
 
           o++;
         }
@@ -913,7 +915,7 @@ void update_status(Drawable *S)
 
     status_change = 0; 
     //updated++;
-    screenmanager.UpdateWH(col(1), row(15), 3 * FONT_SIZE_X, PATTERN_EDIT_ROWS * FONT_SIZE_Y) ;
+    screenmanager.UpdateWH(col(g_posx_tracks - 4), row(15), 3 * FONT_SIZE_X, PATTERN_EDIT_ROWS * FONT_SIZE_Y) ;
     S->unlock();
   }
 }
