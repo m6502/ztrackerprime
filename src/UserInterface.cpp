@@ -36,7 +36,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ******/
+
+#include <filesystem>
 #include "zt.h"
+
 
 /* OO UI code - YUM - Can you tell this is the first time i've done this? */
 
@@ -272,6 +275,7 @@ void UserInterface::update()
       }
     }
 
+    e->auto_update_anchor() ;
     e = e->next;
   }
 
@@ -448,6 +452,56 @@ UserInterfaceElement::~UserInterfaceElement(void) {
 // ------------------------------------------------------------------------------------------------
 //
 //
+void UserInterfaceElement::auto_update_anchor()
+{
+    if(anchor_type & ANCHOR_RIGHT)
+        anchor_x = INTERNAL_RESOLUTION_X ;
+
+    if(anchor_type & ANCHOR_DOWN)
+        anchor_y = INTERNAL_RESOLUTION_Y ;
+
+    if(anchor_type & (ANCHOR_LEFT | ANCHOR_RIGHT))
+        x = anchor_x + anchor_offset_x ;
+            
+    if(anchor_type & (ANCHOR_UP | ANCHOR_DOWN))
+        y = anchor_y + anchor_offset_y ;
+}
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void UserInterfaceElement::auto_anchor_at_current_pos(int how)
+{
+    anchor_type = how ;
+
+    if(anchor_type & ANCHOR_RIGHT) {
+                
+        anchor_x = INTERNAL_RESOLUTION_X ;
+    }
+    else if(anchor_type & ANCHOR_LEFT) {
+                
+        anchor_x = 0 ;
+    }
+
+    if(anchor_type & ANCHOR_DOWN) {
+                
+        anchor_y = INTERNAL_RESOLUTION_Y ;
+    }
+    else if(anchor_type & ANCHOR_UP) {
+                
+        anchor_y = 0 ;
+    }
+
+    anchor_offset_x = x - anchor_x ;
+    anchor_offset_y = y - anchor_y ;
+}
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void UserInterfaceElement::enter(void) {
     
 }
@@ -504,7 +558,53 @@ TextInput::~TextInput(void) {
 }
 
 
+// ------------------------------------------------------------------------------------------------
+//
+//
+void TextInput::auto_update_anchor()
+{
+    if(anchor_type & ANCHOR_RIGHT)
+        anchor_x = INTERNAL_RESOLUTION_X / 8 ;
 
+    if(anchor_type & ANCHOR_DOWN)
+        anchor_y = INTERNAL_RESOLUTION_Y / 8 ;
+
+    if(anchor_type & (ANCHOR_LEFT | ANCHOR_RIGHT))
+        x = anchor_x + anchor_offset_x ;
+            
+    if(anchor_type & (ANCHOR_UP | ANCHOR_DOWN))
+        y = anchor_y + anchor_offset_y ;
+}
+
+
+// ------------------------------------------------------------------------------------------------
+// <Manu> Character anchor - Same as text input, merge
+//
+void TextInput::auto_anchor_at_current_pos(int how)
+{
+    anchor_type = how ;
+
+    if(anchor_type & ANCHOR_RIGHT) {
+                
+        anchor_x = INTERNAL_RESOLUTION_X / 8 ;
+    }
+    else if(anchor_type & ANCHOR_LEFT) {
+                
+        anchor_x = 0 ;
+    }
+
+    if(anchor_type & ANCHOR_DOWN) {
+                
+        anchor_y = INTERNAL_RESOLUTION_Y / 8 ;
+    }
+    else if(anchor_type & ANCHOR_UP) {
+                
+        anchor_y = 0 ;
+    }
+
+    anchor_offset_x = x - anchor_x ;
+    anchor_offset_y = y - anchor_y ;
+}
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -1765,7 +1865,12 @@ void TextBox::draw(Drawable *S, int active)
           if (cx<x+xsize-4) printchar(col(x + 1 +cx), row(y + line), text[sc], use, S);
           else {
       
-            if (bWordWrap) d++;
+            if (bWordWrap) {
+                
+                d++;
+
+                if(sc > 0) sc--;       // <Manu> do not miss a letter when wrapping
+            }
           }
     
           cx++;
@@ -2431,37 +2536,33 @@ bool file_exists(char *file) {
 
 
 
-
 // ------------------------------------------------------------------------------------------------
 //
 //
 void SkinSelector::OnChange() {
     clear();
-    long res,hnd;
-    _finddata_t f;
-    char s[512];
-    strcpy(s,cur_dir);
-    strcat(s,"/skins/*.*");
-    hnd = res = _findfirst(s,&f);
-    while(res != -1) {
-        if (f.attrib & _A_SUBDIR) {
-            LBNode *p;
-            if (f.name[0] != '.'){
-                char str[200];
-                strcpy(str,cur_dir);
-                strcat(str,"/skins/");
-                strcat(str, f.name);
-                strcat(str, "/colors.conf");
-                if (file_exists(str)) {
-                    p = insertItem(f.name);
-                    if (zcmp(p->caption,zt_config_globals.skin))
-                        p->checked = true;
-                }
+
+    std::string skins_dir = std::string(cur_dir) + "/skins";
+
+    // Iterate through the directory entries
+    for (const auto& entry : std::filesystem::directory_iterator(skins_dir)) {
+        
+        const std::string dir_name = entry.path().filename().string();
+
+        // Ignore "." and ".." directories
+        if (dir_name[0] != '.') {
+            std::string config_file = entry.path().string() + "/colors.conf";
+
+            // Check if the "colors.conf" file exists in the subdirectory
+            if (std::filesystem::exists(config_file)) {
+                LBNode *p = insertItem((char *)dir_name.c_str());
+                if (zcmp(p->caption,zt_config_globals.skin))
+                    p->checked = true;
             }
         }
-        res = _findnext(hnd, &f);
+        
     }
-    _findclose(hnd);
+
 }
 
 

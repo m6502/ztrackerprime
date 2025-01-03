@@ -5,13 +5,16 @@
 
 class Button : public UserInterfaceElement {
     public:
-        char *caption;
+        const char *caption;
         int state;
         int updown;
         ActFunc OnClick;
 
         Button();
         ~Button();
+
+        virtual void auto_anchor_at_current_pos(int how) ;
+        virtual void auto_update_anchor() ;
 
         int update();
         void draw(Drawable *S, int active);

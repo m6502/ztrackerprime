@@ -111,7 +111,7 @@ void CUI_SongMessage::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(11,"Song Message",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Song Message",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
         S->unlock();

@@ -10,25 +10,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
-#include <io.h>
-#include <direct.h>
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-#include <mmsystem.h>
 #include <math.h>
-
+#include <iostream>
 
 #include <sdl.h>
 #include <SDL_main.h>
 //#include "sdl_mixer.h"  // this is for audio testing
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+
+
+#define DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
+#define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
+#define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
+#define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
 
 
 // ------------------------------------------------------------------------------------------------
 //
+// 
+// 
+// 
+// 
+// 
+// 
+// 
 // ------------------------------------------------------------------------------------------------
 
 //#define VER_MAJ 0
@@ -36,11 +44,11 @@
 // <Manu> antes era 98
 //#define VER_MIN 986
 
-#define ZTRACKER_VERSION                "zTracker' v20171228"
+#define ZTRACKER_VERSION                "zTracker' v2025_01_03"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
-#define ZOOM                            2.0f
+#define ZOOM                            (zt_config_globals.zoom)
 
 #define INTERNAL_RESOLUTION_X           ((int)(zt_config_globals.screen_width  * (1.0f / (float)ZOOM)))
 #define INTERNAL_RESOLUTION_Y           ((int)(zt_config_globals.screen_height * (1.0f / (float)ZOOM)))
@@ -48,10 +56,18 @@
 #define RESOLUTION_X                    (zt_config_globals.screen_width)
 #define RESOLUTION_Y                    (zt_config_globals.screen_height)
 
+#define MINIMUM_SCREEN_WIDTH            840
+#define MINIMUM_SCREEN_HEIGHT           480
+
 #define FACTOR_ESCALAX                  ((float)INTERNAL_RESOLUTION_X / (float)RESOLUTION_X)
 #define FACTOR_ESCALAY                  ((float)INTERNAL_RESOLUTION_Y / (float)RESOLUTION_Y)
 
 
+
+#define INITIAL_ROW 1 // <Manu> Never set to 0, there are some -1 in calculations
+#define PAGE_TITLE_ROW_Y                (INITIAL_ROW + 8)
+#define TRACKS_ROW_Y                    (PAGE_TITLE_ROW_Y + 2)
+#define HEADER_ROW                      2
 
 #define SCREEN_BPP                      32
 
@@ -101,7 +117,6 @@ extern int PATTERN_EDIT_ROWS;
 
 #include "../resource.h"         // resource includes for win32 icon
 
-#include "fxml.h"
 #include "lc_sdl_wrapper.h"      // libCON wrapper 
 #include "zlib_wrapper.h"        // zlib wrapper 
 #include "CDataBuf.h"            // data buffer for building chunks before writing to disk
@@ -152,7 +167,7 @@ public:
         return (Blue + (Green<<8) + (Red<<16));
     }
     
-    TColor get_color_from_hex(char *str, conf *ColorsFile) {
+    TColor get_color_from_hex(const char *str, conf *ColorsFile) {
         unsigned char r,g,b;
         r = ColorsFile->getcolor(str,0);
         g = ColorsFile->getcolor(str,1);
@@ -349,13 +364,15 @@ public:
   // ----------------------------------------------------------------------------------------------
   //
   //
-  void Refresh(Drawable *S) 
+  bool Refresh(Drawable *S) 
   {
     if (update_all) {
 
       SDL_UpdateRect(S->surface,0,0,0,0);
       update_all = false;
       updated_rects = 0;
+
+      return true ;
     } 
     else {
 
@@ -372,9 +389,12 @@ public:
         */
         SDL_UpdateRects(S->surface, updated_rects, &r[0]);
         updated_rects = 0;
+
+        return true ;
       }
     }
 
+    return false ;
   }
 
 
@@ -487,7 +507,10 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_SWITCH_ABOUT,
         CMD_SWITCH_LOAD,
         CMD_SWITCH_SAVE,
+
+#ifndef DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
         CMD_SWITCH_CONFIG,
+#endif
         CMD_PLAY,
         CMD_PLAY_PAT,
         CMD_PLAY_PAT_LINE,
@@ -497,9 +520,20 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_QUIT,
         CMD_PLAY_ORDER,
         CMD_SWITCH_SONGLEN,
+
+
+#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
         CMD_SWITCH_SONGMSG,
+#endif
+
+#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
         CMD_SWITCH_ARPEDIT,
+#endif
+
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
         CMD_SWITCH_MIDIMACEDIT
+#endif
+
     };
 
 
@@ -615,7 +649,7 @@ extern int last_cmd_keyjazz,last_keyjazz;
 void draw_status(Drawable *S); /* S MUST BE LOCKED! */
 extern Bitmap *load_cached_bitmap(char *name);
 extern char ls_filename[256],load_filename[256], save_filename[256];
-extern void setGamma(float f, Screen *S);
+
 extern int faded, doredraw;
 
 extern Bitmap *load_bitmap(char *name);

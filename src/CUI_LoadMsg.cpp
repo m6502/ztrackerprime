@@ -126,12 +126,12 @@ void CUI_LoadMsg::draw(Drawable *S)
 {
   int i;
 
-  char *str[] = { 
+  const char *str[] = { 
 
-                  "Please wait, loading... |",
-                  "Please wait, loading... /",
-                  "Please wait, loading... -",
-                  "Please wait, loading... \\"
+    "Please wait, loading... |",
+    "Please wait, loading... /",
+    "Please wait, loading... -",
+    "Please wait, loading... \\"
   };
 
   if (S->lock() == 0) {

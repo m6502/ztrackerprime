@@ -1,6 +1,8 @@
 #include "zt.h"
 #include "FileList.h"
 
+#include <filesystem>
+
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -97,12 +99,11 @@ void DriveList::OnChange()
 }
 
 
-
 // ------------------------------------------------------------------------------------------------
 //
 //
 void DriveList::OnSelect(LBNode *selected) {
-    chdir(&selected->caption[2]);
+    std::filesystem::current_path(&selected->caption[2]);
     OnChange();
     updated++;
     ListBox::OnSelect(selected);
@@ -184,21 +185,55 @@ void DirList::draw(Drawable *S, int active) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void DirList::OnChange() {
+bool is_root_directory(const std::filesystem::path &dir_path)
+{
+    if (std::filesystem::exists(dir_path) && std::filesystem::is_directory(dir_path)) {
+
+        bool result = (dir_path == dir_path.root_path()) ;
+        return result ;
+    }
+
+    return false;
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void DirList::OnChange()
+{
     clear();
+
+    std::filesystem::path current_dir = std::filesystem::current_path();
+
+    if(!is_root_directory(current_dir))
+    {
+        LBNode* p = insertItem((char *)"..");
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(".")) {
+
+        if (entry.is_directory()) {
+
+            const std::string dirName = entry.path().filename().string();
+            LBNode* p = insertItem((char *)dirName.c_str());
+        }
+    }
+
+/*
     long res,hnd;
     _finddata_t f;
     hnd = res = _findfirst("*.*",&f);
     while(res != -1) {
         if (f.attrib & _A_SUBDIR) {
-            LBNode *p;
-//            if (f.name[0] != '.' && f.name[1]!=0){
-                p = insertItem(f.name);
-//            }
+            LBNode *p  = insertItem(f.name);
         }
         res = _findnext(hnd, &f);
     }
     _findclose(hnd);
+*/
     need_redraw++;
 }
 
@@ -209,7 +244,7 @@ void DirList::OnChange() {
 //
 //
 void DirList::OnSelect(LBNode *selected) {
-    chdir(selected->caption);
+    std::filesystem::current_path(selected->caption);
     OnChange();
     updated++;
     char d[1024];
@@ -355,23 +390,19 @@ void FileList::draw(Drawable *S, int active)
 
 
 
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
 void FileList::AddFiles(char *pattern, TColor c) 
 {
-    long res,hnd;
-    _finddata_t f;
-    hnd = res = _findfirst(pattern,&f);
-    while(res != -1) {
-        LBNode *p;
-        p = insertItem(f.name);
-        p->int_data = c;
-        res = _findnext(hnd, &f);
+    for (const auto& entry : std::filesystem::directory_iterator(".")) {
+        // Match the pattern (simple example using filename)
+
+        if (entry.is_regular_file() && entry.path().extension() == pattern) {
+            LBNode* p = insertItem((char *)entry.path().filename().string().c_str());
+            p->int_data = c; // Set the integer data
+        }
     }
-    _findclose(hnd);
 }
 
 
@@ -383,11 +414,11 @@ void FileList::AddFiles(char *pattern, TColor c)
 void FileList::OnChange() 
 {
     clear();
-    AddFiles("*.zt", COLORS.Data);
-    AddFiles("*.it", COLORS.Highlight);
+    AddFiles(".zt", COLORS.Data);
+    AddFiles(".it", COLORS.Highlight);
     
     // <Manu> Quiero que muestre tambien los .mid, asi que añado esta linea
-    AddFiles("*.mid", COLORS.Highlight);
+    AddFiles(".mid", COLORS.Highlight);
     
     need_redraw++;
 }

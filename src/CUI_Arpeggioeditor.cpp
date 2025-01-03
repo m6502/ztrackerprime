@@ -87,7 +87,7 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(11,"Arpeggio Editor",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Arpeggio Editor",COLORS.Text,COLORS.Background,S);
         print(col(12),row(BASE_Y),"name",COLORS.Text,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();

@@ -160,7 +160,7 @@ void CUI_Config::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         status(S);
-        printtitle(11,"Global Configuration",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Global Configuration",COLORS.Text,COLORS.Background,S);
         print(row(2),col(14),"   Full Screen",COLORS.Text,S);
         print(row(2),col(16),"    Key Repeat",COLORS.Text,S);
         print(row(2),col(18),"      Key Wait",COLORS.Text,S);

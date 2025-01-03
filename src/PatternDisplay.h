@@ -18,7 +18,7 @@ class PatternDisplay : public UserInterfaceElement {
 
     public:
 
-        Frame *frm;
+        Frame *frame;
         int disp_row;
         int cur_pat_view;
         int starttrack;

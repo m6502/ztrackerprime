@@ -1,9 +1,10 @@
 #include "zt.h"
 
 CUI_PEParms::CUI_PEParms(void) {
-    ValueSlider *vs;
-	CheckBox *cb;
+
     UI = new UserInterface;
+
+    
 
     int window_width = 54 * col(1);
     int window_height = 20 * row(1);
@@ -13,82 +14,82 @@ CUI_PEParms::CUI_PEParms(void) {
     for(;start_y % 8;start_y--);
     
     /* Initialize BPM Slider */
-        vs = new ValueSlider;
-        UI->add_element(vs,0);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 14;
-        vs->y = (start_y / 8) + 6; 
-        vs->xsize=window_width/8 - 20;
-        vs->min = 0;
-        vs->max = 32;
-        vs->value = cur_step;   
+        vs_step = new ValueSlider;
+        UI->add_element(vs_step,0);
+        vs_step->frame = 1;
+        vs_step->x = (start_x / 8) + 14;
+        vs_step->y = (start_y / 8) + 6; 
+        vs_step->xsize=window_width/8 - 20;
+        vs_step->min = 0;
+        vs_step->max = 32;
+        vs_step->value = cur_step;   
 
-        vs = new ValueSlider;
-        UI->add_element(vs,1);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 14;
-        vs->y = (start_y / 8) + 8; 
-        vs->xsize=window_width/8 - 20;
-        vs->min = 32;
-        vs->max = 999;
-        vs->value = song->patterns[cur_edit_pattern]->length;
+        vs_pat_length = new ValueSlider;
+        UI->add_element(vs_pat_length,1);
+        vs_pat_length->frame = 1;
+        vs_pat_length->x = (start_x / 8) + 14;
+        vs_pat_length->y = (start_y / 8) + 8; 
+        vs_pat_length->xsize=window_width/8 - 20;
+        vs_pat_length->min = 32;
+        vs_pat_length->max = 999;
+        vs_pat_length->value = song->patterns[cur_edit_pattern]->length;
 
-        vs = new ValueSlider;
-        UI->add_element(vs,2);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 14;
-        vs->y = (start_y / 8) + 10; 
-        vs->xsize=window_width/8 - 20;
-        vs->min = 1;
-        vs->max = 32;
-        vs->value = zt_config_globals.highlight_increment;
+        vs_highlight = new ValueSlider;
+        UI->add_element(vs_highlight,2);
+        vs_highlight->frame = 1;
+        vs_highlight->x = (start_x / 8) + 14;
+        vs_highlight->y = (start_y / 8) + 10; 
+        vs_highlight->xsize=window_width/8 - 20;
+        vs_highlight->min = 1;
+        vs_highlight->max = 32;
+        vs_highlight->value = zt_config_globals.highlight_increment;
 
-        vs = new ValueSlider;
-        UI->add_element(vs,3);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 14;
-        vs->y = (start_y / 8) + 12; 
-        vs->xsize=window_width/8 - 20;
-        vs->min = 1;
-        vs->max = 32;
-        vs->value = zt_config_globals.lowlight_increment;
+        vs_lowlight = new ValueSlider;
+        UI->add_element(vs_lowlight,3);
+        vs_lowlight->frame = 1;
+        vs_lowlight->x = (start_x / 8) + 14;
+        vs_lowlight->y = (start_y / 8) + 12; 
+        vs_lowlight->xsize=window_width/8 - 20;
+        vs_lowlight->min = 1;
+        vs_lowlight->max = 32;
+        vs_lowlight->value = zt_config_globals.lowlight_increment;
 
-        cb = new CheckBox;
-        UI->add_element(cb,4);
-        cb->frame = 0;
-        cb->x = (start_x / 8) + 14;
-        cb->y = (start_y / 8) + 14;
-        cb->xsize = 5;
-        cb->value = &zt_config_globals.centered_editing;
-        cb->frame = 1;
+        cb_centered = new CheckBox;
+        UI->add_element(cb_centered,4);
+        cb_centered->frame = 0;
+        cb_centered->x = (start_x / 8) + 14;
+        cb_centered->y = (start_y / 8) + 14;
+        cb_centered->xsize = 5;
+        cb_centered->value = &zt_config_globals.centered_editing;
+        cb_centered->frame = 1;
 
-        cb = new CheckBox;
-        UI->add_element(cb,5);
-        cb->frame = 0;
-        cb->x = (start_x / 8) + 14 + 16;
-        cb->y = (start_y / 8) + 14;
-        cb->xsize = 5;
-        cb->value = &zt_config_globals.step_editing;
-        cb->frame = 1;
+        cb_stepedit = new CheckBox;
+        UI->add_element(cb_stepedit,5);
+        cb_stepedit->frame = 0;
+        cb_stepedit->x = (start_x / 8) + 14 + 16;
+        cb_stepedit->y = (start_y / 8) + 14;
+        cb_stepedit->xsize = 5;
+        cb_stepedit->value = &zt_config_globals.step_editing;
+        cb_stepedit->frame = 1;
 
-        cb = new CheckBox;
-        UI->add_element(cb,6);
-        cb->frame = 0;
-        cb->x = (start_x / 8) + 14 + 32;
-        cb->y = (start_y / 8) + 14;
-        cb->xsize = 5;
-        cb->value = &zt_config_globals.record_velocity;
-        cb->frame = 1;
+        cb_recveloc = new CheckBox;
+        UI->add_element(cb_recveloc,6);
+        cb_recveloc->frame = 0;
+        cb_recveloc->x = (start_x / 8) + 14 + 32;
+        cb_recveloc->y = (start_y / 8) + 14;
+        cb_recveloc->xsize = 5;
+        cb_recveloc->value = &zt_config_globals.record_velocity;
+        cb_recveloc->frame = 1;
 
-        vs = new ValueSlider;
-        UI->add_element(vs,7);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 14;
-        vs->y = (start_y / 8) + 16;
-        vs->xsize=window_width/8 - 20;
-        vs->min=1;
-        vs->max = 32;
-        vs->value = zt_config_globals.control_navigation_amount;
+        vs_speedup = new ValueSlider;
+        UI->add_element(vs_speedup,7);
+        vs_speedup->frame = 1;
+        vs_speedup->x = (start_x / 8) + 14;
+        vs_speedup->y = (start_y / 8) + 16;
+        vs_speedup->xsize=window_width/8 - 20;
+        vs_speedup->min=1;
+        vs_speedup->max = 32;
+        vs_speedup->value = zt_config_globals.control_navigation_amount;
 
 }
 
@@ -170,7 +171,7 @@ void CUI_PEParms::update() {
 }
 
 void CUI_PEParms::draw(Drawable *S) {
-    int i;
+
     int window_width = 54 * col(1);
     int window_height = 20 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
@@ -178,10 +179,28 @@ void CUI_PEParms::draw(Drawable *S) {
     int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
 
+    vs_step->x = (start_x / 8) + 14;
+    vs_step->y = (start_y / 8) + 6; 
+    vs_pat_length->x = (start_x / 8) + 14;
+    vs_pat_length->y = (start_y / 8) + 8; 
+    vs_highlight->x = (start_x / 8) + 14;
+    vs_highlight->y = (start_y / 8) + 10; 
+    vs_lowlight->x = (start_x / 8) + 14;
+    vs_lowlight->y = (start_y / 8) + 12; 
+    cb_centered->x = (start_x / 8) + 14;
+    cb_centered->y = (start_y / 8) + 14;
+    cb_stepedit->x = (start_x / 8) + 14 + 16;
+    cb_stepedit->y = (start_y / 8) + 14;
+    cb_recveloc->x = (start_x / 8) + 14 + 32;
+    cb_recveloc->y = (start_y / 8) + 14;
+    vs_speedup->x = (start_x / 8) + 14;
+    vs_speedup->y = (start_y / 8) + 16;
+
+
     if (S->lock()==0) {
         S->fillRect(start_x,start_y,start_x + window_width,start_y + window_height,COLORS.Background);
         printline(start_x,start_y + window_height - row(1) + 1,148,window_width / 8, COLORS.Lowlight,S);
-        for (i = start_y / row(1); i < (start_y + window_height) / row(1);i++) {
+        for (int i = start_y / row(1); i < (start_y + window_height) / row(1);i++) {
             printchar(start_x,row(i),145,COLORS.Highlight,S);
             printchar(start_x + window_width - row(1) + 1,row(i),146,COLORS.Lowlight,S);
         }

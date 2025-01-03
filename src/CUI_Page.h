@@ -3,6 +3,14 @@
 
 #include "zt.h"
 
+class Button ;
+class OrderEditor ;
+class PatternDisplay ;
+class FileList ;
+class DirList ;
+class DriveList ;
+class InstEditor ;
+
 typedef void (*VFunc)();
 
 class CUI_Page {
@@ -27,6 +35,7 @@ class CUI_InstEditor : public CUI_Page {
     public:
         int reset;
         UserInterfaceElement *trackerModeButton;
+        InstEditor *ie;
 
         CUI_InstEditor();
         ~CUI_InstEditor();
@@ -39,7 +48,9 @@ class CUI_InstEditor : public CUI_Page {
 
 class CUI_Playsong : public CUI_Page {
     public:
-      
+
+        PatternDisplay *pattern_display;
+
         UserInterface *UI_PatternDisplay;
         UserInterface *UI_VUMeters;
 
@@ -77,6 +88,8 @@ class CUI_About : public CUI_Page {
 
 class CUI_Songconfig : public CUI_Page {
     public:
+
+        OrderEditor *oe;
 
         int rev_tpb_tab[97];
         int tpb_tab[9];// = ;
@@ -131,6 +144,8 @@ class CUI_Ordereditor : public CUI_Page {
 
 class CUI_Help : public CUI_Page {
     public:
+
+        TextBox *tb;
 
         int needfree;
         
@@ -187,6 +202,10 @@ class CUI_Loadscreen : public CUI_Page {
 //        Bitmap *img;
         int clear;
 
+        FileList *fl;
+        DirList *dl;
+        DriveList *dr;
+
         CUI_Loadscreen();
         ~CUI_Loadscreen();
 
@@ -200,6 +219,15 @@ class CUI_Savescreen : public CUI_Page {
     public:
 //        Bitmap *img;
         int clear;
+
+        FileList *fl;
+        DirList *dl;
+        DriveList *dr;
+
+        TextInput *ti;
+        Button *b_zt;
+        Button *b_mid;
+        //Button *b_gba;
         
         CUI_Savescreen();
         ~CUI_Savescreen();
@@ -283,6 +311,17 @@ class CUI_Patterneditor : public CUI_Page {
 class CUI_PEParms : public CUI_Page {
     public:
 
+        ValueSlider *vs_step ;
+        ValueSlider *vs_pat_length ;
+        ValueSlider *vs_highlight ;
+        ValueSlider *vs_lowlight ;
+
+	    CheckBox *cb_centered ;
+	    CheckBox *cb_stepedit ;
+	    CheckBox *cb_recveloc ;
+
+        ValueSlider *vs_speedup ;
+
         CUI_PEParms();
         ~CUI_PEParms();
 
@@ -337,8 +376,12 @@ class CUI_SliderInput : public CUI_Page {
         void setfirst(int val);
 };
 
+
 class CUI_NewSong : public CUI_Page {
     public:
+
+        Button *b_yes;
+        Button *b_no;
 
         CUI_NewSong();
         ~CUI_NewSong();
@@ -349,8 +392,12 @@ class CUI_NewSong : public CUI_Page {
         void draw(Drawable *S);                 
 };
 
+
 class CUI_RUSure : public CUI_Page {
     public:
+
+        Button *button_yes;
+        Button *button_no;
 
         char *str;
         VFunc OnYes;

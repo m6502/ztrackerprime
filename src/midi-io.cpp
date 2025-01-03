@@ -144,7 +144,7 @@ void midiOut::set_bank_select(int dev, int bank_select) {
     }
 }
 
-char *midiOut::get_alias(int dev) {
+const char *midiOut::get_alias(int dev) {
     if ((unsigned int)dev>=numOuputDevices) return NULL;
     return (outputDevices[dev]->alias != NULL && strlen(outputDevices[dev]->alias))?outputDevices[dev]->alias:"";
 }
@@ -286,6 +286,21 @@ void miq::clear(void) {
 }
 int g_midi_in_clocks_received = 0;
 
+
+
+
+
+// <Manu> Variables para saber si se van produciendo eventos de estos tipos
+int mim_moredata = 0 ;
+int mim_error = 0 ;
+int mim_longerror = 0 ;
+
+
+
+
+
+
+
 void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2) {
 
     unsigned char msg;
@@ -403,10 +418,13 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD 
 
           break;
         case MIM_MOREDATA:
+          mim_moredata++ ;
             break;
         case MIM_ERROR:
+          mim_error++ ;
             break;
         case MIM_LONGERROR:
+          mim_longerror++ ;
             break;
         default:
             break;

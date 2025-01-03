@@ -6,7 +6,6 @@ CUI_Help::CUI_Help(void) {
 
     UI = new UserInterface;
 
-    TextBox *tb;
     tb = new TextBox;
     UI->add_element(tb, 0);
     tb->x = 1;
@@ -33,7 +32,7 @@ CUI_Help::CUI_Help(void) {
         needfree = 1;
     } else {
         needfree = 0;
-        tb->text = "\n\n  i couldnt find doc/help.txt.  no help for you :[";
+        tb->text = "\n\n  I couldn't find doc/help.txt.  no help for you :[";
     }
     free(help_file);
 }
@@ -64,10 +63,14 @@ void CUI_Help::update() {
 }
 
 void CUI_Help::draw(Drawable *S) {
+
+    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    tb->ysize = 36+ ((INTERNAL_RESOLUTION_Y-480)/8);
+
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(11,"Help",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Help",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
         S->unlock();

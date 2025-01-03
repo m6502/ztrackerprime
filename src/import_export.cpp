@@ -794,7 +794,7 @@ int ZTImportExport::ImportIT(char *fn, zt_module* zt)
 
   for (i = 0; i < mod.header.numOrders; i++) {
 
-    if (i<0xFF) zt->orderlist[i] = mod.header.orders[i];
+    if (i < 255) zt->orderlist[i] = mod.header.orders[i];
   }
   
   // import instruments

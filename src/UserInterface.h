@@ -6,9 +6,28 @@
 
 void midi_sel(int dev);
 
+enum
+{
+    NO_ANCHOR    = 0,
+    ANCHOR_RIGHT = 1 << 0,
+    ANCHOR_LEFT  = 1 << 1,
+    ANCHOR_UP    = 1 << 2,
+    ANCHOR_DOWN  = 1 << 3
+} ;
+
 class UserInterfaceElement {
 
     public:
+
+        int anchor_type = NO_ANCHOR ;
+        int anchor_x = 0 ;
+        int anchor_y = 0 ;
+        int anchor_offset_x = 0 ;
+        int anchor_offset_y = 0 ;
+
+        virtual void auto_anchor_at_current_pos(int how) ;
+        virtual void auto_update_anchor() ;
+
         int x,y;
         int xsize,ysize;
         int changed;
@@ -87,6 +106,9 @@ class TextInput : public UserInterfaceElement {
         ~TextInput();
         int update();
         void draw(Drawable *S, int active);
+
+        void auto_anchor_at_current_pos(int how) ;
+        void auto_update_anchor() ;
 };
 
 

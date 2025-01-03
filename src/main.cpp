@@ -65,6 +65,13 @@
 
 #include "zt.h"
 #include "sdl_syswm.h"
+#include <filesystem>
+
+
+#ifndef main
+    #define main SDL_main
+#endif
+
 
 #ifdef DEBUG
     BarGraph *playbuff1_bg,*playbuff2_bg,*keybuff_bg;
@@ -92,6 +99,8 @@ int need_popup_refresh = 0;
 int select_row_start,select_row_end;
 int light_pos = 0, need_update_lights = 0;
 
+char errstr[2048] ;
+
 player *ztPlayer;
 
 UserInterface *UI = NULL ;
@@ -117,7 +126,7 @@ int fast_update=0, FU_x=0, FU_y=0, FU_dx=0, FU_dy=0;
 
 int Force_CON_Reactivated=0;
 int select_track_start,select_track_end;
-int selected=0,faded=0,oldhead=0;
+int selected=0;
 
 int zclear_flag, zclear_presscount;
 int already_changed_default_directory = 0;
@@ -246,6 +255,17 @@ CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 
 
+
+#ifdef __ENABLE_FULL_SCREEN
+  Screen *thescreen = NULL;
+#endif
+
+SDL_Surface *hardware_surface ;
+SDL_Surface *screen_buffer_surface ;
+
+Screen *screen_buffer = NULL ;
+
+SDL_Surface *set_video_mode(int w, int h, char *errstr) ;
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -778,57 +798,14 @@ char *hex2note(char *str,unsigned char note)
 
 
 
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-void fadeOut(float step, Screen *S) 
+void status(char *msg,Drawable *S)
 {
-/*
-    for (float f=1;f>0;f-=step) {
-        S->setGammaFade(f,f,f);
-        SDL_Delay(1);
-    }
-*/
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void fadeIn(float step, Screen *S) 
-{
-/*
-    for (float f=0;f<=1;f+=step) {
-        S->setGammaFade(f,f,f);
-        SDL_Delay(1);
-    }
-*/
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void setGamma(float f, Screen *S) 
-{
-//    S->setGammaFade(f,f,f);
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void status(char *msg,Drawable *S) 
-{
-    printBG(col(3),row(9),"                                                                            ",COLORS.Text,COLORS.Background,S);
-    printBGCC(col(3),row(9),msg,COLORS.Text,COLORS.Background,S);
-    screenmanager.Update(col(3),row(9),col(80)-1,row(10));
+    printBG(col(3),row(INITIAL_ROW + 6),"                                                                            ",COLORS.Text,COLORS.Background,S);
+    printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);
+    screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(80)-1,row(10));
 }
 
 
@@ -889,8 +866,6 @@ void update_status(Drawable *S)
 
         int max_row = cur_edit_row_disp + max_displayable_rows ;
         if(max_row > song->patterns[cur_edit_pattern]->length) max_row = song->patterns[cur_edit_pattern]->length ;
-        
-        
 
         for(i = cur_edit_row_disp; i < max_row; i++) {
 
@@ -900,7 +875,7 @@ void update_status(Drawable *S)
           else line_number_color = COLORS.Text ;
             
           sprintf(str,"%.3d", i) ;
-          printBG(col(g_posx_tracks - 4), row(15+o), str, line_number_color, COLORS.Background, S) ;
+          printBG(col(g_posx_tracks - 4), row(TRACKS_ROW_Y+1+o), str, line_number_color, COLORS.Background, S) ;
 
           o++;
         }
@@ -915,7 +890,7 @@ void update_status(Drawable *S)
 
     status_change = 0; 
     //updated++;
-    screenmanager.UpdateWH(col(g_posx_tracks - 4), row(15), 3 * FONT_SIZE_X, PATTERN_EDIT_ROWS * FONT_SIZE_Y) ;
+    screenmanager.UpdateWH(col(g_posx_tracks - 4), row(TRACKS_ROW_Y+1), 3 * FONT_SIZE_X, PATTERN_EDIT_ROWS * FONT_SIZE_Y) ;
     S->unlock();
   }
 }
@@ -1045,19 +1020,19 @@ void draw_status_vars(Drawable *S)
 
 
   sprintf(s,"%.2d",song->instruments[cur_inst]->channel+1);
-  printBG(col(posx_columna2),row(5),s,COLORS.Data,COLORS.Black,S); // Channel
+  printBG(col(posx_columna2),row(INITIAL_ROW + 2),s,COLORS.Data,COLORS.Black,S); // Channel
 
   sprintf(s,"%.1d",base_octave);
-  printBG(col(posx_columna2),row(6),s,COLORS.Data,COLORS.Black,S); // Octave
+  printBG(col(posx_columna2),row(INITIAL_ROW + 3),s,COLORS.Data,COLORS.Black,S); // Octave
 
   sprintf(s,"%.3d/255",cur_edit_order);
-  printBG(col(12),row(5),s,COLORS.Data,COLORS.Black,S); // ORDER
+  printBG(col(12),row(INITIAL_ROW + 2),s,COLORS.Data,COLORS.Black,S); // ORDER
 
   sprintf(s,"%.3d/255",cur_edit_pattern);
-  printBG(col(12),row(6),s,COLORS.Data,COLORS.Black,S); // PATTERN
+  printBG(col(12),row(INITIAL_ROW + 3),s,COLORS.Data,COLORS.Black,S); // PATTERN
 
   sprintf(s,"%.3d/%.3d",cur_edit_row,song->patterns[cur_edit_pattern]->length-1);
-  printBG(col(12),row(7),s,COLORS.Data,COLORS.Black,S); // ROW
+  printBG(col(12),row(INITIAL_ROW + 4),s,COLORS.Data,COLORS.Black,S); // ROW
 
   sprintf(s,"%.3d/%.3d",song->tpb,song->bpm);
 
@@ -1067,26 +1042,26 @@ void draw_status_vars(Drawable *S)
     }
   }
 
-  printBG(col(posx_columna2),row(4),s,COLORS.Data,COLORS.Black,S); // ORDER
+  printBG(col(posx_columna2),row(INITIAL_ROW + 1),s,COLORS.Data,COLORS.Black,S); // ORDER
 
   sprintf(s,"%.2d:                       ",cur_inst);
-  printBG(col(posx_columna2),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
+  printBG(col(posx_columna2),row(INITIAL_ROW),s,COLORS.Data,COLORS.Black,S); // ORDER
 
   sprintf(s,"%.2d: %.24s",cur_inst,song->instruments[cur_inst]->title);
-  printBG(col(posx_columna2),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
+  printBG(col(posx_columna2),row(INITIAL_ROW),s,COLORS.Data,COLORS.Black,S); // ORDER
 
-  screenmanager.Update( col(10), row(2), col(79), row(10) );
+  screenmanager.Update( col(10), row(INITIAL_ROW - 1), col(79), row(10) );
     
 }
-
 
 
 
 // ------------------------------------------------------------------------------------------------
 //
 //
-void draw_status(Drawable *S) 
-{ /* S MUST BE LOCKED! */
+void draw_status(Drawable *S)
+{
+    /* S MUST BE LOCKED! */
     char fn[256] ;
     int i ;
 
@@ -1095,41 +1070,41 @@ void draw_status(Drawable *S)
     S->copy(BG_IMAGE,0,0);
     S->lock();
 #endif
-    print(col(2),row(3),"Song Name",COLORS.Text,S);
-    print(col(2),row(4),"File Name",COLORS.Text,S);
-    print(col(2),row(5),"    Order",COLORS.Text,S);
-    print(col(2),row(6),"  Pattern",COLORS.Text,S);
-    print(col(2),row(7),"      Row",COLORS.Text,S);
+    print(col(2),row(INITIAL_ROW),    "Song Name",COLORS.Text,S);
+    print(col(2),row(INITIAL_ROW + 1),"File Name",COLORS.Text,S);
+    print(col(2),row(INITIAL_ROW + 2),"    Order",COLORS.Text,S);
+    print(col(2),row(INITIAL_ROW + 3),"  Pattern",COLORS.Text,S);
+    print(col(2),row(INITIAL_ROW + 4),"      Row",COLORS.Text,S);
 
 
     int posx_columna2 = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 30 - 12 ;
 
-    print(col(posx_columna2),row(3)," Instrument",COLORS.Text,S);
-    print(col(posx_columna2),row(4),"    TPB/BPM",COLORS.Text,S);
-    print(col(posx_columna2),row(5),"    Channel",COLORS.Text,S);
-    print(col(posx_columna2),row(6),"     Octave",COLORS.Text,S);
+    print(col(posx_columna2),row(INITIAL_ROW),    " Instrument",COLORS.Text,S);
+    print(col(posx_columna2),row(INITIAL_ROW + 1),"    TPB/BPM",COLORS.Text,S);
+    print(col(posx_columna2),row(INITIAL_ROW + 2),"    Channel",COLORS.Text,S);
+    print(col(posx_columna2),row(INITIAL_ROW + 3),"     Octave",COLORS.Text,S);
     
-    printline(col(12),row(2),0x86,25,COLORS.Lowlight,S);        
-    printline(col(19),row(5),0x81,18,COLORS.Highlight,S);       
-    printBG(col(12),row(3),"                         ",COLORS.Data,COLORS.Black,S);
-    printBG(col(12),row(3),(char *)song->title,COLORS.Data,COLORS.Black,S);
-    printBG(col(12),row(4),"                         ",COLORS.Data,COLORS.Black,S);
+    printline(col(12),row(INITIAL_ROW - 1),0x86,25,COLORS.Lowlight,S);
+    printline(col(19),row(INITIAL_ROW + 2),0x81,18,COLORS.Highlight,S);
+    printBG(col(12),row(INITIAL_ROW),"                         ",COLORS.Data,COLORS.Black,S);
+    printBG(col(12),row(INITIAL_ROW),(char *)song->title,COLORS.Data,COLORS.Black,S);
+    printBG(col(12),row(INITIAL_ROW + 1),"                         ",COLORS.Data,COLORS.Black,S);
     strcpy(fn,(const char *)song->filename);
     fn[25] = 0;
-    printBG(col(12),row(4),(char *)fn,COLORS.Data,COLORS.Black,S);
+    printBG(col(12),row(INITIAL_ROW + 1),(char *)fn,COLORS.Data,COLORS.Black,S);
     
     draw_status_vars(S);
 
 //  sprintf(s,"%.2d: %.24s",cur_inst,song->instruments[cur_inst]->title);
 //  printBG(col(50),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
     
-    printline(col(12),row(8),0x81,7,COLORS.Highlight,S);        
+    printline(col(12),row(INITIAL_ROW + 5),0x81,7,COLORS.Highlight,S);        
 
-    for (i=3;i<=7;i++)
+    for (i=INITIAL_ROW;i<=(INITIAL_ROW + 4);i++)
         printchar(col(11),row(i),0x84,COLORS.Lowlight,S);
-    for (i=5;i<=7;i++)
+    for (i=(INITIAL_ROW + 2);i<=(INITIAL_ROW + 4);i++)
         printchar(col(19),row(i),0x83,COLORS.Highlight,S);
-    for (i=3;i<=4;i++)
+    for (i=INITIAL_ROW;i<=(INITIAL_ROW + 1);i++)
         printchar(col(37),row(i),0x83,COLORS.Highlight,S);
 
 
@@ -1137,23 +1112,23 @@ void draw_status(Drawable *S)
 
     posx_columna2 += 12 ;
 
-    printline(col(posx_columna2),row(2),0x86,28,COLORS.Lowlight,S);         // Over inst
+    printline(col(posx_columna2),row(INITIAL_ROW - 1),0x86,28,COLORS.Lowlight,S);         // Over inst
 
-    printchar(col(posx_columna2 + 28),row(3),0x83,COLORS.Highlight,S); // end of inst
+    printchar(col(posx_columna2 + 28),row(INITIAL_ROW),0x83,COLORS.Highlight,S); // end of inst
     
-    printchar(col(posx_columna2 + 7),row(4),0x83,COLORS.Highlight,S);
-    printchar(col(posx_columna2 + 2),row(5),0x83,COLORS.Highlight,S);
-    printchar(col(posx_columna2 + 1),row(6),0x83,COLORS.Highlight,S);
-    printchar(col(posx_columna2 + 1),row(6),0x81,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 7),row(INITIAL_ROW + 1),0x83,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 2),row(INITIAL_ROW + 2),0x83,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 1),row(INITIAL_ROW + 3),0x83,COLORS.Highlight,S);
+    printchar(col(posx_columna2 + 1),row(INITIAL_ROW + 3),0x81,COLORS.Highlight,S);
 
-    printchar(col(posx_columna2),row(7),0x81,COLORS.Highlight,S);
+    printchar(col(posx_columna2),row(INITIAL_ROW + 4),0x81,COLORS.Highlight,S);
     
-    printline(col(posx_columna2 + 7),row(4),0x81,21,COLORS.Highlight,S);       // Under inst
+    printline(col(posx_columna2 + 7),row(INITIAL_ROW + 1),0x81,21,COLORS.Highlight,S);       // Under inst
 
-    printline(col(posx_columna2 + 2),row(5),0x81,5,COLORS.Highlight,S);        
+    printline(col(posx_columna2 + 2),row(INITIAL_ROW + 2),0x81,5,COLORS.Highlight,S);        
 
-    for (i=3;i<7;i++)
-        printchar(col(posx_columna2 - 1),row(i),0x84,COLORS.Lowlight,S);
+    for (i=0;i<4;i++)
+        printchar(col(posx_columna2 - 1),row(INITIAL_ROW + i),0x84,COLORS.Lowlight,S);
 
     /*
     {
@@ -1165,7 +1140,7 @@ void draw_status(Drawable *S)
     }
     */
 
-    screenmanager.Update( col(10), row(2), col(INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 2, row(10) );
+    screenmanager.Update( col(10), row(INITIAL_ROW - 1), col(INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 2, row(INITIAL_ROW + 7) );
 }
 
 
@@ -1201,13 +1176,13 @@ void quit() {
 //
 void global_keys(Drawable *S) 
 {
-  int i ;
-
     KBKey key,clear=0,kstate;
     int command = CMD_NONE,full=0;
     key = Keys.checkkey();
     kstate = Keys.getstate();
+    
     if (!key) return;
+    
     if (!modal) {
         switch(key) {
             case DIK_RIGHT: 
@@ -1265,39 +1240,51 @@ void global_keys(Drawable *S)
                     command = CMD_PLAY_ORDER;
                 }
                 break;
+
+
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
             case DIK_F4:
                 if (kstate & KS_CTRL) {
                     command=CMD_SWITCH_MIDIMACEDIT;
                 }
                 break;
+#endif
+
+
             //case DIK_F9: // load
             case DIK_L: // load
                 if (kstate & KS_CTRL) {
                     command = CMD_SWITCH_LOAD;
                     key = Keys.getkey();
-                } else
-                if (kstate & KS_SHIFT) {
-                    command = CMD_HARD_PANIC;
-                }
+                } 
                 break;
 
-            //case DIK_F10: // save
+#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
+            case DIK_F10:
+
+                if (kstate == KS_NO_SHIFT_KEYS) {
+
+                    command = CMD_SWITCH_SONGMSG; 
+                }
+#endif
+
+              break ;
+
             case DIK_S: // save
                 if (kstate & KS_CTRL) {
 
                     bool saveas = true ;
 
-                    if(kstate & KS_SHIFT) {
+                    if(kstate & KS_SHIFT) saveas = true ;
+                    else 
+                    {
+                          if (song->filename[0] != '\0') {
+                              if (song->filename[0] != ' ') {
+                                  popup_window(UIP_SaveMsg);
+                                  saveas = false ;
+                              }
+                          } 
                     }
-                    else {
-
-                      if (song->filename[0]) {
-                          if (song->filename[0] != ' ') {
-                              popup_window(UIP_SaveMsg);
-                              saveas = false ;
-                          }
-                      } 
-                    }                    
 
                     if(saveas) command = CMD_SWITCH_SAVE;
                     else {
@@ -1306,10 +1293,7 @@ void global_keys(Drawable *S)
                     key = Keys.getkey(); 
                     clear++;
                 }
-                else
-                if (kstate == KS_NO_SHIFT_KEYS) {
-                    command = CMD_SWITCH_SONGMSG; 
-                }
+
                 break;
 
 
@@ -1321,7 +1305,9 @@ void global_keys(Drawable *S)
                     }
                     else {
 
-                        for(i = 0; i < 255; i++) {
+                        int i ;
+
+                        for(i = 0; i < ZTM_ORDERLIST_LEN; i++) {
                             if(song->orderlist[i] == cur_edit_pattern) {
                                 i = -1;
                                 break;
@@ -1334,7 +1320,7 @@ void global_keys(Drawable *S)
 
                               if(i == cur_edit_order) break;
 
-                              if(i == 255) {
+                              if(i == ZTM_ORDERLIST_LEN) {
                                   i = 0;
                               }
 
@@ -1349,128 +1335,209 @@ void global_keys(Drawable *S)
                 }
                 break;
             case DIK_F12: 
-                if (kstate & KS_ALT)
-                    command = CMD_SWITCH_ABOUT;
-                //else if (kstate & KS_CTRL)
-                //    command = CMD_SWITCH_CONFIG;
-                else
-                    command = CMD_SWITCH_SYSCONF; 
+                if (kstate & KS_ALT) command = CMD_SWITCH_ABOUT;
+                //else if (kstate & KS_CTRL) command = CMD_SWITCH_CONFIG;
+                else command = CMD_SWITCH_SYSCONF; 
                 break;          
 
         }
-        if (kstate == KS_NO_SHIFT_KEYS)
-            switch(key) {
-                case DIK_F1: command=CMD_SWITCH_HELP; break;
-                case DIK_F2: command=CMD_SWITCH_PEDIT; break;
-                case DIK_F3: command=CMD_SWITCH_IEDIT; break;
-                case DIK_F4: command=CMD_SWITCH_ARPEDIT; break;
-                //case DIK_F10: command=CMD_SWITCH_SONGCONF; break;
-                case DIK_F11: command=CMD_SWITCH_SONGCONF; break;
-                case DIK_F5: command = CMD_PLAY;  break;
-                case DIK_F6: command = CMD_PLAY_PAT;  break;
+        
+        
+        
+        if (kstate == KS_NO_SHIFT_KEYS) {
+        
+            switch(key)
+            {
+                // ----------------------------------------------
+                case DIK_F1: command=CMD_SWITCH_HELP;      break;
+                // ----------------------------------------------
+                case DIK_F2: command=CMD_SWITCH_PEDIT;     break;
+                // ----------------------------------------------
+                case DIK_F3: command=CMD_SWITCH_IEDIT;     break;
+                
+#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
+                // ----------------------------------------------
+                case DIK_F4: command=CMD_SWITCH_ARPEDIT;   break;
+#endif
+                // ----------------------------------------------
+                case DIK_F5: command = CMD_PLAY;           break;
+                // ----------------------------------------------
+                case DIK_F6: command = CMD_PLAY_PAT;       break;
+                // ----------------------------------------------
                 case DIK_F7: command = CMD_PLAY_PAT_LINE;  break;
-                case DIK_F8: command = CMD_STOP;  break;
-                case DIK_F9: command = CMD_PANIC;  break;
+                // ----------------------------------------------
+                case DIK_F8: command = CMD_STOP;           break;
+                // ----------------------------------------------
+                case DIK_F9: 
+                    
+                    if((kstate & KS_ALT) == 0) {
+                        command = CMD_PANIC;  
+                    }
+                    
+                    break ;
+
+                // ----------------------------------------------
+                //case DIK_F10: command=CMD_SWITCH_SONGCONF; break;
+                // ----------------------------------------------
+                case DIK_F11: command=CMD_SWITCH_SONGCONF; break;
+
+                // ----------------------------------------------
+                default:
+                    break ;
             }
-    }
-    switch(command) {
-            case CMD_QUIT: quit(); break;
-            case CMD_SWITCH_LOAD: 
-                switch_page(UIP_Loadscreen); 
-                clear++; doredraw++; 
-                break;
-            case CMD_SWITCH_SAVE:               
-                switch_page(UIP_Savescreen);
-                clear++; doredraw++; 
-                break;
-            case CMD_SWITCH_SONGCONF: 
-                switch_page(UIP_Songconfig);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_SONGMSG: 
-                switch_page(UIP_SongMessage);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_ARPEDIT:
-                switch_page(UIP_Arpeggioeditor);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_MIDIMACEDIT:
-                switch_page(UIP_Midimacroeditor);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_PEDIT: 
-                if (cur_state == STATE_PEDIT) {
-                    popup_window(UIP_PEParms); clear++;
-                    doredraw++;
-                } else {
-                    switch_page(UIP_Patterneditor);
-                    doredraw++; clear++; 
-                }                   
-                break;
-            case CMD_SWITCH_IEDIT: 
-                switch_page(UIP_InstEditor);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_ORDERLIST: 
-                switch_page(UIP_Ordereditor);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_SYSCONF: 
-                switch_page(UIP_Sysconfig);
-                doredraw++; clear++; 
-                break;
-            case CMD_SWITCH_CONFIG:
-                switch_page(UIP_Config);
-                doredraw++; clear++;
-                break;
-            case CMD_SWITCH_ABOUT: 
-                switch_page(UIP_About);
-                doredraw++; clear++; 
-                break;          
-            case CMD_SWITCH_HELP: 
-                switch_page(UIP_Help);
-                doredraw++; clear++; 
-                break;          
-            case CMD_PLAY: 
-                draw_status_vars(S);
-                if (cur_state != STATE_PLAY) {
-                    switch_page(UIP_Playsong);
-                    doredraw++;
-                    clear++;
-                }
-                if (song->orderlist[0] != 0x100 && !ztPlayer->playing) { 
-                    ztPlayer->play(0,cur_edit_pattern,1); 
-                    clear++; 
-                } 
-                break;
-            case CMD_PLAY_ORDER:
-                draw_status_vars(S);
-                if(song->orderlist[cur_edit_order] != 0x100)
+        }
+        else {
+
+            if((kstate & KS_ALT) == 0) {
+
+                switch(key)
                 {
-                    ztPlayer->play(0,cur_edit_order,3);
-                    clear++;
-                }
-                break;
-            case CMD_PLAY_PAT:
-                draw_status_vars(S);
-                ztPlayer->play(0,cur_edit_pattern,0);
-                clear++;
-                break;
-            case CMD_PLAY_PAT_LINE: 
-                if (  ((cur_state == STATE_SONG_CONFIG) || (cur_state == STATE_ORDER )) && sel_pat < 0x100) { 
-                    ztPlayer->play(0,sel_order,3); 
-                } else {
-                    ztPlayer->play(cur_edit_row,cur_edit_pattern,2); 
-                }
-                clear++; 
-                break;
-            case CMD_STOP: ztPlayer->stop(); draw_status_vars(S);clear++; break;
-            case CMD_PANIC: MidiOut->panic(); draw_status_vars(S); statusmsg = "Panic"; clear++; break;
-            case CMD_HARD_PANIC: MidiOut->hardpanic(); draw_status_vars(S); statusmsg = "Hard Panic"; clear++; break;
-            default:
-                break;
+                    case DIK_F9: command = CMD_HARD_PANIC;  break ;
+                    default:
+                        break ;
+                } ;
+            }
+
+        }
+
     }
+
+
+
+    switch(command)
+    {
+        // ------------------------------------------------------------------------
+        case CMD_QUIT: quit(); break;
+        case CMD_SWITCH_LOAD: 
+            switch_page(UIP_Loadscreen); 
+            clear++; doredraw++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_SAVE:               
+            switch_page(UIP_Savescreen);
+            clear++; doredraw++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_SONGCONF: 
+            switch_page(UIP_Songconfig);
+            doredraw++; clear++; 
+            break;
+
+#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_SONGMSG: 
+            switch_page(UIP_SongMessage);
+            doredraw++; clear++; 
+            break;
+#endif
+
+#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_ARPEDIT:
+            switch_page(UIP_Arpeggioeditor);
+            doredraw++; clear++; 
+            break;
+#endif
+
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_MIDIMACEDIT:
+            switch_page(UIP_Midimacroeditor);
+            doredraw++; clear++; 
+            break;
+#endif
+
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_PEDIT: 
+            if (cur_state == STATE_PEDIT) {
+                popup_window(UIP_PEParms); clear++;
+                doredraw++;
+            } else {
+                switch_page(UIP_Patterneditor);
+                doredraw++; clear++; 
+            }                   
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_IEDIT: 
+            switch_page(UIP_InstEditor);
+            doredraw++; clear++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_ORDERLIST: 
+            switch_page(UIP_Ordereditor);
+            doredraw++; clear++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_SYSCONF: 
+            switch_page(UIP_Sysconfig);
+            doredraw++; clear++; 
+            break;
+
+#ifndef DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_CONFIG:
+            switch_page(UIP_Config);
+            doredraw++; clear++;
+            break;
+#endif
+
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_ABOUT: 
+            switch_page(UIP_About);
+            doredraw++; clear++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_HELP: 
+            switch_page(UIP_Help);
+            doredraw++; clear++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_PLAY: 
+            draw_status_vars(S);
+            if (cur_state != STATE_PLAY) {
+                switch_page(UIP_Playsong);
+                doredraw++;
+                clear++;
+            }
+            if (song->orderlist[0] != 0x100 && !ztPlayer->playing) { 
+                ztPlayer->play(0,cur_edit_pattern,1); 
+                clear++; 
+            } 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_PLAY_ORDER:
+            draw_status_vars(S);
+            if(song->orderlist[cur_edit_order] != 0x100)
+            {
+                ztPlayer->play(0,cur_edit_order,3);
+                clear++;
+            }
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_PLAY_PAT:
+            draw_status_vars(S);
+            ztPlayer->play(0,cur_edit_pattern,0);
+            clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_PLAY_PAT_LINE: 
+            if (  ((cur_state == STATE_SONG_CONFIG) || (cur_state == STATE_ORDER )) && sel_pat < 0x100) { 
+                ztPlayer->play(0,sel_order,3); 
+            } else {
+                ztPlayer->play(cur_edit_row,cur_edit_pattern,2); 
+            }
+            clear++; 
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_STOP: ztPlayer->stop(); draw_status_vars(S);clear++; break;
+        // ------------------------------------------------------------------------
+        case CMD_PANIC: MidiOut->panic(); draw_status_vars(S); statusmsg = "Panic"; clear++; break;
+        // ------------------------------------------------------------------------
+        case CMD_HARD_PANIC: MidiOut->hardpanic(); draw_status_vars(S); statusmsg = "Hard Panic"; clear++; break;
+        // ------------------------------------------------------------------------
+        default:
+            break;
+    };
 
 
     if (clear) {
@@ -1489,6 +1556,14 @@ void global_keys(Drawable *S)
 
 
 
+
+// <Manu> Variables para saber si se van produciendo eventos de estos tipos
+extern int mim_moredata ;
+extern int mim_error ;
+extern int mim_longerror ;
+
+
+
 // ------------------------------------------------------------------------------------------------
 //
 //
@@ -1498,21 +1573,23 @@ void redrawscreen(Drawable *S)
 
   // <Manu> header era 80 y he cambiado el texto del sprintf
   
-  char header[180];
+  char header[256];
+  //  sprintf(header,"%s ||||| DEBUG: moredata = %d || error = %d || longerror = %d", ZTRACKER_VERSION, mim_moredata, mim_error, mim_longerror) ;
+
     sprintf(header,"%s", ZTRACKER_VERSION) ;
+
     if (S->lock()==0) {
 
         S->fillRect(0,0,INTERNAL_RESOLUTION_X-1,INTERNAL_RESOLUTION_Y-1/*410*/,COLORS.Background);
 
 //      S->fillRect(0,465,INTERNAL_RESOLUTION_X,479,COLORS.LCDLow);
-
         printline(0,0,0x81,INTERNAL_RESOLUTION_X/8,COLORS.Highlight,S);      
         printchar(0,0,0x80,COLORS.Highlight,S);
 
         for(int y=0;y<INTERNAL_RESOLUTION_Y/8;y++)
             printchar(0,row(y),131,COLORS.Highlight,S);
 
-        print(col(textcenter(header)),row(1),header,COLORS.Text,S);
+        print(col(textcenter(header)),row(HEADER_ROW),header,COLORS.Text,S);
 //      sprintf(header,"015/128 - C:012 N:013");
 //      printLCD(col(2),row(55),header,S);
         draw_status(S);
@@ -1526,11 +1603,16 @@ void redrawscreen(Drawable *S)
         }
         S->unlock();
     }
+
+
     S->copy(CurrentSkin->bmToolbar, 0,INTERNAL_RESOLUTION_Y-55/*425*/,0,0,640,55);
     int remblk = (INTERNAL_RESOLUTION_X-640)/80;
     for(int cx = 0; cx<remblk;cx++)
         S->copy(bmToolbarRepeater, 640+(cx*80), INTERNAL_RESOLUTION_Y-55,0,0,80,55);
     UI_Toolbar->full_refresh();
+
+
+
     doredraw=0;
     //updated=2;
     screenmanager.UpdateAll();
@@ -1620,6 +1702,7 @@ void make_toolbar(void)
     gb = new GfxButton();
     gb->x = PLAY_BUTTON_POS_X ;
     gb->y = PLAY_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,0,0);
@@ -1630,6 +1713,7 @@ void make_toolbar(void)
     gb = new GfxButton();
     gb->x = LOAD_BUTTON_POS_X ;
     gb->y = LOAD_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,29,0);
@@ -1642,6 +1726,7 @@ void make_toolbar(void)
     gb = new GfxButton();
     gb->x = CONF_BUTTON_POS_X ;
     gb->y = CONF_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,0);
@@ -1652,6 +1737,7 @@ void make_toolbar(void)
     gb = new GfxButton();
     gb->x = STOP_BUTTON_POS_X ;
     gb->y = STOP_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,0,17);
@@ -1662,6 +1748,7 @@ void make_toolbar(void)
     gb = new GfxButton();
     gb->x = SAVE_BUTTON_POS_X ;
     gb->y = SAVE_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     gb->xsize = NORMAL_BUTTONS_SIZE_X ; 
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,29,17);
@@ -1675,6 +1762,7 @@ void make_toolbar(void)
     gb = new GfxButton();
     gb->x = EXIT_BUTTON_POS_X ;
     gb->y = EXIT_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,17);
@@ -1690,6 +1778,7 @@ void make_toolbar(void)
     
     gb->x = ABOUT_BUTTON_POS_X ;
     gb->y = ABOUT_BUTTON_POS_Y ;
+    gb->auto_anchor_at_current_pos(ANCHOR_RIGHT | ANCHOR_DOWN) ;
     
     gb->xsize = ABOUT_BUTTON_SIZE_X ;
     gb->ysize = ABOUT_BUTTON_SIZE_Y ;
@@ -1782,7 +1871,7 @@ void setup_midi()
         }
         sprintf(szKey,"alias_%s",tt);
         temp = Config->get(&szKey[0]);
-        if(temp && strlen(temp) > 0) {
+        if(temp && temp[0] != '\0') {
             MidiOut->outputDevices[j]->alias = strdup(temp);
         }
 		else MidiOut->outputDevices[j]->alias = strdup("");
@@ -1882,7 +1971,6 @@ int initGFX ()
 
 
 
-
 // ------------------------------------------------------------------------------------------------
 //
 //
@@ -1900,7 +1988,7 @@ int postAction ()
 	char val[256];
 	char tt[256];
 
-    chdir(cur_dir);
+    std::filesystem::current_path(cur_dir);
     for (i=0;i<MAX_MIDI_OUTS;i++) {
         sprintf(name,"open_out_device_%d",i);
         zt_config_globals.Config->remove(&name[0]);
@@ -2117,8 +2205,55 @@ void mouseupbuttonhandler(SDL_MouseButtonEvent *e) {
     MousePressY = LastY;
 }
 
+
+SDL_Surface *resizeSurface(SDL_Surface *oldSurface, int newWidth, int newHeight) {
+    // Create a new surface with the desired size
+    SDL_Surface *newSurface = SDL_CreateRGBSurface(
+        SDL_SWSURFACE, // Flags
+        newWidth,      // New width
+        newHeight,     // New height
+        oldSurface->format->BitsPerPixel, // Same bit depth
+        oldSurface->format->Rmask,
+        oldSurface->format->Gmask,
+        oldSurface->format->Bmask,
+        oldSurface->format->Amask
+    );
+
+    if (!newSurface) {
+        printf("Failed to create new surface: %s\n", SDL_GetError());
+        return NULL;
+    }
+
+    // Fill the new surface with a default color, if desired
+    SDL_FillRect(newSurface, NULL, SDL_MapRGB(newSurface->format, 0, 0, 0)); // Black
+
+    // Optionally, blit the old surface onto the new one
+    SDL_Rect destRect = {0, 0, oldSurface->w, oldSurface->h};
+    SDL_BlitSurface(oldSurface, NULL, newSurface, &destRect);
+
+    // Free the old surface
+    SDL_FreeSurface(oldSurface);
+
+    return newSurface;
+}
+
 void mousedownbuttonhandler(SDL_MouseButtonEvent *e) {
+
+    int old_zoom = ZOOM ;
+
     switch(e->button) {
+
+#ifdef _ENABLE_WIP_MOUSE_WHEEL_ZOOM_TEST
+        case SDL_BUTTON_WHEELUP:
+            ZOOM += 0.1f ;
+            if(ZOOM > 2.0f) ZOOM = 2.0f ;
+            break ;
+
+        case SDL_BUTTON_WHEELDOWN:
+            ZOOM -= 0.1f ;
+            if(ZOOM < 1.0f) ZOOM = 1.0f ;
+            break ;
+#endif
         case SDL_BUTTON_LEFT:
             Keys.insert(DIK_MOUSE_1_ON);
             bMouseIsDown = true;
@@ -2127,8 +2262,17 @@ void mousedownbuttonhandler(SDL_MouseButtonEvent *e) {
             Keys.insert(DIK_MOUSE_2_ON);
         break;
     }
+
     MousePressX = LastX;
     MousePressY = LastY;    
+
+#ifdef _ENABLE_WIP_MOUSE_WHEEL_ZOOM_TEST
+    if(ZOOM != old_zoom) {
+        
+        set_video_mode(RESOLUTION_X, RESOLUTION_Y, errstr) ;
+        screenmanager.UpdateAll();
+    }
+#endif
 }
 
 
@@ -2165,8 +2309,6 @@ int action(Screen *S)
         window_stack.update();
     else
         ActivePage->update();
-
-
 
 #ifdef DEBUG
     playbuff1_bg->setvalue(ztPlayer->play_buffer[0]->size);
@@ -2222,19 +2364,87 @@ int action(Screen *S)
 
 
 
+// ------------------------------------------------------------------------------------------------
+//
+//
+SDL_Surface *set_video_mode(int w, int h, char *errstr)
+{
+  RESOLUTION_X = w ;
+  RESOLUTION_Y = h ;
+
+  if((RESOLUTION_X / ZOOM) < MINIMUM_SCREEN_WIDTH)
+  {
+      RESOLUTION_X = MINIMUM_SCREEN_WIDTH * ZOOM ;
+  }
+
+  if((RESOLUTION_Y / ZOOM) < MINIMUM_SCREEN_HEIGHT)
+  {
+      RESOLUTION_Y = MINIMUM_SCREEN_HEIGHT * ZOOM ;
+  }
+
+
+  Uint32 flags = SDL_SWSURFACE ;
+  //flags = SDL_HWSURFACE ;
+  
+  if (zt_config_globals.full_screen) {
+    
+    flags |= SDL_FULLSCREEN; //SDL_SWSURFACE | SDL_FULLSCREEN;
+    bIsFullscreen = true;
+  }
+
+  flags = flags | SDL_RESIZABLE ;
+  SDL_Surface *screen = SDL_SetVideoMode(RESOLUTION_X, RESOLUTION_Y, SCREEN_BPP, flags);
+  
+  if ( screen == NULL ) {
+    
+    // <Manu> El mensaje de error estaba mal
+
+    //sprintf(errstr, "Couldn't set 640x480x32 video mode: %s\n", SDL_GetError());
+    sprintf(errstr, "Couldn't set %dx%dx%d video mode: %s\n", INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, SCREEN_BPP, SDL_GetError());
+    
+    MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
+    return NULL;
+  } 
+  else {
+    
+    if (screen->w != RESOLUTION_X || screen->h != RESOLUTION_Y || screen->format->BitsPerPixel != SCREEN_BPP) {
+      
+      sprintf(errstr, "Set mode, but it wasn't what i wanted: %s\n", SDL_GetError());
+      MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
+      return NULL;
+    }
+  }
 
 
 
 
 
+  screen_buffer_surface = SDL_CreateRGBSurface(0, INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, 32, 0, 0, 0, 0) ;
+
+  if(screen_buffer_surface == NULL) {
+
+    // Error opening the skin !
+    exit(1);
+  }
+
+  if(screen_buffer != NULL) delete screen_buffer ;
+
+  //Screen screen_buffer(hardware_surface, false);
+  screen_buffer = new Screen(screen_buffer_surface, false);
+
+  /*if(UI) delete UI ;
+  UI = new UserInterface;
+
+  if(UI_Toolbar) delete UI_Toolbar ;
+  UI_Toolbar = new UserInterface;
+  UI_Toolbar->dontmess = 1;*/
+
+
+  return screen ;
+}
 
 
 
-#ifndef main
-    #define main SDL_main
-#endif
-
-extern HWND SDL_Window;
 
 
 
@@ -2243,10 +2453,6 @@ extern HWND SDL_Window;
 //
 SDL_Surface *initSDL(void) 
 {
-  char errstr[2048];
-  Uint32 flags ;
-  //  char *errstr;
-  
   if(zt_config_globals.default_directory[0] != '\0') SetCurrentDirectory((LPCTSTR)zt_config_globals.default_directory);
   
   cur_dir = (LPSTR)malloc(256);
@@ -2279,38 +2485,32 @@ SDL_Surface *initSDL(void)
     MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
     return(NULL);
   }
-  
-  
-  flags = SDL_SWSURFACE ;
-  //flags = SDL_HWSURFACE ;
-  
-  if (zt_config_globals.full_screen) {
-    
-    flags|= SDL_FULLSCREEN; //SDL_SWSURFACE | SDL_FULLSCREEN;
-    bIsFullscreen = true;
-  }
-  
-  SDL_Surface *screen = SDL_SetVideoMode(RESOLUTION_X, RESOLUTION_Y, SCREEN_BPP, flags);
-  
-  if ( screen == NULL ) {
-    
-    // <Manu> El mensaje de error estaba mal
 
-    //sprintf(errstr, "Couldn't set 640x480x32 video mode: %s\n", SDL_GetError());
-    sprintf(errstr, "Couldn't set %dx%dx%d video mode: %s\n", INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, SCREEN_BPP, SDL_GetError());
-    
-    MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-    return NULL;
-  } 
-  else {
-    
-    if (screen->w != RESOLUTION_X || screen->h != RESOLUTION_Y || screen->format->BitsPerPixel != SCREEN_BPP) {
-      
-      sprintf(errstr, "Set mode, but it wasn't what i wanted: %s\n", SDL_GetError());
-      MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-      return NULL;
-    }
+
+#ifdef __DESACTIVADO_HASTA_ACTUALIZAR_SDL
+  SDL_version compiled;
+  SDL_version linked;
+
+  SDL_VERSION(&compiled);
+  SDL_GetVersion(&linked);
+#endif
+
+
+  
+
+#ifdef __DESACTIVADO_HASTA_ACTUALIZAR_SDL
+  SDL_Rect usableBounds;
+  if (SDL_GetDisplayUsableBounds(0, &usableBounds) != 0) {
+      SDL_Log("Could not get usable display bounds: %s\n", SDL_GetError());
+      SDL_Quit();
+      //return 1;
   }
+#endif
+
+
+  SDL_Surface *screen = set_video_mode(zt_config_globals.screen_width, zt_config_globals.screen_height, errstr) ;
+  if(screen == NULL) return NULL ;
+
 
 //    char str[80];
 //    istream *is;
@@ -2369,11 +2569,14 @@ SDL_Surface *initSDL(void)
     
     for(int i=0;i<512;i++) jazz[i].note=0x80;
 
+#ifdef __MANU__OLD_AND_UNNEEDED
     // This loads the icon from the resource and attaches it to the main window
     HICON icon=(HICON)LoadImage(GetModuleHandle(NULL),MAKEINTRESOURCE(IDI_ZTICON),IMAGE_ICON,0,0,0);    
     HWND w = FindWindow("zt","zt");
-    SDL_WM_SetCaption("zt","zt");
     SetClassLong(w, GCL_HICON, (LONG)icon);
+#endif
+
+    SDL_WM_SetCaption("zt","zt");
 
 
     UIP_About = new CUI_About;
@@ -2421,19 +2624,9 @@ void audio_mixer(void *udata, Uint8 *stream, int len)
 
 #endif
 
-
-
+   
     
     
-    
-
-#ifdef __ENABLE_FULL_SCREEN
-  Screen *thescreen = NULL;
-#endif
-
-SDL_Surface *hardware_surface ;
-SDL_Surface *screen_buffer_surface ;
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -2472,39 +2665,10 @@ int main(int argc, char *argv[])
   
   doredraw++;
 
-/*
-    FXMLParser fxml;
-    FXMLElement *xmlconfig;
-
-    fxml.nParser = USE_PARSER_FXML;
-    xmlconfig = fxml.ParseFile("config.xml");
-    if (xmlconfig) {
-        std::string a = xmlconfig->getValueFromPath("general.skin");
-        a = a;
-    }
-    delete xmlconfig;
-*/  
-
   hardware_surface = initSDL();
 
-  screen_buffer_surface = SDL_CreateRGBSurface(0, INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, 32, 0, 0, 0, 0) ;
-
-  if(screen_buffer_surface == NULL) {
-
-    // Error opening the skin !
-    exit(1);
-  }
 
 
-
-
-
-
-
-
-
-  //Screen screen_buffer(hardware_surface, false);
-  Screen screen_buffer(screen_buffer_surface, false);
   
 
   if (screen_buffer_surface != NULL) {
@@ -2555,66 +2719,48 @@ int main(int argc, char *argv[])
     
 #endif
 
-     while(!action(&screen_buffer)) {
-
-      screenmanager.Refresh(&screen_buffer);
-
-      {
-        //float factor_escalax = (float)INTERNAL_RESOLUTION_X / (float)RESOLUTION_X ;
-        //float factor_escalay = (float)INTERNAL_RESOLUTION_Y / (float)RESOLUTION_Y ;
-
-        int dst_sizex = RESOLUTION_X ;
-        int dst_sizey = RESOLUTION_Y ;
-
-        //if(dst_sizex > RESOLUTION_X) dst_sizex = INTERNAL_RESOLUTION_X ;
-        //if(dst_sizey > RESOLUTION_Y) dst_sizey = INTERNAL_RESOLUTION_Y ;
-
-        for(int vary = 0; vary < dst_sizey; vary++) {
-
-          for(int varx = 0; varx < dst_sizex; varx++) {
-
-            ((unsigned long *)hardware_surface->pixels)[(vary * (hardware_surface->pitch / 4)) + varx] = ((unsigned long *)screen_buffer.surface->pixels)[ (((int)(vary * FACTOR_ESCALAY)) * (screen_buffer.surface->pitch >> 2)) + ((int)(varx * FACTOR_ESCALAX)) ] ;
-          }
-        }
-
-        SDL_UpdateRect(hardware_surface,0,0,0,0);
-      }
+    while(!action(screen_buffer)) {
 
 
 
-
-
-
-       
-       SDL_Delay(1);
+       //SDL_Delay(1);
        SDL_Event e;
        
        while(SDL_PollEvent(&e)){  /* Loop until there are no events left on the queue */
          
-         switch(e.type){  /* Process the appropiate event type */
-           
-           case SDL_KEYDOWN:  /* Handle a KEYDOWN event */         
+         switch(e.type)  /* Process the appropiate event type */
+         {
+          // ---------------------------------------------------------------------------- 
+           case SDL_KEYDOWN:  /* Handle a KEYDOWN event */
            case SDL_KEYUP:
            
              keyhandler(&e.key);
              
              break;
              
+          // ---------------------------------------------------------------------------- 
            case SDL_MOUSEMOTION:
              
              mousemotionhandler(&e.motion);
              
              break;
              
+          // ---------------------------------------------------------------------------- 
            case SDL_MOUSEBUTTONDOWN:
              mousedownbuttonhandler(&e.button);
              break;
+
+          // ---------------------------------------------------------------------------- 
            case SDL_MOUSEBUTTONUP:
              mouseupbuttonhandler(&e.button);
              break;
+
+          // ---------------------------------------------------------------------------- 
            case SDL_QUIT:
              quit();
              break;
+
+          // ---------------------------------------------------------------------------- 
            case SDL_ACTIVEEVENT:
              
              {
@@ -2622,10 +2768,12 @@ int main(int argc, char *argv[])
                
                switch(p) {
                  
+               // ---------------------------------------------------------------
                case SDL_APPMOUSEFOCUS:
                  
                  if (!bIsFullscreen) break;
                  
+               // ---------------------------------------------------------------
                case SDL_APPINPUTFOCUS:
                case SDL_APPACTIVE:
                  
@@ -2643,10 +2791,12 @@ int main(int argc, char *argv[])
              }
              break;
              
+          // ---------------------------------------------------------------------------- 
            case SDL_SYSWMEVENT:
-             //SDL_Delay(1);//e.syswm;                        
-             switch(e.syswm.msg->msg) {
-               
+             //SDL_Delay(1);//e.syswm;
+             switch(e.syswm.msg->msg)
+             {
+             // --------------------------------------------------------
              case WM_SETFOCUS:
                
                if (UI) UI->full_refresh();
@@ -2660,18 +2810,59 @@ int main(int argc, char *argv[])
              }
              
              break;
+
+             // --------------------------------------------------------
+             case SDL_VIDEORESIZE:
+ 
+               {
+                   hardware_surface = set_video_mode(e.resize.w, e.resize.h, errstr) ;
+
+                   if (UI) UI->full_refresh();
+                   if (UI_Toolbar) UI_Toolbar->full_refresh();
+               
+                   doredraw++;
+                   need_refresh++;
+                   screenmanager.UpdateAll();
+               }
+
+               break ;
              
+             // --------------------------------------------------------
              default: /* Report an unhandled event */
                break;
          } ;
          
-       }    //      SDL_PumpEvents(); // Dont need this if we are using SDL_PollEvents from the action() loop
-     }
+      }    //      SDL_PumpEvents(); // Dont need this if we are using SDL_PollEvents from the action() loop
 
 
 
+      static int debug_contador = 0 ;
+
+      if(screenmanager.Refresh(screen_buffer)) {
+
+          debug_contador = 0 ;
+
+           for(int vary = 0; vary < RESOLUTION_Y; vary++) {
+
+               unsigned long *surface_pixels = ((unsigned long *)screen_buffer->surface->pixels) ;
+               unsigned long *hardware_pixels = ((unsigned long *)hardware_surface->pixels) ;
+
+               for(int varx = 0; varx < RESOLUTION_X; varx++) {
+
+                   hardware_pixels[(vary * (hardware_surface->pitch / 4)) + varx] = surface_pixels[ (((int)(vary * FACTOR_ESCALAY)) * (screen_buffer->surface->pitch >> 2)) + ((int)(varx * FACTOR_ESCALAX)) ] ;
+               }
+           }
+
+           SDL_UpdateRect(hardware_surface,0,0,0,0);
+      }
+      else {
+           
+          debug_contador++ ;
+          SDL_Delay(1) ;  // <Manu> Don't eat unnecessary CPU
+      }
 
 
+    }
 
 
 #ifdef _ENABLE_AUDIO
@@ -2679,14 +2870,13 @@ int main(int argc, char *argv[])
     SDL_CloseAudio();
 #endif
     
-        SDL_FreeSurface(screen_buffer_surface);
-    }
-    postAction();
-    SDL_Quit();
-    return 0;
+    SDL_FreeSurface(screen_buffer_surface);
+  }
+
+  postAction();
+  SDL_Quit();
+  return 0;
 }
-
-
 
 
 
@@ -2785,7 +2975,9 @@ static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
         zt_config_globals.full_screen = true;
     }
 
+    *flags = *flags | SDL_RESIZABLE ;
     SDL_Surface *surf = SDL_SetVideoMode(w, h, bpp, (*flags));
+
     *surface = surf;
 
     if (!(*surface))  /* yikes! Try to put it back as it was... */

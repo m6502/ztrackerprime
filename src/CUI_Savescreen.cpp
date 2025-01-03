@@ -105,30 +105,51 @@ int file_exists(const char *fn)
 //
 void BTNCLK_ToggleZTMID(UserInterfaceElement *b)
 {
-  Button *btn;
-  btn = (Button *)b;
-  need_refresh++; 
+    Button *btn;
+    btn = (Button *)b;
+    need_refresh++; 
 
-  if (btn->updown == 0) {
+    if (btn->updown == 0) {
 
-    btn->updown = !btn->updown;
+        btn->updown = !btn->updown;
 
-    if (btn->ID == 4) {
+        if (btn->ID == 4) {
 
-      ((Button *)UIP_Savescreen->UI->get_element(5))->updown = 0;
-      ((Button *)UIP_Savescreen->UI->get_element(5))->state = 0;
-      ((Button *)UIP_Savescreen->UI->get_element(5))->need_redraw = 1;
+            ((Button*)UIP_Savescreen->UI->get_element(5))->updown = 0;
+            ((Button*)UIP_Savescreen->UI->get_element(5))->state = 0;
+            ((Button*)UIP_Savescreen->UI->get_element(5))->need_redraw = 1;
+
+            /*((Button*)UIP_Savescreen->UI->get_element(6))->updown = 0;
+            ((Button*)UIP_Savescreen->UI->get_element(6))->state = 0;
+            ((Button*)UIP_Savescreen->UI->get_element(6))->need_redraw = 1;*/
+        }
+        else {
+
+            if (btn->ID == 5) {
+
+                ((Button*)UIP_Savescreen->UI->get_element(4))->updown = 0;
+                ((Button*)UIP_Savescreen->UI->get_element(4))->state = 0;
+                ((Button*)UIP_Savescreen->UI->get_element(4))->need_redraw = 1;
+
+                /*((Button*)UIP_Savescreen->UI->get_element(6))->updown = 0;
+                ((Button*)UIP_Savescreen->UI->get_element(6))->state = 0;
+                ((Button*)UIP_Savescreen->UI->get_element(6))->need_redraw = 1;*/
+            }
+            /*else {
+
+                if (btn->ID == 6) {
+
+                    ((Button*)UIP_Savescreen->UI->get_element(4))->updown = 0;
+                    ((Button*)UIP_Savescreen->UI->get_element(4))->state = 0;
+                    ((Button*)UIP_Savescreen->UI->get_element(4))->need_redraw = 1;
+
+                    ((Button*)UIP_Savescreen->UI->get_element(5))->updown = 0;
+                    ((Button*)UIP_Savescreen->UI->get_element(5))->state = 0;
+                    ((Button*)UIP_Savescreen->UI->get_element(5))->need_redraw = 1;
+                }
+            }*/
+        }
     }
-    else {
-
-      if (btn->ID == 5) {
-
-        ((Button *)UIP_Savescreen->UI->get_element(4))->updown = 0;
-        ((Button *)UIP_Savescreen->UI->get_element(4))->state = 0;
-        ((Button *)UIP_Savescreen->UI->get_element(4))->need_redraw = 1;
-      }
-    }
-  }
 }
 
 
@@ -152,12 +173,6 @@ void fl_enter(UserInterfaceElement *uie)
 //
 CUI_Savescreen::CUI_Savescreen(void)
 {
-  FileList *fl;
-  DirList *dl;
-  TextInput *ti;
-  DriveList *dr;
-  Button *b;
-
   UI = new UserInterface;
 
   fl = new FileList;
@@ -173,6 +188,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   fl->onEnter = (ActFunc)fl_enter;
   //    strcpy(fl->filepattern,"*.zt");
 
+
   dl = new DirList;
   UI->add_element(dl,1);
 
@@ -183,6 +199,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
 
 
+  
   dr = new DriveList;
   UI->add_element(dr,2);
 
@@ -192,35 +209,48 @@ CUI_Savescreen::CUI_Savescreen(void)
   dr->xsize = DRIVE_LIST_SIZE_X ;
   dr->ysize = DRIVE_LIST_SIZE_Y ;
 
+
   ti = new TextInput;
   UI->add_element(ti,3);
   
   ti->x      = SAVE_TEXTINPUT_POS_X ;
   ti->y      = SAVE_TEXTINPUT_POS_Y ;
-  ti->ysize  = 1 ;
   ti->xsize  = SAVE_TEXTINPUT_SIZE_X ;
+  ti->ysize  = 1 ;
   ti->length = SAVE_TEXTINPUT_SIZE_X ;
+  ti->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   ti->str = (unsigned char *)&save_filename[0];
 
-  b = new Button;
-  UI->add_element(b, 4); 
-  b->x = SAVE_ZT_BUTTON_POS_X ;
-  b->y = SAVE_ZT_BUTTON_POS_Y ;
-  b->caption = " Save as .ZT ";
-  b->ysize = 1;
-  b->xsize = strlen(b->caption)+1;
-  b->state = b->updown = 1;
-  b->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_zt = new Button;
+  UI->add_element(b_zt, 4); 
+  b_zt->x = SAVE_ZT_BUTTON_POS_X ;
+  b_zt->y = SAVE_ZT_BUTTON_POS_Y ;
+  b_zt->caption = " Save as .ZT ";
+  b_zt->ysize = 1;
+  b_zt->xsize = strlen(b_zt->caption)+1;
+  b_zt->state = b_zt->updown = 1;
+  b_zt->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_zt->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
-  b = new Button;
-  UI->add_element(b, 5); 
-  b->x = SAVE_MID_BUTTON_POS_X ;
-  b->y = SAVE_MID_BUTTON_POS_Y ;
-  b->caption = " Save as .MID";
-  b->ysize = 1;
-  b->xsize = strlen(b->caption)+1;
-  b->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_mid = new Button;
+  UI->add_element(b_mid, 5);
+  b_mid->x = SAVE_MID_BUTTON_POS_X;
+  b_mid->y = SAVE_MID_BUTTON_POS_Y;
+  b_mid->caption = " Save as .MID";
+  b_mid->ysize = 1;
+  b_mid->xsize = strlen(b_mid->caption) + 1;
+  b_mid->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_mid->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
+
+  /*b_gba = new Button;
+  UI->add_element(b_gba, 6);
+  b_gba->x = SAVE_GBA_BUTTON_POS_X;
+  b_gba->y = SAVE_GBA_BUTTON_POS_Y;
+  b_gba->caption = " Export to GBA";
+  b_gba->ysize = 1;
+  b_gba->xsize = strlen(b->caption) + 1;
+  b_gba->OnClick = (ActFunc)BTNCLK_ToggleZTMID;*/
 }
 
 
@@ -403,6 +433,10 @@ void CUI_Savescreen::update()
 //
 void CUI_Savescreen::draw(Drawable *S)
 {
+  fl->ysize = SAVE_FILE_LIST_SIZE_Y_CHARS ;
+  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
+  dr->ysize = DRIVE_LIST_SIZE_Y ;
+
   if (clear) {
 
     if (S->lock() == 0) {
@@ -423,7 +457,7 @@ void CUI_Savescreen::draw(Drawable *S)
 
     if (!is_saving) draw_status(S);
 
-    printtitle(11, "File Save", COLORS. Text, COLORS.Background, S) ;
+    printtitle(PAGE_TITLE_ROW_Y, "File Save", COLORS. Text, COLORS.Background, S) ;
 
     need_refresh = 0;
     updated=2;

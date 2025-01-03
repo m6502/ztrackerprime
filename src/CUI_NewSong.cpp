@@ -29,27 +29,26 @@ void BTNCLK_newsong_no(void) {
 }
 
 CUI_NewSong::CUI_NewSong(void) {
-    Button *b;
     int tabindex=0;
     UI = new UserInterface;
 
-    b = new Button;
-    UI->add_element(b,tabindex++);
-    b->x = 32;
-    b->y = 23;
-    b->xsize = 7;
-    b->ysize = 1;
-    b->caption = "  Yes";
-    b->OnClick = (ActFunc)BTNCLK_newsong_yes;
+    b_yes = new Button;
+    UI->add_element(b_yes,tabindex++);
+    b_yes->x = 32;
+    b_yes->y = 23;
+    b_yes->xsize = 7;
+    b_yes->ysize = 1;
+    b_yes->caption = "  Yes";
+    b_yes->OnClick = (ActFunc)BTNCLK_newsong_yes;
 
-    b = new Button;
-    UI->add_element(b,tabindex++);
-    b->x = 32+7+2;
-    b->y = 23;
-    b->xsize = 7;
-    b->ysize = 1;
-    b->caption = "  No";
-    b->OnClick = (ActFunc)BTNCLK_newsong_no;
+    b_no = new Button;
+    UI->add_element(b_no,tabindex++);
+    b_no->x = 32+7+2;
+    b_no->y = 23;
+    b_no->xsize = 7;
+    b_no->ysize = 1;
+    b_no->caption = "  No";
+    b_no->OnClick = (ActFunc)BTNCLK_newsong_no;
 
 }
 
@@ -65,7 +64,8 @@ void CUI_NewSong::enter(void) {
 void CUI_NewSong::leave(void) {
 }
 
-void CUI_NewSong::update() {
+void CUI_NewSong::update()
+{
     int key=0,act=0;;
 //  act = Keys.size(); 
 //  key = Keys.checkkey();
@@ -98,16 +98,24 @@ void CUI_NewSong::update() {
 }
 
 void CUI_NewSong::draw(Drawable *S) {
-    int i;
+
+    int popup_x = ((INTERNAL_RESOLUTION_X / 8) / 2) - 7 - 1 - 2 ;
+    int popup_y = ((INTERNAL_RESOLUTION_Y / 8) / 2) - 2 - 1 ;
+
+    b_yes->x = popup_x + 2 ;
+    b_yes->y = popup_y + 3 ;
+    b_no->x = b_yes->x + 7 + 2 ;
+    b_no->y = b_yes->y ;
+
     if (S->lock()==0) {
-        S->fillRect(col(30),row(20),col(50)-1,row(25)-1,COLORS.Background);
-        printline(col(30),row(24),148,20,COLORS.Lowlight,S);
-        for (i=20;i<25;i++) {
-            printchar(col(30),row(i),145,COLORS.Highlight,S);
-            printchar(col(49),row(i),146,COLORS.Lowlight,S);
+        S->fillRect(col(popup_x),row(popup_y),col(popup_x + 20)-1,row(popup_y + 5)-1,COLORS.Background);
+        printline(col(popup_x),row(popup_y + 4),148,20,COLORS.Lowlight,S);
+        for (int i=0;i<5;i++) {
+            printchar(col(popup_x),row(popup_y + i),145,COLORS.Highlight,S);
+            printchar(col(popup_x + 19),row(popup_y + i),146,COLORS.Lowlight,S);
         } 
-        printline(col(30),row(20),143,20,COLORS.Highlight,S);
-        print(col(30),row(21)," Clear Current Song",COLORS.Text,S);
+        printline(col(popup_x),row(popup_y),143,20,COLORS.Highlight,S);
+        print(col(popup_x),row(popup_y + 1)," Clear Current Song",COLORS.Text,S);
         UI->full_refresh();
         UI->draw(S);
         S->unlock();

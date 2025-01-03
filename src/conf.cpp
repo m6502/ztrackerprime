@@ -43,14 +43,6 @@
 #include "zt.h"
 
 
-
-#define MINIMUM_SCREEN_WIDTH        1024
-#define MINIMUM_SCREEN_HEIGHT       700
-
-
-
-
-
 conf::conf() {
     filename = NULL;
     hash = new list;
@@ -162,13 +154,13 @@ int conf::hex2dec(char *c) {
     else
         return (c[0]-'0');
 }
-int conf::getcolor(char *key, int part) { /* 0=r 1=g 2=b */
+int conf::getcolor(const char *key, int part) { /* 0=r 1=g 2=b */
     int result=0;
     char c[2];
-    key = get(key);
-    if (key) {
-        c[0] = toupper(key[(part*2)+1]);
-        c[1] = toupper(key[(part*2)+2]);
+    char *color_data = get(key);
+    if (color_data) {
+        c[0] = toupper(color_data[(part*2)+1]);
+        c[1] = toupper(color_data[(part*2)+2]);
         result = hex2dec(&c[0]) << 4;
         result += hex2dec(&c[1]);
     }
@@ -191,13 +183,13 @@ int conf::save(char *filen=NULL) {
     return 1;
 }
 
-char* conf::get(char *key) {
+char* conf::get(const char *key) {
     return hash->getstrdata(key);
 }
 void conf::remove(char *key) {
     hash->remove(key);
 }
-void conf::set(char *key,char *value,int dat) {
+void conf::set(const char *key, const char *value,int dat) {
     if (hash->remove(key) == -1)
         SDL_Delay(1);
     if (hash->insert(key,value,dat)==-1)
@@ -243,6 +235,7 @@ ZTConf::ZTConf() {
 
     screen_width  = MINIMUM_SCREEN_WIDTH ;
     screen_height = MINIMUM_SCREEN_HEIGHT ;
+    zoom = 1.0f ;
 
     autoload_ztfile = 0;
     autoload_ztfile_filename[0] = '\0';
@@ -280,6 +273,7 @@ int ZTConf::load()
   
   if(Config->get("screen_width"))                     screen_width = atoi(Config->get("screen_width"));
   if(Config->get("screen_height"))                    screen_height = atoi(Config->get("screen_height"));
+  if(Config->get("zoom"))                             zoom = atof(Config->get("zoom"));
 
   if(screen_width < MINIMUM_SCREEN_WIDTH) screen_width = MINIMUM_SCREEN_WIDTH ;
   if(screen_height < MINIMUM_SCREEN_HEIGHT) screen_height = MINIMUM_SCREEN_HEIGHT ;
@@ -341,6 +335,9 @@ int ZTConf::save() {
     Config->set("screen_width", s);
     sprintf(s, "%d", screen_height);
     Config->set("screen_height", s);
+
+    sprintf(s, "%.1f", zoom);
+    Config->set("zoom", s);
 
     sprintf(s, "%d", control_navigation_amount);
     Config->set("control_navigation_amount", s);

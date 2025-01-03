@@ -2,16 +2,18 @@
 
 
 
-
-
-
-void AddPlugin(midiOut *mout, OutputDevice *o) {
+void AddPlugin(midiOut *mout, OutputDevice *o)
+{
     if (mout->numOuputDevices<MAX_MIDI_OUTS-1) {
         mout->outputDevices[mout->numOuputDevices] = o;
         mout->numOuputDevices++;
     }
 }
-void InitializePlugins(midiOut *mout) {
+
+
+
+void InitializePlugins(midiOut *mout)
+{
     
 #ifdef _ENABLE_AUDIO    
     AddPlugin(mout, new NoiseOutputDevice());
@@ -28,135 +30,6 @@ void InitializePlugins(midiOut *mout) {
 }
 
 
-
-///////
-//
-// TestTone plugin - Plays a square wave at fixed freq
-//
-
-TestToneOutputDevice::TestToneOutputDevice()
-{
-  int i ;
-
-    type = OUTPUTDEVICE_TYPE_AUDIO;
-    strcpy(szName, "TestTone Audio Plugin");
-    reset();
-    wavec = 0;
-    for(i=0;i<128;i++)
-        wave[i]=0;
-    for(i=128;i<256;i++)
-        wave[i]=0x7F;
-    //smp = NULL;
-}
-
-
-TestToneOutputDevice::~TestToneOutputDevice() {
-}
-
-
-int TestToneOutputDevice::open(void) {
-    //smp = Mix_LoadWAV("sound.wav");
-    opened = 1;
-    return 0;
-}
-
-
-int TestToneOutputDevice::close(void) {
-    //Mix_FreeChunk(smp);
-    opened = 0;
-    return 0;
-}
-
-
-void TestToneOutputDevice::reset(void) {
-    makenoise = 0;
-    OutputDevice::reset(); // dont forget this
-}
-void TestToneOutputDevice::hardpanic(void) {
-    panic();
-}
-void TestToneOutputDevice::send(unsigned int msg) {
-}
-void TestToneOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
-    makenoise=1;
-    //Mix_PlayChannel(-1,smp,0);
-}
-void TestToneOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
-    makenoise=0;
-}
-void TestToneOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
-}
-void TestToneOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
-}
-void TestToneOutputDevice::progChange(int program, int bank, unsigned char chan) {
-}
-void TestToneOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
-}
-void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
-    //Mix_PlayChannelTimed()
-    
-        if (makenoise) {
-        for(int i=0;i<len;i++) {
-            stream[i] = wave[wavec&0xFF];
-            wavec++; 
-        }
-    }
-}
-
-
-
-///////
-//
-// NoiseMaker plugin - Makes random static
-//
-
-
-NoiseOutputDevice::NoiseOutputDevice() {
-    type = OUTPUTDEVICE_TYPE_AUDIO;
-    strcpy(szName, "NoiseMaker Audio Plugin");
-    reset();
-}
-NoiseOutputDevice::~NoiseOutputDevice() {
-
-}
-int NoiseOutputDevice::open(void) {
-    opened = 1;
-    return 0;
-}
-int NoiseOutputDevice::close(void) {
-    opened = 0;
-    return 0;
-}
-void NoiseOutputDevice::reset(void) {
-    makenoise = 0;
-    OutputDevice::reset(); // dont forget this
-}
-void NoiseOutputDevice::hardpanic(void) {
-    panic();
-}
-void NoiseOutputDevice::send(unsigned int msg) {
-}
-void NoiseOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
-    makenoise=1;
-}
-void NoiseOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
-    makenoise=0;
-}
-void NoiseOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
-}
-void NoiseOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
-}
-void NoiseOutputDevice::progChange(int program, int bank, unsigned char chan) {
-}
-void NoiseOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
-}
-void NoiseOutputDevice::work( void *udata, Uint8 *stream, int len) {
-    if (makenoise) {
-        for(int i=0;i<len;i++) {
-            stream[i] = rand()&0x3F;
-        }
-    }
-}
 
 
 ///////
@@ -302,6 +175,143 @@ void MidiOutputDevice::progChange(int program, int bank, unsigned char chan) {
 			midiOutMsg( 0xC0 + chan, program, 0x00);
     }
 }
+
 void MidiOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
 	midiOutMsg( 0xB0 + chan, cc, value);
 }
+
+
+
+#ifdef _ENABLE_AUDIO    
+
+
+///////
+//
+// TestTone plugin - Plays a square wave at fixed freq
+//
+
+TestToneOutputDevice::TestToneOutputDevice()
+{
+  int i ;
+
+    type = OUTPUTDEVICE_TYPE_AUDIO;
+    strcpy(szName, "TestTone Audio Plugin");
+    reset();
+    wavec = 0;
+    for(i=0;i<128;i++)
+        wave[i]=0;
+    for(i=128;i<256;i++)
+        wave[i]=0x7F;
+    //smp = NULL;
+}
+
+
+TestToneOutputDevice::~TestToneOutputDevice() {
+}
+
+
+int TestToneOutputDevice::open(void) {
+    //smp = Mix_LoadWAV("sound.wav");
+    opened = 1;
+    return 0;
+}
+
+
+int TestToneOutputDevice::close(void) {
+    //Mix_FreeChunk(smp);
+    opened = 0;
+    return 0;
+}
+
+
+void TestToneOutputDevice::reset(void) {
+    makenoise = 0;
+    OutputDevice::reset(); // dont forget this
+}
+void TestToneOutputDevice::hardpanic(void) {
+    panic();
+}
+void TestToneOutputDevice::send(unsigned int msg) {
+}
+void TestToneOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+    makenoise=1;
+    //Mix_PlayChannel(-1,smp,0);
+}
+void TestToneOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
+    makenoise=0;
+}
+void TestToneOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
+}
+void TestToneOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+}
+void TestToneOutputDevice::progChange(int program, int bank, unsigned char chan) {
+}
+void TestToneOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
+}
+void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
+    //Mix_PlayChannelTimed()
+    
+        if (makenoise) {
+        for(int i=0;i<len;i++) {
+            stream[i] = wave[wavec&0xFF];
+            wavec++; 
+        }
+    }
+}
+
+
+
+///////
+//
+// NoiseMaker plugin - Makes random static
+//
+
+
+NoiseOutputDevice::NoiseOutputDevice() {
+    type = OUTPUTDEVICE_TYPE_AUDIO;
+    strcpy(szName, "NoiseMaker Audio Plugin");
+    reset();
+}
+NoiseOutputDevice::~NoiseOutputDevice() {
+
+}
+int NoiseOutputDevice::open(void) {
+    opened = 1;
+    return 0;
+}
+int NoiseOutputDevice::close(void) {
+    opened = 0;
+    return 0;
+}
+void NoiseOutputDevice::reset(void) {
+    makenoise = 0;
+    OutputDevice::reset(); // dont forget this
+}
+void NoiseOutputDevice::hardpanic(void) {
+    panic();
+}
+void NoiseOutputDevice::send(unsigned int msg) {
+}
+void NoiseOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+    makenoise=1;
+}
+void NoiseOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
+    makenoise=0;
+}
+void NoiseOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
+}
+void NoiseOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+}
+void NoiseOutputDevice::progChange(int program, int bank, unsigned char chan) {
+}
+void NoiseOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
+}
+void NoiseOutputDevice::work( void *udata, Uint8 *stream, int len) {
+    if (makenoise) {
+        for(int i=0;i<len;i++) {
+            stream[i] = rand()&0x3F;
+        }
+    }
+}
+
+#endif

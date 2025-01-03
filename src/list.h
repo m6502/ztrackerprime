@@ -34,14 +34,14 @@ public:
   ~list();
   void reset();
   char *getnextkey();
-  int list::size(void);
-  int insert(char *str,char *strdata,listitemtype data=0);
-  int remove(char *str);
+  int size(void);
+  int insert(const char *str,const char *strdata,listitemtype data=0);
+  int remove(const char *str);
   int isempty(void);
-  int setdata(char *str, char *strdata, listitemtype data);
-  void *findnode(char *str);
-  listitemtype getdata(char *str);
-  char *getstrdata(char *str);
+  int setdata(const char *str, const char *strdata, listitemtype data);
+  void *findnode(const char *str);
+  listitemtype getdata(const char *str);
+  char *getstrdata(const char *str);
 };
 #endif
 

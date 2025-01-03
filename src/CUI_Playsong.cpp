@@ -10,8 +10,6 @@
 //
 CUI_Playsong::CUI_Playsong(void) 
 {
-
-    PatternDisplay *p;
     VUPlay *vu;
 //    LCDDisplay *lcd;
     //UI = new UserInterface;
@@ -19,22 +17,22 @@ CUI_Playsong::CUI_Playsong(void)
     UI_PatternDisplay = new UserInterface;
     UI_VUMeters = new UserInterface;
 
-    p = new PatternDisplay() ;
-    p->x = 1;
+    pattern_display = new PatternDisplay() ;
+    pattern_display->x = 1;
 
     clear = 0 ;
 
     // <Manu> ¿Por qué 20?
     //p->y = 20 ;
-    p->y = 14 ;
+    pattern_display->y = 14 ;
     
     // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
     //p->ysize = 30 ;
 
-    p->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - p->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
     //p->ysize = 62;
 
-    UI_PatternDisplay->add_element(p,0);
+    UI_PatternDisplay->add_element(pattern_display,0);
 
     //delete p;
 /*
@@ -197,20 +195,21 @@ void CUI_Playsong::update()
 //
 void CUI_Playsong::draw(Drawable *S) 
 {
+  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+
   //  char str[256];
   if (S->lock()==0) {
     
     if (clear > 0) {
       
-
-                                                    // <Manu> cambio res
+      // <Manu> cambio res
       //S->fillRect(0,row(15),INTERNAL_RESOLUTION_X,row(50)/*410*/,COLORS.Background);
-      S->fillRect(0, row(15), INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y - (640 - row(50))/*410*/,COLORS.Background);
+      S->fillRect(0, row(15), INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y - (640 - row(50))/*410*/,COLORS.Background); // <Manu> Necesario?
 
       clear = 0 ;
     }
     
-    printtitle(11,"Play Song",COLORS.Text,COLORS.Background,S);
+    printtitle(PAGE_TITLE_ROW_Y,"Play Song",COLORS.Text,COLORS.Background,S);
     need_refresh = 0;
     updated=2;
     

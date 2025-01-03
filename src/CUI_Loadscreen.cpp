@@ -112,14 +112,6 @@ void BTNCLK_Toggle(UserInterfaceElement *b) {
 //
 CUI_Loadscreen::CUI_Loadscreen(void)
 {
-  FileList *fl;
-  DirList *dl;
-  DriveList *dr;
-
-  //  TextInput *ti;
-  //  Button *b;  
-
-
   UI = new UserInterface;
 
   fl = new FileList ;
@@ -268,6 +260,10 @@ void CUI_Loadscreen::update()
 //
 void CUI_Loadscreen::draw(Drawable *S) 
 {
+  fl->ysize = LOAD_FILE_LIST_SIZE_Y_CHARS ;
+  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
+  dr->ysize = DRIVE_LIST_SIZE_Y ;
+
   if (clear) {
 
     if (S->lock() == 0) {
@@ -288,7 +284,7 @@ void CUI_Loadscreen::draw(Drawable *S)
 
     if (!is_loading) draw_status(S);
 
-    printtitle(11,"File Load",COLORS.Text,COLORS.Background,S) ;
+    printtitle(PAGE_TITLE_ROW_Y,"File Load",COLORS.Text,COLORS.Background,S) ;
     need_refresh = 0; updated=2;
     S->unlock();
   }

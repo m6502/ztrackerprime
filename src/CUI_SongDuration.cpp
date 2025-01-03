@@ -1,6 +1,10 @@
 #include "zt.h"
 #include "Button.h"
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void BTNCLK_close_songduration(void) {
     Keys.flush();
     close_popup_window();
@@ -8,14 +12,22 @@ void BTNCLK_close_songduration(void) {
     need_refresh++;
 }
 
-int calcSongSeconds(int cur_row, int cur_ord) {
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int calcSongSeconds(int cur_row, int cur_ord)
+{
     int o = 0;
     int rows = 0;
     int seconds;
     int cr=0;
-    while (song->orderlist[o]==0x101 && o<=0xFF)
+    
+    while (o < ZTM_ORDERLIST_LEN && song->orderlist[o] == 0x101) {
         o++;
-    while(song->orderlist[o]<0x100 && o<=0xFF) {
+    }
+
+    while( o < ZTM_ORDERLIST_LEN && song->orderlist[o] < 0x100) {
         rows += song->patterns[song->orderlist[o]]->length;
         if (cur_row != -1) {
             if (o<cur_ord)
@@ -24,7 +36,7 @@ int calcSongSeconds(int cur_row, int cur_ord) {
                 cr+=cur_row;
         }
         o++;
-        while (song->orderlist[o]==0x101 && o<=0xFF)
+        while (o < ZTM_ORDERLIST_LEN && song->orderlist[o]==0x101)
             o++;
     }
     if (rows>0)
@@ -38,6 +50,10 @@ int calcSongSeconds(int cur_row, int cur_ord) {
     return seconds;
 }
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 CUI_SongDuration::CUI_SongDuration(void) {
     Button *b;
     int tabindex=0;
@@ -68,10 +84,18 @@ CUI_SongDuration::CUI_SongDuration(void) {
 */
 }
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 CUI_SongDuration::~CUI_SongDuration(void) {
     delete UI; UI = NULL;
 }
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void CUI_SongDuration::enter(void) {
     need_refresh = 1;
     UI->cur_element = 1;
@@ -82,9 +106,16 @@ void CUI_SongDuration::enter(void) {
 // 16 rows @ 8 rows/beat = 16/8 = 2 beats
 // 138 beats/min    (2*60)/138
 
+// ------------------------------------------------------------------------------------------------
+//
+//
 void CUI_SongDuration::leave(void) {
 }
 
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void CUI_SongDuration::update() {
     int key=0,act=0;;
 //  act = Keys.size(); 
@@ -105,6 +136,11 @@ void CUI_SongDuration::update() {
     }
 }
 
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 void CUI_SongDuration::draw(Drawable *S) {
     int i;
     if (S->lock()==0) {

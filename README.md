@@ -23,6 +23,8 @@ Program behavior changes:
 
 - Zoom mode enables the program to work in 2x, 3x, 4x... So it's useable again on high resolution screens.
 
+- Resizeable window allows for a much more convenient experience.
+
 - Many shortcuts have been modified to use ALT key instead of Control (selections, etc).
 
 - Channel enable / disable controls work with F keys row instead of the numbers row.
@@ -50,15 +52,17 @@ Program behavior changes:
 - Play view draws as many channels as it can fit within the horizontal resolution, instead of a fixed number of them.
   
 - Load and Save screens now use all the available space to display their list entries, and have an improved X size.
-  
-- File requester didn't show .mid files; now it does.
-
-- Many memory bugs have been fixed (reading from uninitialized variables et al).
 
 - Many more.
 
 
 Fixed bugs:
+
+- Many crashes have been fixed - Works rock solid now.
+  
+- Many memory bugs have been fixed (reading from uninitialized variables et al).
+
+- File requester didn't show .mid files; now it does.
 
 - Control + L to load and Control + S to save work again.
 

@@ -56,14 +56,14 @@
 
 unsigned char font[256 * 8] ;
 
-int textcenter(char *str, int local) {
+int textcenter(const char *str, int local) {
     if (local != -1) {
         return ((local) -(strlen((char *)str)/2));
     } else
     return ((INTERNAL_RESOLUTION_X/16) -(strlen((char *)str)/2));
 }
 
-int printtitle(int y, char *str, TColor col,TColor bg,Drawable *S) {
+int printtitle(int y, const char *str, TColor col,TColor bg,Drawable *S) {
     int x;
     char str2[256];
     str2[0] = ' '; str2[1] = 0; strcat(str2,str); strcat(str2," ");
@@ -201,7 +201,7 @@ int font_load(std::istream *is) {
 }
 */
 
-void print(int x, int y, char *str, TColor col, Drawable *S) {
+void print(int x, int y, const char *str, TColor col, Drawable *S) {
     TColor *buf;
     unsigned char byte;
     int c=0,i,j;
@@ -254,7 +254,7 @@ void fillline(int y, char c, TColor col, TColor bg, Drawable *S) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void printBG(int x, int y, char *str,TColor col, TColor bg, Drawable *S)
+void printBG(int x, int y, const char *str,TColor col, TColor bg, Drawable *S)
 {
   TColor *buf,*start;
   unsigned char byte;
@@ -386,6 +386,7 @@ void printBGu(int x, int y, unsigned char *str, TColor col, TColor bg, Drawable 
         c++;
     }
 }
+
 void printchar(int x, int y, unsigned char ch, TColor col, Drawable *S) {
     TColor *buf;
     unsigned char byte;
@@ -412,6 +413,7 @@ void printchar(int x, int y, unsigned char ch, TColor col, Drawable *S) {
         }
     }
 }
+
 void printcharBG(int x, int y, unsigned char ch, TColor col, TColor bg, Drawable *S) {
     TColor *buf;
     unsigned char byte;

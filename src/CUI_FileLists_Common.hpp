@@ -67,6 +67,8 @@
 #define SAVE_MID_BUTTON_POS_X        FILE_LIST_POS_X_CHARS
 #define SAVE_MID_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1 + 1)
 
+//#define SAVE_GBA_BUTTON_POS_X        FILE_LIST_POS_X_CHARS
+//#define SAVE_GBA_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1 + 1 + 1 + 1)
 
 // Images
 

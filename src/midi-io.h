@@ -116,7 +116,7 @@ class midiOut {
 
 
         void set_alias(int dev, char *alias);
-        char* get_alias(int dev);
+        const char *get_alias(int dev);
 
         UINT AddDevice(int dev);
         int RemDevice(int dev);
@@ -153,12 +153,12 @@ class midiOut {
             }
         }
 
-        inline void midiOut::send(unsigned int dev,unsigned  int msg) {
+        inline void send(unsigned int dev,unsigned  int msg) {
             if (dev>=numOuputDevices) 
                 return;
             outputDevices[dev]->send(msg);
         }
-        inline void midiOut::sendGlobal(unsigned int msg) {
+        inline void sendGlobal(unsigned int msg) {
             intlist *t = devlist_head;
             while(t) {
                 outputDevices[t->key]->send(msg);
@@ -166,7 +166,7 @@ class midiOut {
             }
         } 
         
-        inline void midiOut::noteOn(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol, unsigned char track, unsigned char muted, unsigned char flags = 0) {
+        inline void noteOn(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol, unsigned char track, unsigned char muted, unsigned char flags = 0) {
             if (dev>=numOuputDevices) return;
             if (outputDevices[dev]->opened && !muted)
                 outputDevices[dev]->noteOn(note,chan,vol);
@@ -177,37 +177,37 @@ class midiOut {
                 outputDevices[dev]->notestates[note][chan] |= NB_RETRIG;
         }
 
-        inline void midiOut::noteOff(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol,unsigned char muted) {
+        inline void noteOff(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol,unsigned char muted) {
             if (dev>=numOuputDevices) return;
             if (outputDevices[dev]->opened && !muted)
                 outputDevices[dev]->noteOff(note,chan,vol);
             outputDevices[dev]->notestates[note][chan] = NB_OFF;
         }
 
-        inline void midiOut::afterTouch(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol) {
+        inline void afterTouch(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol) {
             if (dev>=numOuputDevices) return;
             outputDevices[dev]->afterTouch(note,chan,vol);
         }
 
-        inline void midiOut::pitchWheel(unsigned int dev, unsigned char chan, unsigned short int value) {
+        inline void pitchWheel(unsigned int dev, unsigned char chan, unsigned short int value) {
             if (dev>=numOuputDevices) return;
              outputDevices[dev]->pitchWheel(chan,value);
         }
 
-        inline void midiOut::progChange(unsigned int dev, int program, int bank, unsigned char chan) {
+        inline void progChange(unsigned int dev, int program, int bank, unsigned char chan) {
             if (dev>=numOuputDevices) return;
             outputDevices[dev]->progChange(program,bank,chan);
         }
-        inline void midiOut::sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
+        inline void sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
             if (dev>=numOuputDevices) return;
             outputDevices[dev]->sendCC(cc,value,chan);
         }
-        inline void midiOut::clock(void) {
+        inline void clock(void) {
             sendGlobal(0xF8);
         }
         
 
-        inline void midiOut::mute_track(unsigned char track) {
+        inline void mute_track(unsigned char track) {
             unsigned char vol;
             int i,j, val;
             int flags = 0;
@@ -231,7 +231,7 @@ class midiOut {
             }
         }
 
-        inline void midiOut::unmute_track(unsigned char track) {
+        inline void unmute_track(unsigned char track) {
             unsigned char vol;
             int i,j;
             intlist *t = devlist_head;
@@ -296,12 +296,12 @@ class midiOut {
         void set_delay_ticks(int dev, int ticks);
         int get_delay_ticks(int dev);
         
-        inline void midiOut::send(unsigned int dev, int msg) {
+        inline void send(unsigned int dev, int msg) {
             if (dev>numMidiDevs) return;
             if (midiOutDev[dev]->opened)
                 midiOutShortMsg(midiOutDev[dev]->handle,msg);
         }
-        inline void midiOut::sendGlobal(int msg) {
+        inline void sendGlobal(int msg) {
             intlist *t = devlist_head;
             while(t) {
                 midiOutShortMsg(midiOutDev[t->key]->handle,msg);
@@ -309,7 +309,7 @@ class midiOut {
             }
         }
 
-        inline void midiOut::mute_track(unsigned char track) {
+        inline void mute_track(unsigned char track) {
             unsigned char vol;
             int i,j, val;
             int flags = 0;
@@ -333,7 +333,7 @@ class midiOut {
             }
         }
 
-        inline void midiOut::unmute_track(unsigned char track) {
+        inline void unmute_track(unsigned char track) {
             unsigned char vol;
             int i,j;
             intlist *t = devlist_head;
@@ -353,7 +353,7 @@ class midiOut {
             }
         }
 
-        inline void midiOut::noteOn(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol, unsigned char track, unsigned char muted, unsigned char flags = 0) {
+        inline void noteOn(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol, unsigned char track, unsigned char muted, unsigned char flags = 0) {
             if (dev>=numMidiDevs) return;
             if (midiOutDev[dev]->opened && !muted)
                 midiOutShortMsg(midiOutDev[dev]->handle,(0x90+(chan)) + ((note)<<8) + ((vol)<<16));
@@ -364,20 +364,20 @@ class midiOut {
                 midiOutDev[dev]->notestates[note][chan] |= NB_RETRIG;
         }
 
-        inline void midiOut::noteOff(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol,unsigned char muted) {
+        inline void noteOff(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol,unsigned char muted) {
             if (dev>=numMidiDevs) return;
             if (midiOutDev[dev]->opened && !muted)
                 midiOutShortMsg(midiOutDev[dev]->handle,(0x80+(chan)) + ((note)<<8) + ((vol)<<16));
             midiOutDev[dev]->notestates[note][chan] = NB_OFF;
         }
 
-        inline void midiOut::afterTouch(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol) {
+        inline void afterTouch(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol) {
             if (dev>=numMidiDevs) return;
             if (midiOutDev[dev]->opened)
                 midiOutShortMsg(midiOutDev[dev]->handle,(0xD0+(chan)) + ((note)<<8) + ((vol)<<16));
         }
 
-        inline void midiOut::pitchWheel(unsigned int dev, unsigned char chan, unsigned short int value) {
+        inline void pitchWheel(unsigned int dev, unsigned char chan, unsigned short int value) {
             unsigned char d1,d2;
             if (dev>=numMidiDevs) return;
             value&=0x3FFF;
@@ -387,7 +387,7 @@ class midiOut {
                 midiOutShortMsg(midiOutDev[dev]->handle,(0xE0+(chan)) + (d1<<8) + (d2<<16));
         }
 
-        inline void midiOut::progChange(unsigned int dev, int program, int bank, unsigned char chan) {
+        inline void progChange(unsigned int dev, int program, int bank, unsigned char chan) {
             unsigned short int b;
             unsigned char hb,lb;
             bank &= 0x3fff;
@@ -404,12 +404,12 @@ class midiOut {
                     midiOutShortMsg(midiOutDev[dev]->handle,(0xC0+(chan)) + (((unsigned char)program)<<8));                  // Program change
             }           
         }
-        inline void midiOut::sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
+        inline void sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
             if (dev>=numMidiDevs) return;
             if (midiOutDev[dev]->opened)
                 midiOutShortMsg(midiOutDev[dev]->handle,(0xB0+chan) + (cc<<8) + (value<<16));
         }
-        inline void midiOut::clock(void) {
+        inline void clock(void) {
             sendGlobal(0xF8);
         }
 

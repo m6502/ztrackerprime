@@ -5,6 +5,57 @@
 // ------------------------------------------------------------------------------------------------
 //
 //
+void Button::auto_update_anchor()
+{
+    if(anchor_type & ANCHOR_RIGHT)
+        anchor_x = INTERNAL_RESOLUTION_X / 8 ;
+
+    if(anchor_type & ANCHOR_DOWN)
+        anchor_y = INTERNAL_RESOLUTION_Y / 8 ;
+
+    if(anchor_type & (ANCHOR_LEFT | ANCHOR_RIGHT))
+        x = anchor_x + anchor_offset_x ;
+            
+    if(anchor_type & (ANCHOR_UP | ANCHOR_DOWN))
+        y = anchor_y + anchor_offset_y ;
+}
+
+
+
+// ------------------------------------------------------------------------------------------------
+// <Manu> Character anchor - Same as text input, merge
+//
+void Button::auto_anchor_at_current_pos(int how)
+{
+    anchor_type = how ;
+
+    if(anchor_type & ANCHOR_RIGHT) {
+                
+        anchor_x = INTERNAL_RESOLUTION_X / 8 ;
+    }
+    else if(anchor_type & ANCHOR_LEFT) {
+                
+        anchor_x = 0 ;
+    }
+
+    if(anchor_type & ANCHOR_DOWN) {
+                
+        anchor_y = INTERNAL_RESOLUTION_Y / 8 ;
+    }
+    else if(anchor_type & ANCHOR_UP) {
+                
+        anchor_y = 0 ;
+    }
+
+    anchor_offset_x = x - anchor_x ;
+    anchor_offset_y = y - anchor_y ;
+}
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 Button::Button(void) {
     caption = NULL;
     OnClick = NULL;
@@ -102,7 +153,17 @@ int Button::mouseupdate(int cur_element) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-int Button::update() {
+int Button::update()
+{
+    // ------------------------------------
+    // Anchor code 
+    // ------------------------------------
+
+    auto_update_anchor() ;
+
+    // ------------------------------------
+    // ------------------------------------
+
     KBKey key,act=0;
     int ret=0;
     key = Keys.checkkey();

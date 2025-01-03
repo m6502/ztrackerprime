@@ -1,5 +1,10 @@
+// portar
+
 #ifndef _HIRESTIMER_H_
 #define _HIRESTIMER_H_
+
+#include <mmsystem.h>
+
 
 class hires_timer
 {
@@ -31,5 +36,5 @@ public:
     }
 };
 
-#endif //_HIRESTIMER_H_  - Greets to OMAN for some help with this and origional code
+#endif //_HIRESTIMER_H_  - Greets to OMAN for some help with this and original code
 

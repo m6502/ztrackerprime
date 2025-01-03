@@ -7,7 +7,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
     TextInput *ti;
     CheckBox *cb;
     Frame *fm;
-    OrderEditor *oe;
+    
 //    CommentEditor *ce;
 
     int base_y = 13;
@@ -105,11 +105,8 @@ CUI_Songconfig::CUI_Songconfig(void) {
         UI->add_element(oe,5);
         oe->x = 59;
         oe->y = 15;
-        oe->ysize = 32 + ((INTERNAL_RESOLUTION_Y-480)/8);
         oe->xsize = 9;
-
-
-
+        oe->ysize = 32 ;
 }
 
 CUI_Songconfig::~CUI_Songconfig(void) {
@@ -124,7 +121,8 @@ void CUI_Songconfig::enter(void) {
     vs = (ValueSlider *)UI->get_element(2);
     vs->value = rev_tpb_tab[song->tpb];
 
-    vs->force_f=1; vs->force_v = song->tpb;
+    vs->force_f=1; 
+    vs->force_v = song->tpb;
 
     if(!zt_config_globals.highlight_increment)
         zt_config_globals.highlight_increment = song->tpb;
@@ -140,7 +138,10 @@ void CUI_Songconfig::leave(void) {
 
 }
 
-void CUI_Songconfig::update() {
+void CUI_Songconfig::update()
+{
+    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - 22) ;
+
     int key=0;
     ValueSlider *vs;
     TextInput *t;
@@ -185,7 +186,7 @@ void CUI_Songconfig::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(11,"Song Configuration",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Song Configuration",COLORS.Text,COLORS.Background,S);
         print(row(11),col(base_y),"Title",COLORS.Text,S);
         print(row(13),col(base_y+2),   "BPM",COLORS.Text,S);
         print(row(13),col(base_y+3),"TPB",COLORS.Text,S);

@@ -246,7 +246,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         status(S);
-        printtitle(11,"System Configuration",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"System Configuration",COLORS.Text,COLORS.Background,S);
         print(row(4),col(14),"     Prebuffer",COLORS.Text,S);
         print(row(4),col(16)," Panic on stop",COLORS.Text,S);
         print(row(4),col(18)," MIDI-IN Slave",COLORS.Text,S);

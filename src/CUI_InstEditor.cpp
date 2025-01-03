@@ -74,7 +74,6 @@ void BTNCLK_ToggleTrackerMode(UserInterfaceElement *b) {
 CUI_InstEditor::CUI_InstEditor(void) {
 
 //    MidiDevSelectList *msl;
-    InstEditor *ie;
     ValueSlider *vs;
     ValueSliderDL *vsd;
     ValueSliderOFF *vso;
@@ -92,9 +91,8 @@ CUI_InstEditor::CUI_InstEditor(void) {
     ie->x = 5;
     ie->y = 13;
     ie->xsize = 29;
-    int s = 39 + ((INTERNAL_RESOLUTION_Y-480)/8);
-    if (s>100) s = 100;
-    ie->ysize = s;
+
+    ie->ysize = MAX_INSTS ;
 
     ///////////////////////////////////////////////////
     // HERE we changed all the slider object constructors to have a (1) argument (for focus) -nic
@@ -462,14 +460,18 @@ keepgoing:
 }
 
 
-void CUI_InstEditor::draw(Drawable *S) {
-    InstEditor *ie;
+void CUI_InstEditor::draw(Drawable *S)
+{
     ValueSlider *vs;
     ValueSliderDL *vsd;
     ValueSliderOFF *vso;
     Button *b;
 
     ie = (InstEditor *)UI->get_element(0);
+
+    ie->ysize = 39 + ((INTERNAL_RESOLUTION_Y-480)/8);
+    if(ie->ysize > MAX_INSTS) ie->ysize = MAX_INSTS ;
+
     if (ie->cursor+ie->list_start != cur_inst) {
         cur_inst = ie->cursor+ie->list_start;
         int ocs = mds->cur_sel;
@@ -550,7 +552,7 @@ void CUI_InstEditor::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         status(S);
-        printtitle(11,"Instrument Editor",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Instrument Editor",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(14),"Bank",COLORS.Text,COLORS.Background,S);
         printBG(col(58),row(14),"Patch",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(19),"Default Volume",COLORS.Text,COLORS.Background,S);

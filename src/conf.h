@@ -27,9 +27,9 @@ class conf {
         //int load(istream *is);
         int load(char *filen);
         int save(char *filen);
-        char* get(char *key);
-        void set(char *key, char *value,int dat=0);
-        int getcolor(char *key, int part);
+        char* get(const char *key);
+        void set(const char *key, const char *value,int dat=0);
+        int getcolor(const char *key, int part);
         void remove(char *key);
 };
 
@@ -71,6 +71,7 @@ class ZTConf {
         int centered_editing;
         int screen_width;
         int screen_height;
+        float zoom;
         int control_navigation_amount;
         char default_directory[512];
         int record_velocity;

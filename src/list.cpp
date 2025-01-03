@@ -96,7 +96,7 @@ int list::size(void)
     }
     return i;
 }
-void *list::findnode(char *str)
+void *list::findnode(const char *str)
 {
     node *temp;
     temp = head->next;
@@ -128,7 +128,7 @@ void *list::findprev(node *loc)
     }
     return NULL;
 }   
-int list::insert(char *str,char *strdata,listitemtype data)
+int list::insert(const char *str, const char *strdata, listitemtype data)
 {
     node *next, *prev;
     if (findnode(str) != NULL)
@@ -149,7 +149,7 @@ int list::insert(char *str,char *strdata,listitemtype data)
     strcpy(next->strdata, strdata);
     return 0;
 }
-int list::remove(char *str)
+int list::remove(const char *str)
 {
     node *temp,*prev;
     temp = (node *)findnode(str);
@@ -164,7 +164,7 @@ int list::remove(char *str)
     delete temp;
     return 0;
 }
-listitemtype list::getdata(char *str)
+listitemtype list::getdata(const char *str)
 {
     node *temp;
     temp = (node *)findnode(str);
@@ -172,7 +172,7 @@ listitemtype list::getdata(char *str)
         return -1;
     return temp->data;
 }
-char* list::getstrdata(char *str)
+char* list::getstrdata(const char *str)
 {
     node *temp;
     temp = (node *)findnode(str);
@@ -180,7 +180,7 @@ char* list::getstrdata(char *str)
         return NULL;
     return temp->strdata;
 }
-int list::setdata(char *str, char *strdata,listitemtype data)
+int list::setdata(const char *str, const char *strdata,listitemtype data)
 {
     node *temp;
     temp = (node *)findnode(str);

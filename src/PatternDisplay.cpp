@@ -8,7 +8,7 @@
 //
 PatternDisplay::PatternDisplay(void) 
 {
-    frm = new Frame;
+    frame = new Frame;
     
     // <Manu> Por defecto estaba a 0, pero yo quiero cur_pat_view a 1
     
@@ -27,7 +27,7 @@ PatternDisplay::PatternDisplay(void)
 //
 PatternDisplay::~PatternDisplay(void) 
 {
-  if (frm) delete frm;
+  if (frame) delete frame;
 }
 
 
@@ -210,10 +210,11 @@ void PatternDisplay::draw(Drawable *S, int active)
 {
   if (ztPlayer->playing) this->disp_playing_pattern(S);
   else this->disp_track_headers(S);
+
+  frame->ysize = ysize ;
+  frame->draw(S,0);
   
-  frm->draw(S,0);
-  
-  screenmanager.UpdateWH(col(frm->x), row(frm->y-1), col(frm->xsize+1), row(frm->ysize+1));
+  screenmanager.UpdateWH(col(frame->x), row(frame->y-1), col(frame->xsize+1), row(frame->ysize+1));
   
   changed = 0;
 }
@@ -297,7 +298,7 @@ void PatternDisplay::update_frame(void)
     
     // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto)
     //tracks = 10;
-    tracks = (INTERNAL_RESOLUTION_X / (tracksize * FONT_SIZE_X)) - 1 ;
+    tracks = ((INTERNAL_RESOLUTION_X /*- LEFT_LINE_NUMBER_MARGIN*/) / (tracksize * FONT_SIZE_X)) - 1 ;
 
     break ;
 
@@ -306,10 +307,10 @@ void PatternDisplay::update_frame(void)
     break ;
   } ;
   
-  frm->x = x+4;
-  frm->y = y;
-  frm->ysize=ysize;
-  frm->xsize=tracks*tracksize;
+  frame->x = x+4;
+  frame->y = y;
+  frame->ysize=ysize;
+  frame->xsize=tracks*tracksize;
   
 }
 
@@ -382,7 +383,6 @@ void PatternDisplay::disp_playing_pattern(Drawable *S)
   int cy, rows, cur_row, pat, last ;
   int next ;
   TColor bg;
-  
 
   //int dontchangeitasshole = 0
   

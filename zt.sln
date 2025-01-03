@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zt", "zt.vcxproj", "{4864983A-C625-4447-B2F1-C0FCF882458A}"
 EndProject
@@ -14,19 +14,31 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
 		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{4864983A-C625-4447-B2F1-C0FCF882458A}.Debug|Win32.ActiveCfg = Debug|Win32
 		{4864983A-C625-4447-B2F1-C0FCF882458A}.Debug|Win32.Build.0 = Debug|Win32
+		{4864983A-C625-4447-B2F1-C0FCF882458A}.Debug|x64.ActiveCfg = Debug|x64
+		{4864983A-C625-4447-B2F1-C0FCF882458A}.Debug|x64.Build.0 = Debug|x64
 		{4864983A-C625-4447-B2F1-C0FCF882458A}.Release|Win32.ActiveCfg = Release|Win32
 		{4864983A-C625-4447-B2F1-C0FCF882458A}.Release|Win32.Build.0 = Release|Win32
+		{4864983A-C625-4447-B2F1-C0FCF882458A}.Release|x64.ActiveCfg = Release|x64
+		{4864983A-C625-4447-B2F1-C0FCF882458A}.Release|x64.Build.0 = Release|x64
 		{9EEDFB58-5EFA-4BD3-9E87-59F8795B1EAB}.Debug|Win32.ActiveCfg = Release|Win32
+		{9EEDFB58-5EFA-4BD3-9E87-59F8795B1EAB}.Debug|x64.ActiveCfg = Debug|x64
 		{9EEDFB58-5EFA-4BD3-9E87-59F8795B1EAB}.Release|Win32.ActiveCfg = Release|Win32
+		{9EEDFB58-5EFA-4BD3-9E87-59F8795B1EAB}.Release|x64.ActiveCfg = Release|x64
 		{E2FAE786-155A-4C01-9AA2-E5A535FE4117}.Debug|Win32.ActiveCfg = Release|Win32
+		{E2FAE786-155A-4C01-9AA2-E5A535FE4117}.Debug|x64.ActiveCfg = Debug|x64
 		{E2FAE786-155A-4C01-9AA2-E5A535FE4117}.Release|Win32.ActiveCfg = Release|Win32
+		{E2FAE786-155A-4C01-9AA2-E5A535FE4117}.Release|x64.ActiveCfg = Release|x64
 		{F8956B71-5787-4CBE-8158-6CC45352F80A}.Debug|Win32.ActiveCfg = Release|Win32
+		{F8956B71-5787-4CBE-8158-6CC45352F80A}.Debug|x64.ActiveCfg = Debug|x64
 		{F8956B71-5787-4CBE-8158-6CC45352F80A}.Release|Win32.ActiveCfg = Release|Win32
+		{F8956B71-5787-4CBE-8158-6CC45352F80A}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

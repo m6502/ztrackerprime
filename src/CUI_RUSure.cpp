@@ -19,7 +19,7 @@ void BTNCLK_rusure_yes(void) {
 
 
 CUI_RUSure::CUI_RUSure(void) {
-    Button *b;
+
     int tabindex=0;
     UI = new UserInterface;
 
@@ -31,24 +31,23 @@ CUI_RUSure::CUI_RUSure(void) {
     for(;start_y % 8;start_y--);
 
 
-    b = new Button;
-    UI->add_element(b,tabindex++);
-    b->x = (start_x / 8) + 12;
-    b->y = (start_y + (window_height / 2) ) / 8 +1; //23;
-    b->xsize = 7;
-    b->ysize = 1;
-    b->caption = "  Yes";
-    b->OnClick = (ActFunc)BTNCLK_rusure_yes;
+    button_yes = new Button;
+    UI->add_element(button_yes,tabindex++);
+    button_yes->x = (start_x / 8) + 12;
+    button_yes->y = (start_y + (window_height / 2) ) / 8 +1; //23;
+    button_yes->xsize = 7;
+    button_yes->ysize = 1;
+    button_yes->caption = "  Yes";
+    button_yes->OnClick = (ActFunc)BTNCLK_rusure_yes;
 
-    b = new Button;
-    UI->add_element(b,tabindex++);
-    b->x = (start_x / 8) + 12 + 7 + 2;
-    b->y = (start_y + (window_height / 2) ) / 8 +1;
-    b->xsize = 7;
-    b->ysize = 1;
-    b->caption = "  No";
-    b->OnClick = (ActFunc)BTNCLK_rusure_no;
-
+    button_no = new Button;
+    UI->add_element(button_no,tabindex++);
+    button_no->x = (start_x / 8) + 12 + 7 + 2;
+    button_no->y = (start_y + (window_height / 2) ) / 8 +1;
+    button_no->xsize = 7;
+    button_no->ysize = 1;
+    button_no->caption = "  No";
+    button_no->OnClick = (ActFunc)BTNCLK_rusure_no;
 }
 
 CUI_RUSure::~CUI_RUSure(void) {
@@ -98,6 +97,12 @@ void CUI_RUSure::draw(Drawable *S) {
     for(;start_x % 8;start_x--);
     int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
+
+
+    button_yes->x = (start_x / 8) + 2 ;
+    button_yes->y = (start_y + (window_height / 2) ) / 8 +1; //23;
+    button_no->x = (start_x / 8) + 2 + 7 + 2;
+    button_no->y = (start_y + (window_height / 2) ) / 8 +1;
 
     if (S->lock()==0) {
         S->fillRect(start_x,start_y,start_x + window_width,start_y + window_height,COLORS.Background);

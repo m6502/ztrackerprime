@@ -1,5 +1,13 @@
 #include "zt.h"
 
+#define LEFT_MARGIN                     40
+#define RIGHT_MARGIN                    2
+
+#define TRACKS_POS_Y                    row(TRACKS_ROW_Y)
+#define TRACKS_FIRST_NOTE_POS_Y         row(TRACKS_ROW_Y + 1)
+
+#define SPACE_IN_CHARACTERS_AT_BOTTOM   20
+
 
 int PATTERN_EDIT_ROWS = 100;
 int m_upd = 0;
@@ -42,9 +50,8 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
 
   case 'B':
 
-    // <Manu> Nuevo comando B para hacer loops; pintamos la informacion
-
-    sprintf(str,"Command: Loop to pattern %d", effect_data);
+    // <Manu> Nuevo comando B para hacer loops en la GBA; pintamos la informacion
+    sprintf(str,"Command: Write GBA loop marker to pattern %d when exporting MIDI", effect_data);
 
     break ;
 
@@ -254,8 +261,8 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(str," Track %.2d ",j+1);
     else sprintf(str," %.2d ",j+1);
 
-    if (song->track_mute[j]) printBG(col(g_posx_tracks + (p*(field_size+1))),row(14),str,COLORS.Text,COLORS.Lowlight,S);
-    else printBG(col(g_posx_tracks + (p*(field_size+1))),row(14),str,COLORS.Brighttext,COLORS.Lowlight,S);
+    if (song->track_mute[j]) printBG(col(g_posx_tracks + (p*(field_size+1))),row(TRACKS_ROW_Y),str,COLORS.Text,COLORS.Lowlight,S);
+    else printBG(col(g_posx_tracks + (p*(field_size+1))),row(TRACKS_ROW_Y),str,COLORS.Brighttext,COLORS.Lowlight,S);
     
     p++;
   }
@@ -361,15 +368,17 @@ void draw_signed_bar(int x, int y, int xsize, int ysize, int value, int maxval, 
 //
 void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S, int upd_one=0,event *which_e=NULL) 
 {
-
   int var_row,var_track,num_displayed_tracks,num_displayed_rows,data,datamax;
   TColor bg;
   event *e;
   char str[64];
-  printline(col(5),row(14),148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
-  printline(col(5),row(14+(PATTERN_EDIT_ROWS+1)),143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
+
+  printline(col(5),row(TRACKS_ROW_Y),148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
+  printline(col(5),row(TRACKS_ROW_Y+(PATTERN_EDIT_ROWS+1)),143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
+  
   draw_track_markers(tracks_shown, field_size,S);
-  printchar(col(4),row(14),139,COLORS.Lowlight,S);
+  
+  printchar(col(4),row(TRACKS_ROW_Y),139,COLORS.Lowlight,S);
 
 
   num_displayed_rows = 0 ;
@@ -471,10 +480,10 @@ please_skip:
     num_displayed_rows++;
   }
 
-  printchar(col(4),                               row(14),                   153, COLORS.Lowlight,  S) ;
-  printchar(col(4+(tracks_shown*(field_size+1))), row(14),                   152, COLORS.Lowlight,  S) ;
-  printchar(col(4),                               row(15+PATTERN_EDIT_ROWS), 151, COLORS.Lowlight,  S) ;
-  printchar(col(4+(tracks_shown*(field_size+1))), row(15+PATTERN_EDIT_ROWS), 150, COLORS.Highlight, S) ;
+  printchar(col(4),                               row(TRACKS_ROW_Y),                   153, COLORS.Lowlight,  S) ;
+  printchar(col(4+(tracks_shown*(field_size+1))), row(TRACKS_ROW_Y),                   152, COLORS.Lowlight,  S) ;
+  printchar(col(4),                               row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS), 151, COLORS.Lowlight,  S) ;
+  printchar(col(4+(tracks_shown*(field_size+1))), row(TRACKS_ROW_Y + PATTERN_EDIT_ROWS), 150, COLORS.Highlight, S) ;
 }
 
 
@@ -505,11 +514,10 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   if(last_row > song->patterns[cur_edit_pattern]->length) last_row = song->patterns[cur_edit_pattern]->length ;
 
   int blank_rows = PATTERN_EDIT_ROWS - max_displayable_rows /*- 1*/ ;
+
   int first_blank_row = first_row + max_displayable_rows ;
 
 
-#define TRACKS_POS_Y                 row(14)
-#define TRACKS_FIRST_NOTE_POS_Y      (TRACKS_POS_Y + row(1))
 
   //printBG(col(5),row(15),
  
@@ -521,21 +529,26 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   else
   sprintf(str," %.2d ",var_track+1);
   if (song->track_mute[var_track])
-  printBG(col(5+(num_displayed_tracks*(field_size+1))),row(14),str,COLORS.Text,COLORS.Lowlight,S);
+  printBG(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y),str,COLORS.Text,COLORS.Lowlight,S);
   else
-  printBG(col(5+(num_displayed_tracks*(field_size+1))),row(14),str,COLORS.Brighttext,COLORS.Lowlight,S);
+  printBG(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y),str,COLORS.Brighttext,COLORS.Lowlight,S);
   num_displayed_tracks++;
 } */
 
 
 
   // <Manu> Cumple alguna función dibujar este carácter?
-  //printchar(col(4), row(14), 139, COLORS.Lowlight,S);
+  //printchar(col(4), row(TRACKS_ROW_Y), 139, COLORS.Lowlight,S);
 
-
-
-  int poscharx_tracks = ((INTERNAL_RESOLUTION_X / FONT_SIZE_X) - (tracks_shown*(field_size+1))) >> 1 ;
+  
+  int total_pixels = INTERNAL_RESOLUTION_X /*- LEFT_MARGIN - RIGHT_MARGIN*/ ;
+  int track_pixels = ((tracks_shown * (field_size+1)) * FONT_SIZE_X) + LEFT_MARGIN  ;
+  int extra_pixels = total_pixels - track_pixels ;
+  
+  //int poscharx_tracks = LEFT_MARGIN/*(extra_pixels >> 1)*/ / FONT_SIZE_X ;
+  int poscharx_tracks = ((extra_pixels >> 1) + LEFT_MARGIN) / FONT_SIZE_X ;
   g_posx_tracks = poscharx_tracks ;
+
 
   num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1
   
@@ -809,8 +822,7 @@ void CUI_Patterneditor::enter(void)
   // <Manu> 180 es el espacio que queda más o menos para las notas descontando dónde empiezan los tracks, la toolbar, etc.
   //        No sería mala idea calcular esto de una manera un poco más clara.
 
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y - 180) / 8 ;
-  
+  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
 
   //  this->mode = PEM_REGULARKEYS;
 }
@@ -840,6 +852,8 @@ void CUI_Patterneditor::leave(void)
 //
 void CUI_Patterneditor::update() 
 {
+  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+
   int i,j,o=0,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
   int key;
@@ -896,7 +910,7 @@ void CUI_Patterneditor::update()
 //#define _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
 
 #ifndef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-  zt_config_globals.cur_edit_mode = VIEW_BIG ;
+  zt_config_globals.cur_edit_mode = VIEW_BIG ;//VIEW_SQUISH ;
 #else
 
   if (Keys.size()) {
@@ -932,8 +946,6 @@ void CUI_Patterneditor::update()
 #endif
 
 
-#define LEFT_MARGIN       40
-#define RIGHT_MARGIN      4
 
   
   switch(zt_config_globals.cur_edit_mode) 
@@ -1072,7 +1084,7 @@ void CUI_Patterneditor::update()
         need_refresh++;
         break;
       case DIK_ADD:
-        if(cur_edit_order < 255 && song->orderlist[cur_edit_order + 1] != 0x100)
+        if(cur_edit_order < (ZTM_ORDERLIST_LEN - 1) && song->orderlist[cur_edit_order + 1] != 0x100)
         {
           cur_edit_order++;
           cur_edit_pattern = song->orderlist[cur_edit_order];
@@ -2009,10 +2021,7 @@ void CUI_Patterneditor::update()
             key = DIK_TAB; oktogo=1;
             break;
             
-            
-          case DIK_F1: toggle_track_mute(0); 
-            need_refresh++; 
-            break;
+          case DIK_F1: toggle_track_mute(0); need_refresh++; break;
           case DIK_F2: toggle_track_mute(1); need_refresh++; break;
           case DIK_F3: toggle_track_mute(2); need_refresh++; break;
           case DIK_F4: toggle_track_mute(3); need_refresh++; break;
@@ -3024,7 +3033,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     draw_status_vars(S);
     
-    printtitle(11,"Pattern Editor",COLORS.Text,COLORS.Background,S);
+    printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor",COLORS.Text,COLORS.Background,S);
     
     switch(mode) {
       
