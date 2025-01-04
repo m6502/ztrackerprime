@@ -5,6 +5,8 @@ zTracker was a Win32 only MIDI tracker / sequencer modeled after Impulse Tracker
 
 zTracker' is, as it's name implies, a derivate of zTracker.
 
+![ztscreenshot](https://github.com/user-attachments/assets/4ea296d7-0b72-49e2-a246-a064474e8c75)
+
 This fork is released as a homage to the original work of Chris Micali. I have been using zTracker nearly on a daily basis for the past 18 years. As the original project has remained untouched since 2002, at some point I started tinkering with the source code, at first to fix bugs and later to change how the program behaves.
 
 I don't know if there are any zTracker users remaining out there, but as I'm preparing to try a big overhaul of this software that could potentially end as a whole new program, this is released with the hope that someone can find it useful.
