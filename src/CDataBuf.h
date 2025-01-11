@@ -1,5 +1,3 @@
-#include "zt.h"
-
 #ifndef CDATABUF_H
 #define CDATABUF_H
 
@@ -50,7 +48,6 @@ class CDataBuf {
 
         void reset_read(void);
         void seek(int size, int mode);
-
 };
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef _KEYBUFFER_H
 #define _KEYBUFFER_H
 
-#include "zt.h"
+#include <SDL.h>
 
 #define KS_NO_SHIFT_KEYS 0
 #define KS_ALT   1
@@ -18,7 +18,7 @@ class KeyBuffer {
     public:
         
         KeyBuffer(void);
-        ~KeyBuffer(void);
+        ~KeyBuffer(void) = default ;
 
         KBKey getkey(void);
         KBMod getstate(void);

@@ -17,10 +17,6 @@
 #include <SDL_main.h>
 //#include "sdl_mixer.h"  // this is for audio testing
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-
 
 #define DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
 #define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
@@ -44,7 +40,7 @@
 // <Manu> antes era 98
 //#define VER_MIN 986
 
-#define ZTRACKER_VERSION                "zTracker' v2025_01_03"
+#define ZTRACKER_VERSION                "zTracker' v2025_01_11"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
@@ -111,8 +107,6 @@ extern int PATTERN_EDIT_ROWS;
 #define MAX_MIDI_OUTS                   MAX_MIDI_DEVS
 #define MAX_MIDI_INS                    MAX_MIDI_DEVS
 
-#define MAX_TRACKS                      64 // Max # of tracks
-#define MAX_INSTS                       100 // Max # of instruments
 
 
 #include "../resource.h"         // resource includes for win32 icon
@@ -120,19 +114,35 @@ extern int PATTERN_EDIT_ROWS;
 #include "lc_sdl_wrapper.h"      // libCON wrapper 
 #include "zlib_wrapper.h"        // zlib wrapper 
 #include "CDataBuf.h"            // data buffer for building chunks before writing to disk
-#include "timer.h"               // timer 
-#include "module.h"              // module load/save and memory/events 
+
+
 #include "UserInterface.h"       // UI drawing, widgets, and UI managment
+
 #include "font.h"                // font drawer
 #include "keybuffer.h"           // keyboard driver
+
 #include "conf.h"                // config class (assoc. array class)
-#include "midi-io.h"             // MIDI in/out 
-#include "OutputDevices.h"       // in/out plugins
+
 #include "edit_cols.h"           // pattern editor columns hack
-#include "playback.h"            // playing 
-#include "CUI_Page.h"            // main UI pages
+
 #include "import_export.h"       // file import/export
 #include "img.h"                 // image loading/scaling
+
+#include "CUI_Page.h"            // main UI pages
+
+
+
+#include "OutputDevices.h"       // in/out plugins
+
+#include "playback.h"            // playing 
+#include "timer.h"               // timer 
+#include "midi-io.h"             // MIDI in/out 
+
+
+#include "module.h"              // module load/save and memory/events 
+
+
+
 
 extern ZTConf zt_config_globals;
 
@@ -568,7 +578,7 @@ int checkclick(int x1, int y1, int x2, int y2);
 extern int sel_pat,sel_order;
 extern int modal;
 //extern int prebuffer_rows;
-extern int LastX,LastY,MousePressX,MousePressY;
+
 extern edit_col edit_cols[41];
 extern int zclear_flag, zclear_presscount;
 extern int fast_update, FU_x, FU_y, FU_dx, FU_dy;
@@ -642,13 +652,13 @@ extern midiIn  *MidiIn;
 
 extern UserInterface *UI;
 
-enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_EXTEND };
 
 extern int last_cmd_keyjazz,last_keyjazz;
 
 void draw_status(Drawable *S); /* S MUST BE LOCKED! */
 extern Bitmap *load_cached_bitmap(char *name);
-extern char ls_filename[256],load_filename[256], save_filename[256];
+
+extern char ls_filename[MAX_PATH + 1],load_filename[MAX_PATH + 1], save_filename[MAX_PATH + 1];
 
 extern int faded, doredraw;
 

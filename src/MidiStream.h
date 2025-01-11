@@ -1,11 +1,12 @@
 #ifndef _MIDI_STREAM_H
 #define _MIDI_STREAM_H
 
-#include "zt.h"
+#include <mmsystem.h>
 
 #define CMS_BufferLength 10*1024
 
-class CMidiStream {
+class CMidiStream
+{
     public:
         MIDIHDR midihdr;
         

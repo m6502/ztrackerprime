@@ -86,7 +86,7 @@ void Skin::makepath(char *dst, char *filename)
 //
 void Skin::setpath(char *name) 
 {
-  char str[256];
+  static char str[MAX_PATH + 1];
 
   strcpy(strSkinName, name);
   strcpy(&str[0],cur_dir);

@@ -43,7 +43,7 @@
 CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
 
     TextInput *ti;
-    static unsigned char testname[256];
+    static unsigned char testname[MAX_PATH + 1];
 
     UI = new UserInterface;
 

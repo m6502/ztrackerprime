@@ -38,8 +38,15 @@
  *
  ******/
 
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
 
-#include "stdafx.h"
+#include <SDL.h>
+
+#include "conf.h"
+
 #include "zt.h"
 
 

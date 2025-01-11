@@ -40,8 +40,10 @@
 #ifndef __PLAYBACK_H
 #define __PLAYBACK_H
 
-#include "zt.h"
+#include <mmsystem.h>
 
+//#include "zt.h"
+class zt_module ;
 
 enum Emeventtypes { 
     ET_NOTE_ON,

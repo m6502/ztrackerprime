@@ -37,8 +37,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ******/
-#include "zt.h"
 #include <stdarg.h>
+#include "zt.h"
 
 /* test flag, define to force uncompressed song files */
 //#define SAVE_UNCOMPRESSED
@@ -616,7 +616,7 @@ void instrument::save(CDataBuf *buf, unsigned char inum) {
 
 int zt_module::save(char *fn, int compressed) 
 {
-    char ls_filename[256];
+    static char ls_filename[MAX_PATH + 1];
     int i ;
 
     DeflateStream *lpDS=NULL;
@@ -1033,7 +1033,7 @@ int zt_module::load(char *fn)
 {
 //  unsigned char buf[10];
 
-    char ls_filename[256];
+    static char ls_filename[MAX_PATH + 1];
     int compressed=0;
     InflateStream *input = NULL;
     ZTImportExport *zti;
@@ -1042,6 +1042,7 @@ int zt_module::load(char *fn)
     char ititle[ZTM_SONGTITLE_MAXLEN];
     int imidiclock, imidistopstart;
     int islideonsubtick;
+
 #ifdef CONVERT_SLIDEPRECISION
     int islideprecision;
 #endif /* CONVERT_SLIDEPRECISION */

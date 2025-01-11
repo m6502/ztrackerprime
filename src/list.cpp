@@ -38,8 +38,8 @@
  *
  ******/
 
-#include "stdafx.h"
-#include "zt.h"
+#include <string.h>
+#include "list.h"
 
 node::node() {
     str = NULL;

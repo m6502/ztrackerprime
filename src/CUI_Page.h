@@ -1,15 +1,22 @@
 #ifndef _UI_PAGE_H_
 #define _UI_PAGE_H_
 
-#include "zt.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 class Button ;
-class OrderEditor ;
-class PatternDisplay ;
-class FileList ;
+class CheckBox ;
 class DirList ;
 class DriveList ;
+class FileList ;
 class InstEditor ;
+class OrderEditor ;
+class PatternDisplay ;
+class TextBox ;
+class TextInput ;
+class UserInterface ;
+class UserInterfaceElement ;
+class ValueSlider ;
 
 typedef void (*VFunc)();
 
@@ -316,9 +323,9 @@ class CUI_PEParms : public CUI_Page {
         ValueSlider *vs_highlight ;
         ValueSlider *vs_lowlight ;
 
-	    CheckBox *cb_centered ;
-	    CheckBox *cb_stepedit ;
-	    CheckBox *cb_recveloc ;
+        CheckBox *cb_centered ;
+        CheckBox *cb_stepedit ;
+        CheckBox *cb_recveloc ;
 
         ValueSlider *vs_speedup ;
 

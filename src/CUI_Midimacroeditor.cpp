@@ -42,7 +42,7 @@
 CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
 
     TextInput *ti;
-    static unsigned char testname[256];
+    static unsigned char testname[MAX_PATH + 1];
 
 
     UI = new UserInterface;

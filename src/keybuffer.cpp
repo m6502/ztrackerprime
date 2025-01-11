@@ -68,9 +68,6 @@ KeyBuffer::KeyBuffer(void) {
     cursize=0;
 }
 
-KeyBuffer::~KeyBuffer(void) {
-}
-
 void KeyBuffer::flush(void) {
     tail=head;
     cursize = 0;

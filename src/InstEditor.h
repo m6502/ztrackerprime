@@ -1,12 +1,12 @@
 #ifndef _UserInterfaceInstEd_H
 #define _UserInterfaceInstEd_H
 
-#include "zt.h"
 #include "UserInterface.h"
 
+class Drawable ;
 
-
-class InstEditor : public UserInterfaceElement {
+class InstEditor : public UserInterfaceElement
+{
     public:
         Frame *frm;
         int cursor,text_cursor;
@@ -22,7 +22,5 @@ class InstEditor : public UserInterfaceElement {
         void draw(Drawable *S, int active);
         int mouseupdate(int cur_element);
 };
-
-
 
 #endif

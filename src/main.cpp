@@ -130,7 +130,7 @@ int selected=0;
 
 int zclear_flag, zclear_presscount;
 int already_changed_default_directory = 0;
-char ls_filename[256];
+char ls_filename[MAX_PATH + 1];
 
 //int default_midistopstart = 1;
 //int default_midiclock = 1;
@@ -1573,7 +1573,7 @@ void redrawscreen(Drawable *S)
 
   // <Manu> header era 80 y he cambiado el texto del sprintf
   
-  char header[256];
+  static char header[256];
   //  sprintf(header,"%s ||||| DEBUG: moredata = %d || error = %d || longerror = %d", ZTRACKER_VERSION, mim_moredata, mim_error, mim_longerror) ;
 
     sprintf(header,"%s", ZTRACKER_VERSION) ;
@@ -1982,11 +1982,11 @@ int postAction ()
     intlist *mod;
     OutputDevice *m;
     midiInDevice *mi;
-    char blah[256];
+    static char blah[256];
     int i;
-    char name[256];
-	char val[256];
-	char tt[256];
+    static char name[256];
+	static char val[256];
+	static char tt[256];
 
     std::filesystem::current_path(cur_dir);
     for (i=0;i<MAX_MIDI_OUTS;i++) {
@@ -1998,6 +1998,7 @@ int postAction ()
         zt_config_globals.Config->remove(&name[0]);
     }
 	//tt = NULL;
+
     for (int j=0;j<MidiOut->numOuputDevices;j++) {
 
         m = MidiOut->outputDevices[j];
@@ -2228,7 +2229,7 @@ SDL_Surface *resizeSurface(SDL_Surface *oldSurface, int newWidth, int newHeight)
     SDL_FillRect(newSurface, NULL, SDL_MapRGB(newSurface->format, 0, 0, 0)); // Black
 
     // Optionally, blit the old surface onto the new one
-    SDL_Rect destRect = {0, 0, oldSurface->w, oldSurface->h};
+    SDL_Rect destRect = {0, 0, (Uint16)oldSurface->w, (Uint16)oldSurface->h};
     SDL_BlitSurface(oldSurface, NULL, newSurface, &destRect);
 
     // Free the old surface
@@ -2394,7 +2395,7 @@ SDL_Surface *set_video_mode(int w, int h, char *errstr)
 
   flags = flags | SDL_RESIZABLE ;
   SDL_Surface *screen = SDL_SetVideoMode(RESOLUTION_X, RESOLUTION_Y, SCREEN_BPP, flags);
-  
+
   if ( screen == NULL ) {
     
     // <Manu> El mensaje de error estaba mal
@@ -2474,8 +2475,12 @@ SDL_Surface *initSDL(void)
   */
   CurrentSkin = new Skin;
   if (! CurrentSkin->load(zt_config_globals.skin) ) {
-    
-    return NULL;
+
+    if(!CurrentSkin->load("default")) {
+
+        // <Manu> :-/
+        return NULL;
+    }
   }
   
   

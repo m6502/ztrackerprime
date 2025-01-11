@@ -38,24 +38,15 @@
  *
  ******/
 
-
-
-
-
-
-
-// http://electrickeet.com/line-itfont.html
-
-
-
-
-
-
+// https://web.archive.org/web/20220524212910/http://www.electrickeet.com/line-itfont.html
 
 #include "zt.h"
 
 unsigned char font[256 * 8] ;
 
+// -----------------------------------------------------------------------------------
+//
+//
 int textcenter(const char *str, int local) {
     if (local != -1) {
         return ((local) -(strlen((char *)str)/2));
@@ -63,9 +54,13 @@ int textcenter(const char *str, int local) {
     return ((INTERNAL_RESOLUTION_X/16) -(strlen((char *)str)/2));
 }
 
+
+// -----------------------------------------------------------------------------------
+//
+//
 int printtitle(int y, const char *str, TColor col,TColor bg,Drawable *S) {
     int x;
-    char str2[256];
+    static char str2[256];
     str2[0] = ' '; str2[1] = 0; strcat(str2,str); strcat(str2," ");
     x = textcenter(str2);
     printBG(col(x),row(y),str2,col,bg,S);
@@ -74,24 +69,82 @@ int printtitle(int y, const char *str, TColor col,TColor bg,Drawable *S) {
     return 0;
 }
 
+
+
+// -----------------------------------------------------------------------------------
+//
+//
 int font_load(char *filename)
 {
-    FILE *fp;
-    char c;
-    int i;
+    {
+        // <Manu> Try to use a PNG file first instead
+        static char buffer[260 + 1] ;
+        strcpy(buffer, filename) ;
 
-    if (!(fp = fopen(filename,"rb"))) return 1;
+        int len = strlen(filename) ;
+        buffer[len - 3] = 'p' ;
+        buffer[len - 2] = 'n' ;
+        buffer[len - 1] = 'g' ;
 
-    for (i=0;i<256*8;i++) {
+        SDL_Surface *temp = SDL_LoadPNG(buffer) ;
 
-        c = fgetc(fp);
-        font[i] = c;
+        memset(font, 0, sizeof(font)) ;
+
+        if(temp != NULL) {
+
+            for (int vary = 0; vary < 128; vary++) {
+
+                int chary = ((vary >> 3) ) ;
+                int line_char = vary & 0x7 ;
+
+                for (int varx = 0; varx < 128; varx++) {
+
+                    int charx = ((varx >> 3) ) ;
+
+                    unsigned char *puntero = (unsigned char *)temp->pixels ;
+
+                    puntero += (vary * temp->pitch) + varx ;
+                
+                    if(*puntero)
+                    {
+                        #define SIZE_PER_CHAR (8 * 1)
+                    
+                        int num_char = (chary * 16) + (varx >> 3) ;
+                        int bit = 7 - (varx & 0x7) ;
+                        font[(num_char * SIZE_PER_CHAR) + (line_char * 1)] |= (1 << bit) ;
+                    }
+                }
+            }
+
+            SDL_FreeSurface(temp) ;
+
+            return 0 ;
+        }
     }
 
-    fclose(fp);
-    
+    {
+        // Old skin fnt files are still supported
+        FILE *fp;
+        unsigned char c;
+        int i;
+
+        if (!(fp = fopen(filename,"rb"))) return 1;
+
+        for (i=0;i<256*8;i++) {
+
+            c = fgetc(fp);
+            font[i] = c;
+        }
+
+        fclose(fp);
+
+        return 0;
+    }
+
     return 0;
 }
+
+
 
 
 

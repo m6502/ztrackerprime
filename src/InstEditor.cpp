@@ -1,7 +1,7 @@
 #include "InstEditor.h"
+#include "zt.h"
 
-
-#define INSTRUMENT_USED_MARK    "+"
+#define INSTRUMENT_USED_MARK_CHAR    "+"
 
 
 
@@ -468,7 +468,7 @@ void InstEditor::draw(Drawable *S, int active)
 
     //<Manu>
 
-    if(song->instruments[inst_num]->IsUsed()) printBG(col(x-4), row(cy+y), INSTRUMENT_USED_MARK, COLORS.Text, COLORS.Background, S);
+    if(song->instruments[inst_num]->IsUsed()) printBG(col(x-4), row(cy+y), INSTRUMENT_USED_MARK_CHAR, COLORS.Text, COLORS.Background, S);
 
     sprintf(str2,"%.2d", inst_num);
     printBG(col(x-3),row(cy+y),str2,COLORS.Text,COLORS.Background,S);

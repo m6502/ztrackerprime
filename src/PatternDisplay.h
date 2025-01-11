@@ -1,21 +1,14 @@
 #ifndef ZT_PATTERNDISPLAY_INCLUDED_
 #define ZT_PATTERNDISPLAY_INCLUDED_
 
+#include "lc_sdl_wrapper.h"
+#include "UserInterface.h"
 
-//typedef enum
-//{
-//  PATTERN_VIEW_,
-//  PATTERN_VIEW_,
-//  PATTERN_VIEW_,
-//  PATTERN_VIEW_,
-//  PATTERN_VIEW_,
-//
-//
-//} PATTERN_VIEW_MODE ;
+class Frame;
+class Drawable ;
 
-
-class PatternDisplay : public UserInterfaceElement {
-
+class PatternDisplay : public UserInterfaceElement
+{
     public:
 
         Frame *frame;
@@ -40,11 +33,6 @@ class PatternDisplay : public UserInterfaceElement {
         void disp_playing_pattern(Drawable *S);
         char* printNote(char *str, event *r);
         void disp_track_headers(Drawable *S);
-
 };
 
-
-
 #endif
-
-

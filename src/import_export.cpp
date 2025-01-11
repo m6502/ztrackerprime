@@ -38,14 +38,14 @@
  *
  ******/
 
+#include "zt.h"
+
+#include "it.h"
+
 #include "import_export.h"
+#include "CDataBuf.h"
 
-
-ZTImportExport::ZTImportExport() {
-}
-
-ZTImportExport::~ZTImportExport() {
-}
+#include <string.h>
 
 
 //// .MID/.SMF FILE EXPORTER 
@@ -88,7 +88,7 @@ void push_varlen(CDataBuf *buf, unsigned int value)
     buffer |= ((value & 0x7F) | 0x80);
   }
   
-  while(TRUE) {
+  while(true) {
 
     buf->pushc((unsigned char)(buffer&0xFF)) ;
     

@@ -1,7 +1,6 @@
 #ifndef ZT_SLIDERS_INCLUDED___
 #define ZT_SLIDERS_INCLUDED___
 
-#include "zt.h"
 #include "UserInterface.h"
 
 class ValueSlider : public UserInterfaceElement {
@@ -17,7 +16,7 @@ class ValueSlider : public UserInterfaceElement {
         int focus;  // new value here
         ValueSlider();
         ValueSlider(int fset); // new constructor
-        ~ValueSlider();
+        ~ValueSlider() = default ;
         int mouseupdate(int cur_element);
         virtual int update();
         void draw(Drawable *S, int active);
@@ -34,7 +33,7 @@ class ValueSliderDL : public UserInterfaceElement {
         int focus;  // new value here
         ValueSliderDL();
         ValueSliderDL(int fset); // new constructor
-        ~ValueSliderDL();
+        ~ValueSliderDL() = default ;
         int mouseupdate(int cur_element);
         int update();
         void draw(Drawable *S, int active);
@@ -49,7 +48,7 @@ class ValueSliderOFF : public UserInterfaceElement {
         int focus;  // new value here
         ValueSliderOFF();
         ValueSliderOFF(int fset); // new constructor
-        ~ValueSliderOFF();
+        ~ValueSliderOFF() = default ;
         int mouseupdate(int cur_element);
         int update();
         void draw(Drawable *S, int active);

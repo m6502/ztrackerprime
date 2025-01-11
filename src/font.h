@@ -1,7 +1,7 @@
 #ifndef _FONT_H
 #define _FONT_H
 
-#include "zt.h"
+#include "lc_sdl_wrapper.h"
 
 
 // <Manu>

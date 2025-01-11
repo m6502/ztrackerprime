@@ -42,6 +42,7 @@
 
 #include "zt.h"
 
+
 class Skin {
         
     public:
@@ -53,7 +54,7 @@ class Skin {
         Bitmap *bmLogo;
         
         colorset Colors;
-        char strSkinPath[256];
+        char strSkinPath[MAX_PATH + 1];
         char strSkinName[64];
 
         Skin();

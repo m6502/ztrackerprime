@@ -38,15 +38,7 @@
  ******/
 #ifndef _ZLIB_WRAPPER_H
 #define _ZLIB_WRAPPER_H
-#include "zt.h"
-#include <fstream>
 
-
-/* these must be present to get the win32 dll linkage working */
-#define ZLIB_DLL
-#ifndef _WINDOWS
-#define _WINDOWS
-#endif
 #include <zlib.h>
 #include <fstream>
 
@@ -85,4 +77,3 @@ class DeflateStream
 };
 
 #endif /* _ZLIB_WRAPPER_H */
-/* eof */

@@ -41,7 +41,15 @@
 #ifndef _MODULE_H
 #define _MODULE_H
 
-#include "zt.h"
+#include <fstream>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+
+class CDataBuf ;
+class DeflateStream ;
+class InflateStream ;
 
 /* experimental arpeggio support */
 #define USE_ARPEGGIOS
@@ -56,6 +64,10 @@
  ******/
 
 /* these should be phased out from zt.h and put here */
+
+#define MAX_TRACKS                      64 // Max # of tracks
+#define MAX_INSTS                       100 // Max # of instruments
+
 
 #define ZTM_MAX_TRACKS                      MAX_TRACKS
 #define ZTM_MAX_INSTS                       MAX_INSTS

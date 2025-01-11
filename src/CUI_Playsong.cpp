@@ -216,10 +216,7 @@ void CUI_Playsong::draw(Drawable *S)
     UI->draw(S);
     
     S->unlock();
-    
   }
 }
-
-
 
 

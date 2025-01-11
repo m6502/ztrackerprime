@@ -37,12 +37,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  ******/
-#include "zt.h"
+
+#include "lc_sdl_wrapper.h"
+#include "UserInterface.h"
 #include "FileList.h"
 #include "CUI_FileLists_Common.hpp"
 
-char load_filename[256];
-char szSearch[256];
+#include "zt.h"
+
+char load_filename[MAX_PATH + 1];
+//char szSearch[256];
 
 extern int is_loading;
 

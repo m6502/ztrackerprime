@@ -45,7 +45,7 @@
 
 
 
-char save_filename[256];
+char save_filename[MAX_PATH + 1];
 extern int is_saving;
 
 

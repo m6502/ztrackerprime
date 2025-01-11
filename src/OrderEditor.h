@@ -1,11 +1,13 @@
 #ifndef _UserInterfaceOrdEd_H
 #define _UserInterfaceOrdEd_H
 
-#include "zt.h"
 #include "UserInterface.h"
 
+class Drawable ;
 
-class OrderEditor : public UserInterfaceElement {
+
+class OrderEditor : public UserInterfaceElement
+{
     public:
         Frame *frm;
         int cursor_y,cursor_x;

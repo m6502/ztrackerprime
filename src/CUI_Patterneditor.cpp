@@ -16,6 +16,8 @@ event *upd_e = NULL;
 int max_displayable_rows = 0 ;
 int g_posx_tracks = 0 ;
 
+int last_unused_key = 0 ;
+
 // ------------------------------------------------------------------------------------------------
 //
 //
@@ -252,7 +254,7 @@ char *printBlankNote(char *str, int cur_edit_mode)
 //
 void draw_track_markers(int tracks_shown, int field_size, Drawable *S) 
 {
-  char str[256];
+  static char str[256];
   int j;
   int p=0;
 
@@ -1010,6 +1012,7 @@ void CUI_Patterneditor::update()
 
     break;
   }
+
   
   if (cur_edit_track_disp+tracks_shown >= MAX_TRACKS) {    // Fix for bug #454764 -cm
     
@@ -1055,6 +1058,11 @@ void CUI_Patterneditor::update()
     }
   }
   
+  //static char test[256] ;
+  //statusmsg = test ;
+  //extern int last_unused_key ;
+  //sprintf(test, "Last pressed key code: %d", last_unused_key) ;
+  //need_refresh++ ;
   
   
   if (Keys.size() || midiInQueue.size() > 0) {
@@ -1083,6 +1091,8 @@ void CUI_Patterneditor::update()
         else mode = PEM_MOUSEDRAW;
         need_refresh++;
         break;
+
+
       case DIK_ADD:
         if(cur_edit_order < (ZTM_ORDERLIST_LEN - 1) && song->orderlist[cur_edit_order + 1] != 0x100)
         {
@@ -1091,7 +1101,9 @@ void CUI_Patterneditor::update()
           need_refresh++;
         }
         break;
+
       case DIK_SUBTRACT:
+
         if(cur_edit_order > 0 && song->orderlist[cur_edit_order -1] != 0x100)
         {
           cur_edit_order--;
@@ -1099,22 +1111,19 @@ void CUI_Patterneditor::update()
           need_refresh++;
         }
         break;
+
+
       } ;
     }
-    
+
+
+
     if (kstate == KS_NO_SHIFT_KEYS) {
 
       switch(key)
       {
-      case DIK_ADD:
-
-        if (cur_edit_pattern<255) {
-          cur_edit_pattern++;
-          need_refresh++; 
-        }
-
-        break;
-
+      case SDLK_QUOTE:
+      //case SDLK_LEFTBRACKET:
       case DIK_SUBTRACT:
 
         if (cur_edit_pattern>0) {
@@ -1124,6 +1133,26 @@ void CUI_Patterneditor::update()
         }
 
         break;
+
+      
+      //case 92:
+      case SDLK_BACKSLASH: // <ManU> 92 en español, ¿qué pasa con teclados internacionales?
+      //case SDLK_RIGHTBRACKET:
+      case DIK_ADD:
+
+        if (cur_edit_pattern<255) {
+          cur_edit_pattern++;
+          need_refresh++; 
+        }
+
+        break;
+
+      default:
+
+          last_unused_key = key ;
+
+          break ;
+
       }           
     }
     
@@ -1993,7 +2022,7 @@ void CUI_Patterneditor::update()
                 need_refresh++;
             }
             break;
-          case DIK_A: /* Transpose up */
+          case DIK_A: /* Transpose down */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++)
                 for(j=select_row_start;j<=select_row_end;j++) {
@@ -2074,15 +2103,8 @@ void CUI_Patterneditor::update()
         
         switch(key) {
 
-        case DIK_MULTIPLY:
-
-          if (base_octave<9) {
-            base_octave++;
-            need_refresh++; 
-          }
-
-          break;
-
+        // -------------------------------------------
+        case SDLK_LEFTBRACKET:
         case DIK_DIVIDE:
 
           if (base_octave>0) {
@@ -2092,6 +2114,19 @@ void CUI_Patterneditor::update()
 
           break;
 
+        // -------------------------------------------
+        case SDLK_RIGHTBRACKET:
+        case DIK_MULTIPLY:
+
+          if (base_octave<9) {
+            base_octave++;
+            need_refresh++; 
+          }
+
+          break;
+        
+
+        // -------------------------------------------
         case DIK_RETURN:
           if (e = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)) {
             if (e->inst < MAX_INSTS) {
@@ -2101,6 +2136,7 @@ void CUI_Patterneditor::update()
           }
           break;
         
+        // -------------------------------------------
         case DIK_DELETE:
 
           if (kstate == KS_CTRL) {
@@ -2395,8 +2431,13 @@ void CUI_Patterneditor::update()
                       case DIK_O: set_note = (12*base_octave)+2+12;  break;
                       case DIK_0: set_note = (12*base_octave)+3+12;  break;
                       case DIK_P: set_note = (12*base_octave)+4+12;  break;
-                      case SDLK_LEFTBRACKET: set_note = (12*base_octave)+5+12;  break;
-                      case SDLK_RIGHTBRACKET: set_note = (12*base_octave)+6+12;  break;
+                      
+                      
+                      // <Manu> Repurpose these keys
+                      //case SDLK_LEFTBRACKET: set_note = (12*base_octave)+5+12;  break;
+                      //case SDLK_RIGHTBRACKET: set_note = (12*base_octave)+6+12;  break;
+
+
                         /* BOTTOM ROW */
                       case DIK_Z: set_note = 12*(base_octave-1);     break;
                       case DIK_S: set_note = (12*(base_octave-1))+1; break;

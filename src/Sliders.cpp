@@ -40,15 +40,6 @@ ValueSlider::ValueSlider(int fset)
 // ------------------------------------------------------------------------------------------------
 //
 //
-ValueSlider::~ValueSlider(void) {
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 int ValueSlider::mouseupdate(int cur_element) 
 {
     int newval;
@@ -294,15 +285,6 @@ ValueSliderOFF::ValueSliderOFF(int fset) {
     ysize = 1;
     newclick=1;
     focus=fset;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-ValueSliderOFF::~ValueSliderOFF(void) {
 }
 
 
@@ -559,15 +541,6 @@ ValueSliderDL::ValueSliderDL(int fset) {
     ysize = 1;
     newclick=1;     // NEW Click set
     focus=fset;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-ValueSliderDL::~ValueSliderDL(void) {
 }
 
 

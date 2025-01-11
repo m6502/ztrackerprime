@@ -1,7 +1,7 @@
 #ifndef ZT_FILELIST_INCLUDED__
 #define ZT_FILELIST_INCLUDED__
 
-#include "zt.h"
+#include "UserInterface.h"
 
 class DriveList : public ListBox {
     public:
@@ -9,11 +9,11 @@ class DriveList : public ListBox {
         int updated;
         
         DriveList();
-        ~DriveList();
+        ~DriveList() = default ;
         virtual void draw(Drawable *S, int active);
         virtual void OnChange();
         virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
+        virtual void OnSelectChange() {}
         virtual void enter(void);
 
 };
@@ -25,12 +25,12 @@ class DirList : public ListBox {
         int updated;
         
         DirList();
-        ~DirList();
+        ~DirList() = default ;
         virtual int update();
         virtual void draw(Drawable *S, int active);
         virtual void OnChange();
         virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
+        virtual void OnSelectChange() {}
         virtual void enter(void);
 
 };
@@ -47,7 +47,7 @@ class FileList: public ListBox {
         virtual void draw(Drawable *S, int active);
         virtual void OnChange();
         virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
+        virtual void OnSelectChange() {}
         virtual void enter(void);
         void AddFiles(char *pattern, TColor c);
 };

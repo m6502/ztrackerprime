@@ -38,8 +38,11 @@
  *
  ******/
 
-#include "zt.h"
+#include <stdlib.h>
+#include <string.h>
+#include <SDL.h>
 
+#include "CDataBuf.h"
 
 CDataBuf::CDataBuf() {
     this->buffer = NULL;

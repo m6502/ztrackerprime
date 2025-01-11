@@ -1,8 +1,8 @@
 #ifndef _UserInterface_H
 #define _UserInterface_H
 
-#include "zt.h"
-
+#include "module.h"
+#include "lc_sdl_wrapper.h"
 
 void midi_sel(int dev);
 
@@ -36,10 +36,10 @@ class UserInterfaceElement {
         int need_redraw;
 
         UserInterfaceElement(void);
-        virtual ~UserInterfaceElement(void);
+        virtual ~UserInterfaceElement(void) = default ;
         
         virtual int mouseupdate(int cur_element);
-        virtual void enter(void);
+        virtual void enter(void) {}
         virtual int update()=0;
         virtual void draw(Drawable *S, int active)=0;
 
@@ -81,7 +81,7 @@ class Frame : public UserInterfaceElement {
     public:
         int type;
         Frame();
-        ~Frame();
+        ~Frame() = default ;
         int update();
         void draw(Drawable *S, int active);
 };
@@ -90,7 +90,7 @@ class CheckBox : public UserInterfaceElement {
     public:
         int *value;
         CheckBox();
-        ~CheckBox();
+        ~CheckBox() = default ;
         int mouseupdate(int cur_element);
         int update();
         void draw(Drawable *S, int active);
@@ -103,7 +103,7 @@ class TextInput : public UserInterfaceElement {
         int length;
         unsigned char *str;
         TextInput();
-        ~TextInput();
+        ~TextInput() = default ;
         int update();
         void draw(Drawable *S, int active);
 
@@ -161,7 +161,7 @@ class VUPlay : public UserInterfaceElement {
                                 // and is decremented each run for doing a fake-ass volume
 
         VUPlay();
-        ~VUPlay();
+        ~VUPlay() = default ;
 
         int update();
         void draw(Drawable *S, int active);
@@ -176,7 +176,7 @@ class BarGraph : public UserInterfaceElement {
         int max, maxval, value, trackmaxval;
 
         BarGraph();
-        ~BarGraph();
+        ~BarGraph() = default ;
 
         int update();
         void draw(Drawable *S, int active);
@@ -190,7 +190,7 @@ class LCDDisplay : public UserInterfaceElement {
         char *str;
         char istr[200];
         LCDDisplay();
-        ~LCDDisplay();
+        ~LCDDisplay() = default ;
 
         int update();
         void draw(Drawable *S, int active);
@@ -204,7 +204,7 @@ class AboutBox : public UserInterfaceElement {
         Frame frm;
         int q;
         AboutBox();
-        ~AboutBox();
+        ~AboutBox() = default ;
 
         int update();
         void draw(Drawable *S, int active);
@@ -219,7 +219,7 @@ class TextBox : public UserInterfaceElement {
         Frame frm;
 
         TextBox(int ro = 0);
-        ~TextBox();
+        ~TextBox() = default ;
 
         int update();
         void draw(Drawable *S, int active);
@@ -232,7 +232,7 @@ class CommentEditor : public TextBox {
         CDataBuf *target;
 
         CommentEditor();
-        ~CommentEditor();
+        ~CommentEditor() = default ;
 
         int update();
         
@@ -318,14 +318,14 @@ class MidiOutDeviceSelector : public ListBox {
     public:
 
         MidiOutDeviceSelector();
-        ~MidiOutDeviceSelector();
+        ~MidiOutDeviceSelector() = default ;
 
 //        virtual int update();
 //        virtual void draw(Drawable *S, int active);
 
         virtual void OnChange();
         virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
+        virtual void OnSelectChange() {}
         virtual void enter(void);
 
 };
@@ -336,7 +336,7 @@ class MidiInDeviceOpener : public ListBox {
     public:
 
         MidiInDeviceOpener ();
-        ~MidiInDeviceOpener ();
+        ~MidiInDeviceOpener () = default ;
 
 //        virtual int update();
 //        virtual void draw(Drawable *S, int active);
@@ -344,7 +344,7 @@ class MidiInDeviceOpener : public ListBox {
         virtual int mouseupdate(int cur_element);
         virtual void OnChange();
         virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
+        virtual void OnSelectChange() {}
         virtual void enter(void);
 
 };
@@ -356,7 +356,7 @@ class MidiOutDeviceOpener : public ListBox {
     public:
 
         MidiOutDeviceOpener();
-        ~MidiOutDeviceOpener();
+        ~MidiOutDeviceOpener() = default ;
         UserInterfaceElement *lvs;
         UserInterfaceElement *bscb;
         UserInterfaceElement *al;
@@ -366,7 +366,7 @@ class MidiOutDeviceOpener : public ListBox {
 
         virtual void OnChange();
         virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange();
+        virtual void OnSelectChange() {}
         virtual void enter(void);
         virtual int update(void);
 
@@ -382,7 +382,7 @@ class MidiOutDeviceOpener : public ListBox {
 class LatencyValueSlider : public ValueSlider {
     public:
         LatencyValueSlider(MidiOutDeviceOpener *m);
-        ~LatencyValueSlider();
+        ~LatencyValueSlider() = default ;
         MidiOutDeviceOpener *listbox;
         virtual int update();
         void sync(void);
@@ -393,7 +393,7 @@ class BankSelectCheckBox : public CheckBox {
         int i_value,sel;
         MidiOutDeviceOpener *listbox;
         BankSelectCheckBox(MidiOutDeviceOpener *m);
-        ~BankSelectCheckBox();
+        ~BankSelectCheckBox() = default ;
         virtual int update();
         void sync();
 };
@@ -404,9 +404,11 @@ class AliasTextInput : public TextInput {
         int sel;
         MidiOutDeviceOpener *listbox;
         AliasTextInput(MidiOutDeviceOpener *m);
-        ~AliasTextInput();
+        ~AliasTextInput() = default ;
         virtual int update();
         void sync();
 };
+
+extern int LastX,LastY,MousePressX,MousePressY;
 
 #endif

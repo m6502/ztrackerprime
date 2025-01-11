@@ -3,9 +3,13 @@
 
 #include "list.h"
 
+#define MAX_PATH 260
+
 
 #define DEFAULT_RESOLUTION_X       1360
 #define DEFAULT_RESOLUTION_Y       710
+
+enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_EXTEND };
 
 
 //  New class ZTConf puts all global variables in one place
@@ -49,9 +53,9 @@ class ZTConf {
         int full_screen;
 //        int do_fade; // fade_in_out ?
         int auto_open_midi;
-        char skin[256];
-        char work_directory[256];
-        char autoload_ztfile_filename[256];
+        char skin[MAX_PATH + 1];
+        char work_directory[MAX_PATH + 1];
+        char autoload_ztfile_filename[MAX_PATH + 1];
         int autoload_ztfile;
         int midi_in_sync; // flag_midiinsync
         int auto_send_panic; // flag_autosendpanic
@@ -73,7 +77,7 @@ class ZTConf {
         int screen_height;
         float zoom;
         int control_navigation_amount;
-        char default_directory[512];
+        char default_directory[MAX_PATH + 1];
         int record_velocity;
 };
 

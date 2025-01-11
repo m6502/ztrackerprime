@@ -1,8 +1,7 @@
 #ifndef _OUTPUT_DEVICES_H
 #define _OUTPUT_DEVICES_H
 
-#include "zt.h"
-       
+#include "midi-io.h"
 
 
 class MidiOutputDevice : public OutputDevice {

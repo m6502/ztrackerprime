@@ -1,6 +1,8 @@
 #ifndef _MIDI_DEVICE_H
 #define _MIDI_DEVICE_H
 
+#include <mmsystem.h>
+
 #define NB_OFF    0x000000
 #define NB_ON     0x010000
 #define NB_MUTED  0x020000

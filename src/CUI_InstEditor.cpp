@@ -381,8 +381,10 @@ void CUI_InstEditor::update() {
                         case DIK_O: set_note = (12*base_octave)+2+12;  break;
                         case DIK_0: set_note = (12*base_octave)+3+12;  break;
                         case DIK_P: set_note = (12*base_octave)+4+12;  break;
-                        case SDLK_LEFTBRACKET: set_note = (12*base_octave)+5+12;  break;
-                        case SDLK_RIGHTBRACKET: set_note = (12*base_octave)+6+12;  break;
+                        
+                        // <Manu> Repurpose these keys
+                        //case SDLK_LEFTBRACKET: set_note = (12*base_octave)+5+12;  break;
+                        //case SDLK_RIGHTBRACKET: set_note = (12*base_octave)+6+12;  break;
 
                         case DIK_Z: set_note = 12*(base_octave-1);     break;
                         case DIK_S: set_note = (12*(base_octave-1))+1; break;

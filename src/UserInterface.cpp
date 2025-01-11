@@ -41,12 +41,7 @@
 #include "zt.h"
 
 
-/* OO UI code - YUM - Can you tell this is the first time i've done this? */
-
 int needaclear = 0;
-
-
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -441,13 +436,6 @@ UserInterfaceElement::UserInterfaceElement(void) {
 
 
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-UserInterfaceElement::~UserInterfaceElement(void) {
-}
-
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -499,14 +487,6 @@ void UserInterfaceElement::auto_anchor_at_current_pos(int how)
 }
 
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-void UserInterfaceElement::enter(void) {
-    
-}
-
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -547,14 +527,6 @@ int UserInterfaceElement::mouseupdate(int cur_element)
 //
 TextInput::TextInput(void) {
     cursor = 0;
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-TextInput::~TextInput(void) {
 }
 
 
@@ -782,14 +754,6 @@ CheckBox::CheckBox(void) {
 
 
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-CheckBox::~CheckBox(void) {
-}
-
-
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -910,14 +874,6 @@ void CheckBox::draw(Drawable *S, int active) {
 //
 Frame::Frame(void) {
     type = 0;
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-Frame::~Frame(void) {
 }
 
 
@@ -1161,12 +1117,7 @@ VUPlay::VUPlay() {
     starttrack = 0;
 }
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-VUPlay::~VUPlay() {
 
-}
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -1383,14 +1334,6 @@ BarGraph::BarGraph() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-BarGraph::~BarGraph() {
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 int BarGraph::update() {
     return 0;
 }
@@ -1454,14 +1397,6 @@ LCDDisplay::LCDDisplay() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-LCDDisplay::~LCDDisplay() {
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 int LCDDisplay::update() {
     return 0;
 }
@@ -1507,15 +1442,6 @@ void LCDDisplay::setstr(char *s) {
 AboutBox::AboutBox() {
     xsize = 0;
     ysize = 8*3;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-AboutBox::~AboutBox() {
 }
 
 
@@ -1579,14 +1505,6 @@ TextBox::TextBox(int ro)
   bEof = false;
   bUseColors = 1;
   bWordWrap = false;
-}
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-TextBox::~TextBox() {
-
 }
 
 
@@ -2613,15 +2531,6 @@ MidiOutDeviceSelector::MidiOutDeviceSelector() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-MidiOutDeviceSelector::~MidiOutDeviceSelector() {
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 void MidiOutDeviceSelector::enter(void) {
     OnChange();
 }
@@ -2665,14 +2574,6 @@ void MidiOutDeviceSelector::OnSelect(LBNode *selected) {
 
 
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-void MidiOutDeviceSelector::OnSelectChange() {
-}
-
-
-
 
 
 // ------------------------------------------------------------------------------------------------
@@ -2683,14 +2584,6 @@ MidiOutDeviceOpener::MidiOutDeviceOpener() {
     is_sorted = true;
     use_checks = true;
     OnChange();
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-MidiOutDeviceOpener::~MidiOutDeviceOpener() {
 }
 
 
@@ -2744,14 +2637,6 @@ void MidiOutDeviceOpener::OnSelect(LBNode *selected) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void MidiOutDeviceOpener::OnSelectChange() {
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 int MidiOutDeviceOpener::mouseupdate(int cur_element) {
 /*    if (cur_element == this->ID)
         bDontKeyRepeat = true;
@@ -2789,14 +2674,6 @@ MidiInDeviceOpener::MidiInDeviceOpener() {
     is_sorted = true;
     use_checks = true;
     OnChange();
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-MidiInDeviceOpener::~MidiInDeviceOpener() {
 }
 
 
@@ -2861,15 +2738,6 @@ void MidiInDeviceOpener::OnSelect(LBNode *selected) {
 
 
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-void MidiInDeviceOpener::OnSelectChange() {
-}
-
-
-
-
 
 
 // ------------------------------------------------------------------------------------------------
@@ -2880,14 +2748,6 @@ LatencyValueSlider::LatencyValueSlider(MidiOutDeviceOpener *m) {
     sel = -1;
     value=0;
     sync();
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-LatencyValueSlider::~LatencyValueSlider() {
 }
 
 
@@ -2935,15 +2795,6 @@ BankSelectCheckBox::BankSelectCheckBox(MidiOutDeviceOpener *m) {
     sel = -1;
     i_value = 0;
     sync();
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-BankSelectCheckBox::~BankSelectCheckBox() {
 }
 
 
@@ -3003,15 +2854,6 @@ AliasTextInput::AliasTextInput(MidiOutDeviceOpener *m) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-AliasTextInput::~AliasTextInput() {
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 void AliasTextInput::sync(void) {
     
     LBNode *p = listbox->getNode(listbox->getCurrentItemIndex() );
@@ -3061,16 +2903,6 @@ CommentEditor::CommentEditor() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-CommentEditor::~CommentEditor() {
-
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 int CommentEditor::update() {
     KBKey key,act=0;
     int ret=0;
@@ -3110,6 +2942,3 @@ int CommentEditor::update() {
     return ret;
 }
 
-
-
-/* eof */
