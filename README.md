@@ -23,6 +23,10 @@ So, what's new / different from the original zTracker? Here's a somewhat complet
 
 Program behavior changes:
 
+- Support for laptop keyboards: The two right most keyboard keys after 'i', 'o', 'p' have been remapped to duplicate the octave up and down keys functionality. The two keys below now also go to the previous or next pattern (These have been tested only on Spanish keyboards for now)
+  
+- Support for 1bpp PNG files in the skin fonts.
+
 - Zoom mode enables the program to work in 2x, 3x, 4x... So it's useable again on high resolution screens.
 
 - Resizeable window allows for a much more convenient experience.
