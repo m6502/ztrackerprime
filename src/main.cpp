@@ -2290,15 +2290,38 @@ int action(Screen *S)
         global_keys(S);
     }
 
+    static int old_width = 0 ;
+    static int old_height = 0 ;
+
+    if(old_width != INTERNAL_RESOLUTION_X || old_height != INTERNAL_RESOLUTION_Y) {
+    
+        old_width = INTERNAL_RESOLUTION_X ;
+        old_height = INTERNAL_RESOLUTION_Y ;
+
+        //doredraw = 1 ;
+        need_update++ ;
+        need_popup_refresh = 1 ;
+        clear_popup = 1 ;
+    }
+
+    
+    /*//doredraw = 1 ;
+    need_refresh = 1 ;
+        need_update++ ;
+        need_popup_refresh = 1 ;
+        clear_popup = 1 ;*/
+
     if (doredraw) {
+
         if (cur_state != STATE_LOGO)
             redrawscreen(S);
         fixmouse++;
-        Keys.flush();   
+        //Keys.flush();   
         doredraw=0;
         UI->full_refresh();
         need_refresh++;
     }
+
     if (status_change) {
         update_status(S);
     }
@@ -2328,16 +2351,23 @@ int action(Screen *S)
 
     if (need_refresh) {
         fixmouse++;
-        if (need_update)
-            ActivePage->update();
+        
+        if (need_update) ActivePage->update();
+        
         if (clear_popup) {
+
             if (S->lock()==0) {
-                S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,424,COLORS.Background);
+
+                // Clean UI page background
+                // <Manu> Creo que este clean es mejorable y según cómo redundante
+                S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X-CHARACTER_SIZE_X,INTERNAL_RESOLUTION_Y - (480-424),/*0x00FF00*/COLORS.Background);
                 S->unlock();
+                
                 screenmanager.UpdateAll();
             }
             clear_popup = 0;
         }
+
         ActivePage->draw(S);
         if (!window_stack.isempty())
             window_stack.draw(S);
@@ -2772,6 +2802,13 @@ int main(int argc, char *argv[])
                int p = e.active.state;
                
                switch(p) {
+
+               case 6:
+               {
+                   int a = 50 ;
+               }
+
+                   break ;
                  
                // ---------------------------------------------------------------
                case SDL_APPMOUSEFOCUS:
@@ -2788,7 +2825,7 @@ int main(int argc, char *argv[])
                  if (UI_Toolbar) UI_Toolbar->full_refresh();
                  doredraw++;
                  need_refresh++;
-                 screenmanager.UpdateAll();                                 
+                 screenmanager.UpdateAll();
                  //}
                  
                  break;
@@ -2838,6 +2875,31 @@ int main(int argc, char *argv[])
          } ;
          
       }    //      SDL_PumpEvents(); // Dont need this if we are using SDL_PollEvents from the action() loop
+
+
+
+    // <Manu> Hay un problema de orden de cosas aquí, de momento hacemos un pequeño parche pero habrá que mirar cómo hacerlo bien
+    static int next_frame_redraw_all = 0 ;
+
+    if(next_frame_redraw_all) {
+
+        next_frame_redraw_all = 0 ;
+
+        doredraw++;
+        need_refresh++;
+        screenmanager.UpdateAll();
+    }
+
+
+    static int old_resx = 0 ;
+    static int old_resy = 0 ;
+    if(old_resx != INTERNAL_RESOLUTION_X || old_resy != INTERNAL_RESOLUTION_Y) {
+
+        old_resx = INTERNAL_RESOLUTION_X ;
+        old_resy = INTERNAL_RESOLUTION_Y ;
+
+        next_frame_redraw_all = 1 ;
+    }
 
 
 

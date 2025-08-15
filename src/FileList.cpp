@@ -61,7 +61,7 @@ void DriveList::OnChange()
         already_changed_default_directory = 1;
     }
     
-    GetCurrentDirectory(512,(LPSTR)&cur[0]);
+    GetCurrentDirectory(512,(LPSTR)cur);
     
     for(i=0;i<26;i++) {
         if (r&1) {

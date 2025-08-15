@@ -160,6 +160,12 @@ track::track(short int len) {
     reset();
     event_list = NULL;
     length = len;
+
+    custom_colors = false ;
+    EditText = COLORS.EditText ;
+    EditBG = COLORS.EditBG ;
+    EditBGlow = COLORS.EditBGlow ;
+    EditBGhigh = COLORS.EditBGhigh ;
 }
 
 track::~track(void) {
@@ -452,6 +458,11 @@ pattern::pattern(void) {
     length = zt_config_globals.pattern_length;
     for(i=0;i<ZTM_MAX_TRACKS;i++)
         tracks[i] = new track(length);
+
+    Background = COLORS.Background ;
+    Highlight = COLORS.Highlight ;
+    Lowlight = COLORS.Lowlight ;
+
 }
 pattern::pattern(int len) {
     int i;

@@ -40,14 +40,20 @@
 // <Manu> antes era 98
 //#define VER_MIN 986
 
-#define ZTRACKER_VERSION                "zTracker' v2025_01_11"
+#define ZTRACKER_VERSION                "zTracker' v2025_08_15"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
 #define ZOOM                            (zt_config_globals.zoom)
 
+#define CHARACTER_SIZE_X                8
+#define CHARACTER_SIZE_Y                8
+
 #define INTERNAL_RESOLUTION_X           ((int)(zt_config_globals.screen_width  * (1.0f / (float)ZOOM)))
 #define INTERNAL_RESOLUTION_Y           ((int)(zt_config_globals.screen_height * (1.0f / (float)ZOOM)))
+
+#define CHARS_X                         (INTERNAL_RESOLUTION_X / CHARACTER_SIZE_X)
+#define CHARS_Y                         (INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y)
 
 #define RESOLUTION_X                    (zt_config_globals.screen_width)
 #define RESOLUTION_Y                    (zt_config_globals.screen_height)

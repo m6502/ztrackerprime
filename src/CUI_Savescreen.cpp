@@ -46,7 +46,7 @@
 
 
 char save_filename[MAX_PATH + 1];
-extern int is_saving;
+extern volatile int is_saving;
 
 
 // ------------------------------------------------------------------------------------------------

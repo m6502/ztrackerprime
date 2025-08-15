@@ -42,7 +42,7 @@
 #include "FileList.h"
 
 int save_finished = 0;
-int is_saving = 0;
+volatile int is_saving = 0;
 
 void save_thread(void) {
     char *sstr;
@@ -136,27 +136,39 @@ void CUI_SaveMsg::update() {
     }
 }
 
-void CUI_SaveMsg::draw(Drawable *S) {
-    int i;
+void CUI_SaveMsg::draw(Drawable *S)
+{
+  const char *str[] = { 
 
-    char *str[] = { "Please wait, saving... |",
-                    "Please wait, saving... /",
-                    "Please wait, saving... -",
-                    "Please wait, saving... \\"
-    };
+      "Please wait, saving... |",
+      "Please wait, saving... /",
+      "Please wait, saving... -",
+      "Please wait, saving... \\"
+  };
 
-    if (S->lock()==0) {
-        S->fillRect(col(15),row(20),640-col(15)-1,row(25)-1,COLORS.Background);
-        printline(col(15),row(24),148,50,COLORS.Lowlight,S);
-        for (i=20;i<25;i++) {
-            printchar(col(15),row(i),145,COLORS.Highlight,S);
-            printchar(col(64),row(i),146,COLORS.Lowlight,S);
-        }
-        printline(col(15),row(20),143,50,COLORS.Highlight,S);
-        print(col(textcenter(str[strselect],40)),row(22),str[strselect],COLORS.Text,S);
-        S->unlock();
-        need_refresh = 0;
-        updated++;
+  int sizex = 50 ;
+  int sizey = 5 ;
+  int x = (CHARS_X / 2) - (sizex / 2) ;
+  int y = (CHARS_Y / 2) - (sizey / 2) ;
+
+  if (S->lock() == 0) {
+
+    S->fillRect(col(x), row(y), col(x + sizex) - 1, row(y + sizey) - 1, COLORS.Background);
+    printline(col(x),row(y + 4),148,50,COLORS.Lowlight,S);
+
+    for (int i=y;i<y+5;i++) {
+
+      printchar(col(x),     row(i),145,COLORS.Highlight,S);
+      printchar(col(x + 49),row(i),146,COLORS.Lowlight, S);
     }
+
+    printline(col(x),row(y),143,50,COLORS.Highlight,S);
+    print(col(textcenter(str[strselect],CHARS_X / 2)),row(y + 2),str[strselect],COLORS.Text,S); // <Manu> strselect is not updated while loading anyway... Better to simplify and remove the four strings?
+
+    S->unlock();
+
+    need_refresh = 0;
+    updated++;
+  }
 }
 /* eof */

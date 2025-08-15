@@ -370,7 +370,7 @@ void draw_signed_bar(int x, int y, int xsize, int ysize, int value, int maxval, 
 //
 void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S, int upd_one=0,event *which_e=NULL) 
 {
-  int var_row,var_track,num_displayed_tracks,num_displayed_rows,data,datamax;
+  int num_displayed_tracks,num_displayed_rows,data,datamax;
   TColor bg;
   event *e;
   char str[64];
@@ -385,7 +385,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 
   num_displayed_rows = 0 ;
 
-  for(var_row=cur_edit_row_disp;var_row<(cur_edit_row_disp+PATTERN_EDIT_ROWS);var_row++) {
+  for(int var_row=cur_edit_row_disp;var_row<(cur_edit_row_disp+PATTERN_EDIT_ROWS);var_row++) {
   
     if (!upd_one) {
 
@@ -411,7 +411,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
     
     num_displayed_tracks=0;
     
-    for(var_track=cur_edit_track_disp;var_track <cur_edit_track_disp+tracks_shown; var_track++) {
+    for(int var_track=cur_edit_track_disp;var_track <cur_edit_track_disp+tracks_shown; var_track++) {
     
       bg = COLORS.EditBG;
       
@@ -497,11 +497,9 @@ please_skip:
 //
 void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S) 
 {
-  int var_row, var_track ;
-  int num_displayed_rows, num_displayed_tracks, clear=0, step=0, noplay=0, special ;
+  int num_displayed_rows, num_displayed_tracks, special ;
   TColor bg,fg;
-  char str[512] ;    // <Manu> ¿Seguro que esto no dará problemas con resoluciones muy grandes?
-  event *e;
+  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resolución muy grande. 512 debería servir para w=4096 pero...
   
   int posx_current_track ;
   int posy_current_row ;
@@ -555,7 +553,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1
   
   
-  for(var_row = first_row; var_row < (last_row + blank_rows); var_row++) {
+  for(int var_row = first_row; var_row < (last_row + blank_rows); var_row++) {
 
     posy_current_row = TRACKS_FIRST_NOTE_POS_Y + row(num_displayed_rows) ;
 
@@ -587,40 +585,71 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
     }
 
 
-    if (ztPlayer->playing) {
-
-      if (var_row==ztPlayer->playing_cur_row && ztPlayer->playing_cur_pattern==cur_edit_pattern) {
+    // Dibujar el número de línea
+    if (ztPlayer->playing && 
+        ztPlayer->playing_cur_pattern==cur_edit_pattern &&
+        var_row == ztPlayer->playing_cur_row) {
         
+        // Actual en play
         printBG(col(poscharx_tracks - 4),posy_current_row,str,COLORS.Highlight,COLORS.Background,S);
-      }
-      else {
-        
-        printBG(col(poscharx_tracks - 4),posy_current_row,str,COLORS.Text,COLORS.Background,S);
-      }
     } 
     else {
       
-      printBG(col(poscharx_tracks - 4),posy_current_row,str,COLORS.Text,COLORS.Background,S);
+      // Normal
+      printBG(col(poscharx_tracks - 4),posy_current_row,str,/*0xFF0000*/COLORS.Text,COLORS.Background,S);
     }
 
 
-
-
-
-
-    
-
-
-
-    
     {
+      unsigned long Background, Highlight, Lowlight ;
+
+      if(song->patterns[cur_edit_pattern]->custom_colors) {
+
+          Background = song->patterns[cur_edit_pattern]->Background ;
+          Highlight = song->patterns[cur_edit_pattern]->Highlight ;
+          Lowlight = song->patterns[cur_edit_pattern]->Lowlight ;
+      }
+      else {
+
+          Background = COLORS.Background ;
+          Highlight = COLORS.Highlight ;
+          Lowlight = COLORS.Lowlight ;
+      }
+
+
       if(var_row >= 0) {       // <Manu> ¿Necesario?
     
-    // Contenido de los tracks
+            // Contenido de los tracks
 
             num_displayed_tracks = 0 ;
 
-            for(var_track = cur_edit_track_disp; var_track < (cur_edit_track_disp + tracks_shown); var_track++) {
+            for(int var_track = cur_edit_track_disp; var_track < (cur_edit_track_disp + tracks_shown); var_track++) {
+
+              unsigned long EditText, EditBG, EditBGlow, EditBGhigh ;
+
+              if(song->patterns[cur_edit_pattern]->tracks[var_track]->custom_colors) {
+
+                Background = song->patterns[cur_edit_pattern]->Background ;
+                Highlight = song->patterns[cur_edit_pattern]->Highlight ;
+                Lowlight = song->patterns[cur_edit_pattern]->Lowlight ;
+              }
+              else {
+
+                EditText = song->patterns[cur_edit_pattern]->tracks[var_track]->EditText ;
+                EditBG = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBG ;
+                EditBGlow = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBGlow ;
+                EditBGhigh = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBGhigh ;
+              }
+
+              //if(var_track == 3)
+              //{
+              //  //EditText = song->patterns[cur_edit_pattern]->tracks[var_track]->EditText ;
+              //  EditBG = 0xFFFFFF ;
+              //  //EditBGlow = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBGlow ;
+              //  //EditBGhigh = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBGhigh ;
+              //}
+
+
 
               posx_current_track = col(poscharx_tracks) + col(num_displayed_tracks * (field_size + 1)) ;
 
@@ -642,22 +671,42 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 int y1 = posy_current_row ;
                 int y2 = y1 + FONT_SIZE_Y ;
 
-                S->fillRect(x1, y1, x2, y2, /*COLORS.Highlight*/COLORS.Background) ;
+                S->fillRect(x1, y1, x2, y2, Background) ;
               }
               else {
 
-                // bg = special?COLORS.CursorRowLow:COLORS.EditBG;
+                if(special) {
+                    
+                    bg = COLORS.CursorRowLow ;
+                    if (!(var_row % zt_config_globals.lowlight_increment)) {
+                
+                        bg = COLORS.CursorRowHigh ;
+                    }
 
-                if(special) bg = COLORS.CursorRowLow ;
-                else bg = COLORS.EditBG ;
+                    if (!(var_row % zt_config_globals.highlight_increment)) {
+                    
+                        bg = COLORS.CursorRowHigh ;
+                    }
+                }
+                else {
+                    
+                    bg = EditBG ;
+
+                    if (!(var_row % zt_config_globals.lowlight_increment)) {
+                
+                        bg = EditBGlow ;
+                    }
+
+                    if (!(var_row % zt_config_globals.highlight_increment)) {
+                    
+                        bg = EditBGhigh ;
+                    }
+
+                }
 
 
-                if (!(var_row % zt_config_globals.lowlight_increment))  bg = special ? COLORS.CursorRowHigh : COLORS.EditBGlow ;
-                if (!(var_row % zt_config_globals.highlight_increment)) bg = special ? COLORS.CursorRowHigh : COLORS.EditBGhigh ;
 
-                if (!(e = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(var_row))) e = &blank_event;
-
-                fg = COLORS.EditText;
+                fg = EditText;
 
                 if (selected) {
 
@@ -665,9 +714,9 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
                     if (var_row>=select_row_start && var_row<=select_row_end) {
 
-                      fg = COLORS.Highlight;
+                      fg = Highlight;
 
-                      if (bg == COLORS.EditBGlow || bg==COLORS.EditBGhigh) bg = COLORS.SelectedBGHigh;
+                      if (bg == EditBGlow || bg==EditBGhigh) bg = COLORS.SelectedBGHigh;
                       else {
 
                         if(!special) bg = COLORS.SelectedBGLow;
@@ -677,16 +726,15 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                   }
                 }
 
-
-                //if(var_track >= 0 && var_track < song->patterns[cur_edit_pattern]->length) {
-
+                event *e = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(var_row) ;
+                if (e == NULL) e = &blank_event;
 
                 printNote(str, e, zt_config_globals.cur_edit_mode) ;
                 printBG(col(poscharx_tracks + (num_displayed_tracks*(field_size+1))), posy_current_row, str, fg, bg, S) ;
 
-                str[ edit_cols[cur_edit_col].startx + 1 ] = 0 ;
+                str[edit_cols[cur_edit_col].startx + 1] = 0 ;
 
-                
+
                 // Dibujar el caret
 
                 if (var_row == cur_edit_row && var_track == cur_edit_track) {
@@ -695,8 +743,8 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                           col(poscharx_tracks + edit_cols[cur_edit_col].startx + (num_displayed_tracks * (field_size + 1))),
                           posy_current_row,
                           &str[ edit_cols[cur_edit_col].startx ],
-                          COLORS.EditBG,
-                          COLORS.Highlight,
+                          EditBG,
+                          Highlight,
                           S
                          );
                 }
@@ -735,6 +783,18 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
     
     num_displayed_rows++;
   }
+
+
+  //static int old_num_displayed_rows = 0 ;
+  //
+  //if(num_displayed_rows != old_num_displayed_rows) {
+  //
+  //  old_num_displayed_rows = num_displayed_rows ;
+  //
+  //  need_refresh++ ;
+  //  clear++ ;
+  //}
+
 
 
 
@@ -907,6 +967,7 @@ void CUI_Patterneditor::update()
   //
   //  last_pattern_size = ztPlayer->song->patterns[cur_edit_pattern]->length ;
   //  need_refresh++ ;
+  //  clear++ ;
   //}
 
 //#define _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
@@ -3063,12 +3124,14 @@ void CUI_Patterneditor::draw(Drawable *S)
   bool m_Fullupd = true;
   
   if (S->lock()==0) {
-    
-    if (clear) {
 
-      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),COLORS.Background);
-      clear=0;
-    }
+
+    // Innecesario?
+    //if (clear) {
+    //
+    //  S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),0xFF0000FF/*COLORS.Background*/);
+    //  clear=0;
+    //}
 
     o=0;
     
@@ -3130,15 +3193,7 @@ void CUI_Patterneditor::draw(Drawable *S)
       
       // Update buffer if necessary
 
-      
-      
-      
-      
-      
-      
-      
       // <Manu> Esto nunca puede funcionar porque pe_buf es NULL
-
 
       
       if(pe_modification) // pe_modification is a very very global var which is set to

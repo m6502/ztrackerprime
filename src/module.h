@@ -172,6 +172,15 @@ class track
 {
 public:
 
+  // ---------------------------------------------------------------------
+  bool custom_colors = false ;
+
+  unsigned long EditText;       // text that is in the pattern editor and all other boxes except top info boxes
+  unsigned long EditBG;         // background of the pattern editor and all other boxes except top info boxes
+  unsigned long EditBGlow;      // background of pattern editor (lowlight)
+  unsigned long EditBGhigh;     // background of pattern editor (highlight)
+  // ---------------------------------------------------------------------
+
   unsigned char default_inst;
   unsigned char last_note,last_inst;
   unsigned char default_controller;
@@ -203,6 +212,14 @@ class pattern
 {
 public:
 
+  // ---------------------------------------------------------------------
+  bool custom_colors = false ;
+
+  unsigned long Background ;     // Background of "panel"
+  unsigned long Highlight ;      // highlight of "panel"
+  unsigned long Lowlight ;       // lowlight of "panel"
+  // ---------------------------------------------------------------------
+
   track *tracks[ZTM_MAX_TRACKS];
   short int length;
 
@@ -213,6 +230,7 @@ public:
   void resize(int newsize);
   int isempty(void);
 };
+
 
 #ifdef USE_ARPEGGIOS
 
@@ -331,29 +349,31 @@ class zt_module
 
         int cmp_hd(char *s1,char *s2);
 
-        void build_ZThd(CDataBuf *buf, int compr); /* ZThd - .zt header */
-        void build_ZTol(CDataBuf *buf);  /* ZTol - order list */
-        void build_ZTtm(CDataBuf *buf);  /* ZTtm - track mutes */
-        void build_ZTev(CDataBuf *buf);  /* ZTev - event list */
-        void build_ZTpl(CDataBuf *buf);  /* ZTpl - pattern lengths */
-        void build_SMSG(CDataBuf *buf);           /* SMSG - song message */
-        void build_MMAC(CDataBuf *buf, int num);  /* MMAC - midi macro */
-        void build_ARPG(CDataBuf *buf, int num);  /* ARPG - arpeggio */
+        void build_ZT_header(CDataBuf *buf, int compr); /* ZThd - .zt header */
+        void build_ZT_order_list(CDataBuf *buf);  /* ZTol - order list */
+        void build_ZT_track_mutes(CDataBuf *buf);  /* ZTtm - track mutes */
+        void build_ZT_event_list(CDataBuf *buf);  /* ZTev - event list */
+        void build_ZT_pattern_lengths(CDataBuf *buf);  /* ZTpl - pattern lengths */
+        void build_ZT_pattern_properties(CDataBuf *buf);  /* ZTpl - pattern lengths */
+        void build_song_message(CDataBuf *buf);           /* SMSG - song message */
+        void build_MIDI_macro(CDataBuf *buf, int num);  /* MMAC - midi macro */
+        void build_arpeggio(CDataBuf *buf, int num);  /* ARPG - arpeggio */
         //void build_PATT(CDataBuf *buf);  /* PATT - pattern */
         //void build_INST(CDataBuf *buf);  /* INST - instrument */
         //void build_TMUT(CDataBuf *buf);  /* TMUT - track mutes */
         //void build_OLST(CDataBuf *buf);  /* OLST - order list */
         //void build_ZTHD(CDataBuf *buf, int compr); /* ZTHD - .zt header */
 
-        int read_ZThd(CDataBuf *buf, std::ifstream &ifs); /* ZThd - .zt header */
-        void load_ZTtm(CDataBuf *buf); /* ZTtm - track mutes */
-        void load_ZTpl(CDataBuf *buf); /* ZTpl - pattern lengths */
-        void load_ZTol(CDataBuf *buf); /* ZTol - order list */
-        void load_ZTin(CDataBuf *buf); /* ZTin - instrument */
-        void load_ZTev(CDataBuf *buf); /* ZTev - event list */
-        int load_SMSG(CDataBuf *buf);  /* SMSG - song message */
-        int load_MMAC(CDataBuf *buf);  /* MMAC - midi macro */
-        int load_ARPG(CDataBuf *buf);  /* ARPG - arpeggio */
+        int read_ZT_header(CDataBuf *buf, std::ifstream &ifs); /* ZThd - .zt header */
+        void load_ZT_track_mutes(CDataBuf *buf); /* ZTtm - track mutes */
+        void load_ZT_pattern_lengths(CDataBuf *buf); /* ZTpl - pattern lengths */
+        void load_ZT_pattern_properties(CDataBuf *buf); /* ZTpl - pattern lengths */
+        void load_ZT_order_list(CDataBuf *buf); /* ZTol - order list */
+        void load_ZT_instrument(CDataBuf *buf); /* ZTin - instrument */
+        void load_ZT_event_list(CDataBuf *buf); /* ZTev - event list */
+        int load_song_message(CDataBuf *buf);  /* SMSG - song message */
+        int load_MIDI_macro(CDataBuf *buf);  /* MMAC - midi macro */
+        int load_arpeggio(CDataBuf *buf);  /* ARPG - arpeggio */
         //void load_PATT(CDataBuf *buf);  /* PATT - pattern */
         //void load_INST(CDataBuf *buf);  /* INST - instrument */
         //void load_TMUT(CDataBuf *buf);  /* TMUT - track mutes */

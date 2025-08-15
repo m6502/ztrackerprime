@@ -308,7 +308,7 @@ int player::stop_timer(void) {
 }
 
 
-
+//#include <algorithm>
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -316,6 +316,7 @@ int player::stop_timer(void) {
 int player::init(void) {
     if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR) 
         return -1;
+    //wTimerRes = std::min(std::max(tc.wPeriodMin, wTimerRes), tc.wPeriodMax);
     wTimerRes = min(max(tc.wPeriodMin, wTimerRes), tc.wPeriodMax);
     timeBeginPeriod(wTimerRes); 
     cur_row = 0;

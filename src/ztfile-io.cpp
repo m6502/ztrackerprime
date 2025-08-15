@@ -51,13 +51,14 @@
 
 extern int load_lock;
 
-#define FILEFLAG_SEND_MIDI_CLOCK        1
-#define FILEFLAG_SEND_MIDI_STOP_START   2
-#define FILEFLAG_COMPRESSED             4
-#define FILEFLAG_SLIDEONSUBTICK         8
-#define FILEFLAG_SLIDEPRECISION         16
+#define FILEFLAG_SEND_MIDI_CLOCK        (1<<0)
+#define FILEFLAG_SEND_MIDI_STOP_START   (1<<1)
+#define FILEFLAG_COMPRESSED             (1<<2)
+#define FILEFLAG_SLIDEONSUBTICK         (1<<3)
+#define FILEFLAG_SLIDEPRECISION         (1<<4)
 
-
+#define ZT_FILE_HEADER      "ZThd"
+#define ZT_FILE_HEADER_NEW  "ZThd"
 
 
 // ------------------------------------------------------------------------------------------------
@@ -144,7 +145,7 @@ int zt_module::readblock(char headid[5], CDataBuf *buf, int compressed, std::ifs
 // ------------------------------------------------------------------------------------------------
 //
 //
-int zt_module::read_ZThd(CDataBuf *buf, std::ifstream &ifs) 
+int zt_module::read_ZT_header(CDataBuf *buf, std::ifstream &ifs) 
 {
   int size;
   int compressed;
@@ -153,7 +154,7 @@ int zt_module::read_ZThd(CDataBuf *buf, std::ifstream &ifs)
   buf->flush();
   readdata(headid,4,0,ifs,NULL); headid[4]=0;
 
-  if (!cmp_hd(headid,"ZThd")) {
+  if (!cmp_hd(headid,ZT_FILE_HEADER)) {
 
     if (cmp_hd(headid,"ZTM\x0")) return -2;
     else return -1;
@@ -195,7 +196,7 @@ int zt_module::read_ZThd(CDataBuf *buf, std::ifstream &ifs)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::build_ZThd(CDataBuf *buf, int compr) 
+void zt_module::build_ZT_header(CDataBuf *buf, int compr) 
 {
   unsigned char t,b,tracks=ZTM_MAX_TRACKS;
 
@@ -226,7 +227,7 @@ void zt_module::build_ZThd(CDataBuf *buf, int compr)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::build_ZTol(CDataBuf *buf) 
+void zt_module::build_ZT_order_list(CDataBuf *buf) 
 {
   unsigned short int o[ZTM_ORDERLIST_LEN];
 
@@ -240,7 +241,7 @@ void zt_module::build_ZTol(CDataBuf *buf)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::build_ZTpl(CDataBuf *buf) 
+void zt_module::build_ZT_pattern_lengths(CDataBuf *buf) 
 {
   unsigned short int o[ZTM_MAX_PATTERNS];
 
@@ -250,11 +251,36 @@ void zt_module::build_ZTpl(CDataBuf *buf)
 
 
 
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::build_ZT_pattern_properties(CDataBuf *buf) 
+{
+  unsigned short int o[ZTM_MAX_PATTERNS];
+
+  for (int i=0;i<ZTM_MAX_PATTERNS;i++)
+  {
+      o[i] = i ;//this->patterns[i]->length;
+
+      // Pattern theme color
+      // Pattern bg color
+      // Pattern Highlight
+      // Pattern Lowlight
+      // Pattern name
+      // Pattern type
+      // Pattern display options
+  }
+
+  buf->write((char *)&o[0],sizeof(unsigned short int)*ZTM_MAX_PATTERNS);
+}
+
+
+
 
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::build_ZTtm(CDataBuf *buf) 
+void zt_module::build_ZT_track_mutes(CDataBuf *buf) 
 {
   unsigned char tm[ZTM_MAX_TRACKS/8];
   unsigned char p,mask;
@@ -276,11 +302,11 @@ void zt_module::build_ZTtm(CDataBuf *buf)
 
 /*************************************************************************
  *
- * NAME  zt_module::build_SMSG()
+ * NAME  zt_module::build_song_message()
  *
  * SYNOPSIS
- *   ret = zt_module::build_SMSG (buf)
- *   int zt_module::build_SMSG (CDataBuf *)
+ *   ret = zt_module::build_song_message (buf)
+ *   int zt_module::build_song_message (CDataBuf *)
  *
  * DESCRIPTION
  *   Build a song message (SMSG) chunk to the buffer.
@@ -295,7 +321,7 @@ void zt_module::build_ZTtm(CDataBuf *buf)
  *   none
  *
  ******/
-void zt_module::build_SMSG(CDataBuf *buf) {
+void zt_module::build_song_message(CDataBuf *buf) {
     unsigned int len;
     songmsg *smsg;
     //CDataBuf *smsg;
@@ -314,11 +340,11 @@ void zt_module::build_SMSG(CDataBuf *buf) {
 
 /*************************************************************************
  *
- * NAME  zt_module::build_ARPG()
+ * NAME  zt_module::build_arpeggio()
  *
  * SYNOPSIS
- *   ret = zt_module::build_ARPG (buf, num)
- *   int zt_module::build_ARPG (CDataBuf *, int)
+ *   ret = zt_module::build_arpeggio (buf, num)
+ *   int zt_module::build_arpeggio (CDataBuf *, int)
  *
  * DESCRIPTION
  *   Build a arpeggio (ARPG) chunk to the buffer.
@@ -334,7 +360,7 @@ void zt_module::build_SMSG(CDataBuf *buf) {
  *   none
  *
  ******/
-void zt_module::build_ARPG(CDataBuf *buf, int num) {
+void zt_module::build_arpeggio(CDataBuf *buf, int num) {
     int i,j;
     unsigned short len;
     unsigned char num_cc;
@@ -383,11 +409,11 @@ void zt_module::build_ARPG(CDataBuf *buf, int num) {
 
 /*************************************************************************
  *
- * NAME  zt_module::build_MMAC()
+ * NAME  zt_module::build_MIDI_macro()
  *
  * SYNOPSIS
- *   ret = zt_module::build_MMAC (buf, num)
- *   int zt_module::build_MMAC (CDataBuf *, int)
+ *   ret = zt_module::build_MIDI_macro (buf, num)
+ *   int zt_module::build_MIDI_macro (CDataBuf *, int)
  *
  * DESCRIPTION
  *   Build a midi macro (MMAC) chunk to the buffer.
@@ -403,7 +429,7 @@ void zt_module::build_ARPG(CDataBuf *buf, int num) {
  *   none
  *
  ******/
-void zt_module::build_MMAC(CDataBuf *buf, int num) {
+void zt_module::build_MIDI_macro(CDataBuf *buf, int num) {
     int i;
     unsigned short len,num_entries;
     midimacro *mmac;
@@ -443,7 +469,7 @@ unsigned short int row;
 unsigned short int length;
 unsigned short int effect_data;
 */
-void zt_module::build_ZTev(CDataBuf *buf) {
+void zt_module::build_ZT_event_list(CDataBuf *buf) {
     event dEvent, *e;
     unsigned char def_pattern=0;
     unsigned char def_track=0;
@@ -506,7 +532,7 @@ void zt_module::build_ZTev(CDataBuf *buf) {
     }
 }
 
-void zt_module::load_ZTev(CDataBuf *buf) {
+void zt_module::load_ZT_event_list(CDataBuf *buf) {
     event dEvent;
     unsigned char cmd,c;
     unsigned short tmp_data;
@@ -620,9 +646,11 @@ int zt_module::save(char *fn, int compressed)
     int i ;
 
     DeflateStream *lpDS=NULL;
+
 #ifdef SAVE_UNCOMPRESSED
     compressed = 0;
 #endif /* SAVE_UNCOMPRESSED */
+
     CDataBuf buffer;
 
     setstatusstr(NULL);
@@ -641,8 +669,8 @@ int zt_module::save(char *fn, int compressed)
     }
 
     // ZThd block is never compressed 
-    build_ZThd(&buffer,compressed);
-    writeblock("ZThd",&buffer,0,f,lpDS);
+    build_ZT_header(&buffer,compressed);
+    writeblock(ZT_FILE_HEADER,&buffer,0,f,lpDS);
 
     if (compressed) {
 //      DeflateStream ds(f); // passing the file stream as a parameter
@@ -651,14 +679,16 @@ int zt_module::save(char *fn, int compressed)
 
     /* write song message if not empty */
     if (this->songmessage &&  !this->songmessage->isempty()) {
-        build_SMSG(&buffer);
+        build_song_message(&buffer);
         writeblock("SMSG",&buffer,compressed,f,lpDS);
     }
-    build_ZTol(&buffer);
+    build_ZT_order_list(&buffer);
     writeblock("ZTol",&buffer,compressed,f,lpDS);
-    build_ZTpl(&buffer);
+    build_ZT_pattern_lengths(&buffer);
     writeblock("ZTpl",&buffer,compressed,f,lpDS);
-    build_ZTtm(&buffer);
+    build_ZT_pattern_properties(&buffer);
+    writeblock("ZTpp",&buffer,compressed,f,lpDS);
+    build_ZT_track_mutes(&buffer);
     writeblock("ZTtm",&buffer,compressed,f,lpDS);
 
     for(i=0;i<ZTM_MAX_INSTS;i++) {
@@ -670,19 +700,19 @@ int zt_module::save(char *fn, int compressed)
     
     for(i=0;i<ZTM_MAX_ARPEGGIOS;i++) {
         if (this->arpeggios[i] && !this->arpeggios[i]->isempty()) {
-            build_ARPG(&buffer,i);
+            build_arpeggio(&buffer,i);
             writeblock("ARPG",&buffer,compressed,f,lpDS);
         }
     }
     
     for(i=0;i<ZTM_MAX_MIDIMACROS;i++) {
         if (this->midimacros[i] && !this->midimacros[i]->isempty()) {
-            build_MMAC(&buffer,i);
+            build_MIDI_macro(&buffer,i);
             writeblock("MMAC",&buffer,compressed,f,lpDS);
         }
     }
     
-    build_ZTev(&buffer);
+    build_ZT_event_list(&buffer);
     writeblock("ZTev",&buffer,compressed,f,lpDS);
     
     if (compressed) {
@@ -706,11 +736,11 @@ int zt_module::cmp_hd(char *s1,char *s2) {
 
 /*************************************************************************
  *
- * NAME  zt_module::load_SMSG()
+ * NAME  zt_module::load_song_message()
  *
  * SYNOPSIS
- *   ret = zt_module::load_SMSG (buf)
- *   int zt_module::load_SMSG (CDataBuf *)
+ *   ret = zt_module::load_song_message (buf)
+ *   int zt_module::load_song_message (CDataBuf *)
  *
  * DESCRIPTION
  *   Load a song message (SMSG) chunk into the module.
@@ -725,7 +755,7 @@ int zt_module::cmp_hd(char *s1,char *s2) {
  *   none
  *
  ******/
-int zt_module::load_SMSG(CDataBuf *buf) {
+int zt_module::load_song_message(CDataBuf *buf) {
     char c;
     unsigned int len,i;
     songmsg *smsg;
@@ -754,11 +784,11 @@ int zt_module::load_SMSG(CDataBuf *buf) {
 
 /*************************************************************************
  *
- * NAME  zt_module::load_ARPG()
+ * NAME  zt_module::load_arpeggio()
  *
  * SYNOPSIS
- *   ret = zt_module::load_ARPG (buf)
- *   int zt_module::load_ARPG (CDataBuf *)
+ *   ret = zt_module::load_arpeggio (buf)
+ *   int zt_module::load_arpeggio (CDataBuf *)
  *
  * DESCRIPTION
  *   Load an arpeggio (ARPG) chunk into the module.
@@ -773,7 +803,7 @@ int zt_module::load_SMSG(CDataBuf *buf) {
  *   none
  *
  ******/
-int zt_module::load_ARPG(CDataBuf *buf) {
+int zt_module::load_arpeggio(CDataBuf *buf) {
     char c;
     int i,j;
     unsigned char num_cc;
@@ -853,11 +883,11 @@ int zt_module::load_ARPG(CDataBuf *buf) {
 
 /*************************************************************************
  *
- * NAME  zt_module::load_MMAC()
+ * NAME  zt_module::load_MIDI_macro()
  *
  * SYNOPSIS
- *   ret = zt_module::load_MMAC (buf)
- *   int zt_module::load_MMAC (CDataBuf *)
+ *   ret = zt_module::load_MIDI_macro (buf)
+ *   int zt_module::load_MIDI_macro (CDataBuf *)
  *
  * DESCRIPTION
  *   Load a midimacro (MMAC) chunk into the module.
@@ -872,7 +902,7 @@ int zt_module::load_ARPG(CDataBuf *buf) {
  *   none
  *
  ******/
-int zt_module::load_MMAC(CDataBuf *buf) {
+int zt_module::load_MIDI_macro(CDataBuf *buf) {
     char c;
     int i,j;
     unsigned short num,name_len,num_entries;
@@ -923,7 +953,7 @@ int zt_module::load_MMAC(CDataBuf *buf) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::load_ZTtm(CDataBuf *buf) {
+void zt_module::load_ZT_track_mutes(CDataBuf *buf) {
     unsigned char tm[MAX_TRACKS/8];
     unsigned char p,mask;
     for (int i=0;i<MAX_TRACKS/8;i++) {
@@ -942,7 +972,7 @@ void zt_module::load_ZTtm(CDataBuf *buf) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::load_ZTpl(CDataBuf *buf) {
+void zt_module::load_ZT_pattern_lengths(CDataBuf *buf) {
     unsigned short int size;
     for (int i=0;i<256;i++) {
         size = buf->getusi();
@@ -950,10 +980,23 @@ void zt_module::load_ZTpl(CDataBuf *buf) {
     }
 }
 
+
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::load_ZTol(CDataBuf *buf) {
+void zt_module::load_ZT_pattern_properties(CDataBuf *buf) {
+    unsigned short int size;
+    for (int i=0;i<256;i++) {
+        size = buf->getusi();
+        //this->patterns[i]->resize(size);
+    }
+}
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::load_ZT_order_list(CDataBuf *buf) {
     unsigned short int order;
     for (int i=0;i<ZTM_ORDERLIST_LEN;i++) {
         order = buf->getusi();
@@ -964,7 +1007,7 @@ void zt_module::load_ZTol(CDataBuf *buf) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::load_ZTin(CDataBuf *buf) {
+void zt_module::load_ZT_instrument(CDataBuf *buf) {
     unsigned char inst;
     inst = buf->getuch();
     if (inst<ZTM_MAX_INSTS)
@@ -1103,7 +1146,7 @@ int zt_module::load(char *fn)
         return -1;
     }
 
-    compressed = read_ZThd(&buffer,f);
+    compressed = read_ZT_header(&buffer,f);
 
     if (compressed == -2) {
         f.close();
@@ -1166,21 +1209,23 @@ int zt_module::load(char *fn)
         ret = readblock(&header[0],&buffer,compressed,f,input);
         if (ret!=-1) {
             if (cmp_hd(&header[0], "SMSG"))
-                load_SMSG(&buffer);
+                load_song_message(&buffer);
             if (cmp_hd(&header[0], "ARPG"))
-                load_ARPG(&buffer);
+                load_arpeggio(&buffer);
             if (cmp_hd(&header[0], "MMAC"))
-                load_MMAC(&buffer);
+                load_MIDI_macro(&buffer);
             if (cmp_hd(&header[0], "ZTtm"))
-                load_ZTtm(&buffer);
+                load_ZT_track_mutes(&buffer);
             if (cmp_hd(&header[0], "ZTol"))
-                load_ZTol(&buffer);
+                load_ZT_order_list(&buffer);
             if (cmp_hd(&header[0], "ZTpl"))
-                load_ZTpl(&buffer);
+                load_ZT_pattern_lengths(&buffer);
+            if (cmp_hd(&header[0], "ZTpp"))
+                load_ZT_pattern_properties(&buffer);
             if (cmp_hd(&header[0], "ZTin"))
-                load_ZTin(&buffer);
+                load_ZT_instrument(&buffer);
             if (cmp_hd(&header[0], "ZTev"))
-                load_ZTev(&buffer);
+                load_ZT_event_list(&buffer);
         } SDL_Delay(1);
     }
 #ifdef CONVERT_SLIDEONSUBTICK

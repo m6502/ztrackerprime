@@ -7,4 +7,4 @@ void fix_short_cols(void);
 void init_fx_cols(void);
 void fix_cols(void);
 
-#endif;
+#endif
