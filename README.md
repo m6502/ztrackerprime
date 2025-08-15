@@ -7,7 +7,7 @@ zTracker' is, as it's name implies, a derivate of zTracker.
 
 ![ztscreenshot](https://github.com/user-attachments/assets/4ea296d7-0b72-49e2-a246-a064474e8c75)
 
-This fork is released as a homage to the original work of Chris Micali. I have been using zTracker nearly on a daily basis for the past 18 years. As the original project has remained untouched since 2002, at some point I started tinkering with the source code, at first to fix bugs and later to change how the program behaves.
+This fork is released as a homage to the original work of Chris Micali. I have been using zTracker nearly on a daily basis for the past 24 years. As the original project has remained untouched since 2002, at some point I started tinkering with the source code, at first to fix bugs and later to change how the program behaves.
 
 I don't know if there are any zTracker users remaining out there, but as I'm preparing to try a big overhaul of this software that could potentially end as a whole new program, this is released with the hope that someone can find it useful.
 
@@ -22,6 +22,10 @@ So, what's new / different from the original zTracker? Here's a somewhat complet
 
 
 Program behavior changes:
+
+- Support for laptop keyboards: The two right most keyboard keys after 'i', 'o', 'p' have been remapped to duplicate the octave up and down keys functionality. The two keys below now also go to the previous or next pattern (These have been tested only on Spanish keyboards for now)
+  
+- Support for 1bpp PNG files in the skin fonts.
 
 - Zoom mode enables the program to work in 2x, 3x, 4x... So it's useable again on high resolution screens.
 
