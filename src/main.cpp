@@ -64,6 +64,7 @@
 
 
 #include "zt.h"
+#include "keybindings.h"
 #include "sdl_syswm.h"
 #include <filesystem>
 
@@ -1185,8 +1186,111 @@ void global_keys(Drawable *S)
     if (!key) return;
     
     if (!modal) {
+        // --- Remappable global keybindings (via g_keybindings) ---
+        // This block fires first for actions that can be rebound in zt.conf.
+        // setDefaults() mirrors the original hardcoded values, so untouched
+        // configs produce identical behaviour to the old switch/case below.
+        {
+            ZtAction ga = g_keybindings.match(key, kstate);
+            switch (ga) {
+                case ZT_ACTION_QUIT:
+                    command = CMD_QUIT;
+                    key = Keys.getkey();
+                    break;
+                case ZT_ACTION_PLAY_SONG:
+                    command = CMD_PLAY;
+                    break;
+                case ZT_ACTION_PLAY_PAT:
+                    command = CMD_PLAY_PAT;
+                    break;
+                case ZT_ACTION_PLAY_PAT_LINE:
+                    command = CMD_PLAY_PAT_LINE;
+                    break;
+                case ZT_ACTION_STOP:
+                    command = CMD_STOP;
+                    break;
+                case ZT_ACTION_PANIC:
+                    command = CMD_PANIC;
+                    break;
+                case ZT_ACTION_HARD_PANIC:
+                    command = CMD_HARD_PANIC;
+                    break;
+                case ZT_ACTION_SWITCH_HELP:
+                    command = CMD_SWITCH_HELP;
+                    break;
+                case ZT_ACTION_SWITCH_PEDIT:
+                    command = CMD_SWITCH_PEDIT;
+                    break;
+                case ZT_ACTION_SWITCH_IEDIT:
+                    command = CMD_SWITCH_IEDIT;
+                    break;
+                case ZT_ACTION_SWITCH_SONGCONF:
+                    command = CMD_SWITCH_SONGCONF;
+                    break;
+                case ZT_ACTION_SWITCH_SYSCONF:
+                    command = CMD_SWITCH_SYSCONF;
+                    break;
+                case ZT_ACTION_SWITCH_ABOUT:
+                    command = CMD_SWITCH_ABOUT;
+                    break;
+                case ZT_ACTION_LOAD:
+                    command = CMD_SWITCH_LOAD;
+                    key = Keys.getkey();
+                    break;
+                case ZT_ACTION_SAVE:
+                    // Save or save-as depending on whether file has a name.
+                    if (song->filename[0] != '\0' && song->filename[0] != ' ') {
+                        popup_window(UIP_SaveMsg);
+                    } else {
+                        command = CMD_SWITCH_SAVE;
+                    }
+                    key = Keys.getkey();
+                    clear++;
+                    break;
+                case ZT_ACTION_SAVE_AS:
+                    command = CMD_SWITCH_SAVE;
+                    key = Keys.getkey();
+                    clear++;
+                    break;
+                case ZT_ACTION_NEW_SONG:
+                    popup_window(UIP_NewSong);
+                    key = Keys.getkey();
+                    clear++;
+                    break;
+                case ZT_ACTION_MIDI_EXPORT: {
+                    char midfn[512];
+                    if (song->filename[0]) {
+                        strncpy(midfn, (const char*)song->filename, 500);
+                        char *dot = strrchr(midfn, '.');
+                        if (dot) strcpy(dot, ".mid");
+                        else strcat(midfn, ".mid");
+                    } else {
+                        strcpy(midfn, "export.mid");
+                    }
+                    ZTImportExport zie;
+                    if (zie.ExportMID(midfn, 1) == 0)
+                        sprintf(szStatmsg, "Exported MIDI: %s", midfn);
+                    else
+                        sprintf(szStatmsg, "MIDI export failed");
+                    statusmsg = szStatmsg;
+                    status_change = 1;
+                    need_refresh++;
+                    key = Keys.getkey();
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        // --- End remappable block ---
+
+        // The original hardcoded switch is kept below for non-remappable actions
+        // (ffwd/rewind, fullscreen toggle, scroll lock, F11 order-track, etc.).
+        // Guard against double-firing: if the remappable block already set a
+        // command we skip the legacy switch/case blocks entirely.
+        if (command == CMD_NONE) { // legacy-hardcoded-begin
         switch(key) {
-            case DIK_RIGHT: 
+            case DIK_RIGHT:
                 if (key==DIK_RIGHT && kstate == KS_CTRL)
                     if (ztPlayer->playing)
                         ztPlayer->ffwd();
@@ -1216,11 +1320,11 @@ void global_keys(Drawable *S)
                 else
                     bScrollLock = 1;
                 break;
-            case DIK_Q: 
+            case DIK_Q:
                 if (kstate & KS_ALT && kstate & KS_CTRL) {
-                    command=CMD_QUIT; 
+                    command=CMD_QUIT;
                     key = Keys.getkey();
-                }               
+                }
                 break;
             case DIK_M: // Quick MIDI export
                 if (kstate & KS_CTRL) {
@@ -1425,6 +1529,8 @@ void global_keys(Drawable *S)
             }
 
         }
+
+        } // legacy-hardcoded-end
 
     }
 
@@ -2535,11 +2641,18 @@ SDL_Surface *initSDL(void)
   cur_dir = (LPSTR)malloc(256);
   GetCurrentDirectory(256,(LPSTR)cur_dir);
   
+  // Set default keybindings before conf load so user overrides can replace them.
+  g_keybindings.setDefaults();
+
   if (zt_config_globals.load()) {
-    
+
     MessageBox(NULL,"Fatal: Unable to load zt.conf","zt: error",MB_OK | MB_ICONERROR);
     return NULL;
   }
+
+  // Load any keybinding overrides from zt.conf.
+  g_keybindings.load(zt_config_globals.Config);
+
   /*
   if (zcmp(Config.get("fullscreen"),"yes")) {
   //FULLSCREEN=1;

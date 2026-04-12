@@ -1,4 +1,5 @@
 #include "zt.h"
+#include "keybindings.h"
 #include "platform/undo.h"
 
 static PatternUndo g_undo;
@@ -1612,8 +1613,8 @@ void CUI_Patterneditor::update()
 
         }
 
-        // --- Undo: Cmd+Z / ALT+Z ---
-        if ((kstate & KS_ALT || kstate & KS_META) && key == DIK_Z) {
+        // --- Undo: Cmd+Z / ALT+Z (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_UNDO) {
           int restored = g_undo.restore(song);
           if (restored >= 0) {
             cur_edit_pattern = restored;
@@ -1624,8 +1625,8 @@ void CUI_Patterneditor::update()
           status_change = 1; need_refresh++; key = 0;
         }
 
-        // --- Double Pattern: Ctrl+Shift+G ---
-        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == DIK_G) {
+        // --- Double Pattern: Ctrl+Shift+G (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_DOUBLE_PATTERN) {
           UNDO_SAVE();
           int pat_len = song->patterns[cur_edit_pattern]->length;
           int new_len = pat_len * 2;
@@ -1646,8 +1647,8 @@ void CUI_Patterneditor::update()
           statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
         }
 
-        // --- Clone Pattern + move to it: Ctrl+Shift+D ---
-        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == DIK_D) {
+        // --- Clone Pattern + move to it: Ctrl+Shift+D (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_CLONE_PATTERN) {
           int src = cur_edit_pattern;
           int dest = -1;
           for (int p = 0; p < 256; p++) {
@@ -1681,7 +1682,28 @@ void CUI_Patterneditor::update()
           statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
         }
 
-        if (KS_HAS_ALT(kstate)) {
+        // --- Remappable pattern-editor keybindings (step + octave) ---
+        bool pe_kb_handled = false;
+        {
+          ZtAction pea = g_keybindings.match(key, kstate);
+          switch (pea) {
+            case ZT_ACTION_STEP_0: cur_step=0; need_refresh++; statusmsg="Step set to 0"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_1: cur_step=1; need_refresh++; statusmsg="Step set to 1"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_2: cur_step=2; need_refresh++; statusmsg="Step set to 2"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_3: cur_step=3; need_refresh++; statusmsg="Step set to 3"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_4: cur_step=4; need_refresh++; statusmsg="Step set to 4"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_5: cur_step=5; need_refresh++; statusmsg="Step set to 5"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_6: cur_step=6; need_refresh++; statusmsg="Step set to 6"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_7: cur_step=7; need_refresh++; statusmsg="Step set to 7"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_8: cur_step=8; need_refresh++; statusmsg="Step set to 8"; pe_kb_handled=true; break;
+            case ZT_ACTION_STEP_9: cur_step=9; need_refresh++; statusmsg="Step set to 9"; pe_kb_handled=true; break;
+            default: break;
+          }
+          if (pe_kb_handled) { status_change = 1; key = 0; }
+        }
+        // --- End remappable pattern-editor block ---
+
+        if (KS_HAS_ALT(kstate) && !pe_kb_handled) {
 
           switch(key)
           {
@@ -2069,7 +2091,34 @@ void CUI_Patterneditor::update()
             
             
             }
-        }       
+        }
+
+        // --- Replicate at Cursor (configurable: default ALT+R) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_REPLICATE_AT_CURSOR) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          int chunk_len = cur_edit_row;
+          if (chunk_len > 0 && cur_edit_row < pat_len) {
+            for (j = cur_edit_row; j < pat_len; j++) {
+              int src_row = (j - cur_edit_row) % chunk_len;
+              event *src_ev = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(src_row);
+              if (src_ev) {
+                song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                  j, src_ev->note, src_ev->inst, src_ev->vol, src_ev->length, src_ev->effect, src_ev->effect_data);
+              } else {
+                song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                  j, 0x80, MAX_INSTS, 0x80, 0, 0xFF, 0);
+              }
+            }
+            need_refresh++;
+            sprintf(szStatmsg, "Replicated rows 0-%d from cursor (%d rows)", cur_edit_row - 1, pat_len);
+            statusmsg = szStatmsg;
+          } else {
+            statusmsg = "Replicate: no rows above cursor";
+          }
+          status_change = 1; key = 0;
+        }
+
         if (KS_HAS_ALT(kstate)) {
           switch(key) {
             
@@ -2264,7 +2313,31 @@ void CUI_Patterneditor::update()
         }
         
         //boom
-        
+
+        // --- Remappable octave keys ---
+        {
+          ZtAction oa = g_keybindings.match(key, kstate);
+          if (oa == ZT_ACTION_OCTAVE_DOWN) {
+            if (base_octave > BASE_OCTAVE_MIN) {
+              base_octave--;
+              need_refresh++;
+              sprintf(szStatmsg, "Octave %d", base_octave);
+              statusmsg = szStatmsg;
+              status_change = 1;
+            }
+            key = 0; // consumed
+          } else if (oa == ZT_ACTION_OCTAVE_UP) {
+            if (base_octave < BASE_OCTAVE_MAX) {
+              base_octave++;
+              need_refresh++;
+              sprintf(szStatmsg, "Octave %d", base_octave);
+              statusmsg = szStatmsg;
+              status_change = 1;
+            }
+            key = 0; // consumed
+          }
+        }
+
         switch(key) {
 
         // -------------------------------------------

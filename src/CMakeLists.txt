@@ -37,6 +37,7 @@ set(ZT_SOURCES
     import_export.cpp
     InstEditor.cpp
     it.cpp
+    keybindings.cpp
     keybuffer.cpp
     lc_sdl_wrapper.cpp
     list.cpp
