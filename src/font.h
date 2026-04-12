@@ -41,6 +41,6 @@ void printlineBG(int xi, int y, unsigned char ch, int len, TColor col, TColor bg
 
 void printLCD(int x,int y,char *str, Drawable *S);
 
-void printBGCC(int x, int y, char *str, TColor col, TColor bg, Drawable *S);
+void printBGCC(int x, int y, const char *str, TColor col, TColor bg, Drawable *S);
 
 #endif

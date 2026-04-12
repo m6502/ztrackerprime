@@ -406,7 +406,7 @@ class CUI_RUSure : public CUI_Page {
         Button *button_yes;
         Button *button_no;
 
-        char *str;
+        const char *str;
         VFunc OnYes;
 
         CUI_RUSure();

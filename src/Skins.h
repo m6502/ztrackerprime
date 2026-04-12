@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -58,16 +58,16 @@ class Skin {
         char strSkinName[64];
 
         Skin();
-        Skin(char *name);
+        Skin(const char *name);
         ~Skin();
-        int load( char *name, bool quiet = false);
-        void setpath(char *name);
+        int load(const char *name, bool quiet = false);
+        void setpath(const char *name);
         void unload(void);
         void reset(void);
-        void makepath(char *dst,char *filename);
+        void makepath(char *dst, const char *filename);
         void getLogo(void);
         void freeLogo(void);
-        Skin * switchskin(char *newskintitle);
+        Skin * switchskin(const char *newskintitle);
 };
 
 #endif

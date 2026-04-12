@@ -54,7 +54,7 @@ conf::conf() {
     filename = NULL;
     hash = new list;
 }
-conf::conf(char *filen) {
+conf::conf(const char *filen) {
     hash = new list;
     filename = NULL;
     load(filen);
@@ -76,7 +76,7 @@ void conf::stripspace(char *buf) {
         buf[o++] = buf[p];
     buf[l-i]=0;
 }
-int conf::load(char *filen=NULL) {
+int conf::load(const char *filen=NULL) {
     FILE *fp;
     char buf[512];
     char *p1,*p2,*p3;
@@ -173,7 +173,7 @@ int conf::getcolor(const char *key, int part) { /* 0=r 1=g 2=b */
     }
     return result;
 }
-int conf::save(char *filen=NULL) {
+int conf::save(const char *filen=NULL) {
     char *key;
     FILE *fp;
     hash->reset();
@@ -321,7 +321,7 @@ int ZTConf::load()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int ZTConf::getFlag(char *key) {
+int ZTConf::getFlag(const char *key) {
     char *a = Config->get(key);
     if (a) {
         if (zcmp(a,"yes"))

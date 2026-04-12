@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -159,7 +159,7 @@ void BTNCLK_ToggleZTMID(UserInterfaceElement *b)
 //
 void fl_enter(UserInterfaceElement *uie)
 {
-  char *f;
+  const char *f;
   FileList *fl = (FileList *)uie;
   f = fl->getCurrentItem();
   strcpy(&save_filename[0], f);

@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -65,7 +65,7 @@ void dev_sel(int dev, MidiOutDeviceSelector *mds )
 //
 void midi_out_sel(int dev) {
     int a;
-    char *errmsg;
+    const char *errmsg;
     if ((unsigned int)dev < MidiOut->numOuputDevices) {
         if (MidiOut->QueryDevice(dev)) {
             MidiOut->RemDevice(dev);
@@ -104,7 +104,7 @@ void midi_out_sel(int dev) {
 //
 void midi_in_sel(int dev) {
     int a;
-    char *errmsg;
+    const char *errmsg;
     if ((unsigned int)dev < MidiIn->numMidiDevs) {
         if (MidiIn->QueryDevice(dev)) {
             MidiIn->RemDevice(dev);
@@ -840,7 +840,7 @@ int CheckBox::update() {
 void CheckBox::draw(Drawable *S, int active) {
     int cx,cy=y;
     TColor f,b;
-    char *str;
+    const char *str;
     for(cx=x;cx<x+xsize;cx++) {
         printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
     }
@@ -1640,7 +1640,7 @@ int TextBox::update()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int nextline(char *str, int p) {
+int nextline(const char *str, int p) {
     while(str[p]) {
         if (str[p]=='\n')
             return p+1;
@@ -1985,7 +1985,7 @@ int ListBox::sortstr(char *s1, char *s2) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void ListBox::strc(char *dst, char *src) {
+void ListBox::strc(char *dst, const char *src) {
     int i=0;
     while (i<xsize && src[i]) {
         dst[i] = src[i];
@@ -2343,9 +2343,9 @@ int ListBox::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-char *ListBox::getCurrentItem(void) {
+const char *ListBox::getCurrentItem(void) {
     char * p = getItem(cur_sel + y_start);
-    if (!p) p = "";
+    if (!p) return "";
     return p;
 }
 

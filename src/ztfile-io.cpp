@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -101,11 +101,11 @@ int zt_module::readdata(char *data, int size, int compressed, std::ifstream &ifs
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::writeblock(char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o) 
+void zt_module::writeblock(const char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o)
 {
   int size;
-  
-  writedata(headid,4,compressed,of,o); 
+
+  writedata(const_cast<char*>(headid),4,compressed,of,o);
   size = buf->getsize();
   writedata((char *)&size,sizeof(int),compressed,of,o);
   writedata((char *)buf->getbuffer(),size,compressed,of,o);
@@ -726,7 +726,7 @@ int zt_module::save(char *fn, int compressed)
     return 0;
 }
 
-int zt_module::cmp_hd(char *s1,char *s2) {
+int zt_module::cmp_hd(const char *s1, const char *s2) {
     for(int i=0;i<4;i++)
         if (s1[i] != s2[i])
             return 0;

@@ -355,7 +355,7 @@ void FileList::draw(Drawable *S, int active)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void FileList::AddFiles(char *pattern, TColor c) 
+void FileList::AddFiles(const char *pattern, TColor c)
 {
     for (const auto& entry : std::filesystem::directory_iterator(".")) {
         // Match the pattern (simple example using filename)

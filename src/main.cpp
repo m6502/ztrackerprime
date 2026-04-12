@@ -156,7 +156,7 @@ extern bool bMouseIsDown = false;
 int cur_inst = 0;
     int fixmouse=0;
 
-char *col_desc[41];
+const char *col_desc[41];
 
 int base_octave = BASE_OCTAVE_DEFAULT ;
 int cur_step = DEFAULT_CURSOR_STEP ;
@@ -200,7 +200,7 @@ Bitmap *VS = NULL;
 //char *skinfile;
 //char *colorfile;
 
-char *statusmsg = " ";
+const char *statusmsg = " ";
 char szStatmsg[1024];
 
 //unsigned long numMidiDevs;
@@ -379,7 +379,7 @@ void switch_page(CUI_Page *page)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int zcmp(char *s1, char *s2) 
+int zcmp(const char *s1, const char *s2)
 {
     int i=0;
     if (!s1 || !s2) return 0;
@@ -398,7 +398,7 @@ int zcmp(char *s1, char *s2)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int zcmpi(char *s1, char *s2) 
+int zcmpi(const char *s1, const char *s2)
 {
     int i=0;
     if (!s1 || !s2) return 0;
@@ -798,7 +798,7 @@ char *hex2note(char *str,unsigned char note)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void status(char *msg,Drawable *S)
+void status(const char *msg,Drawable *S)
 {
     printBG(col(3),row(INITIAL_ROW + 6),"                                                                            ",COLORS.Text,COLORS.Background,S);
     printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);

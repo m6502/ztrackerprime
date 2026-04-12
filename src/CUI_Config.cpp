@@ -149,7 +149,7 @@ void CUI_Config::draw(Drawable *S) {
         sprintf(buf,"\n|U|Current Settings in memory:\n");
         if(tb->text != NULL)
         {
-            free(tb->text);
+            free(const_cast<char*>(tb->text));
             tb->text = NULL;
         }
         sprintf(buf+strlen(buf),"\n|U|    Full Screen |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");

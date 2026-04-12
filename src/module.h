@@ -345,7 +345,7 @@ class zt_module
    
         void setstatusstr(const char *fmtstr, ...);
 
-        int cmp_hd(char *s1,char *s2);
+        int cmp_hd(const char *s1, const char *s2);
 
         void build_ZT_header(CDataBuf *buf, int compr); /* ZThd - .zt header */
         void build_ZT_order_list(CDataBuf *buf);  /* ZTol - order list */
@@ -380,7 +380,7 @@ class zt_module
         void writedata(char *data, int size, int compressed, std::ofstream &of, DeflateStream *o);
         int readdata(char *data, int size, int compressed, std::ifstream &ifs, InflateStream *i);
 
-        void writeblock(char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o);
+        void writeblock(const char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o);
         int readblock(char headid[5], CDataBuf *buf, int compressed, std::ifstream &ifs, InflateStream *i);
 
         // high level, safe editing methods

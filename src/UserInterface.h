@@ -187,7 +187,7 @@ class BarGraph : public UserInterfaceElement {
 class LCDDisplay : public UserInterfaceElement {
     public:
         int length;
-        char *str;
+        const char *str;
         char istr[200];
         LCDDisplay();
         ~LCDDisplay() = default ;
@@ -215,7 +215,7 @@ class TextBox : public UserInterfaceElement {
     public:
         bool bEof,bUseColors,bWordWrap;
         int readonly, startline, soff,mousestate,starti,startl;
-        char *text;
+        const char *text;
         Frame frm;
 
         TextBox(int ro = 0);
@@ -263,7 +263,7 @@ class ListBox : public UserInterfaceElement {
 //        int sorted;
         bool use_checks, use_key_select, is_sorted;
         unsigned char check_on, check_off;
-        char *empty_message;
+        const char *empty_message;
         LBNode *items;
         Frame frm;
             
@@ -277,7 +277,7 @@ class ListBox : public UserInterfaceElement {
         virtual void draw(Drawable *S, int active);
 
         int getCurrentItemIndex(void);
-        char *getCurrentItem(void);
+        const char *getCurrentItem(void);
         LBNode *getNode(int index);
         char *getItem(int index);
         int findItem(char *text);
@@ -289,7 +289,7 @@ class ListBox : public UserInterfaceElement {
         void selectAll(void);
         void selectNone(void);
         void setCursor(int index);
-        void strc(char *dst, char *src);
+        void strc(char *dst, const char *src);
         int sortstr(char *s1, char *s2);
         int mouseupdate(int cur_element);
         LBNode *findNodeWithChar(char c, LBNode *start);

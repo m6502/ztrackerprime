@@ -49,7 +49,7 @@ class FileList: public ListBox {
         virtual void OnSelect(LBNode *selected);
         virtual void OnSelectChange() {}
         virtual void enter(void);
-        void AddFiles(char *pattern, TColor c);
+        void AddFiles(const char *pattern, TColor c);
 };
 
 

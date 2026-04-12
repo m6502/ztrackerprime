@@ -25,9 +25,10 @@ CUI_Help::CUI_Help(void) {
             fs++;
         }
         fseek(fp,0,SEEK_SET);
-        tb->text = new char[fs+10];
-        memset(tb->text,0,fs+10);
-        fread(tb->text, fs, 1, fp);
+        char *tb_text_buf = new char[fs+10];
+        memset(tb_text_buf,0,fs+10);
+        fread(tb_text_buf, fs, 1, fp);
+        tb->text = tb_text_buf;
         fclose(fp);
         needfree = 1;
     } else {
@@ -41,7 +42,7 @@ CUI_Help::~CUI_Help(void) {
     TextBox *tb;
     if (needfree) {
         tb = (TextBox *)UI->get_element(0);
-        delete[] tb->text;
+        delete[] const_cast<char*>(tb->text);
     }
 }
 

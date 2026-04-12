@@ -584,8 +584,8 @@ int unlock_mutex(std::timed_mutex &mtx);
 
 void reset_editor(void);
 
-int zcmp(char *s1, char *s2);
-int zcmpi(char *s1, char *s2);
+int zcmp(const char *s1, const char *s2);
+int zcmpi(const char *s1, const char *s2);
 
 int checkclick(int x1, int y1, int x2, int y2);
 
@@ -599,7 +599,7 @@ extern int fast_update, FU_x, FU_y, FU_dx, FU_dy;
 extern zt_module *song;
 extern player *ztPlayer;
 extern int editing; // editing flag/mutex (so it doesnt play a null pointer or something 
-extern char *col_desc[41];
+extern const char *col_desc[41];
 extern int status_change;
 extern int cur_edit_row,cur_edit_row_disp,cur_edit_pattern;
 extern instrument blank_instrument;
@@ -613,15 +613,15 @@ extern char* zt_directory;
 
 extern bool bDontKeyRepeat;
 
-extern char *statusmsg;
+extern const char *statusmsg;
 extern char szStatmsg[1024];
 
 #define COLORS CurrentSkin->Colors
 
-void status(char *msg,Drawable *S);
+void status(const char *msg,Drawable *S);
 void status(Drawable *S);
 
-void force_status(char *msg);
+void force_status(const char *msg);
 
 void redrawscreen(Drawable *S);
 void disp_pattern(int tracks_shown,int field_size,int cols_shown, Drawable *S);
@@ -717,7 +717,7 @@ extern int light_pos, need_update_lights ;
 extern int checkmousepos(int x1, int y1, int x2, int y2);
 
 extern char *hex2note(char *str,unsigned char note);
-extern int zcmpi(char *s1, char *s2);
+extern int zcmpi(const char *s1, const char *s2);
 
 extern int check_ext(const char *str, const char *ext);
 
