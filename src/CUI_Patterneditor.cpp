@@ -2021,13 +2021,13 @@ void CUI_Patterneditor::update()
             
           case DIK_R: /* Replicate at Cursor (from Paketti) */
           {
-            // Take rows 0..cur_edit_row as the source chunk on the current track,
-            // then repeat that chunk from cur_edit_row+1 to the end of the pattern.
+            // Take rows 0..cur_edit_row-1 (above cursor, not including cursor) as source,
+            // then repeat that chunk from cur_edit_row to end of pattern.
             int pat_len = song->patterns[cur_edit_pattern]->length;
-            int chunk_len = cur_edit_row + 1; // rows 0 through cur_edit_row inclusive
-            if (chunk_len > 0 && cur_edit_row < pat_len - 1) {
-              for (j = cur_edit_row + 1; j < pat_len; j++) {
-                int src_row = (j - (cur_edit_row + 1)) % chunk_len;
+            int chunk_len = cur_edit_row; // rows 0 through cur_edit_row-1
+            if (chunk_len > 0 && cur_edit_row < pat_len) {
+              for (j = cur_edit_row; j < pat_len; j++) {
+                int src_row = (j - cur_edit_row) % chunk_len;
                 event *src = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(src_row);
                 if (src) {
                   song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
@@ -2039,7 +2039,7 @@ void CUI_Patterneditor::update()
                 }
               }
               need_refresh++;
-              sprintf(szStatmsg, "Replicated rows 0-%d across pattern (%d rows)", cur_edit_row, pat_len);
+              sprintf(szStatmsg, "Replicated rows 0-%d from cursor (%d rows)", cur_edit_row - 1, pat_len);
               statusmsg = szStatmsg;
               status_change = 1;
             }
