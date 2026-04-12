@@ -4,6 +4,12 @@ All changes on top of m6502/ztrackerprime (last upstream commit: `dba2320`, Aug 
 
 ## Recent fixes (2026-04-12, post-initial-port)
 
+- **Octave up/down with < >** — SDLK_LESS/GREATER keys change octave, status shows "Octave N"
+- **Note off with backtick/§** — matches SchismTracker: backtick = === (note off), 1 = ^^^ (note cut)
+- **Faster key repeat** — 200ms initial delay, 30ms interval (was 500ms/30ms). Tracker-snappy cursor movement
+- **Replicate at Cursor (Cmd+R / ALT+R)** — Paketti-style: rows above cursor repeated through rest of pattern
+- **System Config cursor navigation fixed** — cursor up/down moves between lists and controls (#18)
+- **F12 layout fixed** — skin selector and MIDI lists no longer overlap, dynamic sizing
 - **In-app zt.conf editor** — all settings now editable from F12 System Configuration: Zoom, Highlight, Lowlight, Pattern Length, Record Velocity, Centered Edit, Step Editing. Saves on exit. ztconf.exe is fully replaced (#6)
 - **Playback info shown in Pattern Editor** — bottom of pattern area shows "Playing: Ord Pat Row BPM TPB Step" during playback (#16)
 - **All ALT shortcuts work with Cmd on macOS** — KS_HAS_ALT macro matches ALT, META, or META|ALT. Cmd+B/E/L (block), Cmd+1-0 (edit step), Cmd+Q/A (transpose), Cmd+D (select) all work with Mac Cmd key
