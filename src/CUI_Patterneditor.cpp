@@ -210,7 +210,7 @@ char *printNote(char *str, event *r, int cur_edit_mode)
 #ifdef __AAAA5251785AAAA55AAA
 
 // ------------------------------------------------------------------------------------------------
-// <Manu> Debería mirar si puedo hacer esto de una manera un poco más limpia
+// <Manu> Deberï¿½a mirar si puedo hacer esto de una manera un poco mï¿½s limpia
 //
 char *printBlankNote(char *str, int cur_edit_mode) 
 {
@@ -499,7 +499,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 {
   int num_displayed_rows, num_displayed_tracks, special ;
   TColor bg,fg;
-  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resolución muy grande. 512 debería servir para w=4096 pero...
+  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resoluciï¿½n muy grande. 512 deberï¿½a servir para w=4096 pero...
   
   int posx_current_track ;
   int posy_current_row ;
@@ -537,7 +537,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
-  // <Manu> Cumple alguna función dibujar este carácter?
+  // <Manu> Cumple alguna funciï¿½n dibujar este carï¿½cter?
   //printchar(col(4), row(TRACKS_ROW_Y), 139, COLORS.Lowlight,S);
 
   
@@ -550,7 +550,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   g_posx_tracks = poscharx_tracks ;
 
 
-  num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1
+  num_displayed_rows = 0 ; // <Manu> Esto va de 0 al nï¿½mero mï¿½ximo de rows a dibujar - 1
   
   
   for(int var_row = first_row; var_row < (last_row + blank_rows); var_row++) {
@@ -571,21 +571,21 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
     }
     else {
 
-      if(var_row >= 0) { // <Manu> ¿Necesario?
+      if(var_row >= 0) { // <Manu> ï¿½Necesario?
         
         sprintf(str,"%.3d",var_row);
       
-        // Línea vertical izquierda del marco de los tracks
+        // Lï¿½nea vertical izquierda del marco de los tracks
         printchar(col(poscharx_tracks - 1),                               posy_current_row, 146, COLORS.Lowlight,S) ;
 
-        // Línea vertical derecha del marco de los tracks
+        // Lï¿½nea vertical derecha del marco de los tracks
         printchar(col((poscharx_tracks - 1) + (tracks_shown*(field_size+1))), posy_current_row, 145, COLORS.Highlight,S) ;
       }
       
     }
 
 
-    // Dibujar el número de línea
+    // Dibujar el nï¿½mero de lï¿½nea
     if (ztPlayer->playing && 
         ztPlayer->playing_cur_pattern==cur_edit_pattern &&
         var_row == ztPlayer->playing_cur_row) {
@@ -617,7 +617,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
       }
 
 
-      if(var_row >= 0) {       // <Manu> ¿Necesario?
+      if(var_row >= 0) {       // <Manu> ï¿½Necesario?
     
             // Contenido de los tracks
 
@@ -653,7 +653,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
               posx_current_track = col(poscharx_tracks) + col(num_displayed_tracks * (field_size + 1)) ;
 
-              // <Manu> Si esta línea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo
+              // <Manu> Si esta lï¿½nea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo
 
               if(var_row >= first_blank_row) {
 
@@ -663,7 +663,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 //printBlankNote(str, zt_config_globals.cur_edit_mode) ;
                 //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(15+num_displayed_rows), str, fg, bg, S) ;
 
-                // Lo dibujamos un píxel a la izquierda y un píxel más largo para comernos la posible línea del marco de los tracks
+                // Lo dibujamos un pï¿½xel a la izquierda y un pï¿½xel mï¿½s largo para comernos la posible lï¿½nea del marco de los tracks
 
                 int x1 = posx_current_track - 2  ;
                 int x2 = x1 + col(field_size + 1) + 1  ;
@@ -819,10 +819,10 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
-  // Línea superior de los tracks
+  // Lï¿½nea superior de los tracks
   printline(col(poscharx_tracks),TRACKS_POS_Y, 148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
 
-  // Línea inferior de los tracks
+  // Lï¿½nea inferior de los tracks
   printline(col(poscharx_tracks),TRACKS_POS_Y + row((PATTERN_EDIT_ROWS - blank_rows) + 1), 143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
   
   // Etiquetas de los tracks
@@ -881,8 +881,8 @@ void CUI_Patterneditor::enter(void)
   mousedrawing=0;
   //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
   
-  // <Manu> 180 es el espacio que queda más o menos para las notas descontando dónde empiezan los tracks, la toolbar, etc.
-  //        No sería mala idea calcular esto de una manera un poco más clara.
+  // <Manu> 180 es el espacio que queda mï¿½s o menos para las notas descontando dï¿½nde empiezan los tracks, la toolbar, etc.
+  //        No serï¿½a mala idea calcular esto de una manera un poco mï¿½s clara.
 
   PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
 
@@ -943,7 +943,7 @@ void CUI_Patterneditor::update()
 
 
 
-  // <Manu> Esto arregla el bug del último número de línea destacado cuando el play pasa por el pattern actual y sigue por otro.
+  // <Manu> Esto arregla el bug del ï¿½ltimo nï¿½mero de lï¿½nea destacado cuando el play pasa por el pattern actual y sigue por otro.
   //        No es 100% perfecto por culpa del prebuffer, pero bueno...
 
   if(!ztPlayer->playing) last_cur_pattern = -1 ;
@@ -961,7 +961,7 @@ void CUI_Patterneditor::update()
 
 
   // <Manu> Esto arreglaba el bug de que no se refresque la pantalla al cambiar
-  //        el número de filas del pattern actual, pero ya no es necesario :-)
+  //        el nï¿½mero de filas del pattern actual, pero ya no es necesario :-)
   //
   //if(ztPlayer->song->patterns[cur_edit_pattern]->length != last_pattern_size) {
   //
@@ -1197,7 +1197,7 @@ void CUI_Patterneditor::update()
 
       
       //case 92:
-      case SDLK_BACKSLASH: // <ManU> 92 en español, ¿qué pasa con teclados internacionales?
+      case SDLK_BACKSLASH: // <ManU> 92 en espaï¿½ol, ï¿½quï¿½ pasa con teclados internacionales?
       //case SDLK_RIGHTBRACKET:
       case DIK_ADD:
 
@@ -1306,7 +1306,7 @@ void CUI_Patterneditor::update()
           break;
 
         case DIK_PGUP:
-          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> ¿Esto no debería ser un múltiplo del step?
+          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> ï¿½Esto no deberï¿½a ser un mï¿½ltiplo del step?
           need_refresh++;
           break;
 
@@ -1474,7 +1474,7 @@ void CUI_Patterneditor::update()
                         }
                         else{
                             
-                          // <Manu> if y else eran iguales ¿?
+                          // <Manu> if y else eran iguales ï¿½?
                           select_row_start = song->patterns[cur_edit_pattern]->length-1;
                         }
                       }
@@ -3137,7 +3137,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     draw_status_vars(S);
     
-    printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor",COLORS.Text,COLORS.Background,S);
+    printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
     
     switch(mode) {
       
@@ -3226,7 +3226,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     if (m_Fullupd) {
 
-      // <Manu> Clarificar un poco esta fórmula, porque con row(52 se comía la última línea 
+      // <Manu> Clarificar un poco esta fï¿½rmula, porque con row(52 se comï¿½a la ï¿½ltima lï¿½nea 
 
       screenmanager.Update(0, row(11), INTERNAL_RESOLUTION_X, row(53+((INTERNAL_RESOLUTION_Y-480)/8))) ;
     }

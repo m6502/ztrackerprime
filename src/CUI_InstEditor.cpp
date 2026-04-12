@@ -279,7 +279,7 @@ void CUI_InstEditor::update() {
 
     
     
-    // <Manu> Refrescamos la pantalla cuando cambia la línea -----------
+    // <Manu> Refrescamos la pantalla cuando cambia la lï¿½nea -----------
 
     if(!ztPlayer->playing) ie->last_cur_row = -1 ;
     else {
@@ -554,7 +554,7 @@ void CUI_InstEditor::draw(Drawable *S)
         UI->draw(S);
         draw_status(S);
         status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Instrument Editor",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Instrument Editor (F3)",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(14),"Bank",COLORS.Text,COLORS.Background,S);
         printBG(col(58),row(14),"Patch",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(19),"Default Volume",COLORS.Text,COLORS.Background,S);

@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -87,7 +87,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Midimacro Editor",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"MIDI Macro Editor (F4)",COLORS.Text,COLORS.Background,S);
         print(col(12),row(BASE_Y),"name",COLORS.Text,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
