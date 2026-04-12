@@ -1,4 +1,10 @@
 #include "zt.h"
+#include "platform/undo.h"
+
+static PatternUndo g_undo;
+
+// Save undo snapshot before destructive pattern operations
+#define UNDO_SAVE() g_undo.save(song, cur_edit_pattern)
 
 #define LEFT_MARGIN                     40
 #define RIGHT_MARGIN                    2
@@ -1606,6 +1612,75 @@ void CUI_Patterneditor::update()
 
         }
 
+        // --- Undo: Cmd+Z / ALT+Z ---
+        if ((kstate & KS_ALT || kstate & KS_META) && key == DIK_Z) {
+          int restored = g_undo.restore(song);
+          if (restored >= 0) {
+            cur_edit_pattern = restored;
+            statusmsg = "Undo";
+          } else {
+            statusmsg = "Nothing to undo";
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Double Pattern: Ctrl+Shift+G ---
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == DIK_G) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          int new_len = pat_len * 2;
+          if (new_len <= 256) {
+            song->patterns[cur_edit_pattern]->resize(new_len);
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              for (int r = 0; r < pat_len; r++) {
+                event *ev = trk->get_event(r);
+                if (ev) trk->update_event(r + pat_len, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
+              }
+            }
+            sprintf(szStatmsg, "Pattern doubled: %d -> %d rows", pat_len, new_len);
+          } else {
+            sprintf(szStatmsg, "Cannot double: max 256 rows");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Clone Pattern + move to it: Ctrl+Shift+D ---
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == DIK_D) {
+          int src = cur_edit_pattern;
+          int dest = -1;
+          for (int p = 0; p < 256; p++) {
+            if (p != src && song->patterns[p] && song->patterns[p]->isempty()) { dest = p; break; }
+          }
+          if (dest < 0) {
+            for (int p = 0; p < 256; p++) {
+              if (p != src && !song->patterns[p]) {
+                song->patterns[p] = new pattern(song->patterns[src]->length);
+                dest = p; break;
+              }
+            }
+          }
+          if (dest >= 0) {
+            int pat_len = song->patterns[src]->length;
+            song->patterns[dest]->resize(pat_len);
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              track *st = song->patterns[src]->tracks[t];
+              track *dt = song->patterns[dest]->tracks[t];
+              if (!st || !dt) continue;
+              for (int r = 0; r < pat_len; r++) {
+                event *ev = st->get_event(r);
+                if (ev) dt->update_event(r, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
+              }
+            }
+            cur_edit_pattern = dest;
+            sprintf(szStatmsg, "Cloned pattern %03d -> %03d", src, dest);
+          } else {
+            sprintf(szStatmsg, "No empty pattern slot");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
         if (KS_HAS_ALT(kstate)) {
 
           switch(key)
@@ -1622,7 +1697,6 @@ void CUI_Patterneditor::update()
           case DIK_9: cur_step=9;  need_refresh++; statusmsg = "Step set to 9"; break;
           case DIK_0: cur_step=0;  need_refresh++; statusmsg = "Step set to 0"; break;
 
-            
           case DIK_P: // copy to new pattern
             // select all of current pattern
             {
@@ -2021,6 +2095,7 @@ void CUI_Patterneditor::update()
             
           case DIK_R: /* Replicate at Cursor (from Paketti) */
           {
+            UNDO_SAVE();
             // Take rows 0..cur_edit_row-1 (above cursor, not including cursor) as source,
             // then repeat that chunk from cur_edit_row to end of pattern.
             int pat_len = song->patterns[cur_edit_pattern]->length;
