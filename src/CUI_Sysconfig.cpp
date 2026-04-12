@@ -107,10 +107,78 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs->min = 1;
         vs->max = 1000;
 
+        // Right column: additional settings
+        int rx = 4+35+3;  // right column X
+
+        vs = new ValueSlider;
+        UI->add_element(vs,tabindex++); // zoom
+        vs->x = rx+15;
+        vs->y = base_y;
+        vs->xsize = 10;
+        vs->ysize = 1;
+        vs->value = (int)zt_config_globals.zoom;
+        vs->min = 1;
+        vs->max = 8;
+
+        vs = new ValueSlider;
+        UI->add_element(vs,tabindex++); // highlight
+        vs->x = rx+15;
+        vs->y = base_y + 2;
+        vs->xsize = 10;
+        vs->ysize = 1;
+        vs->value = zt_config_globals.highlight_increment;
+        vs->min = 1;
+        vs->max = 32;
+
+        vs = new ValueSlider;
+        UI->add_element(vs,tabindex++); // lowlight
+        vs->x = rx+15;
+        vs->y = base_y + 4;
+        vs->xsize = 10;
+        vs->ysize = 1;
+        vs->value = zt_config_globals.lowlight_increment;
+        vs->min = 1;
+        vs->max = 32;
+
+        vs = new ValueSlider;
+        UI->add_element(vs,tabindex++); // default pattern length
+        vs->x = rx+15;
+        vs->y = base_y + 6;
+        vs->xsize = 10;
+        vs->ysize = 1;
+        vs->value = zt_config_globals.pattern_length;
+        vs->min = 32;
+        vs->max = 256;
+
+        cb = new CheckBox;
+        UI->add_element(cb,tabindex++); // record velocity
+        cb->x = rx+15;
+        cb->y = base_y + 8;
+        cb->xsize = 5;
+        cb->value = &zt_config_globals.record_velocity;
+        cb->frame = 1;
+
+        cb = new CheckBox;
+        UI->add_element(cb,tabindex++); // centered editing
+        cb->x = rx+15;
+        cb->y = base_y + 10;
+        cb->xsize = 5;
+        cb->value = &zt_config_globals.centered_editing;
+        cb->frame = 1;
+
+        cb = new CheckBox;
+        UI->add_element(cb,tabindex++); // step editing
+        cb->x = rx+15;
+        cb->y = base_y + 12;
+        cb->xsize = 5;
+        cb->value = &zt_config_globals.step_editing;
+        cb->frame = 1;
+
+        // Skin selector
         sk = new SkinSelector;
         UI->add_element(sk,tabindex++);
-        sk->x = 4+35 +10;
-        sk->y = base_y + 2;
+        sk->x = rx;
+        sk->y = base_y + 15;
         sk->xsize = 19+4;
         sk->ysize = 10;
 
@@ -220,14 +288,30 @@ void CUI_Sysconfig::update() {
     char val[8];
 
     UI->update();
-    vs = (ValueSlider *)UI->get_element(0);
-    cb = (CheckBox*)UI->get_element(4);
+    vs = (ValueSlider *)UI->get_element(0); // prebuffer
     if (vs->changed) {
         zt_config_globals.prebuffer_rows = vs->value;
-        ztPlayer->prebuffer = (96/song->tpb) * zt_config_globals.prebuffer_rows; // 96ppqn, so look ahead is 1 beat
-        sprintf(val,"%d",zt_config_globals.prebuffer_rows);
-//        Config.set("prebuffer_rows",&val[0],0);
+        ztPlayer->prebuffer = (96/song->tpb) * zt_config_globals.prebuffer_rows;
     }
+
+    // Key repeat/wait
+    vs = (ValueSlider *)UI->get_element(5);
+    if (vs->changed) zt_config_globals.key_repeat_time = vs->value;
+    vs = (ValueSlider *)UI->get_element(6);
+    if (vs->changed) zt_config_globals.key_wait_time = vs->value;
+
+    // Right column: zoom, highlight, lowlight, pattern length
+    vs = (ValueSlider *)UI->get_element(7);
+    if (vs->changed) zt_config_globals.zoom = (float)vs->value;
+    vs = (ValueSlider *)UI->get_element(8);
+    if (vs->changed) zt_config_globals.highlight_increment = vs->value;
+    vs = (ValueSlider *)UI->get_element(9);
+    if (vs->changed) zt_config_globals.lowlight_increment = vs->value;
+    vs = (ValueSlider *)UI->get_element(10);
+    if (vs->changed) zt_config_globals.pattern_length = vs->value;
+
+    // Fullscreen toggle
+    cb = (CheckBox*)UI->get_element(4);
     int i = 0;
     if (bIsFullscreen) i = 1;
     if ( * cb->value != i) {
@@ -252,7 +336,17 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(TRACKS_ROW_Y+8),"   Full Screen",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+10),"    Key Repeat",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+12),"      Key Wait",COLORS.Text,S);
-        print(row(4+37+8),col(TRACKS_ROW_Y),"Skin Selection",COLORS.Text,S);
+
+        // Right column labels
+        int rx = 4+35+3;
+        print(row(rx),col(TRACKS_ROW_Y),"          Zoom",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+2),"     Highlight",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+4),"      Lowlight",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+6),"   Pattern Len",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+10),"Centered Edit",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+12),"  Step Editing",COLORS.Text,S);
+        print(row(rx),col(TRACKS_ROW_Y+14),"Skin Selection",COLORS.Text,S);
 
         print(row(4),col(30),"MIDI Out Device Selection",COLORS.Text,S);
         print(row(4+37),col(30),"MIDI In Device Selection",COLORS.Text,S);
