@@ -9,9 +9,9 @@ CUI_Help::CUI_Help(void) {
     tb = new TextBox;
     UI->add_element(tb, 0);
     tb->x = 1;
-    tb->y = 14;
-    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
-    tb->ysize = 36+ ((INTERNAL_RESOLUTION_Y-480)/8);
+    tb->y = TRACKS_ROW_Y;
+    tb->xsize = CHARS_X - 2;
+    tb->ysize = CHARS_Y - TRACKS_ROW_Y - 2;
     //tb->text = "This is a test of the textbox reader\n\nit is supposed to work";
 
     FILE *fp;
@@ -68,8 +68,8 @@ void CUI_Help::update() {
 
 void CUI_Help::draw(Drawable *S) {
 
-    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
-    tb->ysize = 36+ ((INTERNAL_RESOLUTION_Y-480)/8);
+    tb->xsize = CHARS_X - 2;
+    tb->ysize = CHARS_Y - TRACKS_ROW_Y - 2;
 
     if (S->lock()==0) {
         UI->draw(S);
