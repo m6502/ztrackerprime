@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -74,7 +74,7 @@ void CUI_SongMessage::enter(void) {
     buffer = song->songmessage->songmessage;
     cb->target = buffer;
     cb->text = buffer->getbuffer();
-    SDL_EnableUNICODE(1); // For trapping characters
+    zt_text_input_start();
 }
 
 void CUI_SongMessage::leave(void) {
@@ -95,8 +95,7 @@ void CUI_SongMessage::leave(void) {
     delete buffer;
     buffer = NULL;
     */
-
-    SDL_EnableUNICODE(0); // Dont need it anymore
+    zt_text_input_stop();
 }
 
 void CUI_SongMessage::update() {

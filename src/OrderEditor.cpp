@@ -56,60 +56,60 @@ int OrderEditor::update() {
 
     if (key) {
         switch(key) {
-            case DIK_TAB: ret = 1; act++; break;
-            case DIK_HOME:
+            case SDLK_TAB: ret = 1; act++; break;
+            case SDLK_HOME:
                 if (cursor_y>0)
                     cursor_y=0;
                 else
                     list_start=0;
                 act++;
                 break;
-            case DIK_END:
+            case SDLK_END:
                 if (cursor_y<ysize-1)
                     cursor_y=ysize-1;
                 else
                     list_start=256-ysize;
                 act++;
                 break;
-            case DIK_PGUP:
+            case SDLK_PAGEUP:
                 if (cursor_y>0)
                     cursor_y-=16;
                 else
                     list_start-=16;
                 act++;
                 break;
-            case DIK_PGDN:
+            case SDLK_PAGEDOWN:
                 if (cursor_y<ysize-2)
                     cursor_y+=16;
                 else
                     list_start+=16;
                 act++;
                 break;
-            case DIK_UP: 
+            case SDLK_UP: 
                 cursor_y--; 
                 if (cursor_y<0)
                     list_start--;
                 act++; 
                 break;
-            case DIK_DOWN: 
+            case SDLK_DOWN: 
                 cursor_y++; 
                 if (cursor_y>=ysize)
                     list_start++;
                 act++; 
                 break;
-            case DIK_LEFT: cursor_x--; act++; break;
-            case DIK_RIGHT: cursor_x++; act++; break;
+            case SDLK_LEFT: cursor_x--; act++; break;
+            case SDLK_RIGHT: cursor_x++; act++; break;
             
-            case DIK_PERIOD:
-            case DIK_SPACE:
-            case DIK_MINUS:
+            case SDLK_PERIOD:
+            case SDLK_SPACE:
+            case SDLK_MINUS:
                 song->orderlist[cursor_y+list_start] = 0x100;
                 cursor_x=0; cursor_y++;
                 if (cursor_y>=ysize)
                     list_start++;
                 act++;
                 break;
-            case DIK_ADD:
+            case SDLK_KP_PLUS:
                 if(kstate == KS_SHIFT)
                 {
                     if(cur_edit_order < 255 && song->orderlist[cur_edit_order + 1] != 0x100)
@@ -127,7 +127,7 @@ int OrderEditor::update() {
                     list_start++;
                 act++;
                 break;
-            case DIK_SUBTRACT:
+            case SDLK_KP_MINUS:
                 if(kstate == KS_SHIFT)
                 {
                     if(cur_edit_order > 0 && song->orderlist[cur_edit_order -1] != 0x100)
@@ -140,7 +140,7 @@ int OrderEditor::update() {
                     break;
                 }
                 break;
-            case DIK_DELETE:
+            case SDLK_DELETE:
                 for(i=cursor_y+list_start;i<255;i++)
                     song->orderlist[i] = song->orderlist[i+1];
                 song->orderlist[255] = 0x100;
@@ -150,24 +150,24 @@ int OrderEditor::update() {
                 if(cur_edit_order<0)
                     cur_edit_order=0;
                 break;
-            case DIK_INSERT:
+            case SDLK_INSERT:
                 for(i=255;i>cursor_y+list_start;i--)
                     song->orderlist[i] = song->orderlist[i-1];
                 song->orderlist[cursor_y+list_start] = 0x100;
                 act++;
                 break;
-            case DIK_0: val = 0; act++; break;
-            case DIK_1: val = 1; act++; break;
-            case DIK_2: val = 2; act++; break;
-            case DIK_3: val = 3; act++; break;
-            case DIK_4: val = 4; act++; break;
-            case DIK_5: val = 5; act++; break;
-            case DIK_6: val = 6; act++; break;
-            case DIK_7: val = 7; act++; break;
-            case DIK_8: val = 8; act++; break;
-            case DIK_9: val = 9; act++; break;
+            case SDLK_0: val = 0; act++; break;
+            case SDLK_1: val = 1; act++; break;
+            case SDLK_2: val = 2; act++; break;
+            case SDLK_3: val = 3; act++; break;
+            case SDLK_4: val = 4; act++; break;
+            case SDLK_5: val = 5; act++; break;
+            case SDLK_6: val = 6; act++; break;
+            case SDLK_7: val = 7; act++; break;
+            case SDLK_8: val = 8; act++; break;
+            case SDLK_9: val = 9; act++; break;
 
-            case DIK_G: 
+            case SDLK_G: 
                 p = song->orderlist[ cursor_y + list_start ];
                 if (p < 0x100) {
                     cur_edit_pattern = p;
@@ -239,21 +239,26 @@ void OrderEditor::draw(Drawable *S, int active) {
     char str[8];
     TColor f;
     for (cy=0;cy<ysize;cy++) {
+        const int ord_idx = cy + list_start;
         if (cy+list_start == ztPlayer->cur_order && ztPlayer->playing)
             f = COLORS.Highlight;
         else if(cy+list_start == cur_edit_order)
             f= COLORS.Lowlight;
         else
             f = COLORS.Text;
-        sprintf(&str[0],"%.3d",cy+list_start);
+        snprintf(&str[0], sizeof(str), "%.3d", ord_idx);
         printBG(col(x),row(cy+y),str,f,COLORS.Background,S);
-        if (song->orderlist[cy+list_start] < 255) {
-            sprintf(&str[0],"%.3d",song->orderlist[cy+list_start]);
+        if (ord_idx >= 0 && ord_idx < ZTM_ORDERLIST_LEN) {
+            if (song->orderlist[ord_idx] < 255) {
+                snprintf(&str[0], sizeof(str), "%.3d", song->orderlist[ord_idx]);
+            } else {
+                if (song->orderlist[ord_idx] == 0x101 )
+                    snprintf(&str[0], sizeof(str), "+++");
+                else
+                    snprintf(&str[0], sizeof(str), "---");
+            }
         } else {
-            if (song->orderlist[cy+list_start] == 0x101 )
-                sprintf(&str[0],"+++");
-            else    
-                sprintf(&str[0],"---");
+            snprintf(&str[0], sizeof(str), "---");
         }
         printBG(col(x+4),row(cy+y),str,COLORS.EditText,COLORS.EditBG,S);
         if (active) 

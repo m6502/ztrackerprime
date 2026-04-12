@@ -1,14 +1,16 @@
 #include "zt.h"
 #include "FileList.h"
+#include <assert.h>
 
 #include <filesystem>
+#include <algorithm>
 
 
 // ------------------------------------------------------------------------------------------------
 //
 //
 DriveList::DriveList() {
-    empty_message = "No drives found";
+    empty_message = (char *)"No drives found";
     is_sorted = true;
     OnChange();
     updated = 1;
@@ -44,25 +46,25 @@ void DriveList::OnChange()
 {
   int i ;
 
-    clear();        
+    clear();
+
+#ifdef _WIN32
     int r;
-//    unsigned char *s;
     char str[4];
-    unsigned char cap[16],cur[512],save[16];
+    char cap[16],cur[512],save[16];
     strcpy(str,"A:\\");
     r = GetLogicalDrives();
-    int cd=0;
     LBNode *p;
     save[0] = 0;
     if(!already_changed_default_directory)
     {
         if(zt_config_globals.default_directory[0] != '\0')
-            SetCurrentDirectory((LPCTSTR)zt_config_globals.default_directory);
+            zt_set_current_directory(zt_config_globals.default_directory);
         already_changed_default_directory = 1;
     }
-    
-    GetCurrentDirectory(512,(LPSTR)cur);
-    
+
+    zt_get_current_directory(512,cur);
+
     for(i=0;i<26;i++) {
         if (r&1) {
             strcpy((char *)&cap[0], "  A:");
@@ -71,10 +73,10 @@ void DriveList::OnChange()
             switch(GetDriveType(str)) {
                 case DRIVE_CDROM:
                 case DRIVE_REMOVABLE:
-                    cap[0] = (unsigned char)225;
+                    cap[0] = (char)225;
                     break;
                 default:
-                    cap[0] = (unsigned char)224;
+                    cap[0] = (char)224;
                     break;
             }
             p = insertItem((char *)&cap[0]);
@@ -87,7 +89,11 @@ void DriveList::OnChange()
     i = findItem((char *)save);
     if (i>=0)
         setCursor(i);
-       
+#else
+    LBNode *p = insertItem((char *)"/");
+    p->int_data = 0;
+    setCursor(0);
+#endif
 }
 
 
@@ -95,7 +101,11 @@ void DriveList::OnChange()
 //
 //
 void DriveList::OnSelect(LBNode *selected) {
+#ifdef _WIN32
     std::filesystem::current_path(&selected->caption[2]);
+#else
+    std::filesystem::current_path(selected->caption);
+#endif
     OnChange();
     updated++;
     ListBox::OnSelect(selected);
@@ -108,7 +118,7 @@ void DriveList::OnSelect(LBNode *selected) {
 //
 DirList::DirList() 
 {
-    empty_message = "";
+    empty_message = (char *)"";
     is_sorted = true;
     use_checks = false;
     updated = 1;
@@ -134,7 +144,7 @@ int DirList::update() {
     int act=0;
     int ret=0;
     switch(key) {
-        case DIK_LEFT: ret = -1; act++; break;
+        case SDLK_LEFT: ret = -1; act++; break;
     }
     if (act) {
         Keys.getkey();
@@ -185,7 +195,7 @@ void DirList::OnChange()
 
     if(!is_root_directory(current_dir))
     {
-        LBNode* p = insertItem((char *)"..");
+        insertItem((char *)"..");
     }
 
     for (const auto& entry : std::filesystem::directory_iterator(".")) {
@@ -193,7 +203,7 @@ void DirList::OnChange()
         if (entry.is_directory()) {
 
             const std::string dirName = entry.path().filename().string();
-            LBNode* p = insertItem((char *)dirName.c_str());
+            insertItem((char *)dirName.c_str());
         }
     }
 
@@ -223,7 +233,7 @@ void DirList::OnSelect(LBNode *selected) {
     OnChange();
     updated++;
     char d[1024];
-    GetCurrentDirectory(1024,d);
+    zt_get_current_directory(1024,d);
     sprintf(szStatmsg,"Browsing %.70s",d);
     statusmsg = szStatmsg;
     status_change = 1;    
@@ -238,7 +248,7 @@ void DirList::OnSelect(LBNode *selected) {
 //
 FileList::FileList() 
 {
-    empty_message = "";
+    empty_message = (char *)"";
     is_sorted = true;
     use_checks = false;
     updated = 1;
@@ -265,7 +275,7 @@ int FileList::update()
     int act=0;
     int ret=0;
     switch(key) {
-        case DIK_RIGHT: ret = 1; act++; break;
+        case SDLK_RIGHT: ret = 1; act++; break;
     }
     if (act) {
         Keys.getkey();
@@ -297,14 +307,14 @@ void FileList::draw(Drawable *S, int active)
   unsigned char *str;
 
   str = (unsigned char *)malloc(xsize+1+2);
-  _ASSERT(str) ;
+  assert(str);
 
   LBNode *node = getNode(y_start);
 
   for (cy=0; cy <= ysize; cy++) {
 
     memset(str, ' ', xsize) ;
-    str[xsize] = NULL ;
+    str[xsize] = 0;
 
     TColor foreground_color = COLORS.EditText;
     TColor background_color = COLORS.EditBG;
@@ -354,12 +364,16 @@ void FileList::draw(Drawable *S, int active)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void FileList::AddFiles(char *pattern, TColor c) 
+void FileList::AddFiles(const char *pattern, TColor c) 
 {
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-        // Match the pattern (simple example using filename)
+    std::string wanted_ext = pattern ? pattern : "";
+    std::transform(wanted_ext.begin(), wanted_ext.end(), wanted_ext.begin(), ::tolower);
 
-        if (entry.is_regular_file() && entry.path().extension() == pattern) {
+    for (const auto& entry : std::filesystem::directory_iterator(".")) {
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+        if (entry.is_regular_file() && ext == wanted_ext) {
             LBNode* p = insertItem((char *)entry.path().filename().string().c_str());
             p->int_data = c; // Set the integer data
         }
@@ -378,7 +392,7 @@ void FileList::OnChange()
     AddFiles(".zt", COLORS.Data);
     AddFiles(".it", COLORS.Highlight);
     
-    // <Manu> Quiero que muestre tambien los .mid, asi que añado esta linea
+    // <Manu> Quiero que muestre tambien los .mid, asi que aÃ±ado esta linea
     AddFiles(".mid", COLORS.Highlight);
     
     need_redraw++;

@@ -64,12 +64,17 @@
 
 
 #include "zt.h"
-#include "sdl_syswm.h"
+#include <cmath>
+#include <ctime>
+#include <algorithm>
 #include <filesystem>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 
 
-#ifndef main
-    #define main SDL_main
+#if defined(_WIN32) && !defined(main)
+#define main SDL_main
 #endif
 
 
@@ -82,6 +87,12 @@
 
 CScreenUpdateManager screenmanager;
 Skin *CurrentSkin = NULL;
+
+SDL_Window *zt_main_window = NULL;
+bool zt_text_input_is_active = false;
+static SDL_Renderer *zt_renderer = NULL;
+static SDL_Texture *zt_frame_texture = NULL;
+static Uint64 g_last_autosave_tick_ms = 0;
 
 bool bScrollLock;
 
@@ -113,7 +124,7 @@ ResourceStream *Skin = NULL;
 BitmapCache *BM_Cache = NULL;
 */
 
-LPSTR cur_dir = NULL;
+char *cur_dir = NULL;
 
 int file_changed = 0;
 char *file_directory;
@@ -163,7 +174,7 @@ int cur_step = DEFAULT_CURSOR_STEP ;
 
 int keypress=0;
 int keywait = 0;
-int keytimer = 0x11;
+zt_timer_handle keytimer = 0;
 int keyID = 0;
 
 int status_change = 0;
@@ -179,9 +190,50 @@ edit_col edit_cols[41];
 //int TicksPerBeat   = 8; // Rows per beat;
 
 int key_jazz = 0x0;
-mbuf jazz[512];
+static std::mutex g_jazz_mutex;
+static std::unordered_map<int, mbuf> g_jazz;
+
+mbuf jazz_get_state(int key) {
+    std::lock_guard<std::mutex> lock(g_jazz_mutex);
+    const auto it = g_jazz.find(key);
+    if (it == g_jazz.end()) {
+        mbuf empty = {0x80, 0};
+        return empty;
+    }
+    return it->second;
+}
+
+bool jazz_note_is_active(int key) {
+    std::lock_guard<std::mutex> lock(g_jazz_mutex);
+    const auto it = g_jazz.find(key);
+    return it != g_jazz.end() && it->second.note != 0x80;
+}
+
+void jazz_set_state(int key, unsigned char note, unsigned char chan) {
+    std::lock_guard<std::mutex> lock(g_jazz_mutex);
+    g_jazz[key].note = note;
+    g_jazz[key].chan = chan;
+}
+
+void jazz_clear_state(int key) {
+    std::lock_guard<std::mutex> lock(g_jazz_mutex);
+    const auto it = g_jazz.find(key);
+    if (it != g_jazz.end()) {
+        it->second.note = 0x80;
+    }
+}
+
+void jazz_clear_all_states(void) {
+    std::lock_guard<std::mutex> lock(g_jazz_mutex);
+    g_jazz.clear();
+}
 
 int attempt_fullscreen_toggle();
+static void zt_request_ui_full_refresh(void);
+static void zt_autosave_tick(void);
+static int zt_autosave_now(void);
+static std::string zt_make_autosave_filename(void);
+static void zt_prune_autosaves(size_t keep_count);
 
 /*
 Bitmap *ZTLOGO = NULL;
@@ -256,16 +308,11 @@ CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 
 
 
-#ifdef __ENABLE_FULL_SCREEN
-  Screen *thescreen = NULL;
-#endif
-
-SDL_Surface *hardware_surface ;
 SDL_Surface *screen_buffer_surface ;
 
 Screen *screen_buffer = NULL ;
 
-SDL_Surface *set_video_mode(int w, int h, char *errstr) ;
+int set_video_mode(int w, int h, char *errstr) ;
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -305,13 +352,9 @@ void reset_editor(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int lock_mutex(HANDLE hMutex, int timeout) 
+int lock_mutex(zt_mutex_handle hMutex, int timeout)
 {
-    int result;
-    result = WaitForSingleObject(hMutex, timeout);
-    if (result == WAIT_OBJECT_0)
-        return 1;
-    return 0;
+    return zt_mutex_lock(hMutex, timeout);
 }
 
 
@@ -320,9 +363,9 @@ int lock_mutex(HANDLE hMutex, int timeout)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int unlock_mutex(HANDLE hMutex) 
+int unlock_mutex(zt_mutex_handle hMutex) 
 {
-    return ReleaseMutex(hMutex);
+    return zt_mutex_unlock(hMutex);
 }
 
 
@@ -524,6 +567,16 @@ WStack::~WStack()
 bool WStack::isempty(void) 
 {
     return (head == NULL);
+}
+
+// ------------------------------------------------------------------------------------------------
+//
+CUI_Page *WStack::top(void)
+{
+    if (!head) return NULL;
+    WStackNode *p = head;
+    while (p->next) p = p->next;
+    return p->page;
 }
 
 
@@ -859,7 +912,7 @@ void update_status(Drawable *S)
 
       if (cur_edit_pattern == ztPlayer->playing_cur_pattern) {
 
-        //<Manu> Hecho así este bucle pintaba números de línea sin comprobar cuántas tenía el pattern actual
+        //<Manu> Hecho as este bucle pintaba nmeros de lnea sin comprobar cuntas tena el pattern actual
 //        for(i = cur_edit_row_disp; i < (cur_edit_row_disp + PATTERN_EDIT_ROWS); i++) {
 
         //int max_row = song->patterns[cur_edit_pattern]->length ;
@@ -902,10 +955,10 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     int i;
     char str[80];
     istream *is;
-    cur_dir = (LPSTR)malloc(256);
-    GetCurrentDirectory(256,(LPSTR)cur_dir);
+    cur_dir = (char *)malloc(256);
+    zt_get_current_directory(256, cur_dir);
     if (!loadconf()) {
-        MessageBox(NULL,"Fatal: Unable to load zt.conf","zt: error",MB_OK | MB_ICONERROR);
+        zt_show_error("zt: error", "Fatal: Unable to load zt.conf");
         return -1;
     }
     Skin = newResourceStream(skinfile);
@@ -923,7 +976,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     Skin->freeStream(is);
     if (!S->isModeAvailable(INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y)) {
         sprintf(str,"Fatal: Screen mode (%dx%dx16) is not support by your gfx card",INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y);
-        MessageBox(NULL,str,"zt: error",MB_OK | MB_ICONERROR);
+        zt_show_error("zt: error", str);
         return -1;
     }
 
@@ -954,7 +1007,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     
     ////////////////////////////////////////////////////////////////////////
     
-    for(i=0;i<512;i++) jazz[i].note=0x80;
+    jazz_clear_all_states();
 
     HICON icon=(HICON)LoadImage(GetModuleHandle(NULL),MAKEINTRESOURCE(IDI_ZTICON),IMAGE_ICON,0,0,0);
     setWindowIcon(icon);
@@ -1185,57 +1238,58 @@ void global_keys(Drawable *S)
     
     if (!modal) {
         switch(key) {
-            case DIK_RIGHT: 
-                if (key==DIK_RIGHT && kstate == KS_CTRL)
+            case SDLK_RIGHT: 
+                if (key==SDLK_RIGHT && kstate == KS_CTRL)
                     if (ztPlayer->playing)
                         ztPlayer->ffwd();
                 break;
-            case DIK_LEFT:
-                if (key==DIK_LEFT && kstate == KS_CTRL)
+            case SDLK_LEFT:
+                if (key==SDLK_LEFT && kstate == KS_CTRL)
                     if (ztPlayer->playing)
                         ztPlayer->rewind();
                 break;
         
-            case DIK_RETURN:
+            case SDLK_RETURN:
                 if (kstate & KS_ALT) {
-                    attempt_fullscreen_toggle();
-                    key = Keys.getkey();
-                    clear++;
-                    doredraw++;  
+                    (void)attempt_fullscreen_toggle();
+                    (void)Keys.getkey();
+                    Keys.flush();
+                    midiInQueue.clear();
                     if (ActivePage->UI)
                         ActivePage->UI->full_refresh();
                     screenmanager.UpdateAll();
-                    need_refresh++; full++;
-                    //SDL_WM_ToggleFullScreen(S->surface);
+                    need_refresh++;
+                    doredraw++;
+                    return;
                 }
                 break;
-            case DIK_SCROLL:
+            case SDLK_SCROLLLOCK:
                 if (bScrollLock)
                     bScrollLock = 0;
                 else
                     bScrollLock = 1;
                 break;
-            case DIK_Q: 
+            case SDLK_Q: 
                 if (kstate & KS_ALT && kstate & KS_CTRL) {
                     command=CMD_QUIT; 
                     key = Keys.getkey();
                 }               
                 break;
-            case DIK_N: // new song
+            case SDLK_N: // new song
                 if (kstate & KS_ALT) {
                     popup_window(UIP_NewSong);
                     key = Keys.getkey();
                     clear++;
                 }
                 break;
-            case DIK_P: // song duration
+            case SDLK_P: // song duration
                 if (kstate & KS_ALT) {
                     popup_window(UIP_SongDuration);
                     key = Keys.getkey();
                     clear++;
                 }
                 break;
-            case DIK_F7: // Play from Order
+            case SDLK_F7: // Play from Order
                 if (kstate & KS_SHIFT) {
                     command = CMD_PLAY_ORDER;
                 }
@@ -1243,7 +1297,7 @@ void global_keys(Drawable *S)
 
 
 #ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
-            case DIK_F4:
+            case SDLK_F4:
                 if (kstate & KS_CTRL) {
                     command=CMD_SWITCH_MIDIMACEDIT;
                 }
@@ -1251,8 +1305,8 @@ void global_keys(Drawable *S)
 #endif
 
 
-            //case DIK_F9: // load
-            case DIK_L: // load
+            //case SDLK_F9: // load
+            case SDLK_L: // load
                 if (kstate & KS_CTRL) {
                     command = CMD_SWITCH_LOAD;
                     key = Keys.getkey();
@@ -1260,7 +1314,7 @@ void global_keys(Drawable *S)
                 break;
 
 #ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
-            case DIK_F10:
+            case SDLK_F10:
 
                 if (kstate == KS_NO_SHIFT_KEYS) {
 
@@ -1270,7 +1324,7 @@ void global_keys(Drawable *S)
 
               break ;
 
-            case DIK_S: // save
+            case SDLK_S: // save
                 if (kstate & KS_CTRL) {
 
                     bool saveas = true ;
@@ -1298,7 +1352,7 @@ void global_keys(Drawable *S)
 
 
 
-            case DIK_F11: // Set Current Order to Playing order or current pattern
+            case SDLK_F11: // Set Current Order to Playing order or current pattern
                 if(kstate & KS_SHIFT) {
                     if(ztPlayer->playing) {
                         cur_edit_order = ztPlayer->cur_order;
@@ -1334,10 +1388,18 @@ void global_keys(Drawable *S)
                     }
                 }
                 break;
-            case DIK_F12: 
-                if (kstate & KS_ALT) command = CMD_SWITCH_ABOUT;
-                //else if (kstate & KS_CTRL) command = CMD_SWITCH_CONFIG;
-                else command = CMD_SWITCH_SYSCONF; 
+            case SDLK_F12: 
+                if (kstate & KS_ALT) {
+                    command = CMD_SWITCH_ABOUT;
+                } else if (cur_state == STATE_SYSTEM_CONFIG) {
+                    command = CMD_SWITCH_CONFIG;
+                } else if (cur_state == STATE_CONFIG) {
+                    command = CMD_SWITCH_SYSCONF;
+                } else if (kstate & KS_CTRL) {
+                    command = CMD_SWITCH_CONFIG;
+                } else {
+                    command = CMD_SWITCH_SYSCONF;
+                }
                 break;          
 
         }
@@ -1349,26 +1411,26 @@ void global_keys(Drawable *S)
             switch(key)
             {
                 // ----------------------------------------------
-                case DIK_F1: command=CMD_SWITCH_HELP;      break;
+                case SDLK_F1: command=CMD_SWITCH_HELP;      break;
                 // ----------------------------------------------
-                case DIK_F2: command=CMD_SWITCH_PEDIT;     break;
+                case SDLK_F2: command=CMD_SWITCH_PEDIT;     break;
                 // ----------------------------------------------
-                case DIK_F3: command=CMD_SWITCH_IEDIT;     break;
+                case SDLK_F3: command=CMD_SWITCH_IEDIT;     break;
                 
 #ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
                 // ----------------------------------------------
-                case DIK_F4: command=CMD_SWITCH_ARPEDIT;   break;
+                case SDLK_F4: command=CMD_SWITCH_ARPEDIT;   break;
 #endif
                 // ----------------------------------------------
-                case DIK_F5: command = CMD_PLAY;           break;
+                case SDLK_F5: command = CMD_PLAY;           break;
                 // ----------------------------------------------
-                case DIK_F6: command = CMD_PLAY_PAT;       break;
+                case SDLK_F6: command = CMD_PLAY_PAT;       break;
                 // ----------------------------------------------
-                case DIK_F7: command = CMD_PLAY_PAT_LINE;  break;
+                case SDLK_F7: command = CMD_PLAY_PAT_LINE;  break;
                 // ----------------------------------------------
-                case DIK_F8: command = CMD_STOP;           break;
+                case SDLK_F8: command = CMD_STOP;           break;
                 // ----------------------------------------------
-                case DIK_F9: 
+                case SDLK_F9: 
                     
                     if((kstate & KS_ALT) == 0) {
                         command = CMD_PANIC;  
@@ -1377,9 +1439,9 @@ void global_keys(Drawable *S)
                     break ;
 
                 // ----------------------------------------------
-                //case DIK_F10: command=CMD_SWITCH_SONGCONF; break;
+                //case SDLK_F10: command=CMD_SWITCH_SONGCONF; break;
                 // ----------------------------------------------
-                case DIK_F11: command=CMD_SWITCH_SONGCONF; break;
+                case SDLK_F11: command=CMD_SWITCH_SONGCONF; break;
 
                 // ----------------------------------------------
                 default:
@@ -1392,7 +1454,7 @@ void global_keys(Drawable *S)
 
                 switch(key)
                 {
-                    case DIK_F9: command = CMD_HARD_PANIC;  break ;
+                    case SDLK_F9: command = CMD_HARD_PANIC;  break ;
                     default:
                         break ;
                 } ;
@@ -1473,13 +1535,11 @@ void global_keys(Drawable *S)
             doredraw++; clear++; 
             break;
 
-#ifndef DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
         // ------------------------------------------------------------------------
         case CMD_SWITCH_CONFIG:
             switch_page(UIP_Config);
             doredraw++; clear++;
             break;
-#endif
 
         // ------------------------------------------------------------------------
         case CMD_SWITCH_ABOUT: 
@@ -1706,7 +1766,7 @@ void make_toolbar(void)
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,0,0);
-    gb->StuffKey = DIK_F5;
+    gb->StuffKey = SDLK_F5;
     UI_Toolbar->add_element(gb,id++);
 
     /* Load */
@@ -1717,9 +1777,9 @@ void make_toolbar(void)
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,29,0);
-    //gb->StuffKey = DIK_F9;
-    gb->StuffKey = DIK_L;
-    gb->StuffKeyState = KMOD_CTRL;
+    //gb->StuffKey = SDLK_F9;
+    gb->StuffKey = SDLK_L;
+    gb->StuffKeyState = SDL_KMOD_CTRL;
     UI_Toolbar->add_element(gb,id++);
     
     /* Conf */
@@ -1730,7 +1790,7 @@ void make_toolbar(void)
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,0);
-    gb->StuffKey = DIK_F11;
+    gb->StuffKey = SDLK_F11;
     UI_Toolbar->add_element(gb,id++);
     
     /* Stop */
@@ -1741,7 +1801,7 @@ void make_toolbar(void)
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,0,17);
-    gb->StuffKey = DIK_F8;
+    gb->StuffKey = SDLK_F8;
     UI_Toolbar->add_element(gb,id++);
     
     /* Save */
@@ -1752,10 +1812,10 @@ void make_toolbar(void)
     gb->xsize = NORMAL_BUTTONS_SIZE_X ; 
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,29,17);
-     gb->StuffKey = DIK_S;         // bugfix #3, tlr
-     gb->StuffKeyState = KMOD_CTRL | KMOD_SHIFT ;  // bugfix #3, tlr
-    //gb->StuffKey = DIK_F10;          // bugfix #3, tlr
-    //gb->StuffKeyState = KMOD_CTRL;     // bugfix #3, tlr
+     gb->StuffKey = SDLK_S;         // bugfix #3, tlr
+     gb->StuffKeyState = SDL_KMOD_CTRL | SDL_KMOD_SHIFT ;  // bugfix #3, tlr
+    //gb->StuffKey = SDLK_F10;          // bugfix #3, tlr
+    //gb->StuffKeyState = SDL_KMOD_CTRL;     // bugfix #3, tlr
     UI_Toolbar->add_element(gb,id++);
     
     /* Exit */
@@ -1766,8 +1826,8 @@ void make_toolbar(void)
     gb->xsize = NORMAL_BUTTONS_SIZE_X ;
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,17);
-    gb->StuffKey = DIK_Q;
-    gb->StuffKeyState = KMOD_CTRL | KMOD_ALT;
+    gb->StuffKey = SDLK_Q;
+    gb->StuffKeyState = SDL_KMOD_CTRL | SDL_KMOD_ALT;
     UI_Toolbar->add_element(gb,id++);
 
 
@@ -1784,10 +1844,10 @@ void make_toolbar(void)
     gb->ysize = ABOUT_BUTTON_SIZE_Y ;
 
     make_button(gb,85,0,80,55)
-    // gb->StuffKey = DIK_F1;                 // bugfix #2, tlr 
+    // gb->StuffKey = SDLK_F1;                 // bugfix #2, tlr 
     // gb->StuffKeyState = KS_CTRL | KS_ALT;  // bugfix #2, tlr
-    gb->StuffKey = DIK_F12;                   // bugfix #2, tlr
-    gb->StuffKeyState = KMOD_ALT;               // bugfix #2, tlr
+    gb->StuffKey = SDLK_F12;                   // bugfix #2, tlr
+    gb->StuffKeyState = SDL_KMOD_ALT;               // bugfix #2, tlr
     UI_Toolbar->add_element(gb,id++);
 
     
@@ -1854,7 +1914,8 @@ void encode(char *str, char w[256])
 void setup_midi() 
 {
     char *name, *temp, szKey[256], tt[256];
-    conf *Config = zt_config_globals.Config;
+    conf DeviceConfig((char *)"devices.conf");
+    conf *Config = &DeviceConfig;
 
 //	tt = NULL;
     for (int j=0;j<MidiOut->numOuputDevices;j++) {
@@ -1871,10 +1932,16 @@ void setup_midi()
         }
         sprintf(szKey,"alias_%s",tt);
         temp = Config->get(&szKey[0]);
+
+        // <Manu> Cuidado con esto....
+        if (MidiOut->outputDevices[j]->alias) {
+            free(MidiOut->outputDevices[j]->alias);
+            MidiOut->outputDevices[j]->alias = NULL;
+        }
         if(temp && temp[0] != '\0') {
             MidiOut->outputDevices[j]->alias = strdup(temp);
         }
-		else MidiOut->outputDevices[j]->alias = strdup("");
+        else MidiOut->outputDevices[j]->alias = strdup("");
         sprintf(szKey,"bank_%s",tt);
         temp = Config->get(szKey);
         if(temp) {
@@ -1892,7 +1959,7 @@ void setup_midi()
     for (int i=0;i<MAX_MIDI_OUTS;i++){ 
 
       sprintf(szKey,"open_out_device_%d",i);
-      name = zt_config_globals.Config->get(szKey);
+      name = Config->get(szKey);
       
       if (name) {
       
@@ -1976,8 +2043,6 @@ int initGFX ()
 //
 int postAction () 
 {  // Deinit functions
-
-    SDL_Quit();
     
     intlist *mod;
     OutputDevice *m;
@@ -1987,33 +2052,40 @@ int postAction ()
     static char name[256];
 	static char val[256];
 	static char tt[256];
+    conf DeviceConfig((char *)"devices.conf");
 
     std::filesystem::current_path(cur_dir);
     for (i=0;i<MAX_MIDI_OUTS;i++) {
         sprintf(name,"open_out_device_%d",i);
-        zt_config_globals.Config->remove(&name[0]);
+        DeviceConfig.remove(&name[0]);
+        sprintf(name,"known_out_device_%d",i);
+        DeviceConfig.remove(&name[0]);
     }
     for (i=0;i<MAX_MIDI_INS;i++) {
         sprintf(name,"open_in_device_%d",i);
-        zt_config_globals.Config->remove(&name[0]);
+        DeviceConfig.remove(&name[0]);
+        sprintf(name,"known_in_device_%d",i);
+        DeviceConfig.remove(&name[0]);
     }
 	//tt = NULL;
 
     for (int j=0;j<MidiOut->numOuputDevices;j++) {
 
         m = MidiOut->outputDevices[j];
+        sprintf(name,"known_out_device_%d",j);
+        DeviceConfig.set(&name[0], m->szName,0);
 //		if(tt != NULL)
 //			free(tt);
 		encode(m->szName, tt);
 //        zt_config_globals.Config->set(&m->szName[0], (m->alias != NULL)?m->alias:"",0);
-	sprintf(blah,"latency_%s",tt);
-	sprintf(val,"%d",m->delay_ticks);
-	zt_config_globals.Config->set(&blah[0], val);
-	sprintf(blah,"bank_%s",tt);
-	zt_config_globals.Config->set(&blah[0], ( ((MidiOutputDevice*)m )->reverse_bank_select)?"Yes":"No");
+		sprintf(blah,"latency_%s",tt);
+		sprintf(val,"%d",m->delay_ticks);
+		DeviceConfig.set(&blah[0], val);
+		sprintf(blah,"bank_%s",tt);
+		DeviceConfig.set(&blah[0], ( ((MidiOutputDevice*)m )->reverse_bank_select)?"Yes":"No");
         if(m->alias != NULL && strlen(m->alias) > 1) {
             sprintf(blah,"alias_%s",tt);
-            zt_config_globals.Config->set(&blah[0], m->alias);
+            DeviceConfig.set(&blah[0], m->alias);
         }
     }
 	//if(tt != NULL)
@@ -2025,7 +2097,7 @@ int postAction ()
             while(mod) {
                 m = MidiOut->outputDevices[mod->key];
                 sprintf(name,"open_out_device_%d",i);
-				zt_config_globals.Config->set(&name[0], m->szName,0);
+				DeviceConfig.set(&name[0], m->szName,0);
                 mod = mod->next; i++;
             }
             i=0;
@@ -2033,11 +2105,17 @@ int postAction ()
             while(mod) {
                 mi = MidiIn->midiInDev[mod->key];
                 sprintf(name,"open_in_device_%d",i);
-                zt_config_globals.Config->set(&name[0], mi->szName,0);
+                DeviceConfig.set(&name[0], mi->szName,0);
                 mod = mod->next; i++;
             }
         }
+        for (int j=0; j<MidiIn->numMidiDevs; j++) {
+            mi = MidiIn->midiInDev[j];
+            sprintf(name,"known_in_device_%d",j);
+            DeviceConfig.set(&name[0], mi->szName,0);
+        }
     }
+    DeviceConfig.save((char *)"devices.conf");
     zt_config_globals.save();
 
     if (cur_dir) free(cur_dir);
@@ -2045,7 +2123,7 @@ int postAction ()
     if (MidiOut) MidiOut->panic();
     if (clipboard) delete clipboard;
     
-    KillTimer(NULL,keytimer);
+    zt_timer_stop(keytimer);
     
     if (UI_Toolbar) {
 #ifdef DEBUG
@@ -2058,12 +2136,12 @@ int postAction ()
     delete InstEditorUI;
     delete UI; UI=NULL;
     delete UIP_About;
+    delete UIP_LoadMsg;
+    delete UIP_SaveMsg;
     delete UIP_InstEditor;
     delete UIP_Logoscreen;
     delete UIP_Loadscreen;
     delete UIP_Savescreen;
-    delete UIP_LoadMsg;
-    delete UIP_SaveMsg;
     delete UIP_Ordereditor;
     delete UIP_Playsong;
     delete UIP_Songconfig;
@@ -2122,39 +2200,77 @@ void update_lights(Drawable *S)
 }
 
 
-VOID CALLBACK TP_Keyboard_Repeat(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
+void TP_Keyboard_Repeat(void) {
+    if (zt_text_input_is_active) {
+        const bool allow_repeat = (keyID == SDLK_BACKSPACE || keyID == SDLK_DELETE ||
+                                   keyID == SDLK_LEFT || keyID == SDLK_RIGHT ||
+                                   keyID == SDLK_UP || keyID == SDLK_DOWN);
+        if (!allow_repeat) {
+            zt_timer_stop(keytimer);
+            keywait = 0;
+            return;
+        }
+    }
     if (keyID) {
-        if ((!key_jazz) || jazz[keyID].note==0x80)            
-            if (!(jazz[keyID].note!=0x80 && cur_state==STATE_IEDIT))
-                if (!bDontKeyRepeat && keyID != DIK_8 && keyID != DIK_4)
+        const int active_jazz_note = jazz_note_is_active(keyID);
+        if ((!key_jazz) || !active_jazz_note)
+            if (!(active_jazz_note && cur_state==STATE_IEDIT))
+                if (!bDontKeyRepeat && keyID != SDLK_8 && keyID != SDLK_4)
                     Keys.insert(keyID,KS_LAST_STATE);
-        if (jazz[keyID].note != 0x80 && !key_jazz) {
+        if (active_jazz_note && !key_jazz) {
             if (cur_state!=STATE_IEDIT) {
-                if(keyID == DIK_8)
+                const mbuf st = jazz_get_state(keyID);
+                if(keyID == SDLK_8)
                     MidiOut->panic();
                 else
-                    MidiOut->noteOff(song->instruments[cur_inst]->midi_device,jazz[keyID].note,jazz[keyID].chan,0x0,0);
-                jazz[keyID].note = 0x80;
+                    MidiOut->noteOff(song->instruments[cur_inst]->midi_device,st.note,st.chan,0x0,0);
+                jazz_clear_state(keyID);
             }
         }   
     }
     if (keywait == 1) {
         keywait = 0;
-        KillTimer(NULL,keytimer);
-        keytimer = SetTimer(NULL,keytimer,zt_config_globals.key_repeat_time,(TIMERPROC)TP_Keyboard_Repeat);
+        zt_timer_stop(keytimer);
+        keytimer = zt_timer_start(keytimer, zt_config_globals.key_repeat_time, TP_Keyboard_Repeat);
     }
 }
+
 
 
 /* MAIN */
 
 void keyhandler(SDL_KeyboardEvent *e) {
-    SDLKey id = e->keysym.sym;
-    char actual_ch = e->keysym.unicode & 0x7F;
-    int pressed = (e->state == SDL_PRESSED);
-    if (id == DIK_NUMPADENTER) 
-      id=SDLK_RETURN;
-    if (id != DIK_LALT && id != DIK_RALT && id != DIK_RCONTROL && id != DIK_LCONTROL && id != DIK_LSHIFT && id != DIK_RSHIFT) {
+    KBKey id = (KBKey)e->key;
+    KBMod mod = (KBMod)e->mod;
+    unsigned char actual_ch = 0;
+    int pressed = e->down ? 1 : 0;
+
+    /* We implement key-repeat ourselves via TP_Keyboard_Repeat + timer.
+       Ignore SDL auto-repeat key-down events to avoid queue buildup/stutter. */
+    if (pressed && e->repeat) {
+        return;
+    }
+
+    if (id == SDLK_KP_ENTER)
+      id = SDLK_RETURN;
+
+    if (pressed && id == SDLK_RETURN) {
+        actual_ch = 10;
+    }
+
+    if (id != SDLK_LALT && id != SDLK_RALT && id != SDLK_RCTRL && id != SDLK_LCTRL && id != SDLK_LSHIFT && id != SDLK_RSHIFT) {
+        if (zt_text_input_is_active && pressed) {
+            const bool is_edit_or_nav =
+                (id == SDLK_UP || id == SDLK_DOWN || id == SDLK_LEFT || id == SDLK_RIGHT ||
+                 id == SDLK_BACKSPACE || id == SDLK_DELETE || id == SDLK_RETURN ||
+                 id == SDLK_TAB || id == SDLK_HOME || id == SDLK_END ||
+                 id == SDLK_PAGEUP || id == SDLK_PAGEDOWN);
+            if (!is_edit_or_nav) {
+                if (id >= 0x20 && id < 0x7f) {
+                    return;
+                }
+            }
+        }
         if (zclear_flag)
             zclear_presscount = 0;
         else
@@ -2167,39 +2283,87 @@ void keyhandler(SDL_KeyboardEvent *e) {
             }
             if (id == keyID) {
                 keyID = 0;
-                KillTimer(NULL, keytimer);
+                zt_timer_stop(keytimer);
             }
-                if (jazz[id].note != 0x80) {
-                    if(id == DIK_8)
-                        MidiOut->panic();
-                    else
-                    MidiOut->noteOff(song->instruments[cur_inst]->midi_device,jazz[id].note,jazz[id].chan,0x0,0);
-                    jazz[id].note = 0x80;
-                }   
+            if (jazz_note_is_active((int)id)) {
+                const mbuf st = jazz_get_state((int)id);
+                if(id == SDLK_8)
+                    MidiOut->panic();
+                else
+                    MidiOut->noteOff(song->instruments[cur_inst]->midi_device,st.note,st.chan,0x0,0);
+                jazz_clear_state((int)id);
+            }
         } else  {
-            Keys.insert(id,e->keysym.mod,actual_ch);
-            if (!(id == DIK_RETURN && e->keysym.mod&KMOD_ALT)) {
-                keytimer = SetTimer(NULL,keytimer,zt_config_globals.key_wait_time,(TIMERPROC)TP_Keyboard_Repeat);
+            Keys.insert(id, mod, actual_ch);
+            const bool allow_repeat = (!zt_text_input_is_active) ||
+                (id == SDLK_BACKSPACE || id == SDLK_DELETE ||
+                 id == SDLK_LEFT || id == SDLK_RIGHT ||
+                 id == SDLK_UP || id == SDLK_DOWN ||
+                 id == SDLK_HOME || id == SDLK_END);
+            if (allow_repeat && !(id == SDLK_RETURN && (mod & SDL_KMOD_ALT))) {
+                keytimer = zt_timer_start(keytimer, zt_config_globals.key_wait_time, TP_Keyboard_Repeat);
                 keywait = 1;
                 keyID = id;
+            } else if (!allow_repeat) {
+                zt_timer_stop(keytimer);
+                keywait = 0;
+                keyID = 0;
             }
         }
     }
 }
 
+void textinputhandler(const SDL_Event *e) {
+    if (!zt_text_input_is_active) {
+        return;
+    }
+    if (!e || !e->text.text || !e->text.text[0]) {
+        return;
+    }
+
+    const unsigned char ch = (unsigned char)e->text.text[0];
+    if (ch >= 0x20 || ch == 10 || ch == 9) {
+        Keys.insert(SDLK_SPACE, SDL_KMOD_NONE, ch);
+    }
+}
+
+static void zt_update_mouse_position(float win_x, float win_y) {
+    int window_w = RESOLUTION_X;
+    int window_h = RESOLUTION_Y;
+    if (zt_main_window) {
+        SDL_GetWindowSize(zt_main_window, &window_w, &window_h);
+    }
+    if (window_w <= 0) {
+        window_w = RESOLUTION_X;
+    }
+    if (window_h <= 0) {
+        window_h = RESOLUTION_Y;
+    }
+
+    const float sx = (float)INTERNAL_RESOLUTION_X / (float)window_w;
+    const float sy = (float)INTERNAL_RESOLUTION_Y / (float)window_h;
+    LastX = (int)(win_x * sx);
+    LastY = (int)(win_y * sy);
+
+    if (LastX < 0) LastX = 0;
+    if (LastY < 0) LastY = 0;
+    if (LastX >= INTERNAL_RESOLUTION_X) LastX = INTERNAL_RESOLUTION_X - 1;
+    if (LastY >= INTERNAL_RESOLUTION_Y) LastY = INTERNAL_RESOLUTION_Y - 1;
+}
+
 void mousemotionhandler(SDL_MouseMotionEvent *e) {
-    LastX = e->x * FACTOR_ESCALAX ;
-    LastY = e->y * FACTOR_ESCALAY ;
+    zt_update_mouse_position((float)e->x, (float)e->y);
 }
 
 void mouseupbuttonhandler(SDL_MouseButtonEvent *e) {
+    zt_update_mouse_position((float)e->x, (float)e->y);
     switch(e->button) {
         case SDL_BUTTON_LEFT:
-            Keys.insert(DIK_MOUSE_1_OFF);
+            Keys.insert(((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)));
             bMouseIsDown = false;
             break;
         case SDL_BUTTON_RIGHT:
-            Keys.insert(DIK_MOUSE_2_OFF);
+            Keys.insert(((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)));
         break;
     }
     MousePressX = LastX;
@@ -2207,73 +2371,320 @@ void mouseupbuttonhandler(SDL_MouseButtonEvent *e) {
 }
 
 
-SDL_Surface *resizeSurface(SDL_Surface *oldSurface, int newWidth, int newHeight) {
-    // Create a new surface with the desired size
-    SDL_Surface *newSurface = SDL_CreateRGBSurface(
-        SDL_SWSURFACE, // Flags
-        newWidth,      // New width
-        newHeight,     // New height
-        oldSurface->format->BitsPerPixel, // Same bit depth
-        oldSurface->format->Rmask,
-        oldSurface->format->Gmask,
-        oldSurface->format->Bmask,
-        oldSurface->format->Amask
-    );
-
-    if (!newSurface) {
-        printf("Failed to create new surface: %s\n", SDL_GetError());
-        return NULL;
-    }
-
-    // Fill the new surface with a default color, if desired
-    SDL_FillRect(newSurface, NULL, SDL_MapRGB(newSurface->format, 0, 0, 0)); // Black
-
-    // Optionally, blit the old surface onto the new one
-    SDL_Rect destRect = {0, 0, (Uint16)oldSurface->w, (Uint16)oldSurface->h};
-    SDL_BlitSurface(oldSurface, NULL, newSurface, &destRect);
-
-    // Free the old surface
-    SDL_FreeSurface(oldSurface);
-
-    return newSurface;
-}
-
 void mousedownbuttonhandler(SDL_MouseButtonEvent *e) {
-
-    int old_zoom = ZOOM ;
+    zt_update_mouse_position((float)e->x, (float)e->y);
 
     switch(e->button) {
-
-#ifdef _ENABLE_WIP_MOUSE_WHEEL_ZOOM_TEST
-        case SDL_BUTTON_WHEELUP:
-            ZOOM += 0.1f ;
-            if(ZOOM > 2.0f) ZOOM = 2.0f ;
-            break ;
-
-        case SDL_BUTTON_WHEELDOWN:
-            ZOOM -= 0.1f ;
-            if(ZOOM < 1.0f) ZOOM = 1.0f ;
-            break ;
-#endif
         case SDL_BUTTON_LEFT:
-            Keys.insert(DIK_MOUSE_1_ON);
+            Keys.insert(((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)));
             bMouseIsDown = true;
             break;
         case SDL_BUTTON_RIGHT:
-            Keys.insert(DIK_MOUSE_2_ON);
+            Keys.insert(((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)));
         break;
     }
 
     MousePressX = LastX;
     MousePressY = LastY;    
+}
 
-#ifdef _ENABLE_WIP_MOUSE_WHEEL_ZOOM_TEST
-    if(ZOOM != old_zoom) {
-        
-        set_video_mode(RESOLUTION_X, RESOLUTION_Y, errstr) ;
-        screenmanager.UpdateAll();
+void mousewheelhandler(SDL_MouseWheelEvent *e) {
+    if (!e) {
+        return;
+    }
+    const SDL_Keymod mods = SDL_GetModState();
+    if ((mods & SDL_KMOD_CTRL) == 0) {
+        return;
+    }
+
+    const float old_zoom = ZOOM;
+    static int zoom_escape_dir = 0;
+
+    int wheel_steps = e->y;
+    while (wheel_steps != 0) {
+        const int dir = (wheel_steps > 0) ? 1 : -1;
+        const float nearest_integer = std::round(ZOOM);
+        const float distance_to_integer = std::fabs(ZOOM - nearest_integer);
+        const bool at_integer_zoom = distance_to_integer < 0.001f;
+
+        /* Integer zoom levels are sticky: first detent is absorbed, second detent exits. */
+        if (at_integer_zoom) {
+            if (zoom_escape_dir != dir) {
+                zoom_escape_dir = dir;
+                wheel_steps -= dir;
+                continue;
+            }
+        }
+
+        zoom_escape_dir = 0;
+        ZOOM += 0.1f * (float)dir;
+        ZOOM = std::round(ZOOM * 10.0f) / 10.0f;
+        if (ZOOM > 3.0f) ZOOM = 3.0f;
+        if (ZOOM < 0.5f) ZOOM = 0.5f;
+
+        wheel_steps -= dir;
+    }
+
+    if (ZOOM != old_zoom) {
+        if (!set_video_mode(RESOLUTION_X, RESOLUTION_Y, errstr)) {
+            ZOOM = old_zoom;
+            (void)set_video_mode(RESOLUTION_X, RESOLUTION_Y, errstr);
+            return;
+        }
+        zt_request_ui_full_refresh();
+    }
+}
+
+static void zt_request_ui_full_refresh(void)
+{
+    if (UI) UI->full_refresh();
+    if (UI_Toolbar) UI_Toolbar->full_refresh();
+    doredraw++;
+    need_refresh++;
+    screenmanager.UpdateAll();
+}
+
+static void zt_queue_full_redraw(void)
+{
+    doredraw++;
+    need_refresh++;
+    screenmanager.UpdateAll();
+}
+
+static void zt_handle_resize_event(int w, int h)
+{
+    if (!set_video_mode(w, h, errstr)) {
+        return;
+    }
+    zt_request_ui_full_refresh();
+}
+
+static int zt_autosave_now(void)
+{
+    if (!song) {
+        return 0;
+    }
+
+    const std::string autosave_file = zt_make_autosave_filename();
+    const char *autosave_tmp_file = "__autosave.tmp.zt";
+
+    const int dirty_before = file_changed;
+    unsigned char original_filename[ZTM_FILENAME_MAXLEN];
+    memcpy(original_filename, song->filename, sizeof(original_filename));
+
+    memset(song->filename, 0, sizeof(song->filename));
+    strncpy((char *)song->filename, autosave_tmp_file, sizeof(song->filename) - 1);
+
+    const int save_ret = song->save((char *)song->filename);
+
+    memcpy(song->filename, original_filename, sizeof(song->filename));
+    file_changed = dirty_before;
+
+    if (save_ret != 0) {
+        ZT_DEBUG_LOG("[autosave] save failed\n");
+        return 0;
+    }
+
+    std::error_code ec;
+    std::filesystem::remove(autosave_file, ec);
+    ec.clear();
+    std::filesystem::rename(autosave_tmp_file, autosave_file, ec);
+    if (ec) {
+        ZT_DEBUG_LOG("[autosave] rename failed: %s\n", ec.message().c_str());
+        return 0;
+    }
+
+    zt_prune_autosaves(3);
+    ZT_DEBUG_LOG("[autosave] wrote %s\n", autosave_file.c_str());
+    return 1;
+}
+
+static std::string zt_make_autosave_filename(void)
+{
+    const std::time_t now = std::time(NULL);
+    std::tm tm_now;
+#if defined(_WIN32)
+    localtime_s(&tm_now, &now);
+#else
+    localtime_r(&now, &tm_now);
+#endif
+
+    char name[64];
+    std::snprintf(name, sizeof(name), "__autosave_%04d_%02d_%02d_%02d_%02d_%02d.zt",
+                  tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday,
+                  tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
+    return std::string(name);
+}
+
+static void zt_prune_autosaves(size_t keep_count)
+{
+    std::vector<std::filesystem::path> autosaves;
+    std::error_code ec;
+    const std::filesystem::path cwd = std::filesystem::current_path(ec);
+    if (ec) {
+        return;
+    }
+
+    for (const auto &entry : std::filesystem::directory_iterator(cwd, ec)) {
+        if (ec) {
+            return;
+        }
+        if (!entry.is_regular_file()) {
+            continue;
+        }
+        const std::string fn = entry.path().filename().string();
+        if (fn.rfind("__autosave_", 0) == 0 && fn.size() > 13 && fn.substr(fn.size() - 3) == ".zt") {
+            autosaves.push_back(entry.path());
+        }
+    }
+
+    std::sort(autosaves.begin(), autosaves.end(), [](const std::filesystem::path &a, const std::filesystem::path &b) {
+        return a.filename().string() > b.filename().string();
+    });
+
+    for (size_t i = keep_count; i < autosaves.size(); ++i) {
+        std::filesystem::remove(autosaves[i], ec);
+        ec.clear();
+    }
+}
+
+static void zt_autosave_tick(void)
+{
+    const int interval_seconds = zt_config_globals.autosave_interval_seconds;
+    if (interval_seconds <= 0) {
+        return;
+    }
+
+    const Uint64 now_ms = SDL_GetTicks();
+    if (g_last_autosave_tick_ms == 0) {
+        g_last_autosave_tick_ms = now_ms;
+        return;
+    }
+
+    const Uint64 interval_ms = (Uint64)interval_seconds * 1000ULL;
+    if (now_ms - g_last_autosave_tick_ms < interval_ms) {
+        return;
+    }
+    g_last_autosave_tick_ms = now_ms;
+
+    if (file_changed <= 0) {
+        return;
+    }
+    if (ztPlayer && ztPlayer->playing) {
+        return;
+    }
+
+    (void)zt_autosave_now();
+}
+
+static void zt_backend_destroy_frame_texture(void)
+{
+    if (zt_frame_texture) {
+        SDL_DestroyTexture(zt_frame_texture);
+        zt_frame_texture = NULL;
+    }
+}
+
+static bool zt_zoom_is_integer(float zoom_value)
+{
+    const float nearest_integer = std::round(zoom_value);
+    return std::fabs(zoom_value - nearest_integer) < 0.001f;
+}
+
+static SDL_ScaleMode zt_get_configured_scale_mode(void)
+{
+    const char *scale_filter = zt_config_globals.scale_filter;
+    if (!scale_filter || !scale_filter[0]) {
+        return zt_zoom_is_integer(ZOOM) ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR;
+    }
+    if (SDL_strcasecmp(scale_filter, "nearest") == 0) {
+        return SDL_SCALEMODE_NEAREST;
+    }
+    if (SDL_strcasecmp(scale_filter, "linear") == 0) {
+        return zt_zoom_is_integer(ZOOM) ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR;
+    }
+#ifdef SDL_SCALEMODE_PIXELART
+    if (SDL_strcasecmp(scale_filter, "pixelart") == 0) {
+        return SDL_SCALEMODE_PIXELART;
     }
 #endif
+    ZT_DEBUG_LOG("[sdl3] unknown scale_filter '%s' in zt.conf, using linear\n", scale_filter);
+    return SDL_SCALEMODE_LINEAR;
+}
+
+static int zt_backend_ensure_frame_texture(int w, int h, char *errstr)
+{
+    if (!zt_renderer) {
+        return 0;
+    }
+    if (zt_frame_texture) {
+        float tw = 0.0f;
+        float th = 0.0f;
+        if (SDL_GetTextureSize(zt_frame_texture, &tw, &th) && (int)tw == w && (int)th == h) {
+            return 1;
+        }
+        zt_backend_destroy_frame_texture();
+    }
+
+    zt_frame_texture = SDL_CreateTexture(zt_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+    if (!zt_frame_texture) {
+        if (errstr) {
+            snprintf(errstr, 2048, "Couldn't create frame texture: %s", SDL_GetError());
+        }
+        return 0;
+    }
+    if (!SDL_SetTextureScaleMode(zt_frame_texture, zt_get_configured_scale_mode())) {
+        if (errstr) {
+            snprintf(errstr, 2048, "Couldn't set frame texture scale mode: %s", SDL_GetError());
+        }
+        return 0;
+    }
+    if (!SDL_SetTextureBlendMode(zt_frame_texture, SDL_BLENDMODE_NONE)) {
+        if (errstr) {
+            snprintf(errstr, 2048, "Couldn't set frame texture blend mode: %s", SDL_GetError());
+        }
+        return 0;
+    }
+    return 1;
+}
+
+static void zt_backend_present_frame(void)
+{
+    if (!zt_renderer || !zt_frame_texture || !screen_buffer || !screen_buffer->surface) {
+      return;
+    }
+
+    if (!SDL_UpdateTexture(zt_frame_texture, NULL, screen_buffer->surface->pixels, screen_buffer->surface->pitch)) {
+      ZT_DEBUG_LOG("[sdl3] update texture failed: %s\n", SDL_GetError());
+      return;
+    }
+
+    if (!SDL_RenderClear(zt_renderer)) {
+      ZT_DEBUG_LOG("[sdl3] render clear failed: %s\n", SDL_GetError());
+      return;
+    }
+    if (!SDL_RenderTexture(zt_renderer, zt_frame_texture, NULL, NULL)) {
+      ZT_DEBUG_LOG("[sdl3] render texture failed: %s\n", SDL_GetError());
+      return;
+    }
+    SDL_RenderPresent(zt_renderer);
+}
+
+static int zt_handle_platform_window_event(const SDL_Event *e)
+{
+    switch (e->type) {
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+    case SDL_EVENT_WINDOW_EXPOSED:
+    case SDL_EVENT_WINDOW_RESTORED:
+        zt_request_ui_full_refresh();
+        return 1;
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        zt_handle_resize_event((int)e->window.data1, (int)e->window.data2);
+        return 1;
+    default:
+        return 0;
+    }
 }
 
 
@@ -2288,6 +2699,10 @@ int action(Screen *S)
         if (!modal)
             UI_Toolbar->update();
         global_keys(S);
+        S = screen_buffer;
+        if (!S) {
+            return 1;
+        }
     }
 
     static int old_width = 0 ;
@@ -2351,6 +2766,10 @@ int action(Screen *S)
 
     if (need_refresh) {
         fixmouse++;
+#ifdef FORCE_FULL_SCREEN_REFRESH
+        UI->full_refresh();
+        if (UI_Toolbar) UI_Toolbar->full_refresh();
+#endif
         
         if (need_update) ActivePage->update();
         
@@ -2359,7 +2778,7 @@ int action(Screen *S)
             if (S->lock()==0) {
 
                 // Clean UI page background
-                // <Manu> Creo que este clean es mejorable y según cómo redundante
+                // <Manu> Creo que este clean es mejorable y segn cmo redundante
                 S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X-CHARACTER_SIZE_X,INTERNAL_RESOLUTION_Y - (480-424),/*0x00FF00*/COLORS.Background);
                 S->unlock();
                 
@@ -2398,7 +2817,40 @@ int action(Screen *S)
 // ------------------------------------------------------------------------------------------------
 //
 //
-SDL_Surface *set_video_mode(int w, int h, char *errstr)
+static int zt_backend_set_video_mode(char *errstr)
+{
+  Uint32 window_flags = SDL_WINDOW_RESIZABLE;
+  if (zt_config_globals.full_screen) {
+    window_flags |= SDL_WINDOW_FULLSCREEN;
+    bIsFullscreen = true;
+  } else {
+    bIsFullscreen = false;
+  }
+
+  if (!zt_main_window) {
+    zt_main_window = SDL_CreateWindow("zt", RESOLUTION_X, RESOLUTION_Y, window_flags);
+    if (!zt_main_window) {
+      sprintf(errstr, "Couldn't create SDL window: %s\n", SDL_GetError());
+      zt_show_error("Error", errstr);
+      return 0;
+    }
+    zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
+    if (!zt_renderer) {
+      snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
+      zt_show_error("Error", errstr);
+      return 0;
+    }
+    if (!SDL_SetRenderVSync(zt_renderer, 1)) {
+      ZT_DEBUG_LOG("Warning: couldn't enable renderer vsync: %s\n", SDL_GetError());
+    }
+  } else {
+    SDL_SetWindowSize(zt_main_window, RESOLUTION_X, RESOLUTION_Y);
+    SDL_SetWindowFullscreen(zt_main_window, zt_config_globals.full_screen ? SDL_WINDOW_FULLSCREEN : 0);
+  }
+  return 1;
+}
+
+int set_video_mode(int w, int h, char *errstr)
 {
   RESOLUTION_X = w ;
   RESOLUTION_Y = h ;
@@ -2413,44 +2865,23 @@ SDL_Surface *set_video_mode(int w, int h, char *errstr)
       RESOLUTION_Y = MINIMUM_SCREEN_HEIGHT * ZOOM ;
   }
 
-
-  Uint32 flags = SDL_SWSURFACE ;
-  //flags = SDL_HWSURFACE ;
-  
-  if (zt_config_globals.full_screen) {
-    
-    flags |= SDL_FULLSCREEN; //SDL_SWSURFACE | SDL_FULLSCREEN;
-    bIsFullscreen = true;
-  }
-
-  flags = flags | SDL_RESIZABLE ;
-  SDL_Surface *screen = SDL_SetVideoMode(RESOLUTION_X, RESOLUTION_Y, SCREEN_BPP, flags);
-
-  if ( screen == NULL ) {
+  if (!zt_backend_set_video_mode(errstr)) {
     
     // <Manu> El mensaje de error estaba mal
 
     //sprintf(errstr, "Couldn't set 640x480x32 video mode: %s\n", SDL_GetError());
-    sprintf(errstr, "Couldn't set %dx%dx%d video mode: %s\n", INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, SCREEN_BPP, SDL_GetError());
+    sprintf(errstr, "Couldn't set %dx%dx32 video mode: %s\n", INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, SDL_GetError());
     
-    MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-    return NULL;
+    zt_show_error("Error", errstr);
+    return 0;
   } 
-  else {
-    
-    if (screen->w != RESOLUTION_X || screen->h != RESOLUTION_Y || screen->format->BitsPerPixel != SCREEN_BPP) {
-      
-      sprintf(errstr, "Set mode, but it wasn't what i wanted: %s\n", SDL_GetError());
-      MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-      return NULL;
-    }
+  // <Manu> Cuidado con esto...
+  if (screen_buffer_surface != NULL) {
+    zt_destroy_surface(screen_buffer_surface);
+    screen_buffer_surface = NULL;
   }
 
-
-
-
-
-  screen_buffer_surface = SDL_CreateRGBSurface(0, INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, 32, 0, 0, 0, 0) ;
+  screen_buffer_surface = SDL_CreateSurface(INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, SDL_PIXELFORMAT_ARGB8888);
 
   if(screen_buffer_surface == NULL) {
 
@@ -2460,8 +2891,11 @@ SDL_Surface *set_video_mode(int w, int h, char *errstr)
 
   if(screen_buffer != NULL) delete screen_buffer ;
 
-  //Screen screen_buffer(hardware_surface, false);
   screen_buffer = new Screen(screen_buffer_surface, false);
+  if (!zt_backend_ensure_frame_texture(INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, errstr)) {
+    zt_show_error("Error", errstr);
+    return 0;
+  }
 
   /*if(UI) delete UI ;
   UI = new UserInterface;
@@ -2471,7 +2905,17 @@ SDL_Surface *set_video_mode(int w, int h, char *errstr)
   UI_Toolbar->dontmess = 1;*/
 
 
-  return screen ;
+  return 1;
+}
+
+static int zt_backend_init_runtime(char *errstr)
+{
+  if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
+    sprintf(errstr,"Could not initialize SDL: %s.\n", SDL_GetError());
+    zt_show_error("Error", errstr);
+    return 0;
+  }
+  return 1;
 }
 
 
@@ -2482,17 +2926,19 @@ SDL_Surface *set_video_mode(int w, int h, char *errstr)
 // ------------------------------------------------------------------------------------------------
 //
 //
-SDL_Surface *initSDL(void) 
+int initSDL(void) 
 {
-  if(zt_config_globals.default_directory[0] != '\0') SetCurrentDirectory((LPCTSTR)zt_config_globals.default_directory);
+  if(zt_config_globals.default_directory[0] != '\0') zt_set_current_directory(zt_config_globals.default_directory);
   
-  cur_dir = (LPSTR)malloc(256);
-  GetCurrentDirectory(256,(LPSTR)cur_dir);
+  cur_dir = (char *)malloc(256);
+  zt_get_current_directory(256, cur_dir);
   
   if (zt_config_globals.load()) {
-    
-    MessageBox(NULL,"Fatal: Unable to load zt.conf","zt: error",MB_OK | MB_ICONERROR);
-    return NULL;
+    if (zt_config_globals.save()) {
+      zt_show_error("zt: error", "Fatal: Unable to create default zt.conf");
+      return 0;
+    }
+    ZT_DEBUG_LOG("[conf] zt.conf not found, created default configuration\n");
   }
   /*
   if (zcmp(Config.get("fullscreen"),"yes")) {
@@ -2509,42 +2955,18 @@ SDL_Surface *initSDL(void)
     if(!CurrentSkin->load("default")) {
 
         // <Manu> :-/
-        return NULL;
+        return 0;
     }
   }
   
   
-  if((SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)==-1)) {
-    
-    sprintf(errstr,"Could not initialize SDL: %s.\n", SDL_GetError());
-    MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
-    return(NULL);
+  if (!zt_backend_init_runtime(errstr)) {
+    return 0;
   }
 
-
-#ifdef __DESACTIVADO_HASTA_ACTUALIZAR_SDL
-  SDL_version compiled;
-  SDL_version linked;
-
-  SDL_VERSION(&compiled);
-  SDL_GetVersion(&linked);
-#endif
-
-
-  
-
-#ifdef __DESACTIVADO_HASTA_ACTUALIZAR_SDL
-  SDL_Rect usableBounds;
-  if (SDL_GetDisplayUsableBounds(0, &usableBounds) != 0) {
-      SDL_Log("Could not get usable display bounds: %s\n", SDL_GetError());
-      SDL_Quit();
-      //return 1;
+  if (!set_video_mode(zt_config_globals.screen_width, zt_config_globals.screen_height, errstr)) {
+    return 0;
   }
-#endif
-
-
-  SDL_Surface *screen = set_video_mode(zt_config_globals.screen_width, zt_config_globals.screen_height, errstr) ;
-  if(screen == NULL) return NULL ;
 
 
 //    char str[80];
@@ -2560,7 +2982,7 @@ SDL_Surface *initSDL(void)
     Skin->freeStream(is);
     if (!S->isModeAvailable(INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y)) {
         sprintf(str,"Fatal: Screen mode (%dx%dx16) is not support by your gfx card",INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y);
-        MessageBox(NULL,str,"zt: error",MB_OK | MB_ICONERROR);
+        zt_show_error("zt: error", str);
         return -1;
     }
 */
@@ -2602,7 +3024,7 @@ SDL_Surface *initSDL(void)
     
     ////////////////////////////////////////////////////////////////////////
     
-    for(int i=0;i<512;i++) jazz[i].note=0x80;
+    jazz_clear_all_states();
 
 #ifdef __MANU__OLD_AND_UNNEEDED
     // This loads the icon from the resource and attaches it to the main window
@@ -2610,8 +3032,7 @@ SDL_Surface *initSDL(void)
     HWND w = FindWindow("zt","zt");
     SetClassLong(w, GCL_HICON, (LONG)icon);
 #endif
-
-    SDL_WM_SetCaption("zt","zt");
+    zt_set_window_title("zt");
 
 
     UIP_About = new CUI_About;
@@ -2641,485 +3062,288 @@ SDL_Surface *initSDL(void)
     UIP_SongDuration = new CUI_SongDuration;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
-    return screen;
+    return 1;
 
 }
-
 
 
 #ifdef _ENABLE_AUDIO
+static SDL_AudioStream *g_audio_stream = NULL;
 
-// ------------------------------------------------------------------------------------------------
-//
-//
-void audio_mixer(void *udata, Uint8 *stream, int len) 
+static void audio_mixer(void *udata, SDL_AudioStream *stream, int additional_amount, int)
 {
-  MidiOut->MixAudio(udata,stream,len);
+  if (additional_amount <= 0) {
+    return;
+  }
+
+  Uint8 *mixbuf = (Uint8 *)malloc((size_t)additional_amount);
+  if (!mixbuf) {
+    return;
+  }
+
+  MidiOut->MixAudio(udata, mixbuf, additional_amount);
+  SDL_PutAudioStreamData(stream, mixbuf, additional_amount);
+  free(mixbuf);
 }
 
+static int zt_backend_audio_start(void)
+{
+  SDL_AudioSpec wanted;
+  SDL_zero(wanted);
+  wanted.freq = 44100;
+  wanted.format = SDL_AUDIO_S16;
+  wanted.channels = 2;
+
+  g_audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &wanted, audio_mixer, NULL);
+  if (!g_audio_stream) {
+    fprintf(stderr, "Couldn't open audio stream: %s\n", SDL_GetError());
+    return 0;
+  }
+  if (!SDL_ResumeAudioStreamDevice(g_audio_stream)) {
+    fprintf(stderr, "Couldn't start audio stream: %s\n", SDL_GetError());
+    SDL_DestroyAudioStream(g_audio_stream);
+    g_audio_stream = NULL;
+    return 0;
+  }
+  return 1;
+}
+
+static void zt_backend_audio_stop(void)
+{
+  if (g_audio_stream) {
+    SDL_DestroyAudioStream(g_audio_stream);
+    g_audio_stream = NULL;
+  }
+}
 #endif
 
-   
-    
-    
+static void zt_backend_release_frame_resources(void)
+{
+  zt_backend_destroy_frame_texture();
+}
+
+static void zt_backend_shutdown_runtime(void)
+{
+  if (zt_renderer) {
+    SDL_DestroyRenderer(zt_renderer);
+    zt_renderer = NULL;
+  }
+  if (zt_main_window) {
+    SDL_DestroyWindow(zt_main_window);
+    zt_main_window = NULL;
+  }
+  SDL_Quit();
+}
+
 
 // ------------------------------------------------------------------------------------------------
 //
 //
-int main(int argc, char *argv[]) 
+int main(int argc, char *argv[])
 {
   char *w;
-  
+  const char path_sep =
+#if defined(_WIN32)
+    '\\';
+#else
+    '/';
+#endif
+
   // Get the zt directory and store it globally
-  
   if(argc > 1) {
-    
     if(argv[1] != NULL && argv[1][0] != '\0') {
-      
-      // store current directory
-      GetCurrentDirectory(1024,zt_filename);
-      strcat(zt_filename,"\\");
+      zt_get_current_directory(1024,zt_filename);
+      strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
       strcat(zt_filename,argv[1]);
     }
   }
 
+  char *last_backslash = strrchr(argv[0], '\\');
+  char *last_slash = strrchr(argv[0], '/');
+  char *last_sep = last_backslash;
+  if (last_slash && (!last_sep || last_slash > last_sep)) {
+    last_sep = last_slash;
+  }
 
-  if(strstr(argv[0],"\\")) {
-    
-    for(w = argv[0] + strlen(argv[0]); w != argv[0] && *w != '\\'; w--);
-    
+  if(last_sep) {
+    w = last_sep;
+
     if(w != argv[0]) {
-      
       *w = '\0';
       zt_directory = strdup(argv[0]);
-      SetCurrentDirectory(argv[0]);
-      *w = '\\';
+      zt_set_current_directory(argv[0]);
+      *w = path_sep;
     }
   }
   else zt_directory = strdup("");
-  
+
   doredraw++;
 
-  hardware_surface = initSDL();
-
-
-
-  
+  if (!initSDL()) {
+    return -1;
+  }
 
   if (screen_buffer_surface != NULL) {
-    
-#ifdef __ENABLE_FULL_SCREEN
-  thescreen = &drawable_hardware ;
-#endif
 
     initGFX();
-    
-    if(argc > 0) song->load(argv[1]);
-    
+
+    if(argc > 1 && argv[1] != NULL && argv[1][0] != '\0') song->load(argv[1]);
     else {
-      
       if (zt_config_globals.autoload_ztfile) {
-        
         if (strlen(zt_config_globals.autoload_ztfile_filename)) {
-          
           song->load(zt_config_globals.autoload_ztfile_filename);
-          SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
-          SDL_EventState(SDL_ACTIVEEVENT, SDL_ENABLE);
         }
       }
     }
-  
+
 #ifdef _ENABLE_AUDIO
-
-    SDL_AudioSpec wanted;
-
-    /* Set the audio format */
-    wanted.freq = 44100 ;
-    wanted.format = AUDIO_S16;
-    wanted.channels = 2;    /* 1 = mono, 2 = stereo */
-    wanted.samples = 2048;  /* Good low-latency value for callback */
-    wanted.callback = audio_mixer;
-    wanted.userdata = NULL;
-    
-
-    /* Open the audio device, forcing the desired format */
-    if ( SDL_OpenAudio(&wanted, NULL) < 0 ) {
-
-      fprintf(stderr, "Couldn't open audio: %s\n", SDL_GetError());
+    if (!zt_backend_audio_start()) {
       return(-1);
     }
-
-//    int ret = Mix_OpenAudio(wanted.freq, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, wanted.samples);
-     SDL_PauseAudio(0);
-    
 #endif
 
-    while(!action(screen_buffer)) {
+    while (1) {
+      CUI_Page *focus_page = NULL;
+      if (!window_stack.isempty()) {
+        focus_page = window_stack.top();
+      } else {
+        focus_page = ActivePage;
+      }
+      if (focus_page && focus_page->UI && focus_page->UI->has_text_focus()) {
+        if (!zt_text_input_is_active) {
+          zt_text_input_start();
+        }
+      } else {
+        if (zt_text_input_is_active) {
+          zt_text_input_stop();
+        }
+      }
 
+      SDL_Event e;
 
+      while (SDL_PollEvent(&e)) {
+        switch (e.type) {
+          case SDL_EVENT_KEY_DOWN:
+          case SDL_EVENT_KEY_UP:
+            keyhandler(&e.key);
+            break;
 
-       //SDL_Delay(1);
-       SDL_Event e;
-       
-       while(SDL_PollEvent(&e)){  /* Loop until there are no events left on the queue */
-         
-         switch(e.type)  /* Process the appropiate event type */
-         {
-          // ---------------------------------------------------------------------------- 
-           case SDL_KEYDOWN:  /* Handle a KEYDOWN event */
-           case SDL_KEYUP:
-           
-             keyhandler(&e.key);
-             
-             break;
-             
-          // ---------------------------------------------------------------------------- 
-           case SDL_MOUSEMOTION:
-             
-             mousemotionhandler(&e.motion);
-             
-             break;
-             
-          // ---------------------------------------------------------------------------- 
-           case SDL_MOUSEBUTTONDOWN:
-             mousedownbuttonhandler(&e.button);
-             break;
+          case SDL_EVENT_MOUSE_MOTION:
+            mousemotionhandler(&e.motion);
+            break;
 
-          // ---------------------------------------------------------------------------- 
-           case SDL_MOUSEBUTTONUP:
-             mouseupbuttonhandler(&e.button);
-             break;
+          case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            mousedownbuttonhandler(&e.button);
+            break;
 
-          // ---------------------------------------------------------------------------- 
-           case SDL_QUIT:
-             quit();
-             break;
+          case SDL_EVENT_MOUSE_BUTTON_UP:
+            mouseupbuttonhandler(&e.button);
+            break;
 
-          // ---------------------------------------------------------------------------- 
-           case SDL_ACTIVEEVENT:
-             
-             {
-               int p = e.active.state;
-               
-               switch(p) {
+          case SDL_EVENT_MOUSE_WHEEL:
+            mousewheelhandler(&e.wheel);
+            break;
 
-               case 6:
-               {
-                   int a = 50 ;
-               }
+          case SDL_EVENT_TEXT_INPUT:
+            textinputhandler(&e);
+            break;
 
-                   break ;
-                 
-               // ---------------------------------------------------------------
-               case SDL_APPMOUSEFOCUS:
-                 
-                 if (!bIsFullscreen) break;
-                 
-               // ---------------------------------------------------------------
-               case SDL_APPINPUTFOCUS:
-               case SDL_APPACTIVE:
-                 
-                 //SDL_WM_SetCaption(sr,sr);
-                 //if (e.active.gain) {
-                 if (UI) UI->full_refresh();
-                 if (UI_Toolbar) UI_Toolbar->full_refresh();
-                 doredraw++;
-                 need_refresh++;
-                 screenmanager.UpdateAll();
-                 //}
-                 
-                 break;
-               }
-             }
-             break;
-             
-          // ---------------------------------------------------------------------------- 
-           case SDL_SYSWMEVENT:
-             //SDL_Delay(1);//e.syswm;
-             switch(e.syswm.msg->msg)
-             {
-             // --------------------------------------------------------
-             case WM_SETFOCUS:
-               
-               if (UI) UI->full_refresh();
-               if (UI_Toolbar) UI_Toolbar->full_refresh();
-               
-               doredraw++;
-               need_refresh++;
-               screenmanager.UpdateAll();
-               
-               break;
-             }
-             
-             break;
+          case SDL_EVENT_QUIT:
+            quit();
+            break;
 
-             // --------------------------------------------------------
-             case SDL_VIDEORESIZE:
- 
-               {
-                   hardware_surface = set_video_mode(e.resize.w, e.resize.h, errstr) ;
+          default:
+            if (zt_handle_platform_window_event(&e)) {
+              break;
+            }
+            break;
+        }
+      }
 
-                   if (UI) UI->full_refresh();
-                   if (UI_Toolbar) UI_Toolbar->full_refresh();
-               
-                   doredraw++;
-                   need_refresh++;
-                   screenmanager.UpdateAll();
-               }
+      if (action(screen_buffer)) {
+        break;
+      }
 
-               break ;
-             
-             // --------------------------------------------------------
-             default: /* Report an unhandled event */
-               break;
-         } ;
-         
-      }    //      SDL_PumpEvents(); // Dont need this if we are using SDL_PollEvents from the action() loop
+      static int next_frame_redraw_all = 0;
+      if(next_frame_redraw_all) {
+        next_frame_redraw_all = 0;
+        zt_queue_full_redraw();
+      }
 
+	      static int old_resx = 0;
+	      static int old_resy = 0;
+	      if(old_resx != INTERNAL_RESOLUTION_X || old_resy != INTERNAL_RESOLUTION_Y) {
+	        old_resx = INTERNAL_RESOLUTION_X;
+	        old_resy = INTERNAL_RESOLUTION_Y;
+	        next_frame_redraw_all = 1;
+	      }
 
+	      zt_autosave_tick();
 
-    // <Manu> Hay un problema de orden de cosas aquí, de momento hacemos un pequeño parche pero habrá que mirar cómo hacerlo bien
-    static int next_frame_redraw_all = 0 ;
-
-    if(next_frame_redraw_all) {
-
-        next_frame_redraw_all = 0 ;
-
-        doredraw++;
-        need_refresh++;
-        screenmanager.UpdateAll();
-    }
-
-
-    static int old_resx = 0 ;
-    static int old_resy = 0 ;
-    if(old_resx != INTERNAL_RESOLUTION_X || old_resy != INTERNAL_RESOLUTION_Y) {
-
-        old_resx = INTERNAL_RESOLUTION_X ;
-        old_resy = INTERNAL_RESOLUTION_Y ;
-
-        next_frame_redraw_all = 1 ;
-    }
-
-
-
-      static int debug_contador = 0 ;
-
-      if(screenmanager.Refresh(screen_buffer)) {
-
-          debug_contador = 0 ;
-
-           for(int vary = 0; vary < RESOLUTION_Y; vary++) {
-
-               unsigned long *surface_pixels = ((unsigned long *)screen_buffer->surface->pixels) ;
-               unsigned long *hardware_pixels = ((unsigned long *)hardware_surface->pixels) ;
-
-               for(int varx = 0; varx < RESOLUTION_X; varx++) {
-
-                   hardware_pixels[(vary * (hardware_surface->pitch / 4)) + varx] = surface_pixels[ (((int)(vary * FACTOR_ESCALAY)) * (screen_buffer->surface->pitch >> 2)) + ((int)(varx * FACTOR_ESCALAX)) ] ;
-               }
-           }
-
-           SDL_UpdateRect(hardware_surface,0,0,0,0);
+	      static int debug_contador = 0;
+	      if(screenmanager.Refresh(screen_buffer)) {
+	        debug_contador = 0;
+        zt_backend_present_frame();
       }
       else {
-           
-          debug_contador++ ;
-          SDL_Delay(1) ;  // <Manu> Don't eat unnecessary CPU
+        debug_contador++;
+        SDL_Delay(1);
       }
-
-
     }
 
-
 #ifdef _ENABLE_AUDIO
-     //    Mix_CloseAudio();
-    SDL_CloseAudio();
+    zt_backend_audio_stop();
 #endif
-    
-    SDL_FreeSurface(screen_buffer_surface);
+
+    if (screen_buffer_surface != NULL) {
+      zt_destroy_surface(screen_buffer_surface);
+      screen_buffer_surface = NULL;
+    }
+    zt_backend_release_frame_resources();
   }
 
   postAction();
-  SDL_Quit();
+  zt_backend_shutdown_runtime();
   return 0;
 }
 
 
-
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-static int do_attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
+static int zt_backend_toggle_fullscreen(void)
 {
-#ifndef __ENABLE_FULL_SCREEN
-
-  return 0 ;
-
-#else
-
-    long framesize = 0;
-    void *pixels = NULL;
-    SDL_Rect clip;
-    Uint32 tmpflags = 0;
-    int w = 0;
-    int h = 0;
-    int bpp = 0;
-    int grabmouse = (SDL_WM_GrabInput(SDL_GRAB_QUERY) == SDL_GRAB_ON);
-    int showmouse = SDL_ShowCursor(-1);
-
-#ifdef BROKEN
-    SDL_Color *palette = NULL;
-    int ncolors = 0;
-#endif
-
-    if ( (!surface) || (!(*surface)) )  /* don't try if there's no surface. */
-    {
-        return(0);
-    } /* if */
-
-    if (SDL_WM_ToggleFullScreen(*surface))
-    {
-        if (flags)
-            *flags ^= SDL_FULLSCREEN;
-        return(1);
-    } /* if */
-
-    if ( !(SDL_GetVideoInfo()->wm_available) )
-    {
-        return(0);
-    } /* if */
-
-    tmpflags = (*surface)->flags;
-    w = (*surface)->w;
-    h = (*surface)->h;
-    bpp = (*surface)->format->BitsPerPixel;
-
-    if (flags == NULL)  /* use the surface's flags. */
-        flags = &tmpflags;
-
-    SDL_GetClipRect(*surface, &clip);
-
-        /* save the contents of the screen. */
-#ifdef BROKEN
-    if ( (!(tmpflags & SDL_OPENGL)) && (!(tmpflags & SDL_OPENGLBLIT)) )
-    {
-        framesize = (w * h) * ((*surface)->format->BytesPerPixel);
-        pixels = malloc(framesize);
-        if (pixels == NULL)
-            return(0);
-        memcpy(pixels, (*surface)->pixels, framesize);
-    } /* if */
-
-    if ((*surface)->format->palette != NULL)
-    {
-        ncolors = (*surface)->format->palette->ncolors;
-        palette = malloc(ncolors * sizeof (SDL_Color));
-        if (palette == NULL)
-        {
-            free(pixels);
-            return(0);
-        } /* if */
-        memcpy(palette, (*surface)->format->palette->colors,
-               ncolors * sizeof (SDL_Color));
-    } /* if */
-#endif
-
-    if (grabmouse)
-        SDL_WM_GrabInput(SDL_GRAB_OFF);
-
-    SDL_ShowCursor(1);
-
-    if ((*flags) & SDL_FULLSCREEN) {
-        *flags = SDL_HWSURFACE;
-        bIsFullscreen = false;
-        zt_config_globals.full_screen = false;
-    } else {
-        *flags = SDL_SWSURFACE | SDL_FULLSCREEN;
-        bIsFullscreen = true;
-        zt_config_globals.full_screen = true;
-    }
-
-    *flags = *flags | SDL_RESIZABLE ;
-    SDL_Surface *surf = SDL_SetVideoMode(w, h, bpp, (*flags));
-
-    *surface = surf;
-
-    if (!(*surface))  /* yikes! Try to put it back as it was... */
-    {
-//        *surface = SDL_SetVideoMode(w, h, bpp, tmpflags);
-        if (*surface == NULL)  /* completely screwed. */
-        {
-#ifdef BROKEN
-            if (pixels != NULL)
-                free(pixels);
-            if (palette != NULL)
-                free(palette);
-#endif
-            return(0);
-        } /* if */
-    } /* if */
-
-    /* Unfortunately, you lose your OpenGL image until the next frame... */
-
-#ifdef BROKEN
-    if (pixels != NULL)
-    {
-        memcpy((*surface)->pixels, pixels, framesize);
-        free(pixels);
-    } /* if */
-    if (palette != NULL)
-    {
-            /* !!! FIXME : No idea if that flags param is right. */
-        SDL_SetPalette(*surface, SDL_LOGPAL, palette, 0, ncolors);
-        free(palette);
-    } /* if */
-#endif
-
-    SDL_SetClipRect(*surface, &clip);
-
-    if (grabmouse)
-        SDL_WM_GrabInput(SDL_GRAB_ON);
-
-    SDL_ShowCursor(showmouse);
-
-    return(1);
-
-#endif
-} /* attempt_fullscreen_toggle */
-
-
-
-
-
-
-int baba=0;
-
-
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-int attempt_fullscreen_toggle() 
-{
-#ifndef __ENABLE_FULL_SCREEN
-  return 0 ;
-#else
-    int r;
-    if (baba==1) {
-        baba=0;
+    if (!zt_main_window) {
         return 0;
     }
-    baba++;
-    r = do_attempt_fullscreen_toggle( &surface_hardware, NULL );
-    thescreen->surface = surface_hardware; 
-    need_refresh++;
-    doredraw++;
-    return r;
-#endif
+
+    const bool enable_fullscreen = !bIsFullscreen;
+    if (!SDL_SetWindowFullscreen(zt_main_window, enable_fullscreen ? SDL_WINDOW_FULLSCREEN : 0)) {
+        return 0;
+    }
+
+    bIsFullscreen = enable_fullscreen;
+    zt_config_globals.full_screen = enable_fullscreen ? 1 : 0;
+
+    int window_w = 0;
+    int window_h = 0;
+    SDL_GetWindowSize(zt_main_window, &window_w, &window_h);
+    if (window_w > 0) {
+        RESOLUTION_X = window_w;
+    }
+    if (window_h > 0) {
+        RESOLUTION_Y = window_h;
+    }
+    SDL_SetWindowMouseGrab(zt_main_window, enable_fullscreen);
+    return 1;
+}
+
+int attempt_fullscreen_toggle()
+{
+    if (!zt_backend_toggle_fullscreen()) {
+        return 0;
+    }
+
+    zt_queue_full_redraw();
+    return 1;
 }

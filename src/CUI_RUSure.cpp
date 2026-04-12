@@ -70,19 +70,19 @@ void CUI_RUSure::update() {
     if (Keys.size()) {
         key = Keys.getkey();
         switch(key) {
-            case DIK_LEFT:
-            case DIK_RIGHT:
+            case SDLK_LEFT:
+            case SDLK_RIGHT:
                 if (UI->cur_element) UI->cur_element = 0;
                     else UI->cur_element = 1;
                 need_refresh++; fixmouse++;
                 UI->full_refresh();
                 break;
-            case DIK_Y:
+            case SDLK_Y:
                 //make_new_song();
                 BTNCLK_rusure_yes();
                 break;
-            case DIK_N:
-            case DIK_ESCAPE:
+            case SDLK_N:
+            case SDLK_ESCAPE:
                 BTNCLK_rusure_no();
                 break;
         }

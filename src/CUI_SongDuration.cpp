@@ -124,7 +124,7 @@ void CUI_SongDuration::update() {
     if (Keys.size()) {
         key = Keys.getkey();
         switch(key) {
-            case DIK_ESCAPE:
+            case SDLK_ESCAPE:
                 act++;
                 break;
         }

@@ -6,8 +6,8 @@
 #define MAX_PATH 260
 
 
-#define DEFAULT_RESOLUTION_X       1360
-#define DEFAULT_RESOLUTION_Y       710
+#define DEFAULT_RESOLUTION_X       1024
+#define DEFAULT_RESOLUTION_Y       700
 
 enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_EXTEND };
 
@@ -64,6 +64,7 @@ class ZTConf {
         int pattern_length;
         int key_repeat_time;
         int key_wait_time;
+        int autosave_interval_seconds;
         int midi_clock; // default_midiclock;
         int midi_stop_start; // default_midistopstart;
         int instrument_global_volume;
@@ -76,6 +77,7 @@ class ZTConf {
         int screen_width;
         int screen_height;
         float zoom;
+        char scale_filter[32];
         int control_navigation_amount;
         char default_directory[MAX_PATH + 1];
         int record_velocity;

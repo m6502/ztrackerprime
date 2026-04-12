@@ -1,5 +1,13 @@
 #ifndef _ZT_H
 #define _ZT_H
+//#define FORCE_FULL_SCREEN_REFRESH
+
+
+
+
+
+
+
 
 // This adds some debugging stuff and some on-screen debug indicators
 //#define DEBUG
@@ -7,18 +15,64 @@
 // This makes every updated rect appear randomly colored so you can see what gets updated
 //#define DEBUG_SCREENMANAGER
 
+// Toggle internal debug logging (stderr). 0 = disabled (default), 1 = enabled.
+#define ZT_ENABLE_DEBUG_LOGS 0
+
+#if ZT_ENABLE_DEBUG_LOGS
+#define ZT_DEBUG_LOG(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define ZT_DEBUG_LOG(...) ((void)0)
+#endif
+
+// Disable configurable key repeat/wait (UI + config load/save).
+#define DISABLED_CONFIGURATION_VALUES
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <iostream>
 
-#include <sdl.h>
+#include "platform.h"
+#include <atomic>
+
+
+// <Manu> Pequeño parche mientras miro qué hago con el main
+#ifndef _WIN32
+    #ifndef SDL_MAIN_HANDLED
+        #define SDL_MAIN_HANDLED
+    #endif
+#endif
+
+#include <SDL.h>
 #include <SDL_main.h>
+
+struct SDL_Window;
+extern SDL_Window *zt_main_window;
+extern bool zt_text_input_is_active;
+
+static inline void zt_set_window_title(const char *title) {
+    if (zt_main_window) SDL_SetWindowTitle(zt_main_window, title);
+}
+
+static inline void zt_destroy_surface(SDL_Surface *surface) {
+    if (!surface) return;
+    SDL_DestroySurface(surface);
+}
+
+static inline void zt_text_input_start(void) {
+    zt_text_input_is_active = true;
+    if (zt_main_window) SDL_StartTextInput(zt_main_window);
+}
+
+static inline void zt_text_input_stop(void) {
+    zt_text_input_is_active = false;
+    if (zt_main_window) SDL_StopTextInput(zt_main_window);
+}
+
 //#include "sdl_mixer.h"  // this is for audio testing
 
 
-#define DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
 #define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
 #define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
 #define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
@@ -26,13 +80,6 @@
 
 // ------------------------------------------------------------------------------------------------
 //
-// 
-// 
-// 
-// 
-// 
-// 
-// 
 // ------------------------------------------------------------------------------------------------
 
 //#define VER_MAJ 0
@@ -40,7 +87,7 @@
 // <Manu> antes era 98
 //#define VER_MIN 986
 
-#define ZTRACKER_VERSION                "zTracker' v2025_08_15"
+#define ZTRACKER_VERSION                "zTracker' v2026_02_23"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
@@ -61,17 +108,10 @@
 #define MINIMUM_SCREEN_WIDTH            840
 #define MINIMUM_SCREEN_HEIGHT           480
 
-#define FACTOR_ESCALAX                  ((float)INTERNAL_RESOLUTION_X / (float)RESOLUTION_X)
-#define FACTOR_ESCALAY                  ((float)INTERNAL_RESOLUTION_Y / (float)RESOLUTION_Y)
-
-
-
 #define INITIAL_ROW 1 // <Manu> Never set to 0, there are some -1 in calculations
 #define PAGE_TITLE_ROW_Y                (INITIAL_ROW + 8)
 #define TRACKS_ROW_Y                    (PAGE_TITLE_ROW_Y + 2)
 #define HEADER_ROW                      2
-
-#define SCREEN_BPP                      32
 
 #define BASE_OCTAVE_MIN                 0
 #define BASE_OCTAVE_MAX                 9
@@ -84,11 +124,6 @@
 //#define PATTERN_EDIT_ROWS               (32+4)
 extern int PATTERN_EDIT_ROWS;
 
-#define DIK_MOUSE_1_ON                  0xF1
-#define DIK_MOUSE_1_OFF                 0xF2
-#define DIK_MOUSE_2_ON                  0xF3
-#define DIK_MOUSE_2_OFF                 0xF4
-
 #define GET_LOW_BYTE(x)                 ((unsigned char)(x & 0x00FF))
 #define GET_HIGH_BYTE(x)                ((unsigned char)((x & 0xFF00)>>8))
 
@@ -99,14 +134,13 @@ extern int PATTERN_EDIT_ROWS;
   #undef RGB
 #endif
 
-#define RGB(r,g,b)                      (long)((r)+((g)<<8)+((b)<<16))
+#define RGB(r,g,b)                      (long)(0xFF000000u | ((r)+((g)<<8)+((b)<<16)))
 
 //// Some hacks
 #define mutetrack(t)                    song->track_mute[t] = 1; MidiOut->mute_track(t)
 #define unmutetrack(t)                  song->track_mute[t] = 0; MidiOut->unmute_track(t)
 #define toggle_track_mute(t)            song->track_mute[t] = !song->track_mute[t];    if (song->track_mute[t]) MidiOut->mute_track(t); else MidiOut->unmute_track(t)
 ////
-
 
 #define MAX_MIDI_DEVS                   64 // Max midi devices in lists
 
@@ -180,7 +214,7 @@ public:
     }
 
     TColor getColor(Uint8 Red, Uint8 Green, Uint8 Blue) {
-        return (Blue + (Green<<8) + (Red<<16));
+        return (TColor)(0xFF000000u | Blue | (Green << 8) | (Red << 16));
     }
     
     TColor get_color_from_hex(const char *str, conf *ColorsFile) {
@@ -247,7 +281,7 @@ public:
 
 } ;
 
-#include "skins.h"
+#include "Skins.h"
 
 
 
@@ -382,9 +416,8 @@ public:
   //
   bool Refresh(Drawable *S) 
   {
+    (void)S;
     if (update_all) {
-
-      SDL_UpdateRect(S->surface,0,0,0,0);
       update_all = false;
       updated_rects = 0;
 
@@ -396,14 +429,13 @@ public:
         
 #ifdef DEBUG_SCREENMANAGER
         for (int i=0;i < updated_rects; i++)
-          SDL_FillRect(S->surface,&r[i], rand() );
+          SDL_FillSurfaceRect(S->surface,&r[i], rand() );
 #endif
           /*
           for (int i=0;i<updated_rects;i++)
           if (r[i].x<0 || r[i].y<0 || r[i].x>INTERNAL_RESOLUTION_X-1 || r[i].y>INTERNAL_RESOLUTION_Y-1)
           SDL_Delay(1);
         */
-        SDL_UpdateRects(S->surface, updated_rects, &r[0]);
         updated_rects = 0;
 
         return true ;
@@ -480,6 +512,7 @@ class WStack {  // The window stack.. used for showing popup windows
         ~WStack();
         void push(CUI_Page *p);
         CUI_Page *pop(void);
+        CUI_Page *top(void);
         void update(void);
         void draw(Drawable *S);
         bool isempty(void);
@@ -524,9 +557,7 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_SWITCH_LOAD,
         CMD_SWITCH_SAVE,
 
-#ifndef DISABLE_UNFINISHED_CTRL_F12_GLOBAL_CONFIG
         CMD_SWITCH_CONFIG,
-#endif
         CMD_PLAY,
         CMD_PLAY_PAT,
         CMD_PLAY_PAT_LINE,
@@ -571,8 +602,8 @@ extern bool bMouseIsDown;
     extern BarGraph *playbuff1_bg,*playbuff2_bg,*keybuff_bg;
 #endif
 
-int lock_mutex(HANDLE hMutex, int timeout = 2000L);
-int unlock_mutex(HANDLE hMutex);
+int lock_mutex(zt_mutex_handle hMutex, int timeout = 2000L);
+int unlock_mutex(zt_mutex_handle hMutex);
 
 void reset_editor(void);
 
@@ -642,7 +673,7 @@ extern int cur_step;
 
 extern int keypress;
 extern int keywait;
-extern int keytimer;
+extern zt_timer_handle keytimer;
 extern int keyID;
 extern int status_change;
 
@@ -650,7 +681,11 @@ extern event blank_event;
 extern instrument blank_instrument;
 
 extern int key_jazz;
-extern mbuf jazz[512];
+mbuf jazz_get_state(int key);
+bool jazz_note_is_active(int key);
+void jazz_set_state(int key, unsigned char note, unsigned char chan);
+void jazz_clear_state(int key);
+void jazz_clear_all_states(void);
 
 extern midiOut *MidiOut;
 extern midiIn  *MidiIn;
@@ -715,13 +750,14 @@ extern int check_ext(const char *str, const char *ext);
 
 extern int file_changed;
 
-extern int load_lock,save_lock;
+extern std::atomic<int> load_lock;
+extern int save_lock;
 
 extern void do_save(void);  
 extern int already_changed_default_directory;
 void draw_status_vars(Drawable *S); 
 void begin_save(void);
-extern LPSTR cur_dir;
+extern char *cur_dir;
 
 extern int pe_modification;
 extern Drawable * pe_buf;

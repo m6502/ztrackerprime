@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -41,20 +41,19 @@
 #include "zt.h"
 #include "FileList.h"
 
-int save_finished = 0;
-volatile int is_saving = 0;
+std::atomic<int> save_finished(0);
+std::atomic<int> is_saving(0);
 
-void save_thread(void) {
+unsigned long ZT_THREAD_CALL save_thread(void *) {
     char *sstr;
-    int ret;
 
     is_saving = 1;
     save_finished= 0;
     switch(UIP_SaveMsg->filetype) {
         case 1:
-            ret = song->save((char *)song->filename);
+            song->save((char *)song->filename);
             /* if there was a status message, display it */
-            if (sstr=song->getstatusstr()) {
+            if ((sstr = song->getstatusstr()) != NULL) {
                 /* display if ret=0, this should do a popup on ret!=0 */
                 statusmsg = sstr;
                 status_change = 1;
@@ -63,11 +62,11 @@ void save_thread(void) {
         case 2:
             ZTImportExport zie;
             zie.ExportMID((char *)song->filename,0);
-            break;          
+            break;
     }
     save_finished = 1;
     is_saving = 0;
-    return;
+    return 0;
 }
 
 void TP_Save_Inc_Str(void) {
@@ -78,33 +77,51 @@ void TP_Save_Inc_Str(void) {
 
 CUI_SaveMsg::CUI_SaveMsg(void) {
     UI = NULL;
+    hThread = NULL;
+    strtimer = 0;
     filetype = 1; // .zt default
 }
 
 CUI_SaveMsg::~CUI_SaveMsg(void) {
-    if (UI) delete UI; UI = NULL;
+    if (hThread) {
+        zt_thread_join(hThread);
+        zt_thread_close(hThread);
+        hThread = NULL;
+    }
+    if (UI) { delete UI; }
+    UI = NULL;
 }
 
 void CUI_SaveMsg::enter(void) {
     need_refresh = 1;
     save_finished= 0;
 //    setWindowTitle("zt - saving...");
-    SDL_WM_SetCaption("zt - [saving file]","zt - [saving file]");
-    OldPriority = GetThreadPriority(GetCurrentThread());
+    zt_set_window_title("zt - [saving file]");
+    OldPriority = zt_thread_get_current_priority();
     strselect = 0;
-    strtimer = SetTimer(NULL,strtimer,500,(TIMERPROC)TP_Save_Inc_Str);
-    hThread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)save_thread,NULL,0,&iID); 
-    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
-    SetThreadPriority(hThread,THREAD_PRIORITY_ABOVE_NORMAL);
+    strtimer = zt_timer_start(strtimer, 500, TP_Save_Inc_Str);
+    hThread = zt_thread_create(save_thread, NULL, &iID);
+    zt_thread_set_current_priority(ZT_THREAD_PRIORITY_BELOW_NORMAL);
+    if (hThread) {
+        zt_thread_set_priority(hThread, ZT_THREAD_PRIORITY_ABOVE_NORMAL);
+    } else {
+        save_finished = 1;
+        statusmsg = (char *)"Error: unable to create save thread";
+        status_change = 1;
+    }
 }
-
 void CUI_SaveMsg::leave(void) {
     FileList *fl;
     DirList *dl;
 
-    SetThreadPriority(GetCurrentThread(),OldPriority);
-    KillTimer(NULL,strtimer);
-    CloseHandle(hThread);
+    zt_thread_set_current_priority(OldPriority);
+    zt_timer_stop(strtimer);
+    strtimer = 0;
+    if (hThread) {
+        zt_thread_join(hThread);
+        zt_thread_close(hThread);
+        hThread = NULL;
+    }
 
     need_refresh++;
 
@@ -120,19 +137,19 @@ void CUI_SaveMsg::leave(void) {
         Keys.flush();
     }
 //    setWindowTitle("zt");
-    SDL_WM_SetCaption("zt","zt");
+    zt_set_window_title("zt");
 }
 
 void CUI_SaveMsg::update() {
-    int key=0;
     if (Keys.size()) {
-        key = Keys.getkey();
-    }   
+        (void)Keys.getkey();
+    }
     if (save_finished) {
-            close_popup_window();
-            UIP_Savescreen->clear = 1;
-            fixmouse++;
-            need_refresh++;     
+        close_popup_window();
+        UIP_Savescreen->clear = 1;
+        fixmouse++;
+        need_refresh++;
+        save_finished = 0;
     }
 }
 

@@ -25,7 +25,7 @@ void CUI_Logoscreen::update() {
         Keys.flush();
         doredraw = 1;
         cur_state = STATE_HELP;
-        Keys.insert(SDLK_F2,KMOD_NONE);
+        Keys.insert(SDLK_F2,SDL_KMOD_NONE);
     }
 }
 

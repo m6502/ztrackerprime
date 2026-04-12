@@ -73,19 +73,19 @@ void CUI_NewSong::update()
     if (Keys.size()) {
         key = Keys.getkey();
         switch(key) {
-            case DIK_LEFT:
-            case DIK_RIGHT:
+            case SDLK_LEFT:
+            case SDLK_RIGHT:
                 if (UI->cur_element) UI->cur_element = 0;
                     else UI->cur_element = 1;
                 need_refresh++; 
                 fixmouse++;
                 break;
-            case DIK_Y:
+            case SDLK_Y:
                 make_new_song();
                 act++;
                 break;
-            case DIK_N:
-            case DIK_ESCAPE:
+            case SDLK_N:
+            case SDLK_ESCAPE:
                 act++;
                 break;
         }

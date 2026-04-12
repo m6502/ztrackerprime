@@ -48,14 +48,14 @@ int ValueSlider::mouseupdate(int cur_element)
     key = Keys.checkkey();
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
                     mousestate = 1;
                     act++;
                     newclick=0; // unset click to focus
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) act++;
                 mousestate=0;
                 break;
@@ -63,7 +63,7 @@ int ValueSlider::mouseupdate(int cur_element)
                 ///////////////////////////////////////////////////
                 // Here is right click mouse focus
 
-            case DIK_MOUSE_2_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
                 if(focus)           // HERE we encapsulate the event in focus determination
                 {                   // same thing for all the other varieties of value slider
                     if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
@@ -72,7 +72,7 @@ int ValueSlider::mouseupdate(int cur_element)
                     }
                 }
                 break;
-            case DIK_MOUSE_2_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)):
                 if(focus)           // again here encapsulated. this is all we need to do to ignore focus
                 {
                     mousestate=0;
@@ -125,6 +125,9 @@ int ValueSlider::mouseupdate(int cur_element)
 //
 //
 int ValueSlider::update() {
+    if (xsize <= 0 || ysize <= 0) {
+        return 0;
+    }
     KBKey key,act=0;
     int ret=0,pop=0,c;
     key = Keys.checkkey();
@@ -146,54 +149,54 @@ int ValueSlider::update() {
     if (key) {
         switch(key) {
 
-            case DIK_UP: ret = -1; act++; break;
-            case DIK_DOWN: ret = 1; act++; break;
-            case DIK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
-            case DIK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
-            case DIK_HOME: value=min; act++; changed++; break;
-            case DIK_END: value=max; act++; changed++; break;
+            case SDLK_UP: ret = -1; act++; break;
+            case SDLK_DOWN: ret = 1; act++; break;
+            case SDLK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
+            case SDLK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
+            case SDLK_HOME: value=min; act++; changed++; break;
+            case SDLK_END: value=max; act++; changed++; break;
 
-            case DIK_0: 
+            case SDLK_0: 
                 UIP_SliderInput->setfirst(0);
                 pop++;
                 break;
-            case DIK_1:
+            case SDLK_1:
                 UIP_SliderInput->setfirst(1);
                 pop++;
                 break;
-            case DIK_2:
+            case SDLK_2:
                 UIP_SliderInput->setfirst(2);
                 pop++;
                 break;
-            case DIK_3:
+            case SDLK_3:
                 UIP_SliderInput->setfirst(3);
                 pop++;
                 break;
-            case DIK_4:
+            case SDLK_4:
                 UIP_SliderInput->setfirst(4);
                 pop++;
                 break;
-            case DIK_5:
+            case SDLK_5:
                 UIP_SliderInput->setfirst(5);
                 pop++;
                 break;
-            case DIK_6:
+            case SDLK_6:
                 UIP_SliderInput->setfirst(6);
                 pop++;
                 break;
-            case DIK_7:
+            case SDLK_7:
                 UIP_SliderInput->setfirst(7);
                 pop++;
                 break;
-            case DIK_8:
+            case SDLK_8:
                 UIP_SliderInput->setfirst(8);
                 pop++;
                 break;
-            case DIK_9:
+            case SDLK_9:
                 UIP_SliderInput->setfirst(9);
                 pop++;
                 break;
-            case DIK_MINUS:
+            case SDLK_MINUS:
                 UIP_SliderInput->setfirst(-1);
                 pop++;
                 break;
@@ -226,6 +229,9 @@ int ValueSlider::update() {
 //
 //
 void ValueSlider::draw(Drawable *S, int active) {
+    if (xsize <= 0 || ysize <= 0) {
+        return;
+    }
     int cx,cy=y;
     TColor col;
     char str[32];
@@ -249,7 +255,12 @@ void ValueSlider::draw(Drawable *S, int active) {
     else
         col = COLORS.EditText;
 
-    printchar(col(x)+(((value-min)*(((xsize-1)*8)-1))/(max-min))+1,row(cy),155,col,S);//156
+    int range = max - min;
+    int knob_x = col(x) + 1;
+    if (range != 0) {
+        knob_x = col(x) + (((value - min) * (((xsize - 1) * 8) - 1)) / range) + 1;
+    }
+    printchar(knob_x,row(cy),155,col,S);//156
     if (frame) {
         printline(col(x),row(y-1),0x86,xsize,COLORS.Lowlight,S);
         printline(col(x),row(y+1),0x81,xsize,COLORS.Highlight,S);
@@ -300,14 +311,14 @@ int ValueSliderOFF::mouseupdate(int cur_element) {
     key = Keys.checkkey();
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
                     mousestate = 1;
                     act++;
                     newclick=0; // unset click to focus
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) act++;
                 mousestate=0;
                 break;
@@ -315,7 +326,7 @@ int ValueSliderOFF::mouseupdate(int cur_element) {
                 ///////////////////////////////////////////////////
                 // Here is right click mouse focus
 
-            case DIK_MOUSE_2_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
                 if(focus)
                 {
                     if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
@@ -324,7 +335,7 @@ int ValueSliderOFF::mouseupdate(int cur_element) {
                     }
                 }
                 break;
-            case DIK_MOUSE_2_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)):
                 if(focus)
                 {
                     mousestate=0;
@@ -393,54 +404,54 @@ int ValueSliderOFF::update() {
     
     if (key) {
         switch(key) {
-            case DIK_UP: ret = -1; act++; break;
-            case DIK_DOWN: ret = 1; act++; break;
-            case DIK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
-            case DIK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
-            case DIK_HOME: value=min; act++; changed++; break;
-            case DIK_END: value=max; act++; changed++; break;
+            case SDLK_UP: ret = -1; act++; break;
+            case SDLK_DOWN: ret = 1; act++; break;
+            case SDLK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
+            case SDLK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
+            case SDLK_HOME: value=min; act++; changed++; break;
+            case SDLK_END: value=max; act++; changed++; break;
 
-            case DIK_0: 
+            case SDLK_0: 
                 UIP_SliderInput->setfirst(0);
                 pop++;
                 break;
-            case DIK_1:
+            case SDLK_1:
                 UIP_SliderInput->setfirst(1);
                 pop++;
                 break;
-            case DIK_2:
+            case SDLK_2:
                 UIP_SliderInput->setfirst(2);
                 pop++;
                 break;
-            case DIK_3:
+            case SDLK_3:
                 UIP_SliderInput->setfirst(3);
                 pop++;
                 break;
-            case DIK_4:
+            case SDLK_4:
                 UIP_SliderInput->setfirst(4);
                 pop++;
                 break;
-            case DIK_5:
+            case SDLK_5:
                 UIP_SliderInput->setfirst(5);
                 pop++;
                 break;
-            case DIK_6:
+            case SDLK_6:
                 UIP_SliderInput->setfirst(6);
                 pop++;
                 break;
-            case DIK_7:
+            case SDLK_7:
                 UIP_SliderInput->setfirst(7);
                 pop++;
                 break;
-            case DIK_8:
+            case SDLK_8:
                 UIP_SliderInput->setfirst(8);
                 pop++;
                 break;
-            case DIK_9:
+            case SDLK_9:
                 UIP_SliderInput->setfirst(9);
                 pop++;
                 break;
-            case DIK_MINUS:
+            case SDLK_MINUS:
                 UIP_SliderInput->setfirst(-1);
                 pop++;
                 break;
@@ -556,14 +567,14 @@ int ValueSliderDL::mouseupdate(int cur_element) {
     key = Keys.checkkey();
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
                     mousestate = 1;
                     act++;
                     newclick=0; // unset click to focus
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) act++;
                 mousestate=0;
                 break;
@@ -571,7 +582,7 @@ int ValueSliderDL::mouseupdate(int cur_element) {
                 ///////////////////////////////////////////////////
                 // Here is right click mouse focus
 
-            case DIK_MOUSE_2_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
                 if(focus)
                 {
                     if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
@@ -580,7 +591,7 @@ int ValueSliderDL::mouseupdate(int cur_element) {
                     }
                 }
                 break;
-            case DIK_MOUSE_2_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)):
                 if(focus)
                 {
                     mousestate=0;
@@ -649,54 +660,54 @@ int ValueSliderDL::update() {
     
     if (key) {
         switch(key) {
-            case DIK_UP: ret = -1; act++; break;
-            case DIK_DOWN: ret = 1; act++; break;
-            case DIK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
-            case DIK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
-            case DIK_HOME: value=min; act++; changed++; break;
-            case DIK_END: value=max; act++; changed++; break;
+            case SDLK_UP: ret = -1; act++; break;
+            case SDLK_DOWN: ret = 1; act++; break;
+            case SDLK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
+            case SDLK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
+            case SDLK_HOME: value=min; act++; changed++; break;
+            case SDLK_END: value=max; act++; changed++; break;
 
-            case DIK_0: 
+            case SDLK_0: 
                 UIP_SliderInput->setfirst(0);
                 pop++;
                 break;
-            case DIK_1:
+            case SDLK_1:
                 UIP_SliderInput->setfirst(1);
                 pop++;
                 break;
-            case DIK_2:
+            case SDLK_2:
                 UIP_SliderInput->setfirst(2);
                 pop++;
                 break;
-            case DIK_3:
+            case SDLK_3:
                 UIP_SliderInput->setfirst(3);
                 pop++;
                 break;
-            case DIK_4:
+            case SDLK_4:
                 UIP_SliderInput->setfirst(4);
                 pop++;
                 break;
-            case DIK_5:
+            case SDLK_5:
                 UIP_SliderInput->setfirst(5);
                 pop++;
                 break;
-            case DIK_6:
+            case SDLK_6:
                 UIP_SliderInput->setfirst(6);
                 pop++;
                 break;
-            case DIK_7:
+            case SDLK_7:
                 UIP_SliderInput->setfirst(7);
                 pop++;
                 break;
-            case DIK_8:
+            case SDLK_8:
                 UIP_SliderInput->setfirst(8);
                 pop++;
                 break;
-            case DIK_9:
+            case SDLK_9:
                 UIP_SliderInput->setfirst(9);
                 pop++;
                 break;
-            case DIK_MINUS:
+            case SDLK_MINUS:
                 UIP_SliderInput->setfirst(-1);
                 pop++;
                 break;

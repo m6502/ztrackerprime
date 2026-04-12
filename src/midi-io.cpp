@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -145,13 +145,28 @@ void midiOut::set_bank_select(int dev, int bank_select) {
 }
 
 const char *midiOut::get_alias(int dev) {
-    if ((unsigned int)dev>=numOuputDevices) return NULL;
-    return (outputDevices[dev]->alias != NULL && strlen(outputDevices[dev]->alias))?outputDevices[dev]->alias:"";
+    if ((unsigned int)dev>=numOuputDevices) return "";
+    if (outputDevices[dev]->alias == NULL) {
+        return "";
+    }
+    return (outputDevices[dev]->alias[0] != '\0') ? outputDevices[dev]->alias : "";
 }
 void midiOut::set_alias(int dev, char *n) {
     if ((unsigned int)dev>=numOuputDevices) return;
-    if(n != NULL && strlen(n) < 1023)
-         strcpy(outputDevices[dev]->alias,n);
+    if (n == NULL) {
+        n = (char *)"";
+    }
+    if (strlen(n) >= 1023) {
+        return;
+    }
+    if (outputDevices[dev]->alias == NULL) {
+        outputDevices[dev]->alias = (char *)malloc(1024);
+        if (outputDevices[dev]->alias == NULL) {
+            return;
+        }
+        outputDevices[dev]->alias[0] = '\0';
+    }
+    strcpy(outputDevices[dev]->alias,n);
 }
 
 UINT midiOut::AddDevice(int dev) {
@@ -301,7 +316,7 @@ int mim_longerror = 0 ;
 
 
 
-void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2) {
+void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
 
     unsigned char msg;
     int song_pos_ptr;
@@ -459,7 +474,7 @@ int midiInDevice::open(void) {
     if (opened)
         if (close())
             return -1;
-    if (!(error = midiInOpen(&handle, devNum, (DWORD)midiInCallback, devNum, CALLBACK_FUNCTION))) {
+    if (!(error = midiInOpen(&handle, devNum, (DWORD_PTR)midiInCallback, (DWORD_PTR)devNum, CALLBACK_FUNCTION))) {
         opened=1;
         midiHdr.lpData = (LPSTR)&SysXBuffer[0];
         midiHdr.dwBufferLength = sizeof(SysXBuffer);

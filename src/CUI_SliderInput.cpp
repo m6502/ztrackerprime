@@ -66,11 +66,11 @@ void CUI_SliderInput::update() {
     if (Keys.size()) {
         key = Keys.getkey();
         switch(key) {
-            case DIK_ESCAPE:
+            case SDLK_ESCAPE:
                 this->canceled = 1;
                 act++;
                 break;
-            case DIK_RETURN:
+            case SDLK_RETURN:
                 this->canceled = 0;
                 act++;
                 break;

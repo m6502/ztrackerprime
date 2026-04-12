@@ -1,7 +1,7 @@
 #ifndef _MIDI_DEVICE_H
 #define _MIDI_DEVICE_H
 
-#include <mmsystem.h>
+#include "winmm_compat.h"
 
 #define NB_OFF    0x000000
 #define NB_ON     0x010000
@@ -60,6 +60,10 @@ class OutputDevice {
             this->clear_notestates();
         }
         virtual ~OutputDevice() {
+            if (alias) {
+                free(alias);
+                alias = NULL;
+            }
         }
 
         virtual int open(void)=0;

@@ -38,18 +38,26 @@
  *
  ******/
 #include "zt.h"
+#include <algorithm>
+#include <stdint.h>
 
 int mctr = 0;
 
 #define TARGET_RESOLUTION 1         // 1-millisecond target resolution
 
-void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, DWORD dw2);
+void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2);
+
+#ifndef _WIN32
+static void player_timer_callback_posix(void) {
+    player_callback(0, 0, 0, 0, 0);
+}
+#endif
 
 
 // ------------------------------------------------------------------------------------------------
 //
 //
-void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, DWORD dw2)
+void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2)
 {
   if(!ztPlayer) return ;
   if(!ztPlayer->playing) return ;
@@ -98,9 +106,9 @@ void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, 
 // ------------------------------------------------------------------------------------------------
 //
 //
-void counter_thread(void) {
+unsigned long ZT_THREAD_CALL counter_thread(void *) {
     int buf;
-    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_TIME_CRITICAL );
+    zt_thread_set_current_priority(ZT_THREAD_PRIORITY_TIME_CRITICAL);
     while(1) {
          if (ztPlayer && ztPlayer->playing) {
             buf = ztPlayer->cur_buf; 
@@ -234,6 +242,7 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
     this->song = ztm;
     this->wTimerRes = res;
     this->fillbuff = this->playing = this->counter = this->wTimerID = 0;
+    this->ztTimerID = 0;
 //  this->hr_timer = new hires_timer;
     this->playing_cur_row = 1;
     init();
@@ -273,12 +282,16 @@ player::~player(void) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-UINT player::SetTimerCallback(UINT msInterval) { 
-    wTimerID = timeSetEvent(msInterval,TARGET_RESOLUTION,player_callback,0x0,TIME_PERIODIC);
-    if(!wTimerID)
+UINT player::SetTimerCallback(UINT msInterval) {
+#ifdef _WIN32
+    wTimerID = timeSetEvent(msInterval, TARGET_RESOLUTION, player_callback, 0x0, TIME_PERIODIC);
+    if (!wTimerID)
         return -1;
-    else
-        return 0;
+    return 0;
+#else
+    ztTimerID = zt_timer_start(ztTimerID, msInterval, player_timer_callback_posix);
+    return ztTimerID ? 0 : (UINT)-1;
+#endif
 } 
 
 
@@ -289,7 +302,7 @@ UINT player::SetTimerCallback(UINT msInterval) {
 //
 int player::start_timer(void) {
     SetTimerCallback(wTimerRes);
-    hThread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)counter_thread,NULL,0,&iID);
+    hThread = zt_thread_create(counter_thread, NULL, &iID);
     return 0;
 }
 
@@ -300,9 +313,18 @@ int player::start_timer(void) {
 //
 //
 int player::stop_timer(void) {
-    if (wTimerID) 
+#ifdef _WIN32
+    if (wTimerID)
         timeKillEvent(wTimerID);
-    TerminateThread(hThread,0);
+#else
+    if (ztTimerID) {
+        zt_timer_stop(ztTimerID);
+        ztTimerID = 0;
+    }
+#endif
+    zt_thread_terminate(hThread, 0);
+    zt_thread_close(hThread);
+    hThread = NULL;
     clear_noel();
     return 0;
 }
@@ -314,11 +336,15 @@ int player::stop_timer(void) {
 //
 //
 int player::init(void) {
-    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR) 
+#ifdef _WIN32
+    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR)
         return -1;
-    //wTimerRes = std::min(std::max(tc.wPeriodMin, wTimerRes), tc.wPeriodMax);
-    wTimerRes = min(max(tc.wPeriodMin, wTimerRes), tc.wPeriodMax);
-    timeBeginPeriod(wTimerRes); 
+    wTimerRes = (std::min)((std::max)(tc.wPeriodMin, wTimerRes), tc.wPeriodMax);
+    timeBeginPeriod(wTimerRes);
+#else
+    if (wTimerRes == 0)
+        wTimerRes = 1;
+#endif 
     cur_row = 0;
     cur_pattern = 0;
     playmode = 0; //loop
@@ -338,7 +364,7 @@ int player::init(void) {
 //
 void player::set_speed() {
 //int t,int b) {
-    __int64 a;
+    int64_t a;
 //  tpb = t; bpm = b;
 
     // <Manu> Apply changes in real-time :-)
@@ -591,8 +617,7 @@ void player::play(int row, int pattern,int pm, int loopmode)
   playing_buffer = play_buffer[cur_buf];
 
   playing = 1;
-
-  SDL_WM_SetCaption("zt - [playing]", "zt [playing]");
+  zt_set_window_title("zt - [playing]");
 }   
 
 
@@ -639,8 +664,7 @@ void player::play_current_row()
         if (song->instruments[pEvent->inst]->midi_device>=0 && song->instruments[pEvent->inst]->midi_device<=MAX_MIDI_DEVS) {
 
           MidiOut->noteOn(song->instruments[pEvent->inst]->midi_device,set_note,song->instruments[pEvent->inst]->channel,p1,MAX_TRACKS,0);            
-          jazz[DIK_8].note = set_note;
-          jazz[DIK_8].chan = song->instruments[pEvent->inst]->channel;
+          jazz_set_state(SDLK_8, set_note, song->instruments[pEvent->inst]->channel);
         }
       }
     }
@@ -690,8 +714,7 @@ void player::play_current_note()
 
       MidiOut->noteOn(song->instruments[e->inst]->midi_device,set_note,song->instruments[e->inst]->channel,p1,MAX_TRACKS /*cur_edit_track*/,0);
 
-      jazz[DIK_4].note = set_note;
-      jazz[DIK_4].chan = song->instruments[e->inst]->channel;
+      jazz_set_state(SDLK_4, set_note, song->instruments[e->inst]->channel);
     }
   }
 }
@@ -719,7 +742,7 @@ void player::stop(void)
     play_buffer[0]->reset();
     play_buffer[1]->reset();
     unlock_mutex(song->hEditMutex);
-    SDL_WM_SetCaption("zt","zt");
+    zt_set_window_title("zt");
 }
 
 

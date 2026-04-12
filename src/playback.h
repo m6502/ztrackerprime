@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -40,7 +40,7 @@
 #ifndef __PLAYBACK_H
 #define __PLAYBACK_H
 
-#include <mmsystem.h>
+#include "winmm_compat.h"
 
 //#include "zt.h"
 class zt_module ;
@@ -94,6 +94,7 @@ class midi_buf {
 class player {
     private:
         MMRESULT wTimerID;
+        zt_timer_handle ztTimerID;
         TIMECAPS tc;
         UINT SetTimerCallback(UINT msInterval);
 
@@ -112,7 +113,7 @@ class player {
         int noteoff_size, noteoff_cur;
         int tpb, bpm, starts;
 
-        HANDLE hThread;
+        zt_thread_handle hThread;
         unsigned long iID;
 
 //      hires_timer *hr_timer;

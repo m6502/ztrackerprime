@@ -210,7 +210,7 @@ char *printNote(char *str, event *r, int cur_edit_mode)
 #ifdef __AAAA5251785AAAA55AAA
 
 // ------------------------------------------------------------------------------------------------
-// <Manu> Debería mirar si puedo hacer esto de una manera un poco más limpia
+// <Manu> DeberÃ­a mirar si puedo hacer esto de una manera un poco mÃ¡s limpia
 //
 char *printBlankNote(char *str, int cur_edit_mode) 
 {
@@ -499,7 +499,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 {
   int num_displayed_rows, num_displayed_tracks, special ;
   TColor bg,fg;
-  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resolución muy grande. 512 debería servir para w=4096 pero...
+  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resoluciÃ³n muy grande. 512 deberÃ­a servir para w=4096 pero...
   
   int posx_current_track ;
   int posy_current_row ;
@@ -537,7 +537,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
-  // <Manu> Cumple alguna función dibujar este carácter?
+  // <Manu> Cumple alguna funciÃ³n dibujar este carÃ¡cter?
   //printchar(col(4), row(TRACKS_ROW_Y), 139, COLORS.Lowlight,S);
 
   
@@ -550,7 +550,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   g_posx_tracks = poscharx_tracks ;
 
 
-  num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1
+  num_displayed_rows = 0 ; // <Manu> Esto va de 0 al nÃºmero mÃ¡ximo de rows a dibujar - 1
   
   
   for(int var_row = first_row; var_row < (last_row + blank_rows); var_row++) {
@@ -571,21 +571,21 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
     }
     else {
 
-      if(var_row >= 0) { // <Manu> ¿Necesario?
+      if(var_row >= 0) { // <Manu> Â¿Necesario?
         
         sprintf(str,"%.3d",var_row);
       
-        // Línea vertical izquierda del marco de los tracks
+        // LÃ­nea vertical izquierda del marco de los tracks
         printchar(col(poscharx_tracks - 1),                               posy_current_row, 146, COLORS.Lowlight,S) ;
 
-        // Línea vertical derecha del marco de los tracks
+        // LÃ­nea vertical derecha del marco de los tracks
         printchar(col((poscharx_tracks - 1) + (tracks_shown*(field_size+1))), posy_current_row, 145, COLORS.Highlight,S) ;
       }
       
     }
 
 
-    // Dibujar el número de línea
+    // Dibujar el nÃºmero de lÃ­nea
     if (ztPlayer->playing && 
         ztPlayer->playing_cur_pattern==cur_edit_pattern &&
         var_row == ztPlayer->playing_cur_row) {
@@ -617,7 +617,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
       }
 
 
-      if(var_row >= 0) {       // <Manu> ¿Necesario?
+      if(var_row >= 0) {       // <Manu> Â¿Necesario?
     
             // Contenido de los tracks
 
@@ -653,7 +653,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
               posx_current_track = col(poscharx_tracks) + col(num_displayed_tracks * (field_size + 1)) ;
 
-              // <Manu> Si esta línea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo
+              // <Manu> Si esta lÃ­nea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo
 
               if(var_row >= first_blank_row) {
 
@@ -663,7 +663,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 //printBlankNote(str, zt_config_globals.cur_edit_mode) ;
                 //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(15+num_displayed_rows), str, fg, bg, S) ;
 
-                // Lo dibujamos un píxel a la izquierda y un píxel más largo para comernos la posible línea del marco de los tracks
+                // Lo dibujamos un pÃ­xel a la izquierda y un pÃ­xel mÃ¡s largo para comernos la posible lÃ­nea del marco de los tracks
 
                 int x1 = posx_current_track - 2  ;
                 int x2 = x1 + col(field_size + 1) + 1  ;
@@ -819,10 +819,10 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
-  // Línea superior de los tracks
+  // LÃ­nea superior de los tracks
   printline(col(poscharx_tracks),TRACKS_POS_Y, 148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
 
-  // Línea inferior de los tracks
+  // LÃ­nea inferior de los tracks
   printline(col(poscharx_tracks),TRACKS_POS_Y + row((PATTERN_EDIT_ROWS - blank_rows) + 1), 143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
   
   // Etiquetas de los tracks
@@ -881,8 +881,8 @@ void CUI_Patterneditor::enter(void)
   mousedrawing=0;
   //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
   
-  // <Manu> 180 es el espacio que queda más o menos para las notas descontando dónde empiezan los tracks, la toolbar, etc.
-  //        No sería mala idea calcular esto de una manera un poco más clara.
+  // <Manu> 180 es el espacio que queda mÃ¡s o menos para las notas descontando dÃ³nde empiezan los tracks, la toolbar, etc.
+  //        No serÃ­a mala idea calcular esto de una manera un poco mÃ¡s clara.
 
   PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
 
@@ -943,7 +943,7 @@ void CUI_Patterneditor::update()
 
 
 
-  // <Manu> Esto arregla el bug del último número de línea destacado cuando el play pasa por el pattern actual y sigue por otro.
+  // <Manu> Esto arregla el bug del Ãºltimo nÃºmero de lÃ­nea destacado cuando el play pasa por el pattern actual y sigue por otro.
   //        No es 100% perfecto por culpa del prebuffer, pero bueno...
 
   if(!ztPlayer->playing) last_cur_pattern = -1 ;
@@ -961,7 +961,7 @@ void CUI_Patterneditor::update()
 
 
   // <Manu> Esto arreglaba el bug de que no se refresque la pantalla al cambiar
-  //        el número de filas del pattern actual, pero ya no es necesario :-)
+  //        el nÃºmero de filas del pattern actual, pero ya no es necesario :-)
   //
   //if(ztPlayer->song->patterns[cur_edit_pattern]->length != last_pattern_size) {
   //
@@ -982,7 +982,7 @@ void CUI_Patterneditor::update()
     kstate = Keys.getstate();
     keyed++;
 
-    if((kstate & KS_CTRL) && (key == DIK_TAB)) {
+    if((kstate & KS_CTRL) && (key == SDLK_TAB)) {
 
       if(kstate & KS_SHIFT) {
         
@@ -1011,6 +1011,8 @@ void CUI_Patterneditor::update()
 
 
   
+  static char view_mode_status[64];
+
   switch(zt_config_globals.cur_edit_mode) 
   {
 
@@ -1019,7 +1021,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_SQUISH:
 
-    if(need_refresh) statusmsg = "View mode: Squish";
+    if (need_refresh) {
+      sprintf(view_mode_status, "View mode: Squish (%.1fx)", ZOOM);
+      statusmsg = view_mode_status;
+    }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 6) ;
     field_size = 6;
@@ -1033,7 +1038,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_REGULAR:
 
-    if (need_refresh) statusmsg = "View mode: Regular";
+    if (need_refresh) {
+      sprintf(view_mode_status, "View mode: Regular (%.1fx)", ZOOM);
+      statusmsg = view_mode_status;
+    }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 14) ;
     field_size = 13;
@@ -1047,7 +1055,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_BIG:
 
-    if (need_refresh) statusmsg = "View mode: Big";
+    if (need_refresh) {
+      sprintf(view_mode_status, "View mode: Big (%.1fx)", ZOOM);
+      statusmsg = view_mode_status;
+    }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / 160 ;    // 160 es lo que mide cada columna; dejamos 80 pixels extras de margen
     field_size = 19;
@@ -1061,7 +1072,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_FX:
 
-    if (need_refresh) statusmsg = "View mode: FX";
+    if (need_refresh) {
+      sprintf(view_mode_status, "View mode: FX (%.1fx)", ZOOM);
+      statusmsg = view_mode_status;
+    }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 13) ;
     
@@ -1139,7 +1153,7 @@ void CUI_Patterneditor::update()
       switch(key)
       {
 
-      case DIK_GRAVE:
+      case SDLK_GRAVE:
         if (mode==PEM_MOUSEDRAW) {
           
         /* Here we flush the MIDIin queue so as to
@@ -1154,7 +1168,7 @@ void CUI_Patterneditor::update()
         break;
 
 
-      case DIK_ADD:
+      case SDLK_KP_PLUS:
         if(cur_edit_order < (ZTM_ORDERLIST_LEN - 1) && song->orderlist[cur_edit_order + 1] != 0x100)
         {
           cur_edit_order++;
@@ -1163,7 +1177,7 @@ void CUI_Patterneditor::update()
         }
         break;
 
-      case DIK_SUBTRACT:
+      case SDLK_KP_MINUS:
 
         if(cur_edit_order > 0 && song->orderlist[cur_edit_order -1] != 0x100)
         {
@@ -1183,9 +1197,9 @@ void CUI_Patterneditor::update()
 
       switch(key)
       {
-      case SDLK_QUOTE:
+      case SDLK_APOSTROPHE:
       //case SDLK_LEFTBRACKET:
-      case DIK_SUBTRACT:
+      case SDLK_KP_MINUS:
 
         if (cur_edit_pattern>0) {
 
@@ -1197,9 +1211,9 @@ void CUI_Patterneditor::update()
 
       
       //case 92:
-      case SDLK_BACKSLASH: // <ManU> 92 en español, ¿qué pasa con teclados internacionales?
+      case SDLK_BACKSLASH: // <ManU> 92 en espaÃ±ol, Â¿quÃ© pasa con teclados internacionales?
       //case SDLK_RIGHTBRACKET:
-      case DIK_ADD:
+      case SDLK_KP_PLUS:
 
         if (cur_edit_pattern<255) {
           cur_edit_pattern++;
@@ -1236,12 +1250,12 @@ void CUI_Patterneditor::update()
       if (kstate == KS_NO_SHIFT_KEYS) {
         switch(key) {
           
-        case DIK_MOUSE_1_OFF:
-        case DIK_MOUSE_2_OFF: 
+        case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
+        case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)): 
           mousedrawing=0;
           break;
           
-        case DIK_MOUSE_1_ON:
+        case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
           if (    MousePressX >= col(5) 
             && MousePressX <  col(5+(tracks_shown*(field_size+1)))
             && MousePressY >= row(15)
@@ -1256,7 +1270,7 @@ void CUI_Patterneditor::update()
             LastY = MousePressY;
           }
           break;
-        case DIK_MOUSE_2_ON:
+        case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
           if (    MousePressX >= col(5) 
                 && MousePressX <  col(5+(tracks_shown*(field_size+1)))
                 && MousePressY >= row(15)
@@ -1273,49 +1287,49 @@ void CUI_Patterneditor::update()
           }
           break;
           
-        case DIK_TAB:
+        case SDLK_TAB:
           md_mode++;
           if (md_mode>=MD_END)
             md_mode = 0;
           need_refresh++;
           break;
 
-        case DIK_DOWN:
+        case SDLK_DOWN:
           cur_edit_row_disp++;
           need_refresh++;
           break;
 
-        case DIK_UP:
+        case SDLK_UP:
           cur_edit_row_disp--;
           need_refresh++;
           break;
 
-        case DIK_LEFT:
+        case SDLK_LEFT:
           cur_edit_track_disp--;
           need_refresh++;
           break;
 
-        case DIK_RIGHT:
+        case SDLK_RIGHT:
           cur_edit_track_disp++;
           need_refresh++;
           break;
 
-        case DIK_PGDN:
+        case SDLK_PAGEDOWN:
           cur_edit_row_disp+= zt_config_globals.highlight_increment * 4 ;
           need_refresh++;
           break;
 
-        case DIK_PGUP:
-          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> ¿Esto no debería ser un múltiplo del step?
+        case SDLK_PAGEUP:
+          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> Â¿Esto no deberÃ­a ser un mÃºltiplo del step?
           need_refresh++;
           break;
 
-        case DIK_END:
+        case SDLK_END:
           cur_edit_row_disp=0xFFF;
           need_refresh++;
           break;
 
-        case DIK_HOME:
+        case SDLK_HOME:
           cur_edit_row_disp = 0;
           need_refresh++;
           break;
@@ -1366,13 +1380,13 @@ void CUI_Patterneditor::update()
               if (kstate == KS_SHIFT) {
                 int effective=0;
                 switch(key) {
-                case DIK_PERIOD:
+                case SDLK_PERIOD:
                   cur_inst++;
                   if (cur_inst>=MAX_INSTS)
                     cur_inst = MAX_INSTS-1;
                   need_refresh++;
                   break;
-                case DIK_COMMA:
+                case SDLK_COMMA:
                   cur_inst--;
                   if (cur_inst<0)
                     cur_inst=0;
@@ -1384,7 +1398,7 @@ void CUI_Patterneditor::update()
                   ////////////////////////////////////////////////////////////////////////
                   // NEW SHIFT SELECTION
                   
-                case DIK_LEFT:
+                case SDLK_LEFT:
                   if(!selected)
                   {
                     selected=1;
@@ -1404,7 +1418,7 @@ void CUI_Patterneditor::update()
                     cur_edit_track_disp--;
                   need_refresh++;
                   break;
-                case DIK_RIGHT:
+                case SDLK_RIGHT:
                   if(cur_edit_track >= MAX_TRACKS-1)
                     break;
                   if(!selected)
@@ -1434,11 +1448,11 @@ void CUI_Patterneditor::update()
                  
                 // <Manu> Clarifico esto un poco
                   
-                case DIK_PGDN:
+                case SDLK_PAGEDOWN:
                   
                   effective=zt_config_globals.highlight_increment * 4;
                 
-                case DIK_DOWN:
+                case SDLK_DOWN:
                 
                   if(!effective) effective+=cur_step;
                   if (!effective) effective = 1;
@@ -1474,7 +1488,7 @@ void CUI_Patterneditor::update()
                         }
                         else{
                             
-                          // <Manu> if y else eran iguales ¿?
+                          // <Manu> if y else eran iguales Â¿?
                           select_row_start = song->patterns[cur_edit_pattern]->length-1;
                         }
                       }
@@ -1493,7 +1507,7 @@ void CUI_Patterneditor::update()
                   
                   break;
                   
-                case DIK_PGUP:
+                case SDLK_PAGEUP:
 
                   effective=zt_config_globals.highlight_increment * 4;
                   
@@ -1508,7 +1522,7 @@ void CUI_Patterneditor::update()
                     }
                   }
 
-                case DIK_UP:
+                case SDLK_UP:
                   
                   if(!effective) effective+=cur_step;
 
@@ -1562,7 +1576,7 @@ void CUI_Patterneditor::update()
 
           switch(key)
           {
-          case DIK_A:
+          case SDLK_A:
             if(selected) {
               popup_window(UIP_PENature);
               Keys.flush();
@@ -1572,7 +1586,7 @@ void CUI_Patterneditor::update()
             }
             break;
             
-          case DIK_W:
+          case SDLK_W:
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++) {         
@@ -1586,7 +1600,7 @@ void CUI_Patterneditor::update()
             }
             break;
             
-          case DIK_N: /* Set length of first note to length of selection */
+          case SDLK_N: /* Set length of first note to length of selection */
             if (selected && 
               (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
               ) {
@@ -1610,19 +1624,19 @@ void CUI_Patterneditor::update()
           switch(key)
           {
 
-          case DIK_1: cur_step=1;  need_refresh++; statusmsg = "Step set to 1"; break;
-          case DIK_2: cur_step=2;  need_refresh++; statusmsg = "Step set to 2"; break;
-          case DIK_3: cur_step=3;  need_refresh++; statusmsg = "Step set to 3"; break;
-          case DIK_4: cur_step=4;  need_refresh++; statusmsg = "Step set to 4"; break;
-          case DIK_5: cur_step=5;  need_refresh++; statusmsg = "Step set to 5"; break;
-          case DIK_6: cur_step=6;  need_refresh++; statusmsg = "Step set to 6"; break;
-          case DIK_7: cur_step=7;  need_refresh++; statusmsg = "Step set to 7"; break;
-          case DIK_8: cur_step=8;  need_refresh++; statusmsg = "Step set to 8"; break;
-          case DIK_9: cur_step=9;  need_refresh++; statusmsg = "Step set to 9"; break;
-          case DIK_0: cur_step=0;  need_refresh++; statusmsg = "Step set to 0"; break;
+          case SDLK_1: cur_step=1;  need_refresh++; statusmsg = "Step set to 1"; break;
+          case SDLK_2: cur_step=2;  need_refresh++; statusmsg = "Step set to 2"; break;
+          case SDLK_3: cur_step=3;  need_refresh++; statusmsg = "Step set to 3"; break;
+          case SDLK_4: cur_step=4;  need_refresh++; statusmsg = "Step set to 4"; break;
+          case SDLK_5: cur_step=5;  need_refresh++; statusmsg = "Step set to 5"; break;
+          case SDLK_6: cur_step=6;  need_refresh++; statusmsg = "Step set to 6"; break;
+          case SDLK_7: cur_step=7;  need_refresh++; statusmsg = "Step set to 7"; break;
+          case SDLK_8: cur_step=8;  need_refresh++; statusmsg = "Step set to 8"; break;
+          case SDLK_9: cur_step=9;  need_refresh++; statusmsg = "Step set to 9"; break;
+          case SDLK_0: cur_step=0;  need_refresh++; statusmsg = "Step set to 0"; break;
 
             
-          case DIK_P: // copy to new pattern
+          case SDLK_P: // copy to new pattern
             // select all of current pattern
             {
               
@@ -1654,7 +1668,7 @@ void CUI_Patterneditor::update()
             
             break;
             
-          case DIK_GRAVE: 
+          case SDLK_GRAVE: 
             // lengthalize selection
             note_row = -1;
             prev_note_row = -1;
@@ -1737,7 +1751,7 @@ void CUI_Patterneditor::update()
             need_refresh++;
             break;
             
-          case DIK_T: 
+          case SDLK_T: 
             // Set all effects to cur row first row in track
             if (selected) {
               
@@ -1757,7 +1771,7 @@ void CUI_Patterneditor::update()
             break;
             
             
-          case DIK_I: // Interpolate effect
+          case SDLK_I: // Interpolate effect
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++) {
                 if (select_row_end - select_row_start > 0) {
@@ -1781,7 +1795,7 @@ void CUI_Patterneditor::update()
             }
             break;
             
-          case DIK_K: // Interpolate volume
+          case SDLK_K: // Interpolate volume
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++) {
                 if (select_row_end - select_row_start > 0) {
@@ -1822,7 +1836,7 @@ void CUI_Patterneditor::update()
             break;
             
             
-          case DIK_J:
+          case SDLK_J:
             if(selected) {
               // display the fader menu
               //cur_volume_percent = 100;
@@ -1839,40 +1853,40 @@ void CUI_Patterneditor::update()
           // <Manu> Copy paste commands
           // ------------------------------------------------------------------------
             
-          case DIK_C:
+          case SDLK_C:
             if (selected) {
               clipboard->copy(); 
               SDL_Delay(50);
             }
             break;
 
-          case DIK_X:
+          case SDLK_X:
             if (!last_cmd_keyjazz && selected) {
               clipboard->copy();
               for(i=select_track_start;i<=select_track_end;i++)
                 for(j=select_row_start;j<=select_row_end;j++)
                   song->patterns[cur_edit_pattern]->tracks[i]->update_event(j,0x80,MAX_INSTS,0x80,0x0,0xff,0x0);
                 need_refresh++;
-                last_keyjazz = DIK_X;
+                last_keyjazz = SDLK_X;
                 last_cmd_keyjazz = 1;
             }
             break;
 
-          case DIK_V:
+          case SDLK_V:
 
             clipboard->paste(cur_edit_track,cur_edit_row,0); // insert
             need_refresh++;
             
             break;
 
-          case DIK_O:
+          case SDLK_O:
 
             clipboard->paste(cur_edit_track,cur_edit_row,1); // overwrite
             need_refresh++;
 
             break;
 
-          case DIK_M:
+          case SDLK_M:
 
             clipboard->paste(cur_edit_track,cur_edit_row,2); // merge
             need_refresh++;
@@ -1881,7 +1895,7 @@ void CUI_Patterneditor::update()
 
           
           
-          case DIK_L:
+          case SDLK_L:
             if ( selected &&
               select_row_start == 0 &&
               select_row_end == song->patterns[cur_edit_pattern]->length-1 &&
@@ -1900,7 +1914,7 @@ void CUI_Patterneditor::update()
             }
             need_refresh++;
             break;
-          case DIK_Z:
+          case SDLK_Z:
             if (selected) {
               if (zclear_presscount) {
 
@@ -1920,11 +1934,11 @@ void CUI_Patterneditor::update()
               }
             }
             break;
-          case DIK_U: // Unselect block
+          case SDLK_U: // Unselect block
             selected=0;
             need_refresh++;
             break;
-          case DIK_F: // Double block length
+          case SDLK_F: // Double block length
             if (selected) {
               int len = select_row_end - select_row_start + 1;
               len *= 2;
@@ -1934,7 +1948,7 @@ void CUI_Patterneditor::update()
               need_refresh++;
             }
             break;
-          case DIK_G: // Halve block length
+          case SDLK_G: // Halve block length
             if (selected) {
               int len = select_row_end - select_row_start + 1;
               len /= 2;
@@ -1945,7 +1959,7 @@ void CUI_Patterneditor::update()
               need_refresh++;
             }
             break;
-          case DIK_B:  // Set Select Begin block
+          case SDLK_B:  // Set Select Begin block
             if (!selected) {    
               selected = 1;
               select_row_start = cur_edit_row;
@@ -1968,7 +1982,7 @@ void CUI_Patterneditor::update()
             }
             need_refresh++;
             break;
-          case DIK_E: // Set Block End
+          case SDLK_E: // Set Block End
             if (!selected) {    
               selected = 1;
               select_row_start = cur_edit_row;
@@ -1998,7 +2012,7 @@ void CUI_Patterneditor::update()
         if (kstate == KS_ALT) {
           switch(key) {
             
-          case DIK_GRAVE: 
+          case SDLK_GRAVE: 
             // find row of previous note in current edit track
             prev_row = -1;
             x = cur_edit_row;
@@ -2018,7 +2032,7 @@ void CUI_Patterneditor::update()
             break;
             
             
-          case DIK_S: /* Set Instrument */
+          case SDLK_S: /* Set Instrument */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++)
                 for(j=select_row_start;j<=select_row_end;j++) {
@@ -2031,7 +2045,7 @@ void CUI_Patterneditor::update()
             }
             break;
             
-          case DIK_D: /* select */
+          case SDLK_D: /* select */
             if ( selected &&
               select_row_start == cur_edit_row &&
               
@@ -2071,7 +2085,7 @@ void CUI_Patterneditor::update()
             
             
             break;
-          case DIK_Q: /* Transpose up */
+          case SDLK_Q: /* Transpose up */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++)
                 for(j=select_row_start;j<=select_row_end;j++) {
@@ -2083,7 +2097,7 @@ void CUI_Patterneditor::update()
                 need_refresh++;
             }
             break;
-          case DIK_A: /* Transpose down */
+          case SDLK_A: /* Transpose down */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++)
                 for(j=select_row_start;j<=select_row_end;j++) {
@@ -2097,7 +2111,7 @@ void CUI_Patterneditor::update()
             break;
             
             
-          case DIK_LEFT:
+          case SDLK_LEFT:
             if (cur_edit_track>cur_edit_track_disp) {
               cur_edit_track--;
             } else {
@@ -2107,20 +2121,20 @@ void CUI_Patterneditor::update()
             }
             need_refresh++;
             break;
-          case DIK_RIGHT:
-            key = DIK_TAB; oktogo=1;
+          case SDLK_RIGHT:
+            key = SDLK_TAB; oktogo=1;
             break;
             
-          case DIK_F1: toggle_track_mute(0); need_refresh++; break;
-          case DIK_F2: toggle_track_mute(1); need_refresh++; break;
-          case DIK_F3: toggle_track_mute(2); need_refresh++; break;
-          case DIK_F4: toggle_track_mute(3); need_refresh++; break;
-          case DIK_F5: toggle_track_mute(4); need_refresh++; break;
-          case DIK_F6: toggle_track_mute(5); need_refresh++; break;
-          case DIK_F7: toggle_track_mute(6); need_refresh++; break;
-          case DIK_F8: toggle_track_mute(7); need_refresh++; break;
-          case DIK_F9: toggle_track_mute(cur_edit_track); need_refresh++; break;
-          case DIK_F10: 
+          case SDLK_F1: toggle_track_mute(0); need_refresh++; break;
+          case SDLK_F2: toggle_track_mute(1); need_refresh++; break;
+          case SDLK_F3: toggle_track_mute(2); need_refresh++; break;
+          case SDLK_F4: toggle_track_mute(3); need_refresh++; break;
+          case SDLK_F5: toggle_track_mute(4); need_refresh++; break;
+          case SDLK_F6: toggle_track_mute(5); need_refresh++; break;
+          case SDLK_F7: toggle_track_mute(6); need_refresh++; break;
+          case SDLK_F8: toggle_track_mute(7); need_refresh++; break;
+          case SDLK_F9: toggle_track_mute(cur_edit_track); need_refresh++; break;
+          case SDLK_F10: 
             
             val = 0;
 
@@ -2166,7 +2180,7 @@ void CUI_Patterneditor::update()
 
         // -------------------------------------------
         case SDLK_LEFTBRACKET:
-        case DIK_DIVIDE:
+        case SDLK_KP_DIVIDE:
 
           if (base_octave>0) {
             base_octave--;
@@ -2177,7 +2191,7 @@ void CUI_Patterneditor::update()
 
         // -------------------------------------------
         case SDLK_RIGHTBRACKET:
-        case DIK_MULTIPLY:
+        case SDLK_KP_MULTIPLY:
 
           if (base_octave<9) {
             base_octave++;
@@ -2188,7 +2202,7 @@ void CUI_Patterneditor::update()
         
 
         // -------------------------------------------
-        case DIK_RETURN:
+        case SDLK_RETURN:
           if (e = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)) {
             if (e->inst < MAX_INSTS) {
               cur_inst = e->inst;
@@ -2198,7 +2212,7 @@ void CUI_Patterneditor::update()
           break;
         
         // -------------------------------------------
-        case DIK_DELETE:
+        case SDLK_DELETE:
 
           if (kstate == KS_CTRL) {
 
@@ -2212,7 +2226,7 @@ void CUI_Patterneditor::update()
           }           
           need_refresh++;
           break;
-        case DIK_INSERT:
+        case SDLK_INSERT:
           if (kstate == KS_CTRL) {
             for(need_refresh=0;need_refresh<MAX_TRACKS;need_refresh++)
               song->patterns[cur_edit_pattern]->tracks[need_refresh]->ins_row(cur_edit_row);
@@ -2225,7 +2239,7 @@ void CUI_Patterneditor::update()
         
         /* END SPECIAL KEYS */
         
-        if ((kstate == KS_CTRL && ( key == DIK_LEFT || key == DIK_RIGHT || key == DIK_UP || key == DIK_DOWN )) || kstate == KS_NO_SHIFT_KEYS || kstate == KS_SHIFT || midiInQueue.size()>0) {
+        if ((kstate == KS_CTRL && ( key == SDLK_LEFT || key == SDLK_RIGHT || key == SDLK_UP || key == SDLK_DOWN )) || kstate == KS_NO_SHIFT_KEYS || kstate == KS_SHIFT || midiInQueue.size()>0) {
           
           pval=0; val=0x80;
           unsigned char leftright;
@@ -2241,17 +2255,17 @@ void CUI_Patterneditor::update()
             if (e==NULL)
               e = &blank_event;
             switch(key) {
-            case DIK_0: val = 0; pval++; break;
-            case DIK_1: val = 1; pval++; break;
-            case DIK_2: val = 2; pval++; break;
-            case DIK_3: val = 3; pval++; break;
-            case DIK_4: val = 4; pval++; break;
-            case DIK_5: val = 5; pval++; break;
-            case DIK_6: val = 6; pval++; break;
-            case DIK_7: val = 7; pval++; break;
-            case DIK_8: val = 8; pval++; break;
-            case DIK_9: val = 9; pval++; break;
-            case DIK_PERIOD: 
+            case SDLK_0: val = 0; pval++; break;
+            case SDLK_1: val = 1; pval++; break;
+            case SDLK_2: val = 2; pval++; break;
+            case SDLK_3: val = 3; pval++; break;
+            case SDLK_4: val = 4; pval++; break;
+            case SDLK_5: val = 5; pval++; break;
+            case SDLK_6: val = 6; pval++; break;
+            case SDLK_7: val = 7; pval++; break;
+            case SDLK_8: val = 8; pval++; break;
+            case SDLK_9: val = 9; pval++; break;
+            case SDLK_PERIOD: 
               if (kstate != KS_SHIFT) {
                 val=0xFF; 
                 pval++; 
@@ -2290,23 +2304,23 @@ void CUI_Patterneditor::update()
               if (e==NULL)
                 e = &blank_event;
               switch(key) {
-              case DIK_0: val = 0; pval++; break;
-              case DIK_1: val = 1; pval++; break;
-              case DIK_2: val = 2; pval++; break;
-              case DIK_3: val = 3; pval++; break;
-              case DIK_4: val = 4; pval++; break;
-              case DIK_5: val = 5; pval++; break;
-              case DIK_6: val = 6; pval++; break;
-              case DIK_7: val = 7; pval++; break;
-              case DIK_8: val = 8; pval++; break;
-              case DIK_9: val = 9; pval++; break;
-              case DIK_A: val = 0xA; pval++; break;
-              case DIK_B: val = 0xB; pval++; break;
-              case DIK_C: val = 0xC; pval++; break;
-              case DIK_D: val = 0xD; pval++; break;
-              case DIK_E: val = 0xE; pval++; break;
-              case DIK_F: val = 0xF; pval++; break;
-              case DIK_PERIOD: 
+              case SDLK_0: val = 0; pval++; break;
+              case SDLK_1: val = 1; pval++; break;
+              case SDLK_2: val = 2; pval++; break;
+              case SDLK_3: val = 3; pval++; break;
+              case SDLK_4: val = 4; pval++; break;
+              case SDLK_5: val = 5; pval++; break;
+              case SDLK_6: val = 6; pval++; break;
+              case SDLK_7: val = 7; pval++; break;
+              case SDLK_8: val = 8; pval++; break;
+              case SDLK_9: val = 9; pval++; break;
+              case SDLK_A: val = 0xA; pval++; break;
+              case SDLK_B: val = 0xB; pval++; break;
+              case SDLK_C: val = 0xC; pval++; break;
+              case SDLK_D: val = 0xD; pval++; break;
+              case SDLK_E: val = 0xE; pval++; break;
+              case SDLK_F: val = 0xF; pval++; break;
+              case SDLK_PERIOD: 
                 if (kstate!=KS_SHIFT) {
                   val=0x80; pval++; 
                 }
@@ -2345,33 +2359,33 @@ void CUI_Patterneditor::update()
 
                 switch(key) {
 
-                case DIK_A: val = 'A'; pval++; break;
-                case DIK_B: val = 'B'; pval++; break;
-                case DIK_C: val = 'C'; pval++; break;
-                case DIK_D: val = 'D'; pval++; break;
-                case DIK_E: val = 'E'; pval++; break;
-                case DIK_F: val = 'F'; pval++; break;
-                case DIK_G: val = 'G'; pval++; break;
-                case DIK_H: val = 'H'; pval++; break;
-                case DIK_I: val = 'I'; pval++; break;
-                case DIK_J: val = 'J'; pval++; break;
-                case DIK_K: val = 'K'; pval++; break;
-                case DIK_L: val = 'L'; pval++; break;
-                case DIK_M: val = 'M'; pval++; break;
-                case DIK_N: val = 'N'; pval++; break;
-                case DIK_O: val = 'O'; pval++; break;
-                case DIK_P: val = 'P'; pval++; break;
-                case DIK_Q: val = 'Q'; pval++; break;
-                case DIK_R: val = 'R'; pval++; break;
-                case DIK_S: val = 'S'; pval++; break;
-                case DIK_T: val = 'T'; pval++; break;
-                case DIK_U: val = 'U'; pval++; break;
-                case DIK_V: val = 'V'; pval++; break;
-                case DIK_W: val = 'W'; pval++; break;
-                case DIK_X: val = 'X'; pval++; break;
-                case DIK_Y: val = 'W'; pval++; break;
-                case DIK_Z: val = 'Z'; pval++; break;
-                case DIK_PERIOD: 
+                case SDLK_A: val = 'A'; pval++; break;
+                case SDLK_B: val = 'B'; pval++; break;
+                case SDLK_C: val = 'C'; pval++; break;
+                case SDLK_D: val = 'D'; pval++; break;
+                case SDLK_E: val = 'E'; pval++; break;
+                case SDLK_F: val = 'F'; pval++; break;
+                case SDLK_G: val = 'G'; pval++; break;
+                case SDLK_H: val = 'H'; pval++; break;
+                case SDLK_I: val = 'I'; pval++; break;
+                case SDLK_J: val = 'J'; pval++; break;
+                case SDLK_K: val = 'K'; pval++; break;
+                case SDLK_L: val = 'L'; pval++; break;
+                case SDLK_M: val = 'M'; pval++; break;
+                case SDLK_N: val = 'N'; pval++; break;
+                case SDLK_O: val = 'O'; pval++; break;
+                case SDLK_P: val = 'P'; pval++; break;
+                case SDLK_Q: val = 'Q'; pval++; break;
+                case SDLK_R: val = 'R'; pval++; break;
+                case SDLK_S: val = 'S'; pval++; break;
+                case SDLK_T: val = 'T'; pval++; break;
+                case SDLK_U: val = 'U'; pval++; break;
+                case SDLK_V: val = 'V'; pval++; break;
+                case SDLK_W: val = 'W'; pval++; break;
+                case SDLK_X: val = 'X'; pval++; break;
+                case SDLK_Y: val = 'W'; pval++; break;
+                case SDLK_Z: val = 'Z'; pval++; break;
+                case SDLK_PERIOD: 
                   if (kstate!=KS_SHIFT) {
                     val=0xFF; pval++; 
                   }
@@ -2394,23 +2408,23 @@ void CUI_Patterneditor::update()
                   if (e==NULL)
                     e = &blank_event;
                   switch(key) {
-                  case DIK_0: val = 0; pval++; break;
-                  case DIK_1: val = 1; pval++; break;
-                  case DIK_2: val = 2; pval++; break;
-                  case DIK_3: val = 3; pval++; break;
-                  case DIK_4: val = 4; pval++; break;
-                  case DIK_5: val = 5; pval++; break;
-                  case DIK_6: val = 6; pval++; break;
-                  case DIK_7: val = 7; pval++; break;
-                  case DIK_8: val = 8; pval++; break;
-                  case DIK_9: val = 9; pval++; break;
-                  case DIK_A: val = 0xA; pval++; break;
-                  case DIK_B: val = 0xB; pval++; break;
-                  case DIK_C: val = 0xC; pval++; break;
-                  case DIK_D: val = 0xD; pval++; break;
-                  case DIK_E: val = 0xE; pval++; break;
-                  case DIK_F: val = 0xF; pval++; break;
-                  case DIK_PERIOD: 
+                  case SDLK_0: val = 0; pval++; break;
+                  case SDLK_1: val = 1; pval++; break;
+                  case SDLK_2: val = 2; pval++; break;
+                  case SDLK_3: val = 3; pval++; break;
+                  case SDLK_4: val = 4; pval++; break;
+                  case SDLK_5: val = 5; pval++; break;
+                  case SDLK_6: val = 6; pval++; break;
+                  case SDLK_7: val = 7; pval++; break;
+                  case SDLK_8: val = 8; pval++; break;
+                  case SDLK_9: val = 9; pval++; break;
+                  case SDLK_A: val = 0xA; pval++; break;
+                  case SDLK_B: val = 0xB; pval++; break;
+                  case SDLK_C: val = 0xC; pval++; break;
+                  case SDLK_D: val = 0xD; pval++; break;
+                  case SDLK_E: val = 0xE; pval++; break;
+                  case SDLK_F: val = 0xF; pval++; break;
+                  case SDLK_PERIOD: 
                     if (kstate!=KS_SHIFT) {
                       val=0x80; pval++; 
                     }
@@ -2459,39 +2473,39 @@ void CUI_Patterneditor::update()
                     else
                       root_note = 0;
                     switch(key) {
-                    case DIK_1: set_note = root_note + (12*1); noplay=1; break;
-                    case DIK_2: set_note = root_note + (12*2); noplay=1; break;
-                    case DIK_3: set_note = root_note + (12*3); noplay=1; break;
-                    case DIK_4: set_note = root_note + (12*4); noplay=1; break;
-                    case DIK_5: set_note = root_note + (12*5); noplay=1; break;
-                    case DIK_6: set_note = root_note + (12*6); noplay=1; break;
-                    case DIK_7: set_note = root_note + (12*7); noplay=1; break;
-                    case DIK_8: set_note = root_note + (12*8); noplay=1; break;
-                    case DIK_9: set_note = root_note + (12*9); noplay=1; break;
-                    case DIK_0: set_note = root_note ; noplay=1; break;
+                    case SDLK_1: set_note = root_note + (12*1); noplay=1; break;
+                    case SDLK_2: set_note = root_note + (12*2); noplay=1; break;
+                    case SDLK_3: set_note = root_note + (12*3); noplay=1; break;
+                    case SDLK_4: set_note = root_note + (12*4); noplay=1; break;
+                    case SDLK_5: set_note = root_note + (12*5); noplay=1; break;
+                    case SDLK_6: set_note = root_note + (12*6); noplay=1; break;
+                    case SDLK_7: set_note = root_note + (12*7); noplay=1; break;
+                    case SDLK_8: set_note = root_note + (12*8); noplay=1; break;
+                    case SDLK_9: set_note = root_note + (12*9); noplay=1; break;
+                    case SDLK_0: set_note = root_note ; noplay=1; break;
                     default: break;
                     }
                     break;
                     case T_NOTE: 
                       switch(key) {
                         /* TOP ROW */
-                      case DIK_Q: set_note = 12*base_octave;         break;
-                      case DIK_2: set_note = (12*base_octave)+1;     break;
-                      case DIK_W: set_note = (12*base_octave)+2;     break;
-                      case DIK_3: set_note = (12*base_octave)+3;     break;
-                      case DIK_E: set_note = (12*base_octave)+4;     break;
-                      case DIK_R: set_note = (12*base_octave)+5;     break;
-                      case DIK_5: set_note = (12*base_octave)+6;     break;
-                      case DIK_T: set_note = (12*base_octave)+7;     break;
-                      case DIK_6: set_note = (12*base_octave)+8;     break;
-                      case DIK_Y: set_note = (12*base_octave)+9;     break;
-                      case DIK_7: set_note = (12*base_octave)+10;    break;
-                      case DIK_U: set_note = (12*base_octave)+11;    break;
-                      case DIK_I: set_note = (12*base_octave)+12;    break;
-                      case DIK_9: set_note = (12*base_octave)+1+12;  break;
-                      case DIK_O: set_note = (12*base_octave)+2+12;  break;
-                      case DIK_0: set_note = (12*base_octave)+3+12;  break;
-                      case DIK_P: set_note = (12*base_octave)+4+12;  break;
+                      case SDLK_Q: set_note = 12*base_octave;         break;
+                      case SDLK_2: set_note = (12*base_octave)+1;     break;
+                      case SDLK_W: set_note = (12*base_octave)+2;     break;
+                      case SDLK_3: set_note = (12*base_octave)+3;     break;
+                      case SDLK_E: set_note = (12*base_octave)+4;     break;
+                      case SDLK_R: set_note = (12*base_octave)+5;     break;
+                      case SDLK_5: set_note = (12*base_octave)+6;     break;
+                      case SDLK_T: set_note = (12*base_octave)+7;     break;
+                      case SDLK_6: set_note = (12*base_octave)+8;     break;
+                      case SDLK_Y: set_note = (12*base_octave)+9;     break;
+                      case SDLK_7: set_note = (12*base_octave)+10;    break;
+                      case SDLK_U: set_note = (12*base_octave)+11;    break;
+                      case SDLK_I: set_note = (12*base_octave)+12;    break;
+                      case SDLK_9: set_note = (12*base_octave)+1+12;  break;
+                      case SDLK_O: set_note = (12*base_octave)+2+12;  break;
+                      case SDLK_0: set_note = (12*base_octave)+3+12;  break;
+                      case SDLK_P: set_note = (12*base_octave)+4+12;  break;
                       
                       
                       // <Manu> Repurpose these keys
@@ -2500,28 +2514,28 @@ void CUI_Patterneditor::update()
 
 
                         /* BOTTOM ROW */
-                      case DIK_Z: set_note = 12*(base_octave-1);     break;
-                      case DIK_S: set_note = (12*(base_octave-1))+1; break;
-                      case DIK_X: set_note = (12*(base_octave-1))+2; break;
-                      case DIK_D: set_note =(12*(base_octave-1))+3;  break;
-                      case DIK_C: set_note =(12*(base_octave-1))+4;  break;
-                      case DIK_V: set_note = (12*(base_octave-1))+5; break;
-                      case DIK_G: set_note = (12*(base_octave-1))+6; break;
-                      case DIK_B: set_note = (12*(base_octave-1))+7; break;
-                      case DIK_H: set_note = (12*(base_octave-1))+8; break;
-                      case DIK_N: set_note = (12*(base_octave-1))+9; break;
-                      case DIK_J: set_note = (12*(base_octave-1))+10;break; 
-                      case DIK_M: set_note = (12*(base_octave-1))+11;break;
+                      case SDLK_Z: set_note = 12*(base_octave-1);     break;
+                      case SDLK_S: set_note = (12*(base_octave-1))+1; break;
+                      case SDLK_X: set_note = (12*(base_octave-1))+2; break;
+                      case SDLK_D: set_note =(12*(base_octave-1))+3;  break;
+                      case SDLK_C: set_note =(12*(base_octave-1))+4;  break;
+                      case SDLK_V: set_note = (12*(base_octave-1))+5; break;
+                      case SDLK_G: set_note = (12*(base_octave-1))+6; break;
+                      case SDLK_B: set_note = (12*(base_octave-1))+7; break;
+                      case SDLK_H: set_note = (12*(base_octave-1))+8; break;
+                      case SDLK_N: set_note = (12*(base_octave-1))+9; break;
+                      case SDLK_J: set_note = (12*(base_octave-1))+10;break; 
+                      case SDLK_M: set_note = (12*(base_octave-1))+11;break;
                         /* EDITING KEYS */
-                      case DIK_1: set_note = 0x81; break;      
-                      case DIK_GRAVE: set_note = 0x82; break;  
-                      case DIK_PERIOD: 
+                      case SDLK_1: set_note = 0x81; break;      
+                      case SDLK_GRAVE: set_note = 0x82; break;  
+                      case SDLK_PERIOD: 
                         if (kstate != KS_SHIFT) {
                           set_note = 0x80; 
                         }
                         break;
                         /* ROW/NOTE PEEK PLAY */
-                      case DIK_8:
+                      case SDLK_8:
                         
                         ztPlayer->play_current_row();
                         
@@ -2547,7 +2561,7 @@ void CUI_Patterneditor::update()
                       
                         break;
                       
-                      case DIK_4:
+                      case SDLK_4:
                         
                         ztPlayer->play_current_note();
 
@@ -2586,18 +2600,18 @@ void CUI_Patterneditor::update()
                         if (e==NULL)
                           e = &blank_event;
                         switch(key) {
-                        case DIK_0: val = 0; pval++; break;
-                        case DIK_1: val = 1; pval++; break;
-                        case DIK_2: val = 2; pval++; break;
-                        case DIK_3: val = 3; pval++; break;
-                        case DIK_4: val = 4; pval++; break;
-                        case DIK_5: val = 5; pval++; break;
-                        case DIK_6: val = 6; pval++; break;
-                        case DIK_7: val = 7; pval++; break;
-                        case DIK_8: val = 8; pval++; break;
-                        case DIK_9: val = 9; pval++; break;
-                        case DIK_I: val = 0xA0; pval++; break;
-                        case DIK_PERIOD: 
+                        case SDLK_0: val = 0; pval++; break;
+                        case SDLK_1: val = 1; pval++; break;
+                        case SDLK_2: val = 2; pval++; break;
+                        case SDLK_3: val = 3; pval++; break;
+                        case SDLK_4: val = 4; pval++; break;
+                        case SDLK_5: val = 5; pval++; break;
+                        case SDLK_6: val = 6; pval++; break;
+                        case SDLK_7: val = 7; pval++; break;
+                        case SDLK_8: val = 8; pval++; break;
+                        case SDLK_9: val = 9; pval++; break;
+                        case SDLK_I: val = 0xA0; pval++; break;
+                        case SDLK_PERIOD: 
                           if (kstate!=KS_SHIFT) {
                             val=0xFF; pval++; 
                           }
@@ -2643,8 +2657,11 @@ void CUI_Patterneditor::update()
               case 0x80: // Note off
                 key = (dw&0xFF00)>>8 ;
                 key+=0xFF;
-                MidiOut->noteOff(song->instruments[cur_inst]->midi_device,jazz[key].note,jazz[key].chan,0x0,0);
-                jazz[key].note = 0x80;
+                if (jazz_note_is_active(key)) {
+                  const mbuf st = jazz_get_state(key);
+                  MidiOut->noteOff(song->instruments[cur_inst]->midi_device,st.note,st.chan,0x0,0);
+                  jazz_clear_state(key);
+                }
                 break;
               case 0x90: // Note on
                 set_note = key = (dw&0xFF00)>>8 ;
@@ -2669,7 +2686,7 @@ void CUI_Patterneditor::update()
                 step++;
               }
               if (set_note < 0x80 && !noplay) {
-                if ( /*(!ztPlayer->playing || key_jazz) && */jazz[key].note>=0x80 ) {
+                if (!jazz_note_is_active(key)) {
                   if (p1==-1) {
                     p1 = song->instruments[cur_inst]->default_volume;
                     if (song->instruments[cur_inst]->global_volume != 0x7F && p1>0) {
@@ -2686,13 +2703,12 @@ void CUI_Patterneditor::update()
 
                   MidiOut->noteOn(song->instruments[cur_inst]->midi_device,set_note,song->instruments[cur_inst]->channel,(unsigned char)p1,MAX_TRACKS,0);
 
-                  jazz[key].note = set_note;
-                  jazz[key].chan = song->instruments[cur_inst]->channel;
+                  jazz_set_state(key, set_note, song->instruments[cur_inst]->channel);
                 }
               }
             }
 
-            if (key == DIK_SPACE) {
+            if (key == SDLK_SPACE) {
 
               key_jazz = ! key_jazz;
 
@@ -2713,7 +2729,7 @@ void CUI_Patterneditor::update()
                 } 
                 else {
 
-                  key = DIK_RIGHT;
+                  key = SDLK_RIGHT;
                 }
 
               } 
@@ -2732,12 +2748,12 @@ wrap:;
               amount = zt_config_globals.control_navigation_amount;
             else
               amount = 1;
-            if (key==DIK_RIGHT) {
+            if (key==SDLK_RIGHT) {
               for(con=0;con < amount;con++) {
                 cur_edit_col++;
                 if (cur_edit_col>=cols_shown) {
                   cur_edit_col = 0;
-                  key=DIK_TAB;
+                  key=SDLK_TAB;
                   kstate = 0;
                 }
                 need_refresh++;
@@ -2745,7 +2761,7 @@ wrap:;
                 statusmsg=szStatmsg;
               }
             }
-            if (key==DIK_LEFT) {
+            if (key==SDLK_LEFT) {
               for(con=0;con < amount;con++) {
                 if (cur_edit_col>0) {
                   cur_edit_col--;
@@ -2772,7 +2788,7 @@ wrap:;
             
         } // End No CTRL or ALT block
         
-        if (key == DIK_PGUP) {
+        if (key == SDLK_PAGEUP) {
           if(zt_config_globals.centered_editing) {
             if ((cur_edit_row-cur_edit_row_disp) > (PATTERN_EDIT_ROWS / 2) || (cur_edit_row == cur_edit_row_disp))
               cur_edit_row-=zt_config_globals.highlight_increment * 4;
@@ -2803,7 +2819,7 @@ wrap:;
             need_refresh++;
           }
         }
-        if (key == DIK_PGDN) {
+        if (key == SDLK_PAGEDOWN) {
           if(zt_config_globals.centered_editing) {
             if (cur_edit_row < (cur_edit_row_disp+PATTERN_EDIT_ROWS) ||
               cur_edit_row == (cur_edit_row_disp + (PATTERN_EDIT_ROWS - 1)))
@@ -2837,7 +2853,7 @@ wrap:;
             need_refresh++;
           }
         } 
-        if (key == DIK_DOWN || step) {
+        if (key == SDLK_DOWN || step) {
           if (cur_step < (song->patterns[cur_edit_pattern]->length - cur_edit_row )) {
             for(con=0;con < amount;con++) {
               if(zt_config_globals.centered_editing) {
@@ -2888,7 +2904,7 @@ wrap:;
           }
           
         }
-        if (key==DIK_UP) {
+        if (key==SDLK_UP) {
           for(con=0;con < amount;con++) {
             if(zt_config_globals.centered_editing) {
               step=cur_step-1; 
@@ -2934,7 +2950,7 @@ wrap:;
             }
           }
         }
-        if (key==DIK_TAB && ((!(kstate & KS_ALT)) || oktogo) ) {
+        if (key==SDLK_TAB && ((!(kstate & KS_ALT)) || oktogo) ) {
           if (kstate & KS_SHIFT) {
             if (cur_edit_track)
               cur_edit_track--;
@@ -2955,7 +2971,7 @@ wrap:;
               } 
           }
         }
-        if (key==DIK_HOME) {
+        if (key==SDLK_HOME) {
           
           if (cur_edit_col>0) {
             cur_edit_col = 0;
@@ -2977,7 +2993,7 @@ wrap:;
           }   
           need_refresh++;
         }
-        if (key==DIK_END) {
+        if (key==SDLK_END) {
           if (cur_edit_col<cols_shown-1) {
             cur_edit_col=cols_shown-1;
           } else {
@@ -3226,7 +3242,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     if (m_Fullupd) {
 
-      // <Manu> Clarificar un poco esta fórmula, porque con row(52 se comía la última línea 
+      // <Manu> Clarificar un poco esta fÃ³rmula, porque con row(52 se comÃ­a la Ãºltima lÃ­nea 
 
       screenmanager.Update(0, row(11), INTERNAL_RESOLUTION_X, row(53+((INTERNAL_RESOLUTION_Y-480)/8))) ;
     }

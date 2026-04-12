@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -49,7 +49,7 @@
 /* convert on non precision slides */
 //#define CONVERT_SLIDEPRECISION
 
-extern int load_lock;
+extern std::atomic<int> load_lock;
 
 #define FILEFLAG_SEND_MIDI_CLOCK        (1<<0)
 #define FILEFLAG_SEND_MIDI_STOP_START   (1<<1)
@@ -79,18 +79,16 @@ void zt_module::writedata(char *data, int size, int compressed, std::ofstream &o
 //
 int zt_module::readdata(char *data, int size, int compressed, std::ifstream &ifs, InflateStream *i) 
 {
+  if (size < 0) return -1;
+
   if (compressed) {
-
-    if (i) {
-
-      i->read(data,size);
-      if (i->eof()) return -1;
-    }
+    if (!i) return -1;
+    i->read(data,size);
+    if (i->fail()) return -1;
   }
   else {
-    
     ifs.read(data,size);
-    if (ifs.eof()) return -1;
+    if (ifs.gcount() != size) return -1;
   }
 
   return(0) ;
@@ -122,7 +120,7 @@ int zt_module::readblock(char headid[5], CDataBuf *buf, int compressed, std::ifs
 {
   int size,ret;
   char *lpBuf;
-  
+
   buf->flush();
 
   ret = readdata(headid,4,compressed,ifs,is); headid[4]=0;
@@ -131,12 +129,14 @@ int zt_module::readblock(char headid[5], CDataBuf *buf, int compressed, std::ifs
   ret = readdata((char *)&size,sizeof(int),compressed,ifs,is);
   if (ret == -1) return -1;
 
+  if (size < 0 || size > (64 * 1024 * 1024)) return -1;
+
   buf->setbufsize(size);
   lpBuf = buf->getbuffer();
-  
+
   if (!lpBuf) return -1; // fail if no buffer
-  readdata(lpBuf,size,compressed,ifs,is);
-  
+  if (readdata(lpBuf,size,compressed,ifs,is) == -1) return -1;
+
   buf->reset_read() ;
   return(size) ;
 }
@@ -150,9 +150,10 @@ int zt_module::read_ZT_header(CDataBuf *buf, std::ifstream &ifs)
   int size;
   int compressed;
   char c,headid[5],*lpBuf;
-  
+
   buf->flush();
-  readdata(headid,4,0,ifs,NULL); headid[4]=0;
+  if (readdata(headid,4,0,ifs,NULL) == -1) return -1;
+  headid[4]=0;
 
   if (!cmp_hd(headid,ZT_FILE_HEADER)) {
 
@@ -160,10 +161,12 @@ int zt_module::read_ZT_header(CDataBuf *buf, std::ifstream &ifs)
     else return -1;
   }
 
-  readdata((char *)&size,sizeof(int),0,ifs,NULL);
+  if (readdata((char *)&size,sizeof(int),0,ifs,NULL) == -1) return -1;
+  if (size < 4 || size > 65536) return -1;
   buf->setbufsize(size);
   lpBuf = buf->getbuffer();
-  ifs.read(lpBuf,size);
+  if (!lpBuf) return -1;
+  if (readdata(lpBuf,size,0,ifs,NULL) == -1) return -1;
   buf->reset_read();
   this->bpm = buf->getuch();
   this->tpb = buf->getuch();
@@ -172,14 +175,14 @@ int zt_module::read_ZT_header(CDataBuf *buf, std::ifstream &ifs)
 
 
   for (int i=0; i < ZTM_SONGTITLE_MAXLEN; i++) {
-    
+
     this->title[i] = buf->getch();
   }
 
   this->title[ZTM_SONGTITLE_MAXLEN - 1] = '\0' ;
 
   buf->flush();
-  
+
   flag_SendMidiClock     = (c&FILEFLAG_SEND_MIDI_CLOCK)?1:0;
   flag_SendMidiStopStart = (c&FILEFLAG_SEND_MIDI_STOP_START)?1:0;
   flag_SlideOnSubtick    = (c&FILEFLAG_SLIDEONSUBTICK)?1:0;
@@ -187,7 +190,7 @@ int zt_module::read_ZT_header(CDataBuf *buf, std::ifstream &ifs)
   flag_SlidePrecision    = (c&FILEFLAG_SLIDEPRECISION)?1:0;
 #endif /* CONVERT_SLIDEPRECISION */
   compressed = (c&FILEFLAG_COMPRESSED)?1:0;
-  
+
   return(compressed) ;
 }
 
@@ -572,6 +575,7 @@ void zt_module::load_ZT_event_list(CDataBuf *buf) {
                     tmp_data=dEvent.effect_data; // preserve
                     // convert pitch slides
                     if (dEvent.effect=='E' || dEvent.effect=='F') {
+
 #ifdef CONVERT_SLIDEONSUBTICK
                         if (!flag_SlideOnSubtick) {
                             // rescale old pitch slides.
@@ -1205,28 +1209,33 @@ int zt_module::load(char *fn)
     }
 
     int ret = 0;
+    int recognized_chunks = 0;
+    int saw_order_list = 0;
+    int saw_pattern_lengths = 0;
+    int saw_event_list = 0;
     while(ret!=-1) {
         ret = readblock(&header[0],&buffer,compressed,f,input);
         if (ret!=-1) {
-            if (cmp_hd(&header[0], "SMSG"))
-                load_song_message(&buffer);
-            if (cmp_hd(&header[0], "ARPG"))
-                load_arpeggio(&buffer);
-            if (cmp_hd(&header[0], "MMAC"))
-                load_MIDI_macro(&buffer);
-            if (cmp_hd(&header[0], "ZTtm"))
-                load_ZT_track_mutes(&buffer);
-            if (cmp_hd(&header[0], "ZTol"))
-                load_ZT_order_list(&buffer);
-            if (cmp_hd(&header[0], "ZTpl"))
-                load_ZT_pattern_lengths(&buffer);
-            if (cmp_hd(&header[0], "ZTpp"))
-                load_ZT_pattern_properties(&buffer);
-            if (cmp_hd(&header[0], "ZTin"))
-                load_ZT_instrument(&buffer);
-            if (cmp_hd(&header[0], "ZTev"))
-                load_ZT_event_list(&buffer);
-        } SDL_Delay(1);
+            if (cmp_hd(&header[0], "SMSG")) { load_song_message(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "ARPG")) { load_arpeggio(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "MMAC")) { load_MIDI_macro(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "ZTtm")) { load_ZT_track_mutes(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "ZTol")) { load_ZT_order_list(&buffer); recognized_chunks++; saw_order_list = 1; }
+            if (cmp_hd(&header[0], "ZTpl")) { load_ZT_pattern_lengths(&buffer); recognized_chunks++; saw_pattern_lengths = 1; }
+            if (cmp_hd(&header[0], "ZTpp")) { load_ZT_pattern_properties(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "ZTin")) { load_ZT_instrument(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "ZTev")) { load_ZT_event_list(&buffer); recognized_chunks++; saw_event_list = 1; }
+        }
+        SDL_Delay(1);
+    }
+
+    if (recognized_chunks == 0 || !saw_order_list || !saw_pattern_lengths || !saw_event_list) {
+        if (compressed) {
+            delete input;
+        }
+        setstatusstr("Error loading %s (invalid/incomplete song data)", fn);
+        unlock_mutex(this->hEditMutex);
+        return -1;
     }
 #ifdef CONVERT_SLIDEONSUBTICK
     // slides already converted in the loading phase
@@ -1242,10 +1251,12 @@ int zt_module::load(char *fn)
     if (compressed) {
         delete input;
         setstatusstr("Loaded %s (compressed)",fn);
-    } else
+    } else {
         setstatusstr("Loaded %s (uncompressed)",fn);
+    }
     if (song->orderlist[0] < 0x100)
         cur_edit_pattern = song->orderlist[0];
+
     strcpy((char*)&this->filename[0],fn);
     file_changed = 0;
     UIP_InstEditor->reset = 1;

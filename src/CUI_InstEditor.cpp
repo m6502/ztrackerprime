@@ -279,7 +279,7 @@ void CUI_InstEditor::update() {
 
     
     
-    // <Manu> Refrescamos la pantalla cuando cambia la línea -----------
+    // <Manu> Refrescamos la pantalla cuando cambia la lÃ­nea -----------
 
     if(!ztPlayer->playing) ie->last_cur_row = -1 ;
     else {
@@ -302,103 +302,109 @@ void CUI_InstEditor::update() {
             key = Keys.getkey();
             kstate = Keys.getstate();
         }
+        const bool editing_name = (ie && ie->text_cursor < 24);
 
         /*if (kstate & KS_ALT && kstate & KS_CTRL) {
             switch(key) {
-                case DIK_T: break;
+                case SDLK_T: break;
             }
         }*/
 
         switch(kstate) {
             case KS_CTRL:
                 switch(key) {
-                    case DIK_1: song->instruments[cur_inst]->channel = 0; act++; break;
-                    case DIK_2: song->instruments[cur_inst]->channel = 1; act++; break;
-                    case DIK_3: song->instruments[cur_inst]->channel = 2; act++; break;
-                    case DIK_4: song->instruments[cur_inst]->channel = 3; act++; break;
-                    case DIK_5: song->instruments[cur_inst]->channel = 4; act++; break;
-                    case DIK_6: song->instruments[cur_inst]->channel = 5; act++; break;
-                    case DIK_7: song->instruments[cur_inst]->channel = 6; act++; break;
-                    case DIK_8: song->instruments[cur_inst]->channel = 7; act++; break;
-                    case DIK_9: song->instruments[cur_inst]->channel = 8; act++; break;
-                    case DIK_0: song->instruments[cur_inst]->channel = 9; act++; break;
+                    case SDLK_1: song->instruments[cur_inst]->channel = 0; act++; break;
+                    case SDLK_2: song->instruments[cur_inst]->channel = 1; act++; break;
+                    case SDLK_3: song->instruments[cur_inst]->channel = 2; act++; break;
+                    case SDLK_4: song->instruments[cur_inst]->channel = 3; act++; break;
+                    case SDLK_5: song->instruments[cur_inst]->channel = 4; act++; break;
+                    case SDLK_6: song->instruments[cur_inst]->channel = 5; act++; break;
+                    case SDLK_7: song->instruments[cur_inst]->channel = 6; act++; break;
+                    case SDLK_8: song->instruments[cur_inst]->channel = 7; act++; break;
+                    case SDLK_9: song->instruments[cur_inst]->channel = 8; act++; break;
+                    case SDLK_0: song->instruments[cur_inst]->channel = 9; act++; break;
                 }
                 break;
             case KS_ALT:
                     switch(key) {
-                    case DIK_1: dev_sel(0,mds); act++; break;
-                    case DIK_2: dev_sel(1,mds); act++; break;
-                    case DIK_3: dev_sel(2,mds); act++; break;
-                    case DIK_4: dev_sel(3,mds); act++; break;
-                    case DIK_5: dev_sel(4,mds); act++; break;
-                    case DIK_6: dev_sel(5,mds); act++; break;
-                    case DIK_7: dev_sel(6,mds); act++; break;
-                    case DIK_8: dev_sel(7,mds); act++; break;
-                    case DIK_9: dev_sel(8,mds); act++; break;
-                    case DIK_0: dev_sel(9,mds); act++; break;
-                    case DIK_T: BTNCLK_ToggleTrackerMode(this->trackerModeButton); act++; break;
+                    case SDLK_1: dev_sel(0,mds); act++; break;
+                    case SDLK_2: dev_sel(1,mds); act++; break;
+                    case SDLK_3: dev_sel(2,mds); act++; break;
+                    case SDLK_4: dev_sel(3,mds); act++; break;
+                    case SDLK_5: dev_sel(4,mds); act++; break;
+                    case SDLK_6: dev_sel(5,mds); act++; break;
+                    case SDLK_7: dev_sel(6,mds); act++; break;
+                    case SDLK_8: dev_sel(7,mds); act++; break;
+                    case SDLK_9: dev_sel(8,mds); act++; break;
+                    case SDLK_0: dev_sel(9,mds); act++; break;
+                    case SDLK_T: BTNCLK_ToggleTrackerMode(this->trackerModeButton); act++; break;
                     }
                     break;
             case KS_NO_SHIFT_KEYS:
                 switch(key) {
-                    case DIK_MULTIPLY:
+                    case SDLK_KP_MULTIPLY:
+                        if (editing_name) break;
                         if (base_octave<9) {
                             base_octave++;
                             need_refresh++; 
                         }
                         break;
-                    case DIK_DIVIDE:
+                    case SDLK_KP_DIVIDE:
+                        if (editing_name) break;
                         if (base_octave>0) {
                             base_octave--;
                             need_refresh++; 
                         }
                         break;
-                    case DIK_PGUP:
+                    case SDLK_PAGEUP:
                         ie->cursor--;
                         if (ie->cursor<0)
                             ie->list_start--;
                         act++; break;
-                    case DIK_PGDN: 
+                    case SDLK_PAGEDOWN: 
                         ie->cursor++;
                         if (ie->cursor>=ie->ysize)
                             ie->list_start++;
                         act++; break;
+                }
+                if (!editing_name) {
+                    switch(key) {
+                        case SDLK_Q: set_note = 12*base_octave;         break;
+                        case SDLK_2: set_note = (12*base_octave)+1;     break;
+                        case SDLK_W: set_note = (12*base_octave)+2;     break;
+                        case SDLK_3: set_note = (12*base_octave)+3;     break;
+                        case SDLK_E: set_note = (12*base_octave)+4;     break;
+                        case SDLK_R: set_note = (12*base_octave)+5;     break;
+                        case SDLK_5: set_note = (12*base_octave)+6;     break;
+                        case SDLK_T: set_note = (12*base_octave)+7;     break;
+                        case SDLK_6: set_note = (12*base_octave)+8;     break;
+                        case SDLK_Y: set_note = (12*base_octave)+9;     break;
+                        case SDLK_7: set_note = (12*base_octave)+10;    break;
+                        case SDLK_U: set_note = (12*base_octave)+11;    break;
+                        case SDLK_I: set_note = (12*base_octave)+12;    break;
+                        case SDLK_9: set_note = (12*base_octave)+1+12;  break;
+                        case SDLK_O: set_note = (12*base_octave)+2+12;  break;
+                        case SDLK_0: set_note = (12*base_octave)+3+12;  break;
+                        case SDLK_P: set_note = (12*base_octave)+4+12;  break;
 
-                        case DIK_Q: set_note = 12*base_octave;         break;
-                        case DIK_2: set_note = (12*base_octave)+1;     break;
-                        case DIK_W: set_note = (12*base_octave)+2;     break;
-                        case DIK_3: set_note = (12*base_octave)+3;     break;
-                        case DIK_E: set_note = (12*base_octave)+4;     break;
-                        case DIK_R: set_note = (12*base_octave)+5;     break;
-                        case DIK_5: set_note = (12*base_octave)+6;     break;
-                        case DIK_T: set_note = (12*base_octave)+7;     break;
-                        case DIK_6: set_note = (12*base_octave)+8;     break;
-                        case DIK_Y: set_note = (12*base_octave)+9;     break;
-                        case DIK_7: set_note = (12*base_octave)+10;    break;
-                        case DIK_U: set_note = (12*base_octave)+11;    break;
-                        case DIK_I: set_note = (12*base_octave)+12;    break;
-                        case DIK_9: set_note = (12*base_octave)+1+12;  break;
-                        case DIK_O: set_note = (12*base_octave)+2+12;  break;
-                        case DIK_0: set_note = (12*base_octave)+3+12;  break;
-                        case DIK_P: set_note = (12*base_octave)+4+12;  break;
-                        
                         // <Manu> Repurpose these keys
                         //case SDLK_LEFTBRACKET: set_note = (12*base_octave)+5+12;  break;
                         //case SDLK_RIGHTBRACKET: set_note = (12*base_octave)+6+12;  break;
 
-                        case DIK_Z: set_note = 12*(base_octave-1);     break;
-                        case DIK_S: set_note = (12*(base_octave-1))+1; break;
-                        case DIK_X: set_note = (12*(base_octave-1))+2; break;
-                        case DIK_D: set_note =(12*(base_octave-1))+3;  break;
-                        case DIK_C: set_note =(12*(base_octave-1))+4;  break;
-                        case DIK_V: set_note = (12*(base_octave-1))+5; break;
-                        case DIK_G: set_note = (12*(base_octave-1))+6; break;
-                        case DIK_B: set_note = (12*(base_octave-1))+7; break;
-                        case DIK_H: set_note = (12*(base_octave-1))+8; break;
-                        case DIK_N: set_note = (12*(base_octave-1))+9; break;
-                        case DIK_J: set_note = (12*(base_octave-1))+10;break; 
-                        case DIK_M: set_note = (12*(base_octave-1))+11;break;
-
+                        case SDLK_Z: set_note = 12*(base_octave-1);     break;
+                        case SDLK_S: set_note = (12*(base_octave-1))+1; break;
+                        case SDLK_X: set_note = (12*(base_octave-1))+2; break;
+                        case SDLK_D: set_note =(12*(base_octave-1))+3;  break;
+                        case SDLK_C: set_note =(12*(base_octave-1))+4;  break;
+                        case SDLK_V: set_note = (12*(base_octave-1))+5; break;
+                        case SDLK_G: set_note = (12*(base_octave-1))+6; break;
+                        case SDLK_B: set_note = (12*(base_octave-1))+7; break;
+                        case SDLK_H: set_note = (12*(base_octave-1))+8; break;
+                        case SDLK_N: set_note = (12*(base_octave-1))+9; break;
+                        case SDLK_J: set_note = (12*(base_octave-1))+10;break; 
+                        case SDLK_M: set_note = (12*(base_octave-1))+11;break;
+                        default: break;
+                    }
                 }
             break;
         }
@@ -414,8 +420,11 @@ keepgoing:
             case 0x80: // Note off
                 key = (dw&0xFF00)>>8 ;
                 key+=0xFF;
-                MidiOut->noteOff(song->instruments[cur_inst]->midi_device,jazz[key].note,jazz[key].chan,0x0,0);
-                jazz[key].note = 0x80;
+                if (jazz_note_is_active(key)) {
+                    const mbuf st = jazz_get_state(key);
+                    MidiOut->noteOff(song->instruments[cur_inst]->midi_device,st.note,st.chan,0x0,0);
+                    jazz_clear_state(key);
+                }
                 break;
             case 0x90: // Note on
                 set_note = key = (dw&0xFF00)>>8 ;
@@ -440,8 +449,7 @@ keepgoing:
                 }
                 set_note += song->instruments[cur_inst]->transpose; if (set_note>0x7f) set_note = 0x7f;
                 MidiOut->noteOn(song->instruments[cur_inst]->midi_device,set_note,song->instruments[cur_inst]->channel,uvol,MAX_TRACKS,0);
-                jazz[key].note = set_note;
-                jazz[key].chan = song->instruments[cur_inst]->channel;
+                jazz_set_state(key, set_note, song->instruments[cur_inst]->channel);
             } else {
                 need_refresh = 1;
                 UI->full_refresh();

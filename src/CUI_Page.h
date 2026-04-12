@@ -1,8 +1,7 @@
 #ifndef _UI_PAGE_H_
 #define _UI_PAGE_H_
 
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include "platform.h"
 
 class Button ;
 class CheckBox ;
@@ -247,12 +246,12 @@ class CUI_Savescreen : public CUI_Page {
 class CUI_LoadMsg : public CUI_Page {
     public:
 
-        HANDLE hThread;
+        zt_thread_handle hThread;
         
         int OldPriority;
         unsigned long iID;
         int strselect;
-        int strtimer;
+        zt_timer_handle strtimer;
 
         CUI_LoadMsg();
         ~CUI_LoadMsg();
@@ -266,11 +265,11 @@ class CUI_LoadMsg : public CUI_Page {
 class CUI_SaveMsg : public CUI_Page {
     public:
 
-        HANDLE hThread;
+        zt_thread_handle hThread;
         int OldPriority;
         unsigned long iID;
         int strselect;
-        int strtimer;
+        zt_timer_handle strtimer;
         int filetype;
 
         CUI_SaveMsg();

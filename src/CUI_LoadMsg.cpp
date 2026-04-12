@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -41,17 +41,16 @@
 #include "FileList.h"
 
 
-int load_finished = 0;
-int load_lock = 0;
-int is_loading = 0;
+std::atomic<int> load_finished(0);
+std::atomic<int> load_lock(0);
+std::atomic<int> is_loading(0);
 
-void load_thread(void) {
+unsigned long ZT_THREAD_CALL load_thread(void *) {
     char *sstr;
     int ret;
 
     is_loading = 1;
     load_finished = 0;
-    load_lock = 1;
     ret=song->load(load_filename);
 
     /* if there was a status message, display it */
@@ -61,54 +60,65 @@ void load_thread(void) {
         status_change = 1;
     }
 
+    load_lock = 0;
     load_finished = 1;
     is_loading = 0;
-    return;
+    return 0;
 }
 
 void TP_Load_Inc_Str(void) {
     UIP_LoadMsg->strselect++;
     if (UIP_LoadMsg->strselect>3) UIP_LoadMsg->strselect = 0;
     need_popup_refresh++;
-    if (load_finished) {
-        close_popup_window();
-        UIP_Loadscreen->clear = 1;
-        fixmouse++;
-        need_refresh++;     
-    }
 }
 
 CUI_LoadMsg::CUI_LoadMsg(void) {
     UI = NULL;
+    hThread = NULL;
+    strtimer = 0;
 }
 
 CUI_LoadMsg::~CUI_LoadMsg(void) {
+    if (hThread) {
+        zt_thread_join(hThread);
+        zt_thread_close(hThread);
+        hThread = NULL;
+    }
     if (UI) delete UI; UI = NULL;
 }
 
 void CUI_LoadMsg::enter(void) {
     need_refresh = 1;
     load_finished = 0;
+    load_lock = 1;
 //    setWindowTitle("zt - loading file...");
-    SDL_WM_SetCaption("zt - [loading file]","zt - [loading file]");
-    OldPriority = GetThreadPriority(GetCurrentThread());
+    zt_set_window_title("zt - [loading file]");
+    OldPriority = zt_thread_get_current_priority();
     strtimer = strselect = 0;
-    strtimer = SetTimer(NULL,strtimer,500,(TIMERPROC)TP_Load_Inc_Str);
-    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
-    hThread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)load_thread,NULL,0,&iID); 
-    while(load_lock) {
-        SDL_Delay(1);
+    strtimer = zt_timer_start(strtimer, 500, TP_Load_Inc_Str);
+    zt_thread_set_current_priority(ZT_THREAD_PRIORITY_BELOW_NORMAL);
+    hThread = zt_thread_create(load_thread, NULL, &iID);
+    if (!hThread) {
+        load_lock = 0;
+        load_finished = 1;
+        statusmsg = (char *)"Error: unable to create load thread";
+        status_change = 1;
     }
 }
 
 void CUI_LoadMsg::leave(void) {
     FileList *fl;
-    SetThreadPriority(GetCurrentThread(),OldPriority);
-    KillTimer(NULL,strtimer);
-    CloseHandle(hThread);
+    zt_thread_set_current_priority(OldPriority);
+    zt_timer_stop(strtimer);
+    strtimer = 0;
+    if (hThread) {
+        zt_thread_join(hThread);
+        zt_thread_close(hThread);
+        hThread = NULL;
+    }
 //    setWindowTitle("zt");
-    SDL_WM_SetCaption("zt","zt");
-    fl = (FileList *)UIP_Savescreen->UI->get_element(0);
+    zt_set_window_title("zt");
+    fl = (FileList *)UIP_Loadscreen->UI->get_element(0);
 //    fl->set_cursor(load_filename);
     fl->setCursor(fl->findItem(load_filename));
     need_refresh++;
@@ -118,10 +128,16 @@ void CUI_LoadMsg::update() {
     int key=0;
     if (Keys.size()) {
         key = Keys.getkey();
-    }   
+    }
 
+    if (load_finished) {
+        close_popup_window();
+        UIP_Loadscreen->clear = 1;
+        fixmouse++;
+        need_refresh++;
+        load_finished = 0;
+    }
 }
-
 void CUI_LoadMsg::draw(Drawable *S)
 {
   const char *str[] = { 

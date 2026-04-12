@@ -24,7 +24,7 @@ class KeyBuffer {
         KBMod getstate(void);
         unsigned char getactualchar(void);
         unsigned char size(void);
-        void insert(KBKey key, KBMod state = KMOD_NONE, unsigned char actual_char=0x0 );
+        void insert(KBKey key, KBMod state = SDL_KMOD_NONE, unsigned char actual_char=0x0 );
 //        void insert(unsigned char key, Keyboard &K);
         void flush(void);
 

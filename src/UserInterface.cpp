@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -38,10 +38,40 @@
  ******/
 
 #include <filesystem>
+#include <fstream>
+#include <set>
+#include <string>
 #include "zt.h"
 
 
 int needaclear = 0;
+int g_ui_tab_dir = 0;
+static void zt_collect_known_device_names(const char *prefix, std::set<std::string> &out_names)
+{
+    std::ifstream fp("devices.conf");
+    if (!fp.is_open()) {
+        return;
+    }
+
+    std::string line;
+    const std::string key_prefix(prefix);
+    while (std::getline(fp, line)) {
+        const std::string::size_type sep = line.find(':');
+        if (sep == std::string::npos) {
+            continue;
+        }
+        std::string key = line.substr(0, sep);
+        std::string value = line.substr(sep + 1);
+
+        while (!key.empty() && (key.back() == ' ' || key.back() == '\t')) key.pop_back();
+        while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) value.erase(value.begin());
+        while (!value.empty() && (value.back() == '\r' || value.back() == '\n' || value.back() == ' ' || value.back() == '\t')) value.pop_back();
+
+        if (key.rfind(key_prefix, 0) == 0 && !value.empty()) {
+            out_names.insert(value);
+        }
+    }
+}
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -214,6 +244,17 @@ void UserInterface::full_refresh() {
     }
 }
 
+bool UserInterface::has_text_focus() const {
+    UserInterfaceElement *e = UIEList;
+    while (e) {
+        if (e->ID == cur_element) {
+            return e->is_text_input();
+        }
+        e = e->next;
+    }
+    return false;
+}
+
 
 
 // ------------------------------------------------------------------------------------------------
@@ -247,15 +288,39 @@ void UserInterface::update()
   KBKey key,act=0, kstate;
   int a, new_redraw = 0;
   int o;
+  int old_focus;
 
   UserInterfaceElement *e = UIEList ;
+  
+  auto advance_focus = [this](int start, int delta) {
+    if (num_elems <= 0) return start;
+    int idx = start;
+    int steps = 0;
+    do {
+      idx += delta;
+      if (idx >= num_elems) idx = 0;
+      if (idx < 0) idx = num_elems - 1;
+      UserInterfaceElement *t = get_element(idx);
+      if (!t || t->is_tab_stop()) return idx;
+      steps++;
+    } while (steps < num_elems);
+    return start;
+  };
+  auto notify_focus = [this](int id) {
+    UserInterfaceElement *t = get_element(id);
+    if (t) t->on_focus();
+  };
 
   while(e) {
 
     o = cur_element;
     cur_element = e->mouseupdate(cur_element);
     
-    if (o!=cur_element) full_refresh();
+    if (o!=cur_element) {
+      g_ui_tab_dir = 0;
+      full_refresh();
+      notify_focus(cur_element);
+    }
     
     if (e->ID == cur_element) {
 
@@ -263,10 +328,16 @@ void UserInterface::update()
       
       if(a) {
 
-        set_redraw(cur_element); new_redraw++;
-      
-        if (a==1) cur_element++;
-        else cur_element--;
+        old_focus = cur_element;
+        g_ui_tab_dir = (a == 1) ? 1 : -1;
+        if (a==1) cur_element = advance_focus(cur_element, 1);
+        else cur_element = advance_focus(cur_element, -1);
+        if (old_focus != cur_element) {
+          set_redraw(old_focus);
+          set_redraw(cur_element);
+          new_redraw++;
+          notify_focus(cur_element);
+        }
       }
     }
 
@@ -275,12 +346,13 @@ void UserInterface::update()
   }
 
 
+
   if (!dontmess) {
 
     key = Keys.checkkey();
     kstate = Keys.getstate();
     
-    if (key == DIK_TAB) SDL_Delay(1);
+    if (key == SDLK_TAB) SDL_Delay(1);
 
     if (key) {
 
@@ -291,9 +363,16 @@ void UserInterface::update()
 
         switch(key)
         {
-          case DIK_TAB:
-            set_redraw(cur_element); new_redraw++;
-            cur_element--;
+          case SDLK_TAB:
+            old_focus = cur_element;
+            g_ui_tab_dir = -1;
+            cur_element = advance_focus(cur_element, -1);
+            if (old_focus != cur_element) {
+              set_redraw(old_focus);
+              set_redraw(cur_element);
+              new_redraw++;
+              notify_focus(cur_element);
+            }
             /*
             if(cur_element <= 1 || cur_element >= num_elems)
             {
@@ -313,9 +392,17 @@ void UserInterface::update()
 
           switch(key)
           {
-            case DIK_TAB:
-              set_redraw(cur_element); new_redraw++;
-              cur_element++; act++; 
+            case SDLK_TAB:
+              old_focus = cur_element;
+              g_ui_tab_dir = 1;
+              cur_element = advance_focus(cur_element, 1);
+              if (old_focus != cur_element) {
+                set_redraw(old_focus);
+                set_redraw(cur_element);
+                new_redraw++;
+                notify_focus(cur_element);
+              }
+              act++;
               break;
           } ;
         }
@@ -497,13 +584,13 @@ int UserInterfaceElement::mouseupdate(int cur_element)
     key = Keys.checkkey();
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize))) {
                     mousestate = 1;
                     act++;
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) act++;
                 mousestate=0;
                 break;
@@ -587,57 +674,87 @@ int TextInput::update() {
     int i;
     key = Keys.checkkey();
     unsigned char kstate = Keys.getstate();
+    unsigned char actual = Keys.getactualchar();
+    unsigned char use_actual = 0;
     if (key) {
-        switch(key) {
-            case DIK_UP: ret = -1; act++; break;
-            case DIK_DOWN: ret = 1; act++; break;
-            case DIK_LEFT: cursor--;  act++; break;
-            case DIK_RIGHT: if (str[cursor]) cursor++; act++; break;
-            case DIK_A: retletter=1; act++; break;
-            case DIK_B: retletter=2; act++; break;
-            case DIK_C: retletter=3; act++; break;
-            case DIK_D: retletter=4; act++; break;
-            case DIK_E: retletter=5; act++; break;
-            case DIK_F: retletter=6; act++; break;
-            case DIK_G: retletter=7; act++; break;
-            case DIK_H: retletter=8; act++; break;
-            case DIK_I: retletter=9; act++; break;
-            case DIK_J: retletter=10; act++; break;
-            case DIK_K: retletter=11; act++; break;
-            case DIK_L: retletter=12; act++; break;
-            case DIK_M: retletter=13; act++; break;
-            case DIK_N: retletter=14; act++; break;
-            case DIK_O: retletter=15; act++; break;
-            case DIK_P: retletter=16; act++; break;
-            case DIK_Q: retletter=17; act++; break;
-            case DIK_R: retletter=18; act++; break;
-            case DIK_S: retletter=19; act++; break;
-            case DIK_T: retletter=20; act++; break;
-            case DIK_U: retletter=21; act++; break;
-            case DIK_V: retletter=22; act++; break;
-            case DIK_W: retletter=23; act++; break;
-            case DIK_X: retletter=24; act++; break;
-            case DIK_Y: retletter=25; act++; break;
-            case DIK_Z: retletter=26; act++; break;
-            case DIK_0: retletter=0xFF; act++; break;
-            case DIK_1: retletter=0xFF; act++; break;
-            case DIK_2: retletter=0xFF; act++; break;
-            case DIK_3: retletter=0xFF; act++; break;
-            case DIK_4: retletter=0xFF; act++; break;
-            case DIK_5: retletter=0xFF; act++; break;
-            case DIK_6: retletter=0xFF; act++; break;
-            case DIK_7: retletter=0xFF; act++; break;
-            case DIK_8: retletter=0xFF; act++; break;
-            case DIK_9: retletter=0xFF; act++; break;
-            case DIK_SPACE: retletter=0xff; act++; break;
-            case DIK_PERIOD: retletter=0xff; act++; break;
-            case DIK_COMMA: retletter=0xff; act++; break;
-            case DIK_BACKSLASH: retletter=0xff; act++; break;
-            case DIK_MINUS: retletter=0xff; act++; break;
-            case DIK_EQUALS: retletter=0xff; act++; break;
-            case DIK_BACKSPACE: retletter=0xFFF; act++; break;
-            case DIK_DELETE: retletter=0xFFF; act++; break;
-            case DIK_SEMICOLON: retletter = 0xfff; act++; break;
+        const bool is_nav_or_edit =
+            (key == SDLK_UP || key == SDLK_DOWN || key == SDLK_LEFT || key == SDLK_RIGHT ||
+             key == SDLK_BACKSPACE || key == SDLK_DELETE || key == SDLK_HOME || key == SDLK_END);
+
+        if (!is_nav_or_edit && actual >= 0x20 && actual != 0x7f) {
+            if (actual == '`') {
+                // Skip raw backtick; allow '~' via actual when shifted.
+            } else {
+                retletter = 0xff;
+                use_actual = 1;
+                act++;
+            }
+        }
+
+        if (!use_actual) switch(key) {
+            case SDLK_UP: ret = -1; act++; break;
+            case SDLK_DOWN: ret = 1; act++; break;
+            case SDLK_LEFT: cursor--;  act++; break;
+            case SDLK_RIGHT: if (str[cursor]) cursor++; act++; break;
+            case SDLK_HOME: cursor = 0; act++; break;
+            case SDLK_END: {
+                int pos = 0;
+                while (pos < length && str[pos]) pos++;
+                cursor = pos;
+                act++;
+                break;
+            }
+            case SDLK_A: retletter=1; act++; break;
+            case SDLK_B: retletter=2; act++; break;
+            case SDLK_C: retletter=3; act++; break;
+            case SDLK_D: retletter=4; act++; break;
+            case SDLK_E: retletter=5; act++; break;
+            case SDLK_F: retletter=6; act++; break;
+            case SDLK_G: retletter=7; act++; break;
+            case SDLK_H: retletter=8; act++; break;
+            case SDLK_I: retletter=9; act++; break;
+            case SDLK_J: retletter=10; act++; break;
+            case SDLK_K: retletter=11; act++; break;
+            case SDLK_L: retletter=12; act++; break;
+            case SDLK_M: retletter=13; act++; break;
+            case SDLK_N: retletter=14; act++; break;
+            case SDLK_O: retletter=15; act++; break;
+            case SDLK_P: retletter=16; act++; break;
+            case SDLK_Q: retletter=17; act++; break;
+            case SDLK_R: retletter=18; act++; break;
+            case SDLK_S: retletter=19; act++; break;
+            case SDLK_T: retletter=20; act++; break;
+            case SDLK_U: retletter=21; act++; break;
+            case SDLK_V: retletter=22; act++; break;
+            case SDLK_W: retletter=23; act++; break;
+            case SDLK_X: retletter=24; act++; break;
+            case SDLK_Y: retletter=25; act++; break;
+            case SDLK_Z: retletter=26; act++; break;
+            case SDLK_0: retletter=0xFF; act++; break;
+            case SDLK_1: retletter=0xFF; act++; break;
+            case SDLK_2: retletter=0xFF; act++; break;
+            case SDLK_3: retletter=0xFF; act++; break;
+            case SDLK_4: retletter=0xFF; act++; break;
+            case SDLK_5: retletter=0xFF; act++; break;
+            case SDLK_6: retletter=0xFF; act++; break;
+            case SDLK_7: retletter=0xFF; act++; break;
+            case SDLK_8: retletter=0xFF; act++; break;
+            case SDLK_9: retletter=0xFF; act++; break;
+            case SDLK_SPACE: retletter=0xff; act++; break;
+            case SDLK_PERIOD: retletter=0xff; act++; break;
+            case SDLK_COMMA: retletter=0xff; act++; break;
+            case SDLK_BACKSLASH: retletter=0xff; act++; break;
+            case SDLK_SLASH: retletter=0xff; act++; break;
+            case SDLK_KP_DIVIDE: retletter=0xff; act++; break;
+            case SDLK_MINUS: retletter=0xff; act++; break;
+            case SDLK_EQUALS: retletter=0xff; act++; break;
+            case SDLK_GRAVE: retletter=0xff; act++; break;
+            case SDLK_LEFTBRACKET: retletter=0xff; act++; break;
+            case SDLK_RIGHTBRACKET: retletter=0xff; act++; break;
+            case SDLK_APOSTROPHE: retletter=0xff; act++; break;
+            case SDLK_BACKSPACE: retletter=0xFFF; act++; break;
+            case SDLK_DELETE: retletter=0xFFF; act++; break;
+            case SDLK_SEMICOLON: retletter = 0xfff; act++; break;
         }
         if (act) {
             key = Keys.getkey();
@@ -657,33 +774,94 @@ int TextInput::update() {
                         else    
                                 str[cursor] = ((int)retletter + 'a' - 1);
                         } else {    
-                            switch(key) {
-                                case DIK_SEMICOLON: if (kstate&KS_SHIFT)  str[cursor] = ':'; else str[cursor] = ';'; break;
-                                case DIK_SPACE:  str[cursor] = ' '; break;
-                                case DIK_PERIOD: str[cursor] = '.'; break;
-                                case DIK_COMMA:  str[cursor] = ','; break;
-                                case DIK_BACKSLASH:  str[cursor] = '\\'; break;
-                                case DIK_MINUS:  str[cursor] = '-'; break;
-                                case DIK_EQUALS: str[cursor] = '='; break;
-                                case DIK_0: str[cursor] = '0'; break;
-                                case DIK_1: str[cursor] = '1'; break;
-                                case DIK_2: str[cursor] = '2'; break;
-                                case DIK_3: str[cursor] = '3'; break;
-                                case DIK_4: str[cursor] = '4'; break;
-                                case DIK_5: str[cursor] = '5'; break;
-                                case DIK_6: str[cursor] = '6'; break;
-                                case DIK_7: str[cursor] = '7'; break;
-                                case DIK_8: str[cursor] = '8'; break;
-                                case DIK_9: str[cursor] = '9'; break;
+                            if (use_actual) {
+                                str[cursor] = actual;
+                            } else {
+                                switch(key) {
+                                    case SDLK_SEMICOLON: if (kstate&KS_SHIFT)  str[cursor] = ':'; else str[cursor] = ';'; break;
+                                    case SDLK_SPACE:  str[cursor] = ' '; break;
+                                case SDLK_PERIOD: str[cursor] = '.'; break;
+                                case SDLK_COMMA:
+                                    if (kstate&KS_SHIFT) str[cursor] = '<';
+                                    else str[cursor] = ',';
+                                    break;
+                                case SDLK_BACKSLASH:  str[cursor] = '\\'; break;
+                                case SDLK_SLASH:
+                                    if (kstate&KS_SHIFT) str[cursor] = '?';
+                                    else str[cursor] = '/';
+                                    break;
+                                case SDLK_KP_DIVIDE: str[cursor] = '/'; break;
+                                case SDLK_MINUS:
+                                    if (kstate&KS_SHIFT) str[cursor] = '_';
+                                    else str[cursor] = '-';
+                                    break;
+                                case SDLK_EQUALS:
+                                    if (kstate&KS_SHIFT) str[cursor] = '+';
+                                    else str[cursor] = '=';
+                                    break;
+                                case SDLK_GRAVE: str[cursor] = (kstate&KS_SHIFT) ? '~' : '`'; break;
+                                case SDLK_LEFTBRACKET:
+                                    if (kstate&KS_SHIFT) str[cursor] = '{';
+                                    else str[cursor] = '[';
+                                    break;
+                                case SDLK_RIGHTBRACKET:
+                                    if (kstate&KS_SHIFT) str[cursor] = '}';
+                                    else str[cursor] = ']';
+                                    break;
+                                case SDLK_APOSTROPHE:
+                                    if (kstate&KS_SHIFT) str[cursor] = '"';
+                                    else str[cursor] = '\'';
+                                    break;
+                                case SDLK_1:
+                                    if (kstate&KS_SHIFT) str[cursor] = '!';
+                                    else str[cursor] = '1';
+                                    break;
+                                case SDLK_2:
+                                    if (kstate&KS_SHIFT) str[cursor] = '@';
+                                    else str[cursor] = '2';
+                                    break;
+                                case SDLK_3:
+                                    if (kstate&KS_SHIFT) str[cursor] = '#';
+                                    else str[cursor] = '3';
+                                    break;
+                                case SDLK_4:
+                                    if (kstate&KS_SHIFT) str[cursor] = '$';
+                                    else str[cursor] = '4';
+                                    break;
+                                case SDLK_5:
+                                    if (kstate&KS_SHIFT) str[cursor] = '%';
+                                    else str[cursor] = '5';
+                                    break;
+                                case SDLK_6:
+                                    if (kstate&KS_SHIFT) str[cursor] = '^';
+                                    else str[cursor] = '6';
+                                    break;
+                                case SDLK_7:
+                                    if (kstate&KS_SHIFT) str[cursor] = '&';
+                                    else str[cursor] = '7';
+                                    break;
+                                case SDLK_8:
+                                    if (kstate&KS_SHIFT) str[cursor] = '*';
+                                    else str[cursor] = '8';
+                                    break;
+                                case SDLK_9:
+                                    if (kstate&KS_SHIFT) str[cursor] = '(';
+                                    else str[cursor] = '9';
+                                    break;
+                                case SDLK_0:
+                                    if (kstate&KS_SHIFT) str[cursor] = ')';
+                                    else str[cursor] = '0';
+                                    break;
+                                }
                             }
                         }
                         cursor++;
                     }
                 } else { // Is backspace/del
-                    if (key==DIK_BACKSPACE)
+                    if (key==SDLK_BACKSPACE)
                         cursor--;
-                    if (key!=DIK_BACKSPACE || (cursor>=0)) {  /* FIX THIS SHIT! */
-                        if (key == DIK_BACKSPACE && cursor == length-1) {
+                    if (key!=SDLK_BACKSPACE || (cursor>=0)) {  /* FIX THIS SHIT! */
+                        if (key == SDLK_BACKSPACE && cursor == length-1) {
                             str[length-2] = str[length-1];
                             str[length-1] = '\0';
                         } else {
@@ -763,13 +941,13 @@ int CheckBox::mouseupdate(int cur_element) {
     key = Keys.checkkey();
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize))) {
                     mousestate = 1;
                     act++;
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) {
                     act++;
                     if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize))) {
@@ -812,9 +990,9 @@ int CheckBox::update() {
     key = Keys.checkkey();
     if (key) {
         switch(key) {
-            case DIK_UP: ret = -1; act++; break;
-            case DIK_DOWN: ret = 1; act++; break;
-            case DIK_SPACE: 
+            case SDLK_UP: ret = -1; act++; break;
+            case SDLK_DOWN: ret = 1; act++; break;
+            case SDLK_SPACE: 
                 if (*value)
                     *value = 0;
                 else
@@ -1019,7 +1197,7 @@ int GfxButton::mouseupdate(int cur_element) {
     }
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(this->x,this->y,this->x+this->xsize,this->y+this->ysize)) {
                     mousestate = 1;
                     state = 3;
@@ -1031,7 +1209,7 @@ int GfxButton::mouseupdate(int cur_element) {
                     fixmouse++;
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) {
                     act++;
                     state = 0;
@@ -1132,11 +1310,11 @@ int VUPlay::update() {
 
     switch(key)
     {
-    case DIK_DOWN:
+    case SDLK_DOWN:
         if(starttrack < MAX_TRACKS - 32)
             starttrack++;
         break;
-    case DIK_UP:
+    case SDLK_UP:
         if(starttrack > 0)
             starttrack--;
         break;
@@ -1479,9 +1657,9 @@ void AboutBox::draw(Drawable *S, int active) {
     q += S->surface->pitch;
     int i=q;
     Uint32 *b = (Uint32 *)S->surface->pixels;
-    for (int iy = col(y); iy < col(y+ysize+1); iy++)    
-        for (int ix = col(x); ix < col(x+xsize); ix++)  {  
-            int bpp = S->surface->format->BytesPerPixel;
+    for (int iy = col(y); iy < col(y+ysize+1); iy++)
+        for (int ix = col(x); ix < col(x+xsize); ix++) {
+            int bpp = SDL_BYTESPERPIXEL(S->surface->format);
             Uint8 *p = (Uint8 *)S->surface->pixels + iy * S->surface->pitch + ix * bpp;
             *(Uint32 *)p = i++;
         }
@@ -1545,7 +1723,7 @@ int TextBox::mouseupdate(int cur_element)
     // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    case DIK_MOUSE_1_ON:
+    case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
 
       if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize+1))) {
         int i = (MousePressY/8) - this->y;
@@ -1560,7 +1738,7 @@ int TextBox::mouseupdate(int cur_element)
     // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    case DIK_MOUSE_1_OFF:
+    case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
 
       if (mousestate) {
         act++;
@@ -1608,16 +1786,15 @@ int TextBox::update()
   if (key) {
 
     switch(key) {
-      //case SDLK_m
-    case DIK_UP  : act++; startline--;  break;
-    case DIK_DOWN: act++; if (!bEof) startline++;  break;
-    case DIK_PGUP: act++; startline-=16;  break;
-    case DIK_PGDN: act++; if (!bEof) startline+=16;  break;
-    case DIK_LEFT: act++; soff--; break;
-    case DIK_RIGHT:act++; soff++; break;
-    case DIK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
-    case DIK_SPACE:  //  / Same thing
-    case DIK_RETURN: //  \ Same thingg
+    case SDLK_UP  : act++; startline--;  break;
+    case SDLK_DOWN: act++; if (!bEof) startline++;  break;
+    case SDLK_PAGEUP: act++; startline-=16;  break;
+    case SDLK_PAGEDOWN: act++; if (!bEof) startline+=16;  break;
+    case SDLK_LEFT: act++; soff--; break;
+    case SDLK_RIGHT:act++; soff++; break;
+    case SDLK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
+    case SDLK_SPACE:  //  / Same thing
+    case SDLK_RETURN: //  \ Same thingg
       break;
     }
     if (act) {
@@ -1899,7 +2076,7 @@ int ListBox::mouseupdate(int cur_element)
     // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    case DIK_MOUSE_1_ON:
+    case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
 
       if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize+1))) {
       
@@ -1922,7 +2099,7 @@ int ListBox::mouseupdate(int cur_element)
     // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
 
-    case DIK_MOUSE_1_OFF:
+    case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
 
       if (mousestate) act++;
 
@@ -2069,24 +2246,22 @@ int ListBox::findItem(char *text) {
 //
 LBNode * ListBox::insertItem(char *text) {
     LBNode *p = new LBNode;
-//    p->caption = strdup(text);
-    if (text) {
-        p->caption = new char[strlen(text)+1];
-        strcpy(p->caption, text);
-    }
+    const char *safe_text = (text != NULL) ? text : "";
+    p->caption = new char[strlen(safe_text)+1];
+    strcpy(p->caption, safe_text);
     p->checked = false;
     if (is_sorted) {
         if (!items)
             items = p;
         else {
-            if (sortstr(text,items->caption) >=0 ) { // 0 = same, 1 = order ok
+            if (sortstr((char *)safe_text,items->caption) >=0 ) { // 0 = same, 1 = order ok
                 p->next = items;
                 items = p;
             } else {
                 LBNode *l = items;
                 LBNode *n = items->next;
                 while (n) {
-                    if (sortstr(n->caption, text) < 0)
+                    if (sortstr(n->caption, (char *)safe_text) < 0)
                         break;
                     l = n;
                     n = n->next;
@@ -2257,8 +2432,8 @@ int ListBox::update() {
         if (num_elements && use_key_select) {
             signed int retchar = key;//getKeyChar(key);
             LBNode *p = getNode(cur_sel + y_start);
-            if (isalpha(retchar) && p) {
-                char c = toupper(retchar);
+            if (retchar >= 0 && retchar <= 0xFF && isalpha((unsigned char)retchar) && p) {
+                char c = (char)toupper((unsigned char)retchar);
                 LBNode *n = findNodeWithChar(c,p);
                 if (n) {
                     this->setCursor(findItem(n->caption));
@@ -2268,8 +2443,8 @@ int ListBox::update() {
         }
         
         switch(key) {
-            case DIK_TAB: ret = 1; act++; break;
-            case DIK_UP: 
+            case SDLK_TAB: ret = 1; act++; break;
+            case SDLK_UP: 
                 if (cur_sel>0)
                     cur_sel--;
                 else
@@ -2277,7 +2452,7 @@ int ListBox::update() {
                     y_start--;
                 act++; 
                 break;
-            case DIK_DOWN: 
+            case SDLK_DOWN: 
                 if (cur_sel+y_start<num_elements-1) {
                     if (cur_sel<ysize)
                         cur_sel++;
@@ -2286,40 +2461,40 @@ int ListBox::update() {
                 }
                 act++;
                 break;
-            case DIK_PGDN:
+            case SDLK_PAGEDOWN:
                 if (cur_sel<ysize)
                     cur_sel = ysize;
                 else
                     y_start+=ysize;
                 act++;
                 break;
-            case DIK_PGUP:
+            case SDLK_PAGEUP:
                 if (cur_sel>0)
                     cur_sel = 0;
                 else
                     y_start -= ysize;
                 act++;
                 break;
-            case DIK_HOME:
+            case SDLK_HOME:
                 if (cur_sel>0)
                     cur_sel = 0;
                 else
                     y_start=0;
                 act++;
                 break;
-            case DIK_END:
+            case SDLK_END:
                 if (cur_sel<ysize)
                     cur_sel = ysize;
                 else
                     y_start = num_elements - ysize -1;
                 act++;
                 break;
-            case DIK_RETURN: 
+            case SDLK_RETURN: 
                 OnSelect(getNode(cur_sel+y_start));
                 act++; 
                 break;
-//            case DIK_HOME: cur_sel=0; act++; break;
-//            case DIK_END: cur_sel = MidiOut->numMidiDevs-1; act++; break;
+//            case SDLK_HOME: cur_sel=0; act++; break;
+//            case SDLK_END: cur_sel = MidiOut->numMidiDevs-1; act++; break;
         }
         if (act) {
             Keys.getkey();
@@ -2383,15 +2558,25 @@ void ListBox::draw(Drawable *S, int active) {
     str = (unsigned char *)malloc(xsize+1+2);
     LBNode *node = getNode(y_start);
     for (cy=0;cy<=ysize;cy++) {
-        memset(str,0,xsize+1);
-        memset(str,' ',xsize);
+        bool row_dimmed = false;
+        memset(str, 0, xsize + 1 + 2);
+        memset(str, ' ', xsize);
+        str[xsize] = 0;
         if (node) {
+            row_dimmed = node->dimmed;
             if (use_checks) {
                 if (node->checked)
                     str[0] = check_on;
                 else
                     str[0] = check_off;
-                strc((char *)str+2, node->caption);
+                if (node->caption && xsize > 2) {
+                    int i = 0;
+                    while (i < (xsize - 2) && node->caption[i]) {
+                        str[2 + i] = (unsigned char)node->caption[i];
+                        i++;
+                    }
+                    str[xsize] = 0;
+                }
             } else {
                 strc((char *)str, node->caption);
             }
@@ -2406,6 +2591,9 @@ void ListBox::draw(Drawable *S, int active) {
         } else {
             b = COLORS.EditBG;
             f = *color_itemnosel;
+            if (row_dimmed) {
+                f = COLORS.Lowlight;
+            }
         }
         if (num_elements == 0 && cy==0) {
             f = COLORS.EditText;
@@ -2546,7 +2734,21 @@ void MidiOutDeviceSelector::OnChange() {
     clear();
     for (int i=0;i<MidiOut->GetNumOpenDevs();i++) {
         int dev = MidiOut->GetDevID(i);
-        LBNode *p = insertItem((strlen(MidiOut->outputDevices[dev]->alias) > 1)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName);
+        if (dev < 0 || dev >= MAX_MIDI_DEVS) {
+            continue;
+        }
+        if (MidiOut->outputDevices[dev] == NULL) {
+            continue;
+        }
+
+        const char *alias = MidiOut->outputDevices[dev]->alias;
+        const char *name = MidiOut->outputDevices[dev]->szName;
+        if (name == NULL) {
+            name = "";
+        }
+
+        const char *display = ((alias != NULL) && (strlen(alias) > 1)) ? alias : name;
+        LBNode *p = insertItem((char *)display);
         if (dev == song->instruments[cur_inst]->midi_device)
             p->checked = true;
         else
@@ -2603,15 +2805,36 @@ void MidiOutDeviceOpener::enter(void) {
 //
 //
 void MidiOutDeviceOpener::OnChange() {
-    clear();        
+    clear();
+
+    std::set<std::string> known_out_names;
+    zt_collect_known_device_names("known_out_device_", known_out_names);
+
     for (unsigned int i=0;i<MidiOut->numOuputDevices;i++) {
-//        LBNode *p = insertItem((MidiOut->outputDevices[i]->alias != NULL)?MidiOut->outputDevices[i]->alias:MidiOut->outputDevices[i]->szName);
-        LBNode *p = insertItem(MidiOut->outputDevices[i]->szName);
-        if (MidiOut->QueryDevice(i))
+        const char *name = MidiOut->outputDevices[i]->szName;
+        if (!name) {
+            continue;
+        }
+        known_out_names.insert(name);
+    }
+
+    for (std::set<std::string>::const_iterator it = known_out_names.begin(); it != known_out_names.end(); ++it) {
+        const std::string &name = *it;
+        int found_dev = -1;
+        for (unsigned int i=0; i<MidiOut->numOuputDevices; i++) {
+            if (MidiOut->outputDevices[i] && MidiOut->outputDevices[i]->szName && zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
+                found_dev = (int)i;
+                break;
+            }
+        }
+
+        LBNode *p = insertItem((char *)name.c_str());
+        p->int_data = found_dev;
+        p->dimmed = (found_dev < 0);
+        if (found_dev >= 0 && MidiOut->QueryDevice(found_dev))
             p->checked = true;
         else
             p->checked = false;
-        p->int_data = i;
     }
 }
 
@@ -2621,15 +2844,7 @@ void MidiOutDeviceOpener::OnChange() {
 //
 //
 void MidiOutDeviceOpener::OnSelect(LBNode *selected) {
-    midi_out_sel(selected->int_data);
-    if (MidiOut->QueryDevice(selected->int_data))
-        selected->checked = true;
-    else
-        selected->checked = false;
-    statusmsg = szStatmsg;
-    status_change = 1;
     ListBox::OnSelect(selected);
-    Keys.flush();
 }
 
 
@@ -2708,14 +2923,36 @@ void MidiInDeviceOpener::enter(void) {
 //
 //
 void MidiInDeviceOpener::OnChange() {
-    clear();        
+    clear();
+
+    std::set<std::string> known_in_names;
+    zt_collect_known_device_names("known_in_device_", known_in_names);
+
     for (unsigned int i=0;i<MidiIn->numMidiDevs;i++) {
-        LBNode *p = insertItem(MidiIn->midiInDev[i]->szName);
-        if (MidiIn->QueryDevice(i))
+        const char *name = MidiIn->midiInDev[i]->szName;
+        if (!name) {
+            continue;
+        }
+        known_in_names.insert(name);
+    }
+
+    for (std::set<std::string>::const_iterator it = known_in_names.begin(); it != known_in_names.end(); ++it) {
+        const std::string &name = *it;
+        int found_dev = -1;
+        for (unsigned int i=0; i<MidiIn->numMidiDevs; i++) {
+            if (MidiIn->midiInDev[i] && MidiIn->midiInDev[i]->szName && zcmp((char *)MidiIn->midiInDev[i]->szName, (char *)name.c_str())) {
+                found_dev = (int)i;
+                break;
+            }
+        }
+
+        LBNode *p = insertItem((char *)name.c_str());
+        p->int_data = found_dev;
+        p->dimmed = (found_dev < 0);
+        if (found_dev >= 0 && MidiIn->QueryDevice(found_dev))
             p->checked = true;
         else
             p->checked = false;
-        p->int_data = i;
     }
 }
 
@@ -2725,15 +2962,7 @@ void MidiInDeviceOpener::OnChange() {
 //
 //
 void MidiInDeviceOpener::OnSelect(LBNode *selected) {
-    midi_in_sel(selected->int_data);
-    if (MidiIn->QueryDevice(selected->int_data))
-        selected->checked = true;
-    else
-        selected->checked = false;
-    statusmsg = szStatmsg;
-    status_change = 1;
     ListBox::OnSelect(selected);
-    Keys.flush();
 }
 
 
@@ -2758,6 +2987,15 @@ LatencyValueSlider::LatencyValueSlider(MidiOutDeviceOpener *m) {
 void LatencyValueSlider::sync() {
     LBNode *p = listbox->getNode(listbox->getCurrentItemIndex() );
     if (p) {
+        if (p->int_data < 0) {
+            if (sel != -1 || value != 0) {
+                sel = -1;
+                value = 0;
+                need_redraw++;
+                need_refresh++;
+            }
+            return;
+        }
         if (p->int_data != sel) {
             sel = p->int_data;
             value = MidiOut->get_delay_ticks(sel);
@@ -2805,6 +3043,15 @@ BankSelectCheckBox::BankSelectCheckBox(MidiOutDeviceOpener *m) {
 void BankSelectCheckBox::sync(void) {
     LBNode *p = listbox->getNode(listbox->getCurrentItemIndex() );
     if (p) {
+        if (p->int_data < 0) {
+            if (sel != -1 || i_value != 0) {
+                sel = -1;
+                i_value = 0;
+                need_redraw++;
+                need_refresh++;
+            }
+            return;
+        }
         if (p->int_data != sel) {
             sel = p->int_data;
             i_value = MidiOut->get_bank_select(sel);
@@ -2858,6 +3105,16 @@ void AliasTextInput::sync(void) {
     
     LBNode *p = listbox->getNode(listbox->getCurrentItemIndex() );
     if (p) {
+        if (p->int_data < 0) {
+            if (sel != -1 || alias[0] != '\0') {
+                sel = -1;
+                alias[0] = '\0';
+                this->cursor = 0;
+                need_redraw++;
+                need_refresh++;
+            }
+            return;
+        }
         if (p->int_data != sel) {
             sel = p->int_data;
             strcpy(alias,MidiOut->get_alias(sel));
@@ -2910,14 +3167,13 @@ int CommentEditor::update() {
     unsigned char ch = Keys.getactualchar();
     if (key) {
         switch(key) {
-        //case SDLK_m
-        case DIK_UP  : act++; startline--;  break;
-        case DIK_DOWN: act++; if (!bEof) startline++;  break;
-        case DIK_PGUP: act++; startline-=16;  break;
-        case DIK_PGDN: act++; if (!bEof) startline+=16;  break;
-        case DIK_LEFT: act++; soff--; break;
-        case DIK_RIGHT:act++; soff++; break;
-        case DIK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
+        case SDLK_UP  : act++; startline--;  break;
+        case SDLK_DOWN: act++; if (!bEof) startline++;  break;
+        case SDLK_PAGEUP: act++; startline-=16;  break;
+        case SDLK_PAGEDOWN: act++; if (!bEof) startline+=16;  break;
+        case SDLK_LEFT: act++; soff--; break;
+        case SDLK_RIGHT:act++; soff++; break;
+        case SDLK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
 
         default:
             if (ch != 0x0) {
@@ -2926,8 +3182,8 @@ int CommentEditor::update() {
                     act++;
                 }
             }
-            //        case DIK_SPACE:  //  / Same thing
-//        case DIK_RETURN: //  \ Same thingg
+            //        case SDLK_SPACE:  //  / Same thing
+//        case SDLK_RETURN: //  \ Same thingg
 //            break;
         }
         if (act) {

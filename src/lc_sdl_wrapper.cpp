@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -62,8 +62,7 @@
         bmask = 0x00ff0000;
         amask = 0xff000000;
     #endif
-        surface = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 32,
-                                       rmask, gmask, bmask, amask);
+        surface = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_ARGB8888);
         free_surface_on_delete = free_surface;
     }
 
@@ -76,8 +75,9 @@
         free_surface_on_delete = free_surface;      
     }
     Drawable::~Drawable() {
-        if (surface && free_surface_on_delete)
-            SDL_FreeSurface(surface);
+        if (surface && free_surface_on_delete) {
+            zt_destroy_surface(surface);
+        }
     }
 
     TColor* Drawable::getLine(int y) {
@@ -89,22 +89,36 @@
         return bufp;
     }
     TColor Drawable::getColor (int Red, int Green, int Blue) {
-        return SDL_MapRGB(surface->format, Red, Green, Blue);           
+        const SDL_PixelFormatDetails *fmt = SDL_GetPixelFormatDetails(surface->format);
+        SDL_Palette *pal = SDL_GetSurfacePalette(surface);
+        return SDL_MapRGB(fmt, pal, (Uint8)Red, (Uint8)Green, (Uint8)Blue);
     }
     long Drawable::unlock () {
         SDL_UnlockSurface(surface);
         return 0;
     }
     long Drawable::lock () {
-        return SDL_LockSurface(surface);
+        return SDL_LockSurface(surface) ? 0 : -1;
     }
     long Drawable::fillRect (int x1, int y1, int x2, int y2, TColor color) {
+        if (!surface) return -1;
+
+        if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
+        if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+
+        if (x1 < 0) x1 = 0;
+        if (y1 < 0) y1 = 0;
+        if (x2 >= surface->w) x2 = surface->w - 1;
+        if (y2 >= surface->h) y2 = surface->h - 1;
+
+        if (x1 > x2 || y1 > y2) return 0;
+
         SDL_Rect r;
         r.x = x1;
         r.y = y1;
-        r.w = x2-x1 +1;
-        r.h = y2-y1 +1;
-        return SDL_FillRect(surface, &r, color);            
+        r.w = x2 - x1 + 1;
+        r.h = y2 - y1 + 1;
+        return SDL_FillSurfaceRect(surface, &r, color);
     }
     void Drawable::release(void) {
 
@@ -147,7 +161,7 @@
 
     void Drawable::drawHLine(int y, int x, int x2, TColor c) {
         TColor *screen = (TColor *)surface->pixels;
-        screen += y*INTERNAL_RESOLUTION_X + x;
+        screen += y * (surface->pitch / (int)sizeof(TColor)) + x;
         TColor *end;
         end = screen + (x2-x);
         for(;screen<end;screen++)

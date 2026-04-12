@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -75,19 +75,19 @@ void KeyBuffer::flush(void) {
 
 KBKey KeyBuffer::checkkey(void) {
     unsigned char a=0;
-    KBKey ret = SDLK_UNKNOWN;
+    KBKey ret = 0;
     if (head != tail) {
         a=tail+1;
         if (a>=maxsize) a = 0;
         ret = buffer[a].key;
         this->cur_state = buffer[a].state;
-        this->actual_char = buffer[tail].actual_char;
+        this->actual_char = buffer[a].actual_char;
     }
     return ret;
 }
 KBKey KeyBuffer::getkey(void) {
     unsigned char a=0; 
-    KBKey ret=SDLK_UNKNOWN;
+    KBKey ret=0;
     if (head != tail) {
         ++tail;
         --cursize;
@@ -115,16 +115,16 @@ unsigned char KeyBuffer::size(void) {
 void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char) {
     unsigned char ls;
     switch(key) {
-        case DIK_NUMPAD0: key=DIK_0; break;
-        case DIK_NUMPAD1: key=DIK_1; break;
-        case DIK_NUMPAD2: key=DIK_2; break;
-        case DIK_NUMPAD3: key=DIK_3; break;
-        case DIK_NUMPAD4: key=DIK_4; break;
-        case DIK_NUMPAD5: key=DIK_5; break;
-        case DIK_NUMPAD6: key=DIK_6; break;
-        case DIK_NUMPAD7: key=DIK_7; break;
-        case DIK_NUMPAD8: key=DIK_8; break;
-        case DIK_NUMPAD9: key=DIK_9; break;
+        case SDLK_KP_0: key=SDLK_0; break;
+        case SDLK_KP_1: key=SDLK_1; break;
+        case SDLK_KP_2: key=SDLK_2; break;
+        case SDLK_KP_3: key=SDLK_3; break;
+        case SDLK_KP_4: key=SDLK_4; break;
+        case SDLK_KP_5: key=SDLK_5; break;
+        case SDLK_KP_6: key=SDLK_6; break;
+        case SDLK_KP_7: key=SDLK_7; break;
+        case SDLK_KP_8: key=SDLK_8; break;
+        case SDLK_KP_9: key=SDLK_9; break;
         default: break;
     }
     if (cursize>=maxsize) 
@@ -140,11 +140,11 @@ void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char) {
 
     buffer[head].key = key;
     KBMod c = 0;
-    if (state & KMOD_ALT)
+    if (state & SDL_KMOD_ALT)
         c |= KS_ALT;
-    if (state & KMOD_CTRL)
+    if (state & SDL_KMOD_CTRL)
         c |= KS_CTRL;
-    if (state & KMOD_SHIFT)
+    if (state & SDL_KMOD_SHIFT)
         c |= KS_SHIFT;
     if (state == KS_LAST_STATE) {
         buffer[head].actual_char = last_actual_char;
@@ -167,11 +167,11 @@ void KeyBuffer::insert(unsigned char key) {
 #endif
     buffer[head].key = key;
     buffer[head].state = KS_NO_SHIFT_KEYS;
-    if (K[DIK_LALT] || K[DIK_RALT])
+    if (K[SDLK_LALT] || K[SDLK_RALT])
         buffer[head].state |= KS_ALT;
-    if (K[DIK_LCONTROL] || K[DIK_RCONTROL])
+    if (K[SDLK_LCTRL] || K[SDLK_RCTRL])
         buffer[head].state |= KS_CTRL;
-    if (K[DIK_LSHIFT] || K[DIK_RSHIFT])
+    if (K[SDLK_LSHIFT] || K[SDLK_RSHIFT])
         buffer[head].state |= KS_SHIFT;
 }
 */

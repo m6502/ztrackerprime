@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -76,7 +76,7 @@ void conf::stripspace(char *buf) {
         buf[o++] = buf[p];
     buf[l-i]=0;
 }
-int conf::load(char *filen=NULL) {
+int conf::load(char *filen) {
     FILE *fp;
     char buf[512];
     char *p1,*p2,*p3;
@@ -173,7 +173,7 @@ int conf::getcolor(const char *key, int part) { /* 0=r 1=g 2=b */
     }
     return result;
 }
-int conf::save(char *filen=NULL) {
+int conf::save(char *filen) {
     char *key;
     FILE *fp;
     hash->reset();
@@ -210,7 +210,7 @@ ZTConf::ZTConf() {
     conf_filename = "zt.conf";
 
     Config = new conf;//NULL;
-    full_screen = 1;
+    full_screen = 0;
 //    do_fade = 1; // fade_in_out ?
     auto_open_midi = 1;
     strcpy(skin, "default");
@@ -221,7 +221,7 @@ ZTConf::ZTConf() {
     highlight_increment = 8;
     lowlight_increment = 8;
 
-    // <Manu> Por  defecto siempre tamaño 64!! ----------------
+    // <Manu> Por  defecto siempre tamaÃ±o 64!! ----------------
 
     //    pattern_length = 128;
     pattern_length = 64;
@@ -230,6 +230,7 @@ ZTConf::ZTConf() {
 
     key_repeat_time = 30;
     key_wait_time = 250;
+    autosave_interval_seconds = 60;
     midi_clock = 1; // default_midiclock;
     midi_stop_start = 1; // default_midistopstart;
     instrument_global_volume = 127;
@@ -240,9 +241,10 @@ ZTConf::ZTConf() {
     step_editing = 1;
     centered_editing = 1;
 
-    screen_width  = MINIMUM_SCREEN_WIDTH ;
-    screen_height = MINIMUM_SCREEN_HEIGHT ;
-    zoom = 1.0f ;
+    screen_width  = DEFAULT_RESOLUTION_X ;
+    screen_height = DEFAULT_RESOLUTION_Y ;
+    zoom = 2.0f ;
+    strcpy(scale_filter, "linear");
 
     autoload_ztfile = 0;
     autoload_ztfile_filename[0] = '\0';
@@ -281,6 +283,10 @@ int ZTConf::load()
   if(Config->get("screen_width"))                     screen_width = atoi(Config->get("screen_width"));
   if(Config->get("screen_height"))                    screen_height = atoi(Config->get("screen_height"));
   if(Config->get("zoom"))                             zoom = atof(Config->get("zoom"));
+  if(Config->get("scale_filter")) {
+      strncpy(scale_filter, Config->get("scale_filter"), sizeof(scale_filter) - 1);
+      scale_filter[sizeof(scale_filter) - 1] = '\0';
+  }
 
   if(screen_width < MINIMUM_SCREEN_WIDTH) screen_width = MINIMUM_SCREEN_WIDTH ;
   if(screen_height < MINIMUM_SCREEN_HEIGHT) screen_height = MINIMUM_SCREEN_HEIGHT ;
@@ -294,8 +300,11 @@ int ZTConf::load()
   
   ////////////////////////////////////////////////
   
+#ifndef DISABLED_CONFIGURATION_VALUES
   if (Config->get("key_repeat"))                      key_repeat_time = atoi(Config->get("key_repeat"));
   if (Config->get("key_wait"))                        key_wait_time = atoi(Config->get("key_wait"));
+#endif
+  if (Config->get("autosave_interval_seconds"))       autosave_interval_seconds = atoi(Config->get("autosave_interval_seconds"));
   if (Config->get("prebuffer_rows"))                  prebuffer_rows = atoi(Config->get("prebuffer_rows"));
   //    if (Config->get("do_fade"))                         do_fade = atoi(Config->get("do_fade"));
   //    FADEINOUT = do_fade;
@@ -345,6 +354,7 @@ int ZTConf::save() {
 
     sprintf(s, "%.1f", zoom);
     Config->set("zoom", s);
+    Config->set("scale_filter", scale_filter);
 
     sprintf(s, "%d", control_navigation_amount);
     Config->set("control_navigation_amount", s);
@@ -361,10 +371,14 @@ int ZTConf::save() {
 
     ////////////////////////////////////////////////
     
+#ifndef DISABLED_CONFIGURATION_VALUES
     sprintf(s, "%d", key_repeat_time);
     Config->set("key_repeat", s);
     sprintf(s, "%d", key_wait_time);
     Config->set("key_wait", s);
+#endif
+    sprintf(s, "%d", autosave_interval_seconds);
+    Config->set("autosave_interval_seconds", s);
     sprintf(s, "%d", prebuffer_rows);
     Config->set("prebuffer_rows", s);
     sprintf(s, "%d", cur_edit_mode);
@@ -418,6 +432,5 @@ int ZTConf::save() {
     sprintf(s, "%s", default_directory);
     Config->set("default_directory", s);
     
-    Config->save(conf_filename);
-    return(0);
+    return Config->save(conf_filename) ? 0 : -1;
 }

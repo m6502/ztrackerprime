@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -130,37 +130,37 @@ InflateStream::~InflateStream()
  ******/     
 void InflateStream::read(char *data, int size)
 {
-    int status = 0, pos ;
+    int status = 0;
 
     this->zstrm.next_out = (unsigned char *)data;
     this->zstrm.avail_out = size;
-    
-    while (!( this->zstrm.avail_out == 0)) {
 
-        if ( !this->ifs->eof() && this->zstrm.avail_in == 0 ) {
-
+    while (!(this->zstrm.avail_out == 0)) {
+        if (this->zstrm.avail_in == 0) {
+            this->ifs->read((char *)this->input_buffer, BUFFER_SIZE);
+            const std::streamsize got = this->ifs->gcount();
+            if (got <= 0) {
+                this->errornum = 1;
+                break;
+            }
             this->zstrm.next_in = this->input_buffer;
-            pos = this->ifs->tellg();
-            this->ifs->read( (char *)this->input_buffer, BUFFER_SIZE );
-            
+            this->zstrm.avail_in = (unsigned int)got;
+        }
 
-            // this->zstrm.avail_in = this->ifs.tellg() - pos; // Pre-VS2008
-
-            int current_pos = this->ifs->tellg() ;
-            this->zstrm.avail_in = current_pos - pos;
-
-
-        }   
-        status = inflate( &this->zstrm, Z_SYNC_FLUSH );
-        if (status!=Z_OK )
+        status = inflate(&this->zstrm, Z_SYNC_FLUSH);
+        if (status == Z_STREAM_END) {
+            this->eofflag = 1;
             break;
-    }    
-    if (status==Z_STREAM_END) {
-        this->eofflag=1;
-    } else if (status!=Z_OK) {
-        this->errornum=1;
+        }
+        if (status != Z_OK)
+            break;
     }
 
+    if (this->zstrm.avail_out != 0) {
+        this->errornum = 1;
+    } else if (status != Z_OK && status != Z_STREAM_END) {
+        this->errornum = 1;
+    }
 }
 
 /*************************************************************************

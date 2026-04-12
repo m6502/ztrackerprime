@@ -49,8 +49,8 @@ void CUI_PEVol::update() {
     UI->update();
     if (Keys.size()) {
         key = Keys.getkey();
-        if (key == DIK_ESCAPE || (key == DIK_RETURN) || key==DIK_MOUSE_2_ON) {
-            if (key == DIK_RETURN) {
+        if (key == SDLK_ESCAPE || (key == SDLK_RETURN) || key==((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT))) {
+            if (key == SDLK_RETURN) {
                 vs = (ValueSlider *)UI->get_element(0);
                 cur_volume_percent = vs->value;
                 for(i=select_track_start;i<=select_track_end;i++) {

@@ -1,7 +1,7 @@
 zTracker'
 =========
 
-zTracker was a Win32 only MIDI tracker / sequencer modeled after Impulse Tracker / Scream Tracker. 
+zTracker is a MIDI tracker / sequencer modeled after Impulse Tracker / Scream Tracker. It was originally Win32 only but now it's been upgraded to 64 bit systems and works both on Windows and Linux. A macOS port is being worked on already.
 
 zTracker' is, as it's name implies, a derivate of zTracker.
 
@@ -115,13 +115,13 @@ Other changes:
 
 - The source code has been updated where needed to compile with modern C++.
 
-- External libraries (zlib, libpng, SDL 1.2) are again up to date.
+- External libraries (zlib, libpng, SDL3) are again up to date.
 
 - zlib and libpng are now statically linked instead of using external .dll files.
 
-- The (good old) Visual C++ 6.0 project and solution have been replaced by both Visual Studio 2008 and 2015 versions.
+- The old project and solutions have been replaced by CMAKE.
   
-- Parts of the code have been cleaned, re-indented, commented and altered to suit my tastes. I sincerely hope this is not seen as a rude move at all. I needed to do it to understand what I was reading.
+- Parts of the code may have been cleaned, re-indented, commented, altered to suit my tastes.or just screwed for any reason.
   
 - Directory tree has been changed.
 

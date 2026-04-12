@@ -1,3 +1,6 @@
+NOTE: This document is historical and contains legacy toolchain details.
+Current builds use CMake and SDL3.
+
 Building ztracker
 -----------------
 Written by Daniel Kahlin <tlr@users.sourceforge.net>

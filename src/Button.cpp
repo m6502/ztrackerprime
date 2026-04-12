@@ -96,7 +96,7 @@ int Button::mouseupdate(int cur_element) {
     }
     if (key) {
         switch(key) {
-            case DIK_MOUSE_1_ON:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize))) {
                     mousestate = 1;
                     state = 3;
@@ -108,7 +108,7 @@ int Button::mouseupdate(int cur_element) {
                     fixmouse++;
                 }
                 break;
-            case DIK_MOUSE_1_OFF:
+            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
                 if (mousestate) {
                     act++;
                     if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+this->ysize))) {
@@ -168,11 +168,11 @@ int Button::update()
     }
     if (key) {
         switch(key) {
-            case DIK_UP: ret = -1; act++; break;
-            case DIK_DOWN: ret = 1; act++; break;
+            case SDLK_UP: ret = -1; act++; break;
+            case SDLK_DOWN: ret = 1; act++; break;
 
-            case DIK_SPACE:  //  / Same thing
-            case DIK_RETURN: //  \ Same thingg
+            case SDLK_SPACE:  //  / Same thing
+            case SDLK_RETURN: //  \ Same thingg
                 if (!last_cmd_keyjazz) {
                     act++; changed++; 
                     state=2;
@@ -198,28 +198,45 @@ int Button::update()
 //
 //
 void Button::draw(Drawable *S, int active) {
-    if (active) 
+    char clearbuf[256];
+    int clear_len = xsize;
+    if (clear_len < 1) clear_len = 1;
+    if (clear_len > (int)sizeof(clearbuf) - 1) clear_len = (int)sizeof(clearbuf) - 1;
+    memset(clearbuf, ' ', clear_len);
+    clearbuf[clear_len] = '\0';
+
+    // Clear only the caption row; border rows are handled explicitly below.
+    printBG(col(x),row(y),clearbuf,COLORS.Background,COLORS.Background,S);
+
+    TColor top_color;
+    TColor bottom_color;
+    TColor left_color;
+    TColor right_color;
+    if (state | updown) {
+        top_color = COLORS.Lowlight;
+        bottom_color = COLORS.Highlight;
+        left_color = COLORS.Lowlight;
+        right_color = COLORS.Highlight;
+    } else {
+        top_color = COLORS.Highlight;
+        bottom_color = COLORS.Lowlight;
+        left_color = COLORS.Highlight;
+        right_color = COLORS.Lowlight;
+    }
+    printline(col(x),row(y-1),0x86,xsize,top_color,S);
+    printline(col(x),row(y+1),0x81,xsize,bottom_color,S);
+//        printline(col(x),row(y+1),0x81,xsize,COLORS.Lowlight,S);
+
+    printchar(col(x-1),row(y),0x84,left_color,S);
+    printchar(col(x+xsize),row(y),0x83,right_color,S);
+
+    if (active)
         print(col(x),row(y),caption,COLORS.Highlight,S);
     else
         print(col(x),row(y),caption,COLORS.Text,S);
-
-    if (state | updown) {
-        printline(col(x),row(y-1),0x86,xsize,COLORS.Lowlight,S);
-        printline(col(x),row(y+1),0x81,xsize,COLORS.Highlight,S);
-//        printline(col(x),row(y+1),0x81,xsize,COLORS.Lowlight,S);
-
-        printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
-        printchar(col(x+xsize),row(y),0x83,COLORS.Highlight,S);
-
-//        printchar(col(x+xsize),row(y),0x83,COLORS.Lowlight,S);
-    } else {
-        printline(col(x),row(y-1),0x86,xsize,COLORS.Highlight,S);
-        printline(col(x),row(y+1),0x81,xsize,COLORS.Lowlight,S);
-        printchar(col(x-1),row(y),0x84,COLORS.Highlight,S);
-        printchar(col(x+xsize),row(y),0x83,COLORS.Lowlight,S);
-    }
     changed = 0;
     screenmanager.Update(col(x-1),row(y-1),col(x+xsize+2),row(y+2));
+    screenmanager.Update(col(x-1),row(y),col(x+xsize+2),row(y));
 }
 
 

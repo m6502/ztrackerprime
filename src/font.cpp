@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -102,10 +102,10 @@ int font_load(char *filename)
                     int charx = ((varx >> 3) ) ;
 
                     unsigned char *puntero = (unsigned char *)temp->pixels ;
+                    int bpp = SDL_BYTESPERPIXEL(temp->format);
+                    puntero += (vary * temp->pitch) + (varx * bpp);
 
-                    puntero += (vary * temp->pitch) + varx ;
-                
-                    if(*puntero)
+                    if ((bpp == 1 && puntero[0]) || (bpp > 1 && (puntero[0] || puntero[1] || puntero[2])))
                     {
                         #define SIZE_PER_CHAR (8 * 1)
                     
@@ -116,7 +116,8 @@ int font_load(char *filename)
                 }
             }
 
-            SDL_FreeSurface(temp) ;
+
+            zt_destroy_surface(temp);
 
             return 0 ;
         }
@@ -262,10 +263,10 @@ void print(int x, int y, const char *str, TColor col, Drawable *S) {
         for(i=0;i<8;i++) {
 
           if((y + i) >= S->surface->h) continue ;
-          if((x + 7) >= S->surface->w) continue ;
+          if((x + (c<<3) + 7) >= S->surface->w) continue ;
 
 
-            byte = font[((int)str[c]<<3)+i];
+            byte = font[(((int)(unsigned char)str[c])<<3)+i];
             buf = S->getLine(y+i) + x + (c<<3) + 7;
             for(j=0;j<8;j++) {
                 if (byte & 1)
@@ -301,7 +302,7 @@ void fillline(int y, char c, TColor col, TColor bg, Drawable *S) {
 
 
 
-#define Screen_Pitch (INTERNAL_RESOLUTION_X*1)
+#define Screen_Pitch ((int)(S->surface->pitch / (int)sizeof(TColor)))
 
 
 // ------------------------------------------------------------------------------------------------
@@ -321,14 +322,14 @@ void printBG(int x, int y, const char *str,TColor col, TColor bg, Drawable *S)
 
   while(str[c]) {
 
-    fontptr = str[c]<<3;
+    fontptr = ((int)(unsigned char)str[c])<<3;
     buf = start + (c<<3);
 
     for(i=0; i<8; i++) {
 
 
       if((y + i) >= S->surface->h) continue ;
-      if((x + 7) >= S->surface->w) continue ;
+      if((x + (c<<3) + 7) >= S->surface->w) continue ;
 
 
       byte = font[fontptr++];
@@ -393,10 +394,10 @@ void printBGCC(int x, int y, char *str, TColor col, TColor bg, Drawable *S) {
         for(i=0;i<8;i++) {
 
           if((y + i) >= S->surface->h) continue ;
-          if((x + 7) >= S->surface->w) continue ;
+          if((x + (pos<<3) + 7) >= S->surface->w) continue ;
 
 
-            byte = font[((int)str[c]<<3)+i];
+            byte = font[(((int)(unsigned char)str[c])<<3)+i];
             buf = S->getLine(y+i) + x + (pos<<3) + 7;
             for(j=0;j<8;j++) {
                 if (byte & 1)
@@ -420,12 +421,12 @@ void printBGu(int x, int y, unsigned char *str, TColor col, TColor bg, Drawable 
         for(i=0;i<8;i++) {
 
           if((y + i) >= S->surface->h) continue ;
-          if((x + 7) >= S->surface->w) continue ;
+          if((x + (c<<3) + 7) >= S->surface->w) continue ;
 
 
 
 
-            byte = font[((int)str[c]<<3)+i];
+            byte = font[(((int)(unsigned char)str[c])<<3)+i];
             buf = S->getLine(y+i) + x + (c<<3) + 7;
             for(j=0;j<8;j++) {
                 if (byte & 1)
@@ -550,7 +551,7 @@ void printLCD(int x,int y, char *str, Drawable *S) {
     int c=0,i,j;
     while(str[c]) {
         for(i=0;i<8;i++) {
-            byte = font[((int)str[c]<<3)+i];
+            byte = font[(((int)(unsigned char)str[c])<<3)+i];
             buf = S->getLine(y+(i*3)) + x + ((c<<3)*3)-2;
             for(j=0;j<24;j++) {
                 *buf = COLORS.LCDLow;

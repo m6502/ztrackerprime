@@ -22,14 +22,14 @@ CUI_Playsong::CUI_Playsong(void)
 
     clear = 0 ;
 
-    // <Manu> ¿Por qué 20?
+    // <Manu> Â¿Por quÃ© 20?
     //p->y = 20 ;
     pattern_display->y = 14 ;
     
-    // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
+    // <Manu> Control del nÃºmero de lÃ­neas que se muestran mientras se reproduce una canciÃ³n (30 por defecto)
     //p->ysize = 30 ;
 
-    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algÃºn #define)
     //p->ysize = 62;
 
     UI_PatternDisplay->add_element(pattern_display,0);
@@ -108,10 +108,10 @@ void CUI_Playsong::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-    case DIK_RIGHT: 
-    case DIK_ADD:
+    case SDLK_RIGHT: 
+    case SDLK_KP_PLUS:
       
-      if ((key==DIK_RIGHT && kstate == KS_CTRL) || key!=DIK_RIGHT) {
+      if ((key==SDLK_RIGHT && kstate == KS_CTRL) || key!=SDLK_RIGHT) {
        
         if (ztPlayer->playing) ztPlayer->ffwd();
       }
@@ -122,10 +122,10 @@ void CUI_Playsong::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-    case DIK_LEFT:
-    case DIK_SUBTRACT:        // <Manu> Was DIK_MINUS
+    case SDLK_LEFT:
+    case SDLK_KP_MINUS:        // <Manu> Was SDLK_MINUS
       
-      if ((key==DIK_LEFT && kstate == KS_CTRL) || key!=DIK_RIGHT)
+      if ((key==SDLK_LEFT && kstate == KS_CTRL) || key!=SDLK_RIGHT)
         if (ztPlayer->playing)
           ztPlayer->rewind();
         break;
@@ -136,9 +136,9 @@ void CUI_Playsong::update()
       // ----------------------------------------------------------------------
 
         
-    case DIK_S:
+    case SDLK_S:
       
-      Keys.insert(SDLK_F10, KMOD_ALT);
+      Keys.insert(SDLK_F10, SDL_KMOD_ALT);
       act++;
       
       break;
@@ -147,7 +147,7 @@ void CUI_Playsong::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-    case DIK_G:
+    case SDLK_G:
       
       cur_edit_pattern = ztPlayer->playing_cur_pattern;
       switch_page(UIP_Patterneditor);
@@ -162,8 +162,8 @@ void CUI_Playsong::update()
 
 #ifndef DISABLE_VUMETERS
 
-    case DIK_PGUP:
-    case DIK_PGDN:
+    case SDLK_PAGEUP:
+    case SDLK_PAGEDOWN:
       
       if (UI == UI_PatternDisplay) UI = UI_VUMeters;
       else UI = UI_PatternDisplay;
@@ -195,7 +195,7 @@ void CUI_Playsong::update()
 //
 void CUI_Playsong::draw(Drawable *S) 
 {
-  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algÃºn #define)
 
   //  char str[256];
   if (S->lock()==0) {

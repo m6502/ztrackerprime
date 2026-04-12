@@ -24,7 +24,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -77,8 +77,8 @@ void Skin::makepath(char *dst, char *filename)
 }
 
 
-#define bmpLoad(f) makepath(d,f); s = SDL_LoadBMP(d); if (!s) { sprintf(d, "Skin[%s]: Cannot load %s", name, f); if (!quiet) MessageBox(NULL,d,"Error",MB_ICONERROR | MB_OK); return 0; }
-#define pngLoad(f) makepath(d,f); s = SDL_LoadPNG(d); if (!s) { sprintf(d, "Skin[%s]: Cannot load %s", name, f); if (!quiet) MessageBox(NULL,d,"Error",MB_ICONERROR | MB_OK); return 0; }
+#define bmpLoad(f) makepath(d,f); s = SDL_LoadBMP(d); if (!s) { sprintf(d, "Skin[%s]: Cannot load %s", name, f); if (!quiet) zt_show_error("Error", d); return 0; }
+#define pngLoad(f) makepath(d,f); s = SDL_LoadPNG(d); if (!s) { sprintf(d, "Skin[%s]: Cannot load %s", name, f); if (!quiet) zt_show_error("Error", d); return 0; }
 
 
 // ------------------------------------------------------------------------------------------------
@@ -89,10 +89,16 @@ void Skin::setpath(char *name)
   static char str[MAX_PATH + 1];
 
   strcpy(strSkinName, name);
-  strcpy(&str[0],cur_dir);
+  strcpy(&str[0], cur_dir);
+#if defined(_WIN32)
   strcat(&str[0], "\\skins\\");
-  strcat(&str[0],name);
-  strcat(&str[0],"\\");
+  strcat(&str[0], name);
+  strcat(&str[0], "\\");
+#else
+  strcat(&str[0], "/skins/");
+  strcat(&str[0], name);
+  strcat(&str[0], "/");
+#endif
   strcpy(strSkinPath, str);
 }
 
@@ -113,7 +119,7 @@ int Skin::load(char *name, bool quiet)
   if (!Colors.load(d)) {
 
     sprintf(d, "Skin[%s]: Cannot load colors.conf", name) ;
-    if (!quiet) MessageBox(NULL,d,"Error",MB_ICONERROR | MB_OK) ;
+    if (!quiet) zt_show_error("Error", d) ;
     return(0) ;
   }
 
@@ -140,12 +146,14 @@ int Skin::load(char *name, bool quiet)
     double yscale = (double)INTERNAL_RESOLUTION_Y / 480;
     Drawable ss( zoomSurface(bmAbout->surface, xscale, yscale ,SMOOTHING_ON) , false );
     //        S->copy(&ss,5,row(12));
-    SDL_FreeSurface( bmAbout->surface );
+
+    zt_destroy_surface(bmAbout->surface);
     bmAbout->surface = ss.surface;
   }    
 
   pngLoad("logo.png");
-  SDL_FreeSurface(s);
+
+  zt_destroy_surface(s);
   bmLogo = NULL;
   
   makepath(d,"font.fnt");
@@ -153,7 +161,7 @@ int Skin::load(char *name, bool quiet)
 
   if (font_load(d)) {
     sprintf(d, "Skin[%s]: Cannot load font.fnt", name); 
-    if (!quiet) MessageBox(NULL,d,"Error",MB_ICONERROR | MB_OK);
+    if (!quiet) zt_show_error("Error", d);
     return 0;
   }
   

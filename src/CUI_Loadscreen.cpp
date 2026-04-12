@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISÂ´Â´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -48,7 +48,7 @@
 char load_filename[MAX_PATH + 1];
 //char szSearch[256];
 
-extern int is_loading;
+extern std::atomic<int> is_loading;
 
 
 
@@ -58,7 +58,7 @@ extern int is_loading;
 //
 void do_load(void) 
 {
-//  <Manu> Si la cancion está sonando la paramos --
+//  <Manu> Si la cancion estÃ¡ sonando la paramos --
   if(ztPlayer->playing) {
     
     ztPlayer->stop() ;
@@ -246,7 +246,7 @@ void CUI_Loadscreen::update()
 
     switch(key) 
     {
-    case DIK_RETURN:
+    case SDLK_RETURN:
       need_refresh++;
       break;
 

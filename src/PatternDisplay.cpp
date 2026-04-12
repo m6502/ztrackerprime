@@ -67,7 +67,7 @@ int PatternDisplay::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-      case DIK_LEFT:
+      case SDLK_LEFT:
 
         cur_track--; act++;
         break;
@@ -75,7 +75,7 @@ int PatternDisplay::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-      case DIK_RIGHT:
+      case SDLK_RIGHT:
 
         cur_track++; act++;
         break;
@@ -83,7 +83,7 @@ int PatternDisplay::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-      case DIK_SPACE:
+      case SDLK_SPACE:
 
         toggle_track_mute(this->cur_track); 
         cur_track++; 
@@ -96,7 +96,7 @@ int PatternDisplay::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-      case DIK_M: // feature 447390 cm
+      case SDLK_M: // feature 447390 cm
 
         toggle_track_mute(this->cur_track) ;
         act++;
@@ -111,25 +111,25 @@ int PatternDisplay::update()
 
       switch(key) 
       {
-      case DIK_1: toggle_track_mute(0); need_refresh++; act++; break;
-      case DIK_2: toggle_track_mute(1); need_refresh++; act++; break;
-      case DIK_3: toggle_track_mute(2); need_refresh++; act++; break;
-      case DIK_4: toggle_track_mute(3); need_refresh++; act++; break;
-      case DIK_5: toggle_track_mute(4); need_refresh++; act++; break;
-      case DIK_6: toggle_track_mute(5); need_refresh++; act++; break;
-      case DIK_7: toggle_track_mute(6); need_refresh++; act++; break;
-      case DIK_8: toggle_track_mute(7); need_refresh++; act++; break;
-      case DIK_9: toggle_track_mute(8); need_refresh++; act++; break;
-      case DIK_0: toggle_track_mute(9); need_refresh++; act++; break;
+      case SDLK_1: toggle_track_mute(0); need_refresh++; act++; break;
+      case SDLK_2: toggle_track_mute(1); need_refresh++; act++; break;
+      case SDLK_3: toggle_track_mute(2); need_refresh++; act++; break;
+      case SDLK_4: toggle_track_mute(3); need_refresh++; act++; break;
+      case SDLK_5: toggle_track_mute(4); need_refresh++; act++; break;
+      case SDLK_6: toggle_track_mute(5); need_refresh++; act++; break;
+      case SDLK_7: toggle_track_mute(6); need_refresh++; act++; break;
+      case SDLK_8: toggle_track_mute(7); need_refresh++; act++; break;
+      case SDLK_9: toggle_track_mute(8); need_refresh++; act++; break;
+      case SDLK_0: toggle_track_mute(9); need_refresh++; act++; break;
         
-      case DIK_F9: 
+      case SDLK_F9: 
         toggle_track_mute(this->cur_track); 
         need_refresh++;
         need_redraw++;
         act++;
         break;
         
-      case DIK_F10: 
+      case SDLK_F10: 
         val = 0;
         for(i=0;i<MAX_TRACKS;i++) {
 
@@ -229,18 +229,30 @@ int PatternDisplay::next_order(void)
   int pass=0,cur_order;
 
   cur_order = ztPlayer->playing_cur_order+1;
+  if (cur_order < 0 || cur_order >= ZTM_ORDERLIST_LEN) {
+    cur_order = 0;
+  }
 
-  while(song->orderlist[cur_order] > 0xFF && pass<3) {
+  while(cur_order < ZTM_ORDERLIST_LEN && song->orderlist[cur_order] > 0xFF && pass<3) {
 
     if (song->orderlist[cur_order] == 0x100) cur_order = 0;
-    
-    while(song->orderlist[cur_order] == 0x101 && cur_order < 256) cur_order++;
-    
+
+    while(cur_order < ZTM_ORDERLIST_LEN && song->orderlist[cur_order] == 0x101) cur_order++;
+    if (cur_order >= ZTM_ORDERLIST_LEN) {
+      cur_order = 0;
+    }
+
     pass++;
   }
 
+  if (cur_order < 0 || cur_order >= ZTM_ORDERLIST_LEN) {
+    return 0x100;
+  }
   return song->orderlist[cur_order];
 }
+
+
+
 
 
 
@@ -296,7 +308,7 @@ void PatternDisplay::update_frame(void)
 
     tracksize = 7;
     
-    // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto)
+    // <Manu> Control del nÃºmero de tracks que se muestran mientras se reproduce una canciÃ³n (10 por defecto)
     //tracks = 10;
     tracks = ((INTERNAL_RESOLUTION_X /*- LEFT_LINE_NUMBER_MARGIN*/) / (tracksize * FONT_SIZE_X)) - 1 ;
 

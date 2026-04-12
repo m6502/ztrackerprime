@@ -42,6 +42,9 @@ class UserInterfaceElement {
         virtual void enter(void) {}
         virtual int update()=0;
         virtual void draw(Drawable *S, int active)=0;
+        virtual bool is_text_input() const { return false; }
+        virtual bool is_tab_stop() const { return true; }
+        virtual void on_focus() {}
 
         UserInterfaceElement *next;
 };
@@ -72,9 +75,12 @@ class UserInterface {
         void set_focus(int id);
         UserInterfaceElement *get_element(int ID);  
         UserInterfaceElement *get_gfx(int ID);
+        bool has_text_focus() const;
 
         void reset(void);
 };
+
+extern int g_ui_tab_dir;
 
 
 class Frame : public UserInterfaceElement {
@@ -106,6 +112,7 @@ class TextInput : public UserInterfaceElement {
         ~TextInput() = default ;
         int update();
         void draw(Drawable *S, int active);
+        bool is_text_input() const override { return true; }
 
         void auto_anchor_at_current_pos(int how) ;
         void auto_update_anchor() ;
@@ -243,6 +250,7 @@ class LBNode {
             next = NULL;
             caption = NULL;
             int_data = 0;
+            dimmed = false;
         }
         ~LBNode() {
             if (caption)
@@ -250,6 +258,7 @@ class LBNode {
         }
         char *caption;
         bool checked;
+        bool dimmed;
         int int_data;
         LBNode *next;
 };
@@ -327,6 +336,7 @@ class MidiOutDeviceSelector : public ListBox {
         virtual void OnSelect(LBNode *selected);
         virtual void OnSelectChange() {}
         virtual void enter(void);
+        bool is_tab_stop() const override { return num_elements > 0; }
 
 };
 
