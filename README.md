@@ -131,3 +131,22 @@ Other changes:
 This is a nearly complete list of changes from the original program. It is not perfect though, because it's been a lot of years since I started playing with the source code. I can't be sure if I really documented ALL the changes I performed. In fact, I know that, at least, I forgot to write one of them, so there can be more!
 
 I'm open to your feedback. I love this software and I will try to fix all the bugs I could have introduced with my changes, plus the bugs from the 2002 version I didn't catch. Please, don't hesitate to contact me about this matter!
+
+
+Cross-platform port
+-------------------
+
+This fork now builds on both Windows (XP 32-bit through Win11) and macOS (Apple Silicon + Intel) from a single source tree using CMake.
+
+The cross-platform work was informed by the earlier [ztracker_mac](https://github.com/esaruoho/ztracker_mac) project, where [@rbruinier](https://github.com/rbruinier) (Robert Bruinier) created the original macOS abstraction layer — identifying the Win32 API boundaries (MIDI, threading, timers, message boxes) and extracting classes from zt.h into separate compilation units — and [@superjohan](https://github.com/superjohan) (Johan Halin) contributed compile fixes that got the Xcode project building on macOS in 2017. Their work demonstrated the feasibility of a cross-platform zTracker and mapped out the portability surface that this fork's CMake build now covers with production implementations (RtMidi, std::thread, std::chrono).
+
+Build instructions:
+
+    # Windows (cross-compile from macOS via MinGW-w64, targets XP 32-bit):
+    cmake -S . -B build-win32 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-xp-toolchain.cmake
+    cmake --build build-win32
+
+    # macOS native:
+    brew install sdl12-compat ninja cmake
+    cmake -S . -B build-macos -G Ninja
+    cmake --build build-macos
