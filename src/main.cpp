@@ -2542,7 +2542,8 @@ SDL_Surface *initSDL(void)
   }
 
   // Enable key repeat so holding cursor keys works on all platforms.
-  SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+  // Fast repeat: 200ms initial delay, 30ms between repeats (tracker-style snappy response).
+  SDL_EnableKeyRepeat(200, 30);
 
 
 #ifdef __DESACTIVADO_HASTA_ACTUALIZAR_SDL

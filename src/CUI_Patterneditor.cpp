@@ -2195,10 +2195,14 @@ void CUI_Patterneditor::update()
         // -------------------------------------------
         case SDLK_LEFTBRACKET:
         case DIK_DIVIDE:
+        case 60:           // < key (SDLK_LESS, octave down)
 
-          if (base_octave>0) {
+          if (base_octave > BASE_OCTAVE_MIN) {
             base_octave--;
-            need_refresh++; 
+            need_refresh++;
+            sprintf(szStatmsg, "Octave %d", base_octave);
+            statusmsg = szStatmsg;
+            status_change = 1;
           }
 
           break;
@@ -2206,10 +2210,14 @@ void CUI_Patterneditor::update()
         // -------------------------------------------
         case SDLK_RIGHTBRACKET:
         case DIK_MULTIPLY:
+        case 62:           // > key (SDLK_GREATER, octave up)
 
-          if (base_octave<9) {
+          if (base_octave < BASE_OCTAVE_MAX) {
             base_octave++;
-            need_refresh++; 
+            need_refresh++;
+            sprintf(szStatmsg, "Octave %d", base_octave);
+            statusmsg = szStatmsg;
+            status_change = 1;
           }
 
           break;
@@ -2542,8 +2550,8 @@ void CUI_Patterneditor::update()
                       case DIK_J: set_note = (12*(base_octave-1))+10;break; 
                       case DIK_M: set_note = (12*(base_octave-1))+11;break;
                         /* EDITING KEYS */
-                      case DIK_1: set_note = 0x81; break;      
-                      case DIK_GRAVE: set_note = 0x82; break;  
+                      case DIK_1: set_note = 0x81; break;       // ^^^ note cut
+                      case DIK_GRAVE: set_note = 0x80; break;  // === note off (backtick/§)  
                       case DIK_PERIOD: 
                         if (kstate != KS_SHIFT) {
                           set_note = 0x80; 
