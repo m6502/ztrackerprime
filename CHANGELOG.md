@@ -4,6 +4,10 @@ All changes on top of m6502/ztrackerprime (last upstream commit: `dba2320`, Aug 
 
 ## Recent fixes (2026-04-12, post-initial-port)
 
+- **Undo (Cmd+Z / ALT+Z)** — single-level pattern undo, saves snapshot before destructive operations
+- **Double Pattern (Ctrl+Shift+G)** — doubles pattern length, copies first half to second half (max 256)
+- **Clone Pattern (Ctrl+Shift+D)** — clones pattern to next empty slot and moves cursor to it
+- **Quick MIDI export (Ctrl+M)** — exports current song as .mid from anywhere
 - **Octave up/down with < >** — SDLK_LESS/GREATER keys change octave, status shows "Octave N"
 - **Note off with backtick/§** — matches SchismTracker: backtick = === (note off), 1 = ^^^ (note cut)
 - **Faster key repeat** — 200ms initial delay, 30ms interval (was 500ms/30ms). Tracker-snappy cursor movement
