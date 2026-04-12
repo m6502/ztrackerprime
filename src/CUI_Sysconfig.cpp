@@ -174,21 +174,23 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->value = &zt_config_globals.step_editing;
         cb->frame = 1;
 
-        // Skin selector
+        // Skin selector — right side, below settings, above MIDI In
+        int midi_y = base_y + 15;
         sk = new SkinSelector;
         UI->add_element(sk,tabindex++);
-        sk->x = rx;
-        sk->y = base_y + 15;
-        sk->xsize = 19+4;
-        sk->ysize = 10;
+        sk->x = rx + 2;
+        sk->y = midi_y;
+        sk->xsize = CHARS_X - rx - 4;
+        sk->ysize = CHARS_Y - midi_y - 10;
 
+        // MIDI Out device list — left side
         ml = new MidiOutDeviceOpener;
         UI->add_element(ml,tabindex++);
         midioutdevlist = ml;
-        ml->x = 4; 
-        ml->y = 50 - 16-2; 
-        ml->xsize=35;
-        ml->ysize = 13;
+        ml->x = 4;
+        ml->y = midi_y;
+        ml->xsize = rx - 4;
+        ml->ysize = CHARS_Y - midi_y - 10;
 
 		//MidiOutputDevice *m;
 
@@ -247,10 +249,10 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         mi = new MidiInDeviceOpener;
         midiindevlist = mi;
         UI->add_element(mi,tabindex++);
-        mi->x = 4+37; 
-        mi->y = 50 - 16-2; 
-        mi->xsize=35;
-        mi->ysize = 13;
+        mi->x = 4;
+        mi->y = midi_y + CHARS_Y - midi_y - 8;
+        mi->xsize = rx - 4;
+        mi->ysize = 6;
 
         b = new Button;
         UI->add_element(b,tabindex++);
@@ -346,14 +348,14 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(rx),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
         print(row(rx),col(TRACKS_ROW_Y+10),"Centered Edit",COLORS.Text,S);
         print(row(rx),col(TRACKS_ROW_Y+12),"  Step Editing",COLORS.Text,S);
-        print(row(rx),col(TRACKS_ROW_Y+14),"Skin Selection",COLORS.Text,S);
+        int midi_y = TRACKS_ROW_Y + 15;
+        print(row(rx+2),col(midi_y - 1),"Skin Selection",COLORS.Text,S);
 
-        print(row(4),col(30),"MIDI Out Device Selection",COLORS.Text,S);
-        print(row(4+37),col(30),"MIDI In Device Selection",COLORS.Text,S);
+        print(row(4),col(midi_y - 1),"MIDI Out Device Selection",COLORS.Text,S);
 
-        print(row(5),col(47),"Latency ",COLORS.Text,S);
-        print(row(5),col(49),"Reverse Bank Select ",COLORS.Text,S);
-        print(row(5),col(51),"Device Alias",COLORS.Text,S);
+        print(row(5),col(CHARS_Y - 7),"Latency ",COLORS.Text,S);
+        print(row(5),col(CHARS_Y - 5),"Reverse Bank Select ",COLORS.Text,S);
+        print(row(5),col(CHARS_Y - 3),"Device Alias",COLORS.Text,S);
         
         need_refresh = 0; 
         updated=2;
