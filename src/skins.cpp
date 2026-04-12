@@ -90,9 +90,15 @@ void Skin::setpath(const char *name)
 
   strcpy(strSkinName, name);
   strcpy(&str[0],cur_dir);
+#ifdef _WIN32
   strcat(&str[0], "\\skins\\");
   strcat(&str[0],name);
   strcat(&str[0],"\\");
+#else
+  strcat(&str[0], "/skins/");
+  strcat(&str[0],name);
+  strcat(&str[0],"/");
+#endif
   strcpy(strSkinPath, str);
 }
 

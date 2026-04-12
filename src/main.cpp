@@ -2681,30 +2681,36 @@ int main(int argc, char *argv[])
   // Get the zt directory and store it globally
   
   if(argc > 1) {
-    
     if(argv[1] != NULL && argv[1][0] != '\0') {
-      
       // store current directory
       GetCurrentDirectory(1024,zt_filename);
+#ifdef _WIN32
       strcat(zt_filename,"\\");
+#else
+      strcat(zt_filename,"/");
+#endif
       strcat(zt_filename,argv[1]);
     }
   }
 
-
-  if(strstr(argv[0],"\\")) {
-    
-    for(w = argv[0] + strlen(argv[0]); w != argv[0] && *w != '\\'; w--);
-    
-    if(w != argv[0]) {
-      
-      *w = '\0';
+  // Extract the directory from argv[0] and chdir into it,
+  // so relative paths to skins/, doc/, zt.conf work.
+  {
+#ifdef _WIN32
+    const char pathsep = '\\';
+#else
+    const char pathsep = '/';
+#endif
+    char *sep = strrchr(argv[0], pathsep);
+    if (sep && sep != argv[0]) {
+      *sep = '\0';
       zt_directory = strdup(argv[0]);
       SetCurrentDirectory(argv[0]);
-      *w = '\\';
+      *sep = pathsep;
+    } else {
+      zt_directory = strdup("");
     }
   }
-  else zt_directory = strdup("");
   
   doredraw++;
 

@@ -1179,8 +1179,7 @@ void VUPlay::draw(Drawable *S, int active)
   int vol_len;
   int i;
   
-  if(ztPlayer->playing && (this->cur_row < ztPlayer->cur_row - 2 || 
-    this->cur_row > ztPlayer->cur_row)) {
+  if(ztPlayer->playing && (this->cur_row != ztPlayer->playing_cur_row)) {
   
     pattern = ztPlayer->playing_cur_pattern;
     cur_row = ztPlayer->playing_cur_row;

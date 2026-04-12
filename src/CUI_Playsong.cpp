@@ -2,7 +2,7 @@
 #include "PatternDisplay.h"
 
 
-#define DISABLE_VUMETERS           // <Manu> It's been broken forever, and I don't use it - Will reenable when it's fixed
+// VU meters re-enabled - toggle with PageUp/PageDown during song playback
 
 
 // ------------------------------------------------------------------------------------------------
@@ -22,14 +22,14 @@ CUI_Playsong::CUI_Playsong(void)
 
     clear = 0 ;
 
-    // <Manu> ¿Por qué 20?
+    // <Manu> ï¿½Por quï¿½ 20?
     //p->y = 20 ;
     pattern_display->y = 14 ;
     
-    // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
+    // <Manu> Control del nï¿½mero de lï¿½neas que se muestran mientras se reproduce una canciï¿½n (30 por defecto)
     //p->ysize = 30 ;
 
-    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algï¿½n #define)
     //p->ysize = 62;
 
     UI_PatternDisplay->add_element(pattern_display,0);
@@ -160,20 +160,16 @@ void CUI_Playsong::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-#ifndef DISABLE_VUMETERS
-
     case DIK_PGUP:
     case DIK_PGDN:
-      
+
       if (UI == UI_PatternDisplay) UI = UI_VUMeters;
       else UI = UI_PatternDisplay;
-      
+
       clear++;
       act++;
-      
-      break;
 
-#endif
+      break;
 
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
@@ -195,7 +191,7 @@ void CUI_Playsong::update()
 //
 void CUI_Playsong::draw(Drawable *S) 
 {
-  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algï¿½n #define)
 
   //  char str[256];
   if (S->lock()==0) {
