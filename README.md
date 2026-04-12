@@ -1,152 +1,145 @@
 zTracker'
 =========
 
-zTracker was a Win32 only MIDI tracker / sequencer modeled after Impulse Tracker / Scream Tracker. 
+zTracker is a cross-platform MIDI tracker / sequencer modeled after Impulse Tracker / Scream Tracker. 
 
-zTracker' is, as it's name implies, a derivate of zTracker.
+zTracker' is a fork of zTracker by [@m6502](https://github.com/m6502) (Manuel Montoto), now ported to build on **Windows (XP 32-bit through Win11)** and **macOS (Apple Silicon + Intel)** from a single source tree.
 
 ![ztscreenshot](https://github.com/user-attachments/assets/4ea296d7-0b72-49e2-a246-a064474e8c75)
 
-This fork is released as a homage to the original work of Chris Micali. I have been using zTracker nearly on a daily basis for the past 24 years. As the original project has remained untouched since 2002, at some point I started tinkering with the source code, at first to fix bugs and later to change how the program behaves.
 
-I don't know if there are any zTracker users remaining out there, but as I'm preparing to try a big overhaul of this software that could potentially end as a whole new program, this is released with the hope that someone can find it useful.
+Build instructions
+------------------
 
-*Please be advised that I can't guarantee this version works better for you than the original*
+Requires CMake 3.20+, Ninja, and a C++17 compiler.
 
-Everyone does have his own tastes, routines and circumstances. zTracker' behaves nearly flawlessly for me and I like it better than the original. But in your case this could be a different history. It is a good idea to check the following list to understand what this fork is about.
+### macOS
 
-There's also the possibility that I misunderstood how something worked and "fixing" it I broke it, or that I have changed the way something works that could have been activated by just pressing a key. Who knows?
+```bash
+brew install sdl12-compat ninja cmake
+cmake -S . -B build-macos -G Ninja
+cmake --build build-macos
+# -> build-macos/src/zt
+```
 
+### Windows (cross-compile from macOS via MinGW-w64)
 
-So, what's new / different from the original zTracker? Here's a somewhat complete (but not really complete) list of the most important changes:
+```bash
+brew install mingw-w64
+cmake -S . -B build-win32 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-xp-toolchain.cmake
+cmake --build build-win32
+# -> build-win32/src/zt.exe (PE32 i386, runs on Windows XP SP2 through Windows 11)
+```
 
+### Windows (native MSVC)
 
-Program behavior changes:
-
-- Support for laptop keyboards: The two right most keyboard keys after 'i', 'o', 'p' have been remapped to duplicate the octave up and down keys functionality. The two keys below now also go to the previous or next pattern (These have been tested only on Spanish keyboards for now)
-  
-- Support for 1bpp PNG files in the skin fonts.
-
-- Zoom mode enables the program to work in 2x, 3x, 4x... So it's useable again on high resolution screens.
-
-- Resizeable window allows for a much more convenient experience.
-
-- Many shortcuts have been modified to use ALT key instead of Control (selections, etc).
-
-- Channel enable / disable controls work with F keys row instead of the numbers row.
-
-- The first 16 instruments get that MIDI channel assigned instead of defaulting to 0.
-
-- BPM/TPB changes are now applied in real-time while playing a song or pattern.
-
-- Song play view shows more information per note.
-
-- Starts in "Tracker Mode" by default.
-
-- After playing a song or pattern the instrument editor shows used instruments with a small dot '·' on the left side.
-
-- Playing the current row only plays non silenced channels.
-
-- Cursor steps when playing the current note / row with '4' and '8' keys.
-
-- Page Up/Down move the cursor 4 highlighted rows instead of fixed 16, making it useful when working in non 4/4 time measures.
-
-- Default pattern size is 64 instead of 128.
-
-- Program doesn't allow the user to set a resolution lower than 1024x700 and will increase the X, Y or both of them if necessary.
-  
-- Play view draws as many channels as it can fit within the horizontal resolution, instead of a fixed number of them.
-  
-- Load and Save screens now use all the available space to display their list entries, and have an improved X size.
-
-- Many more.
+Open the included `zt.sln` in Visual Studio 2015+ or use CMake with the MSVC generator.
 
 
-Fixed bugs:
+Features
+--------
 
-- Many crashes have been fixed - Works rock solid now.
-  
-- Many memory bugs have been fixed (reading from uninitialized variables et al).
+- 1:1 copy of Impulse Tracker interface
+- 64 track sequencer with variable 32-256 rows/pattern, 256 total patterns
+- Multiple MIDI devices across multiple interfaces (via RtMidi: WinMM / CoreMIDI / ALSA / JACK)
+- Rock solid timing (3/496ppqn accuracy)
+- Load/save compressed .zt files
+- Volume/effect curve drawing in pattern editor
+- IT file importing
+- Auto sync via MIDI clock
+- .mid file export
+- Intelligent MIDI-in with slave to external sync
+- Zoom mode (2x, 3x, 4x...) for high resolution screens
+- Resizeable window
+- BPM/TPB changes applied in real-time during playback
+- 7 bundled skins (blue-c64, default, professional, reaktor, tekstyle, x.seed, xt-g01)
 
-- File requester didn't show .mid files; now it does.
+### macOS keyboard
 
-- Control + L to load and Control + S to save work again.
-
-- Using F6 to play current pattern now works even if it's not included in the song order list.
-
-- Scroll didn't move when playing individual notes and rows.
-
-- Current pattern being edited didn't display correctly the row numbers if it had a different count than the default.
-  
-- Last line remained highlighted when play entered the current pattern then exited to another.
-
-- You could use the numeric keypad '+' to advance the song position, but couldn't use the '-' to rewind it.
-
-- Many, many more.
-
-
-Removed things:
-
-- Initial information screen has been removed.
-
-- VUMeters can't be enabled. It's been broken forever, and I don't use it - Will reenable if / when it's fixed.
-  
-- 8 bit .png files are not supported anymore.
-
-- Comments when exporting .mid files have been removed (I needed them to be as small as possible).
-
-- The weird "Are you crazy" requester has been removed, substituted by just stopping the current song and loading the new one.
-  
-- Column size can't be changed.
-
-- Full screen mode is disabled for now, because trying to set the weird resolutions possible with a window to full screen just doesn't work. Still, I like to work on full screen, so it's going to be fixed soon.
-
-- There was a (too frequent) crash when loading a song from disk. It's now fixed.
-  
-
-Broken things:
-
-- zt.conf configuration file needs to be edited by hand.
-
-- Full screen mode doesn't work with the weird resolutions you can set on the windowed mode :-)
+On macOS, the **Cmd key** (Command) works as the primary modifier in place of ALT. All ALT-based shortcuts (transpose, selections, etc.) respond to Cmd on Mac. For example:
+- **Cmd+Q** = Transpose selection up
+- **Cmd+A** = Transpose selection down
+- **Cmd+D** = Select block
+- **ALT+CTRL+Q** = Quit (same on all platforms)
 
 
-Other changes:
+What's different from original zTracker (2002)
+----------------------------------------------
 
-- The source code has been updated where needed to compile with modern C++.
+Changes by [@m6502](https://github.com/m6502) (Manuel Montoto), who has been using zTracker daily for 24+ years:
 
-- External libraries (zlib, libpng, SDL 1.2) are again up to date.
+**Program behavior:**
+- Laptop keyboard support (octave up/down remapped to keys after I/O/P)
+- 1bpp PNG skin font support
+- Zoom mode for high-DPI screens
+- Resizeable window
+- ALT-based shortcuts (instead of CTRL)
+- F-key channel enable/disable (instead of number row)
+- First 16 instruments auto-assigned to MIDI channels
+- Real-time BPM/TPB changes during playback
+- Starts in Tracker Mode by default
+- Used instruments shown with dot in instrument editor after playback
+- Page Up/Down moves by highlighted-row increments (works in non-4/4 time)
+- Default pattern size 64 (was 128)
+- Minimum resolution 1024x700
+- Play view fits channels to window width
+- Load/Save screens use full available space
 
-- zlib and libpng are now statically linked instead of using external .dll files.
+**Bug fixes:**
+- Many crash fixes, memory bug fixes (uninitialized variables etc.)
+- File requester shows .mid files
+- Ctrl+L/Ctrl+S load/save work again
+- F6 plays current pattern even if not in order list
+- Scroll moves when playing individual notes/rows
+- Pattern row numbers display correctly for non-default lengths
+- Highlight clears when playback exits current pattern
+- Numpad +/- both work for song position
 
-- The (good old) Visual C++ 6.0 project and solution have been replaced by both Visual Studio 2008 and 2015 versions.
-  
-- Parts of the code have been cleaned, re-indented, commented and altered to suit my tastes. I sincerely hope this is not seen as a rude move at all. I needed to do it to understand what I was reading.
-  
-- Directory tree has been changed.
+**Removed:**
+- Initial splash screen
+- "Are you crazy" quit dialog (just stops and loads)
 
-- Version number scheme and program name have been changed, too.
-
-
-This is a nearly complete list of changes from the original program. It is not perfect though, because it's been a lot of years since I started playing with the source code. I can't be sure if I really documented ALL the changes I performed. In fact, I know that, at least, I forgot to write one of them, so there can be more!
-
-I'm open to your feedback. I love this software and I will try to fix all the bugs I could have introduced with my changes, plus the bugs from the 2002 version I didn't catch. Please, don't hesitate to contact me about this matter!
+**Known limitations:**
+- zt.conf must be edited by hand (in-app config editor planned)
+- Fullscreen toggle may not work reliably on all platforms
 
 
-Cross-platform port
--------------------
+Cross-platform port (2026)
+--------------------------
 
-This fork now builds on both Windows (XP 32-bit through Win11) and macOS (Apple Silicon + Intel) from a single source tree using CMake.
+This fork adds:
 
-The cross-platform work was informed by the earlier [ztracker_mac](https://github.com/esaruoho/ztracker_mac) project, where [@rbruinier](https://github.com/rbruinier) (Robert Bruinier) created the original macOS abstraction layer — identifying the Win32 API boundaries (MIDI, threading, timers, message boxes) and extracting classes from zt.h into separate compilation units — and [@superjohan](https://github.com/superjohan) (Johan Halin) contributed compile fixes that got the Xcode project building on macOS in 2017. Their work demonstrated the feasibility of a cross-platform zTracker and mapped out the portability surface that this fork's CMake build now covers with production implementations (RtMidi, std::thread, std::chrono).
+| Component | Implementation |
+|---|---|
+| **Build system** | CMake (replaces VS 2008/2015 .sln) |
+| **C++ standard** | C++17 with const correctness |
+| **MIDI I/O** | RtMidi 6.0 (cross-platform: WinMM, CoreMIDI, ALSA, JACK) |
+| **Playback timer** | `std::chrono::steady_clock` (replaces Win32 `timeSetEvent`) |
+| **Threading** | `std::thread` (replaces Win32 `CreateThread`) |
+| **Mutex** | `std::timed_mutex` (replaces Win32 `CreateMutex`) |
+| **Platform shim** | `src/platform/platform.h` for remaining Win32 type stubs |
+| **Dependencies** | zlib 1.3.1 + libpng 1.6.44 via FetchContent; SDL 1.2 (sdl12-compat on macOS) |
+| **Win32 target** | MinGW-w64 cross-compile, PE subsystem 5.1 (XP SP2 compatible) |
+| **macOS target** | Native arm64/x86_64 via Clang |
 
-Build instructions:
+### Acknowledgments
 
-    # Windows (cross-compile from macOS via MinGW-w64, targets XP 32-bit):
-    cmake -S . -B build-win32 -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64-xp-toolchain.cmake
-    cmake --build build-win32
+- **Chris Micali** ([@cmicali](https://github.com/cmicali)) — original zTracker author (2000-2002)
+- **Manuel Montoto** ([@m6502](https://github.com/m6502)) — zTracker' maintainer, 24 years of daily use, bug fixes, and feature improvements
+- **Austin Luminais** (lipid), **Nic Soudee** (zonaj), **Daniel Kahlin** (tlr) — original zTracker contributors
+- **Robert Bruinier** ([@rbruinier](https://github.com/rbruinier)) — created the macOS abstraction layer in [ztracker_mac](https://github.com/esaruoho/ztracker_mac) (2015), identifying the Win32 API boundaries
+- **Johan Halin** ([@superjohan](https://github.com/superjohan)) — compile fixes for macOS Xcode build (2017)
+- **Nicolas Leveille** ([@uucidl](https://github.com/uucidl)) — const correctness guidance for the char* chain reaction fix
 
-    # macOS native:
-    brew install sdl12-compat ninja cmake
-    cmake -S . -B build-macos -G Ninja
-    cmake --build build-macos
+### Skin authors
+
+- **Daxx909** (Rob Smolenaars) — tekstyle, xt-g01 skins
+- **Demmas** — x.seed skin
+
+
+Links
+-----
+
+- [Original zTracker on SourceForge](http://ztracker.sourceforge.net)
+- [zTracker' upstream by m6502](https://github.com/m6502/ztrackerprime)
+- [Original zTracker source by cmicali](https://github.com/cmicali/ztracker)

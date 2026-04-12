@@ -96,7 +96,11 @@ SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
   /* scale greyscale values to the range 0..255 */
   if(color_type == PNG_COLOR_TYPE_GRAY)
     png_set_expand(png_ptr);
-  
+
+  /* Convert paletted/indexed images to RGB */
+  if(color_type == PNG_COLOR_TYPE_PALETTE)
+    png_set_palette_to_rgb(png_ptr);
+
     /* For images with a single "transparent colour", set colour key;
   if more than one index has transparency, use full alpha channel */
   if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) {
