@@ -17,8 +17,11 @@ CUI_Help::CUI_Help(void) {
     FILE *fp;
     int fs=0;
     char *help_file;
-    help_file = (char*)malloc(strlen(zt_directory) + strlen("/doc/help.txt") + 1);
-    sprintf(help_file,"%s/doc/help.txt",zt_directory);
+    help_file = (char*)malloc(strlen(zt_directory) + strlen("doc/help.txt") + 2);
+    if (zt_directory[0])
+        sprintf(help_file,"%s/doc/help.txt",zt_directory);
+    else
+        sprintf(help_file,"doc/help.txt");
     if (fp = fopen(help_file,"rt")) {
         while(!feof(fp)) {
             fgetc(fp);
