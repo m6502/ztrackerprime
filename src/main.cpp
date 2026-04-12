@@ -65,6 +65,7 @@
 
 #include "zt.h"
 #include "keybindings.h"
+#include "lua_engine.h"
 #include "sdl_syswm.h"
 #include <filesystem>
 
@@ -254,6 +255,7 @@ CUI_SongDuration *UIP_SongDuration = NULL;
 CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
+CUI_LuaConsole *UIP_LuaConsole = NULL;
 
 
 
@@ -1278,6 +1280,9 @@ void global_keys(Drawable *S)
                     key = Keys.getkey();
                     break;
                 }
+                case ZT_ACTION_SWITCH_LUA_CONSOLE:
+                    command = CMD_SWITCH_LUA_CONSOLE;
+                    break;
                 default:
                     break;
             }
@@ -1624,6 +1629,15 @@ void global_keys(Drawable *S)
                 switch_page(LastPage);
             } else {
                 switch_page(UIP_Help);
+            }
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_LUA_CONSOLE:
+            if (cur_state == STATE_LUA_CONSOLE) {
+                switch_page(UIP_Patterneditor);
+            } else {
+                switch_page(UIP_LuaConsole);
             }
             doredraw++; clear++;
             break;
@@ -2224,6 +2238,8 @@ int postAction ()
     delete UIP_SongMessage;
     delete UIP_Arpeggioeditor;
     delete UIP_Midimacroeditor;
+    delete UIP_LuaConsole;
+    g_lua.shutdown();
     delete ztPlayer;    
     delete MidiIn;
     delete MidiOut;
@@ -2801,6 +2817,11 @@ SDL_Surface *initSDL(void)
     UIP_RUSure = new CUI_RUSure;
     UIP_Help = new CUI_Help;
     UIP_SongDuration = new CUI_SongDuration;
+    UIP_LuaConsole = new CUI_LuaConsole;
+
+    // Init Lua engine
+    g_lua.init();
+
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
     return screen;

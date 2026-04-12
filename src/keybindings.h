@@ -48,6 +48,8 @@ enum ZtAction {
     ZT_ACTION_STEP_8,
     ZT_ACTION_STEP_9,
 
+    ZT_ACTION_SWITCH_LUA_CONSOLE,
+
     ZT_ACTION_COUNT
 };
 

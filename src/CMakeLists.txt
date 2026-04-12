@@ -1,3 +1,12 @@
+# Lua 5.4 static library
+file(GLOB LUA_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lua/*.c")
+add_library(lua_static STATIC ${LUA_SOURCES})
+target_include_directories(lua_static PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lua")
+# Lua needs math library on Linux/macOS; on Windows it's implicit
+if(NOT WIN32)
+    target_link_libraries(lua_static PRIVATE m)
+endif()
+
 # ztracker main executable.
 
 set(ZT_SOURCES
@@ -53,6 +62,8 @@ set(ZT_SOURCES
     UserInterface.cpp
     zlib_wrapper.cpp
     ztfile-io.cpp
+    lua_engine.cpp
+    CUI_LuaConsole.cpp
 )
 
 # Resource file (icon) — compiled on Windows/MinGW only.
@@ -89,6 +100,7 @@ target_include_directories(zt PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${SDL12_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rtmidi
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lua
 )
 
 # RtMidi backend selection — tells RtMidi which platform MIDI API to compile.
@@ -112,6 +124,7 @@ if(CMAKE_CROSSCOMPILING AND MINGW)
         "${SDL12_LIB_DIR}/libSDL.dll.a"
         png_static
         zlibstatic
+        lua_static
     )
 else()
     target_link_directories(zt PRIVATE ${SDL12_LIBRARY_DIRS})
@@ -119,6 +132,7 @@ else()
         ${SDL12_LIBRARIES}
         png_static
         zlibstatic
+        lua_static
     )
 endif()
 

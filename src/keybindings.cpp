@@ -61,6 +61,7 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "step_7",               // ZT_ACTION_STEP_7
     "step_8",               // ZT_ACTION_STEP_8
     "step_9",               // ZT_ACTION_STEP_9
+    "switch_lua_console",   // ZT_ACTION_SWITCH_LUA_CONSOLE
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -123,6 +124,9 @@ void KeyBindings::setDefaults()
     bindings[ZT_ACTION_STEP_7]             = { DIK_7,  KS_ALT };
     bindings[ZT_ACTION_STEP_8]             = { DIK_8,  KS_ALT };
     bindings[ZT_ACTION_STEP_9]             = { DIK_9,  KS_ALT };
+
+    // Lua console — Ctrl+Alt+L (avoids collision with Ctrl+L load shortcut)
+    bindings[ZT_ACTION_SWITCH_LUA_CONSOLE] = { DIK_L,  KS_CTRL | KS_ALT };
 }
 
 // -----------------------------------------------------------------------
