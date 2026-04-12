@@ -1,9 +1,7 @@
 zTracker'
 =========
 
-zTracker is a MIDI tracker / sequencer modeled after Impulse Tracker / Scream Tracker. It was originally Win32 only but now it's been upgraded to 64 bit systems and works both on Windows and Linux. A macOS port is being worked on already.
-
-zTracker' is, as it's name implies, a derivate of zTracker.
+zTracker is a MIDI tracker / sequencer modeled after Impulse Tracker / Scream Tracker. It was originally Win32 only but now it's been upgraded to 64-bit systems and works on Windows, macOS and Linux.
 
 ![ztscreenshot](https://github.com/user-attachments/assets/4ea296d7-0b72-49e2-a246-a064474e8c75)
 
