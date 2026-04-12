@@ -4,6 +4,8 @@ All changes on top of m6502/ztrackerprime (last upstream commit: `dba2320`, Aug 
 
 ## Recent fixes (2026-04-12, post-initial-port)
 
+- **All ALT shortcuts work with Cmd on macOS** — KS_HAS_ALT macro matches ALT, META, or META|ALT. Cmd+B/E/L (block), Cmd+1-0 (edit step), Cmd+Q/A (transpose), Cmd+D (select) all work with Mac Cmd key
+- **macOS Backspace works as Delete** — Mac "delete" key (DIK_BACK) now falls through to DIK_DELETE handler in Pattern Editor
 - **All pages aligned to TRACKS_ROW_Y** — System Config, Song Config, Instrument Editor content now starts at the same row as Pattern Editor
 - **Version string moved up** — HEADER_ROW changed from 2 to 1, centers properly in top bar
 - **SDL key repeat enabled** — holding cursor keys now repeats on all platforms (SDL_EnableKeyRepeat)
