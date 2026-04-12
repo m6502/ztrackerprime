@@ -6,7 +6,7 @@
 #define TRACKS_POS_Y                    row(TRACKS_ROW_Y)
 #define TRACKS_FIRST_NOTE_POS_Y         row(TRACKS_ROW_Y + 1)
 
-#define SPACE_IN_CHARACTERS_AT_BOTTOM   20
+#define SPACE_AT_BOTTOM                 4  // rows reserved below pattern for border/padding
 
 
 int PATTERN_EDIT_ROWS = 100;
@@ -884,7 +884,7 @@ void CUI_Patterneditor::enter(void)
   // <Manu> 180 es el espacio que queda m�s o menos para las notas descontando d�nde empiezan los tracks, la toolbar, etc.
   //        No ser�a mala idea calcular esto de una manera un poco m�s clara.
 
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+  PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
   //  this->mode = PEM_REGULARKEYS;
 }
@@ -914,7 +914,7 @@ void CUI_Patterneditor::leave(void)
 //
 void CUI_Patterneditor::update() 
 {
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+  PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
   int i,j,o=0,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
