@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -146,6 +146,15 @@ void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char) {
         c |= KS_CTRL;
     if (state & KMOD_SHIFT)
         c |= KS_SHIFT;
+#ifdef __APPLE__
+    // On macOS, map Cmd (KMOD_META) to KS_META AND KS_ALT so that
+    // Cmd+key works everywhere ALT+key does (Cmd is the primary modifier on Mac).
+    if (state & KMOD_META)
+        c |= KS_META | KS_ALT;
+#else
+    if (state & KMOD_META)
+        c |= KS_META;
+#endif
     if (state == KS_LAST_STATE) {
         buffer[head].actual_char = last_actual_char;
         buffer[head].state = ls;

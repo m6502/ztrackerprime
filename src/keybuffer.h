@@ -7,6 +7,7 @@
 #define KS_ALT   1
 #define KS_CTRL  2
 #define KS_SHIFT 4
+#define KS_META  8   // Cmd key on macOS, Win key on Windows
 #define KS_LAST_STATE 0xFF
 
 typedef unsigned int KBKey ;
