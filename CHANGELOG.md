@@ -4,6 +4,8 @@ All changes on top of m6502/ztrackerprime (last upstream commit: `dba2320`, Aug 
 
 ## Recent fixes (2026-04-12, post-initial-port)
 
+- **Lua 5.4 scripting** — REPL console (Ctrl+Alt+L), full zTracker API: pattern access, playback control, MIDI send, state queries. Optional init.lua on startup. (#1)
+- **Configurable keyboard shortcuts** — 35 remappable actions saved to zt.conf. Format: key_action: modifier+key (#11)
 - **Undo (Cmd+Z / ALT+Z)** — single-level pattern undo, saves snapshot before destructive operations
 - **Double Pattern (Ctrl+Shift+G)** — doubles pattern length, copies first half to second half (max 256)
 - **Clone Pattern (Ctrl+Shift+D)** — clones pattern to next empty slot and moves cursor to it
