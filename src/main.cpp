@@ -2042,8 +2042,10 @@ int postAction ()
     if (MidiOut) MidiOut->panic();
     if (clipboard) delete clipboard;
     
+#ifdef _WIN32
     KillTimer(NULL,keytimer);
-    
+#endif
+
     if (UI_Toolbar) {
 #ifdef DEBUG
         playbuff1_bg = NULL;
@@ -2119,9 +2121,10 @@ void update_lights(Drawable *S)
 }
 
 
+#ifdef _WIN32
 VOID CALLBACK TP_Keyboard_Repeat(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
     if (keyID) {
-        if ((!key_jazz) || jazz[keyID].note==0x80)            
+        if ((!key_jazz) || jazz[keyID].note==0x80)
             if (!(jazz[keyID].note!=0x80 && cur_state==STATE_IEDIT))
                 if (!bDontKeyRepeat && keyID != DIK_8 && keyID != DIK_4)
                     Keys.insert(keyID,KS_LAST_STATE);
@@ -2133,7 +2136,7 @@ VOID CALLBACK TP_Keyboard_Repeat(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD d
                     MidiOut->noteOff(song->instruments[cur_inst]->midi_device,jazz[keyID].note,jazz[keyID].chan,0x0,0);
                 jazz[keyID].note = 0x80;
             }
-        }   
+        }
     }
     if (keywait == 1) {
         keywait = 0;
@@ -2141,6 +2144,7 @@ VOID CALLBACK TP_Keyboard_Repeat(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD d
         keytimer = SetTimer(NULL,keytimer,zt_config_globals.key_repeat_time,(TIMERPROC)TP_Keyboard_Repeat);
     }
 }
+#endif
 
 
 /* MAIN */
@@ -2149,7 +2153,7 @@ void keyhandler(SDL_KeyboardEvent *e) {
     SDLKey id = e->keysym.sym;
     char actual_ch = e->keysym.unicode & 0x7F;
     int pressed = (e->state == SDL_PRESSED);
-    if (id == DIK_NUMPADENTER) 
+    if (id == DIK_NUMPADENTER)
       id=SDLK_RETURN;
     if (id != DIK_LALT && id != DIK_RALT && id != DIK_RCONTROL && id != DIK_LCONTROL && id != DIK_LSHIFT && id != DIK_RSHIFT) {
         if (zclear_flag)
@@ -2164,7 +2168,9 @@ void keyhandler(SDL_KeyboardEvent *e) {
             }
             if (id == keyID) {
                 keyID = 0;
+#ifdef _WIN32
                 KillTimer(NULL, keytimer);
+#endif
             }
                 if (jazz[id].note != 0x80) {
                     if(id == DIK_8)
@@ -2172,14 +2178,19 @@ void keyhandler(SDL_KeyboardEvent *e) {
                     else
                     MidiOut->noteOff(song->instruments[cur_inst]->midi_device,jazz[id].note,jazz[id].chan,0x0,0);
                     jazz[id].note = 0x80;
-                }   
+                }
         } else  {
             Keys.insert(id,e->keysym.mod,actual_ch);
+#ifdef _WIN32
             if (!(id == DIK_RETURN && e->keysym.mod&KMOD_ALT)) {
                 keytimer = SetTimer(NULL,keytimer,zt_config_globals.key_wait_time,(TIMERPROC)TP_Keyboard_Repeat);
                 keywait = 1;
                 keyID = id;
             }
+#else
+            // On macOS/Linux, SDL handles key repeat natively — no Win32 timer needed.
+            keyID = id;
+#endif
         }
     }
 }
@@ -2830,25 +2841,27 @@ int main(int argc, char *argv[])
              }
              break;
              
-          // ---------------------------------------------------------------------------- 
+          // ----------------------------------------------------------------------------
+#ifdef _WIN32
            case SDL_SYSWMEVENT:
              //SDL_Delay(1);//e.syswm;
              switch(e.syswm.msg->msg)
              {
              // --------------------------------------------------------
              case WM_SETFOCUS:
-               
+
                if (UI) UI->full_refresh();
                if (UI_Toolbar) UI_Toolbar->full_refresh();
-               
+
                doredraw++;
                need_refresh++;
                screenmanager.UpdateAll();
-               
+
                break;
              }
-             
+
              break;
+#endif // _WIN32
 
              // --------------------------------------------------------
              case SDL_VIDEORESIZE:

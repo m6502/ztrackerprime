@@ -352,7 +352,7 @@ int player::init(void) {
 //
 void player::set_speed() {
 //int t,int b) {
-    __int64 a;
+    int64_t a;
 //  tpb = t; bpm = b;
 
     // <Manu> Apply changes in real-time :-)

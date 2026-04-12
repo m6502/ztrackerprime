@@ -156,7 +156,7 @@ void CUI_Config::draw(Drawable *S) {
 //        sprintf(buf+strlen(buf),"\n|U|    Fade In/Out |L|[|H|%s|L|]",zt_config_globals.do_fade?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
 
-        tb->text = _strdup(buf);
+        tb->text = strdup(buf);
         UI->draw(S);
         draw_status(S);
         status(S);

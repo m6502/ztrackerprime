@@ -63,9 +63,13 @@ if(WIN32)
     endif()
 endif()
 
-# WIN32 subsystem — SDLmain.a provides WinMain which calls our SDL_main (aliased from main).
-# Without this, the MinGW CRT expects WinMain@16 and can't find it.
-add_executable(zt WIN32 ${ZT_SOURCES} ${ZT_RESOURCE_FILES})
+# WIN32 subsystem on Windows — SDLmain.a provides WinMain which calls our SDL_main.
+# On macOS/Linux, just a normal executable.
+if(WIN32)
+    add_executable(zt WIN32 ${ZT_SOURCES} ${ZT_RESOURCE_FILES})
+else()
+    add_executable(zt ${ZT_SOURCES})
+endif()
 
 target_include_directories(zt PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -97,6 +101,7 @@ if(CMAKE_CROSSCOMPILING AND MINGW)
         zlibstatic
     )
 else()
+    target_link_directories(zt PRIVATE ${SDL12_LIBRARY_DIRS})
     target_link_libraries(zt PRIVATE
         ${SDL12_LIBRARIES}
         png_static
@@ -104,9 +109,24 @@ else()
     )
 endif()
 
-# Win32 system libraries needed for MIDI + multimedia timers + COM basics.
+# Platform-specific system libraries.
 if(WIN32)
+    # MIDI + multimedia timers + COM basics.
     target_link_libraries(zt PRIVATE winmm ole32 oleaut32 uuid comdlg32 gdi32 user32 shell32)
+elseif(APPLE)
+    # RtMidi needs CoreMIDI, CoreAudio, CoreFoundation on macOS.
+    find_library(COREMIDI_LIBRARY CoreMIDI)
+    find_library(COREAUDIO_LIBRARY CoreAudio)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+    find_library(COCOA_LIBRARY Cocoa)
+    target_link_libraries(zt PRIVATE ${COREMIDI_LIBRARY} ${COREAUDIO_LIBRARY} ${COREFOUNDATION_LIBRARY} ${COCOA_LIBRARY})
+else()
+    # Linux: RtMidi needs ALSA.
+    find_package(PkgConfig)
+    pkg_check_modules(ALSA alsa)
+    if(ALSA_FOUND)
+        target_link_libraries(zt PRIVATE ${ALSA_LIBRARIES})
+    endif()
 endif()
 
 # Copy SDL.dll next to the exe (Phase 1 smoke-test artifact).
