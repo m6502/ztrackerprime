@@ -1606,8 +1606,8 @@ void CUI_Patterneditor::update()
 
         }
 
-        if (kstate == KS_ALT ) {
-        
+        if (kstate == KS_ALT || kstate == KS_META || kstate == (KS_META|KS_ALT) ) {
+
           switch(key)
           {
 
@@ -1996,7 +1996,7 @@ void CUI_Patterneditor::update()
             
             }
         }       
-        if (kstate == KS_ALT) {
+        if (kstate == KS_ALT || kstate == KS_META || kstate == (KS_META|KS_ALT)) {
           switch(key) {
             
           case DIK_GRAVE: 
