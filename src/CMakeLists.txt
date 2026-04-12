@@ -129,6 +129,16 @@ else()
     endif()
 endif()
 
+# Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
+add_custom_command(TARGET zt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
+)
+
 # Copy SDL.dll next to the exe (Phase 1 smoke-test artifact).
 if(CMAKE_CROSSCOMPILING AND MINGW)
     if(EXISTS "${SDL12_RUNTIME_DLL}")

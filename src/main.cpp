@@ -1971,11 +1971,16 @@ int initGFX ()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int postAction () 
+int postAction ()
 {  // Deinit functions
 
     SDL_Quit();
-    
+
+    // Guard against cleanup crashes when initialization failed (e.g. zt.conf not found).
+    if (!cur_dir || !MidiOut || !MidiIn) {
+        return 0;
+    }
+
     intlist *mod;
     OutputDevice *m;
     midiInDevice *mi;
