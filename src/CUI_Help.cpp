@@ -60,6 +60,9 @@ void CUI_Help::update() {
     UI->update();
     if (Keys.size()) {
         key = Keys.getkey();
+        if (key == DIK_F1 || key == DIK_ESCAPE) {
+            switch_page(LastPage);
+        }
     }
 }
 
