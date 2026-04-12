@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>zTracker</string>
+    <key>CFBundleDisplayName</key>
+    <string>zTracker'</string>
+    <key>CFBundleIdentifier</key>
+    <string>net.sourceforge.ztracker</string>
+    <key>CFBundleVersion</key>
+    <string>2026.04.12</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2026.04.12</string>
+    <key>CFBundleExecutable</key>
+    <string>zt</string>
+    <key>CFBundleIconFile</key>
+    <string>zt.icns</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>zTrk</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>zt</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>zTracker Song</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+        </dict>
+    </array>
+</dict>
+</plist>

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build and run zTracker on macOS (Apple Silicon + Intel).
+# Build and run zTracker.app on macOS (Apple Silicon + Intel).
 # Prerequisites: brew install sdl12-compat ninja cmake
 set -e
 cd "$(dirname "$0")"
@@ -11,5 +11,5 @@ if ! pkg-config --exists sdl 2>/dev/null; then echo "Install SDL: brew install s
 
 cmake -S . -B build-macos -G Ninja 2>&1 | grep -E "error|Configuring done" | tail -1
 cmake --build build-macos --target zt 2>&1 | tail -3
-echo "--- launching zTracker ---"
-cd build-macos/src && ./zt
+echo "--- launching zTracker.app ---"
+open build-macos/src/zt.app

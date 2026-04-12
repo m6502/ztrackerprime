@@ -2702,14 +2702,29 @@ int main(int argc, char *argv[])
     }
   }
 
-  // Extract the directory from argv[0] and chdir into it,
-  // so relative paths to skins/, doc/, zt.conf work.
+  // Set working directory so relative paths to skins/, doc/, zt.conf work.
   {
-#ifdef _WIN32
+#ifdef __APPLE__
+    // On macOS .app bundle: resources are in ../Resources relative to the binary.
+    // argv[0] = .../zt.app/Contents/MacOS/zt
+    // We want to chdir to .../zt.app/Contents/Resources/
+    char respath[4096];
+    char *sep = strrchr(argv[0], '/');
+    if (sep) {
+      *sep = '\0';
+      snprintf(respath, sizeof(respath), "%s/../Resources", argv[0]);
+      *sep = '/';
+      // Try the .app bundle Resources path first; fall back to binary dir.
+      if (chdir(respath) != 0) {
+        *sep = '\0';
+        chdir(argv[0]);
+        *sep = '/';
+      }
+    }
+    zt_directory = strdup("");
+    GetCurrentDirectory(256, (char*)cur_dir);
+#elif defined(_WIN32)
     const char pathsep = '\\';
-#else
-    const char pathsep = '/';
-#endif
     char *sep = strrchr(argv[0], pathsep);
     if (sep && sep != argv[0]) {
       *sep = '\0';
@@ -2719,6 +2734,19 @@ int main(int argc, char *argv[])
     } else {
       zt_directory = strdup("");
     }
+#else
+    // Linux: chdir to binary's directory.
+    const char pathsep = '/';
+    char *sep = strrchr(argv[0], pathsep);
+    if (sep && sep != argv[0]) {
+      *sep = '\0';
+      zt_directory = strdup(argv[0]);
+      SetCurrentDirectory(argv[0]);
+      *sep = pathsep;
+    } else {
+      zt_directory = strdup("");
+    }
+#endif
   }
   
   doredraw++;

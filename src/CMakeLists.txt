@@ -64,9 +64,21 @@ if(WIN32)
 endif()
 
 # WIN32 subsystem on Windows — SDLmain.a provides WinMain which calls our SDL_main.
-# On macOS/Linux, just a normal executable.
+# On macOS, produce a proper .app bundle with icon.
+# On Linux, just a normal executable.
 if(WIN32)
     add_executable(zt WIN32 ${ZT_SOURCES} ${ZT_RESOURCE_FILES})
+elseif(APPLE)
+    set(ZT_ICNS "${CMAKE_SOURCE_DIR}/zt.icns")
+    set_source_files_properties(${ZT_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    add_executable(zt MACOSX_BUNDLE ${ZT_SOURCES} ${ZT_ICNS})
+    set_target_properties(zt PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/macos/Info.plist.in"
+        MACOSX_BUNDLE_ICON_FILE "zt.icns"
+        MACOSX_BUNDLE_BUNDLE_NAME "zTracker"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "net.sourceforge.ztracker"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "2026.04.12"
+    )
 else()
     add_executable(zt ${ZT_SOURCES})
 endif()
@@ -130,14 +142,27 @@ else()
 endif()
 
 # Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
-add_custom_command(TARGET zt POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
-)
+# On macOS .app bundle, put them inside Contents/Resources/.
+if(APPLE)
+    set(ZT_RESOURCE_DIR "$<TARGET_FILE_DIR:zt>/../Resources")
+    add_custom_command(TARGET zt POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/zt.conf" "${ZT_RESOURCE_DIR}/zt.conf"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/skins" "${ZT_RESOURCE_DIR}/skins"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/doc" "${ZT_RESOURCE_DIR}/doc"
+    )
+else()
+    add_custom_command(TARGET zt POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
+    )
+endif()
 
 # Copy SDL.dll next to the exe (Phase 1 smoke-test artifact).
 if(CMAKE_CROSSCOMPILING AND MINGW)
