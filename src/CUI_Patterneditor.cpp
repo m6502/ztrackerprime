@@ -2019,6 +2019,33 @@ void CUI_Patterneditor::update()
             break;
             
             
+          case DIK_R: /* Replicate at Cursor (from Paketti) */
+          {
+            // Take rows 0..cur_edit_row as the source chunk on the current track,
+            // then repeat that chunk from cur_edit_row+1 to the end of the pattern.
+            int pat_len = song->patterns[cur_edit_pattern]->length;
+            int chunk_len = cur_edit_row + 1; // rows 0 through cur_edit_row inclusive
+            if (chunk_len > 0 && cur_edit_row < pat_len - 1) {
+              for (j = cur_edit_row + 1; j < pat_len; j++) {
+                int src_row = (j - (cur_edit_row + 1)) % chunk_len;
+                event *src = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(src_row);
+                if (src) {
+                  song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                    j, src->note, src->inst, src->vol, src->length, src->effect, src->effect_data);
+                } else {
+                  // Clear destination row if source is empty
+                  song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                    j, 0x80, MAX_INSTS, 0x80, 0, 0xFF, 0);
+                }
+              }
+              need_refresh++;
+              sprintf(szStatmsg, "Replicated rows 0-%d across pattern (%d rows)", cur_edit_row, pat_len);
+              statusmsg = szStatmsg;
+              status_change = 1;
+            }
+          }
+          break;
+
           case DIK_S: /* Set Instrument */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++)
