@@ -107,7 +107,7 @@ int PatternDisplay::update()
       }
     }
 
-    if (kstate == KS_ALT) {
+    if (KS_HAS_ALT(kstate)) {
 
       switch(key) 
       {
@@ -296,7 +296,7 @@ void PatternDisplay::update_frame(void)
 
     tracksize = 7;
     
-    // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto)
+    // <Manu> Control del nï¿½mero de tracks que se muestran mientras se reproduce una canciï¿½n (10 por defecto)
     //tracks = 10;
     tracks = ((INTERNAL_RESOLUTION_X /*- LEFT_LINE_NUMBER_MARGIN*/) / (tracksize * FONT_SIZE_X)) - 1 ;
 

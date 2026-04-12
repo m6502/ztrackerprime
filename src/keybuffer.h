@@ -10,6 +10,9 @@
 #define KS_META  8   // Cmd key on macOS, Win key on Windows
 #define KS_LAST_STATE 0xFF
 
+// Helper: true if ALT is active (matches ALT alone, META alone, or META+ALT)
+#define KS_HAS_ALT(ks) (((ks) & (KS_ALT|KS_META)) && !((ks) & (KS_CTRL|KS_SHIFT)))
+
 typedef unsigned int KBKey ;
 typedef unsigned int KBMod;
 

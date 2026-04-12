@@ -1228,7 +1228,7 @@ void CUI_Patterneditor::update()
 /*
       if (kstate == KS_SHIFT) {
       }
-      if (kstate == KS_ALT) {
+      if (KS_HAS_ALT(kstate)) {
       }
       if (kstate == KS_CTRL) {
       }
@@ -1606,7 +1606,7 @@ void CUI_Patterneditor::update()
 
         }
 
-        if (kstate == KS_ALT || kstate == KS_META || kstate == (KS_META|KS_ALT) ) {
+        if (KS_HAS_ALT(kstate)) {
 
           switch(key)
           {
@@ -1996,7 +1996,7 @@ void CUI_Patterneditor::update()
             
             }
         }       
-        if (kstate == KS_ALT || kstate == KS_META || kstate == (KS_META|KS_ALT)) {
+        if (KS_HAS_ALT(kstate)) {
           switch(key) {
             
           case DIK_GRAVE: 
