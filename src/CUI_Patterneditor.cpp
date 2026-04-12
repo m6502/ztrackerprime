@@ -1128,10 +1128,10 @@ void CUI_Patterneditor::update()
   
   
   if (Keys.size() || midiInQueue.size() > 0) {
-    
+
     key=Keys.getkey();
     kstate = Keys.getstate();
-    
+
     set_note = 0xff;
     
     /* COMMON KEYS */
