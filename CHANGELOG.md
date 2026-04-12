@@ -2,6 +2,36 @@
 
 All changes on top of m6502/ztrackerprime (last upstream commit: `dba2320`, Aug 2025).
 
+## Recent fixes (2026-04-12, post-initial-port)
+
+- **macOS .app bundle** with icon (zt.icns), Info.plist, bundled zt.conf/skins/doc in Resources (#10)
+- **macOS startup crash fixed** — cur_dir was NULL when GetCurrentDirectory called during init
+- **Skin switching crash fixed** — guard against double-free of SDL surfaces via sdl12-compat
+- **MIDI device names now display correctly** — RtMidi port index offset was wrong when audio plugins present. "Opened[out]: IAC Driver Bus 1" instead of "Opened[out]: "
+- **help.txt loads on macOS** — tries multiple paths (zt_directory/doc/, doc/, help.txt) as fallback
+- **F1 toggles Help** — pressing F1 while Help is open closes it (was one-way)
+- **Help page aligned** with Pattern Editor — starts at TRACKS_ROW_Y, fills full window
+- **F3 Instrument Editor aligned** — starts at TRACKS_ROW_Y like F2 (was hardcoded row 13)
+- **All page titles show shortcut keys** — "Pattern Editor (F2)", "Help (F1)", "System Configuration (F11)", etc.
+- **macOS Cmd key support** — Cmd maps to ALT so Cmd+Q=transpose up, Cmd+A=transpose down, etc.
+- **VU meters re-enabled** — removed DISABLE_VUMETERS, fixed display row variable (#4)
+- **Version bumped** to v2026_04_12
+- **Start scripts** — start-mac.sh, start-linux.sh, start-windows.sh, start-xp.sh
+- **5 community skins added** — blue-c64, reaktor, tekstyle, x.seed, xt-g01 + old 0.85 skins
+
+### Open issues being tracked
+
+- #18 System Configuration UX: broken tab order, missing keyboard navigation
+- #17 Play Song view bleeds through when switching to Pattern Editor
+- #16 Show playback activity under Pattern Editor during playback
+- #15 Pattern Editor doesn't use full window height
+- #14 Some skins include obsolete shortcuts
+- #13 Resize may leave cursor out of text list
+- #12 Resize window may move it
+- #11 Configurable keyboard shortcuts saved to zt.conf
+- #6 In-app zt.conf editor + document .conf format
+- #1 Add Lua scripting support
+
 ## Cross-platform build system
 
 - **CMake replaces Visual Studio .sln/.vcproj** — one build system for all platforms
