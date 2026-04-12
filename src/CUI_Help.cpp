@@ -17,12 +17,22 @@ CUI_Help::CUI_Help(void) {
     FILE *fp;
     int fs=0;
     char *help_file;
-    help_file = (char*)malloc(strlen(zt_directory) + strlen("doc/help.txt") + 2);
-    if (zt_directory[0])
+    help_file = (char*)malloc(1024);
+    // Try multiple paths: with zt_directory prefix, then relative, then just filename.
+    fp = NULL;
+    if (zt_directory[0]) {
         sprintf(help_file,"%s/doc/help.txt",zt_directory);
-    else
+        fp = fopen(help_file,"r");
+    }
+    if (!fp) {
         sprintf(help_file,"doc/help.txt");
-    if (fp = fopen(help_file,"rt")) {
+        fp = fopen(help_file,"r");
+    }
+    if (!fp) {
+        sprintf(help_file,"help.txt");
+        fp = fopen(help_file,"r");
+    }
+    if (fp) {
         while(!feof(fp)) {
             fgetc(fp);
             fs++;

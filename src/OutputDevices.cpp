@@ -27,8 +27,10 @@ void InitializePlugins(midiOut *mout)
 
     unsigned int total = i+devs;
     mout->numOuputDevices += devs;
+    unsigned int rtmidi_port = 0;
     for (;i<total;i++) {
-        mout->outputDevices[i] = new MidiOutputDevice(i);
+        mout->outputDevices[i] = new MidiOutputDevice(rtmidi_port);
+        rtmidi_port++;
     }
 }
 
