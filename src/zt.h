@@ -48,7 +48,7 @@
 // <Manu> antes era 98
 //#define VER_MIN 986
 
-#define ZTRACKER_VERSION                "zTracker' v2025_08_15"
+#define ZTRACKER_VERSION                "zTracker' v2026_04_12"
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
