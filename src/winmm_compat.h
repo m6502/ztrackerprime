@@ -1,0 +1,720 @@
+/*
+    Wrapper winmm
+*/
+
+#ifndef ZT_WINMM_COMPAT_H
+#define ZT_WINMM_COMPAT_H
+
+#if defined(_WIN32)
+#include <mmsystem.h>
+#else
+
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#if defined(__linux__)
+#include <alsa/asoundlib.h>
+#elif defined(__APPLE__)
+#include <CoreMIDI/CoreMIDI.h>
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
+#ifndef WINAPI
+#define WINAPI
+#endif
+
+#ifndef CALLBACK
+#define CALLBACK
+#endif
+
+typedef uint32_t MMRESULT;
+typedef uint32_t UINT;
+typedef uint32_t DWORD;
+typedef uintptr_t DWORD_PTR;
+typedef uintptr_t UINT_PTR;
+typedef void *HMIDIIN;
+typedef void *HMIDIOUT;
+typedef char *LPSTR;
+
+typedef struct tagMIDIHDR {
+    LPSTR lpData;
+    DWORD dwBufferLength;
+    DWORD dwBytesRecorded;
+    DWORD dwFlags;
+} MIDIHDR, *LPMIDIHDR;
+
+typedef struct tagMIDIOUTCAPS {
+    char szPname[128];
+} MIDIOUTCAPS;
+
+typedef struct tagMIDIINCAPS {
+    char szPname[128];
+} MIDIINCAPS;
+
+typedef struct tagTIMECAPS {
+    UINT wPeriodMin;
+    UINT wPeriodMax;
+} TIMECAPS;
+
+typedef void (CALLBACK *LPTIMECALLBACK)(UINT, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+
+#define CALLBACK_NULL 0x0000
+#define CALLBACK_FUNCTION 0x00030000
+#define TIME_PERIODIC 0x0001
+#define TIMERR_NOERROR 0
+#define MMSYSERR_NOERROR 0
+#define MMSYSERR_ERROR 1
+#define MMSYSERR_NOMEM 7
+#define MMSYSERR_ALLOCATED 4
+#define MIDIERR_NODEVICE 64
+
+#define MIM_OPEN 0x3C1
+#define MIM_CLOSE 0x3C2
+#define MIM_DATA 0x3C3
+#define MIM_LONGDATA 0x3C4
+#define MIM_ERROR 0x3C5
+#define MIM_LONGERROR 0x3C6
+#define MIM_MOREDATA 0x3CC
+
+static inline int zt_midi_message_length(unsigned char status) {
+    if (status < 0x80) {
+        return 0;
+    }
+    if (status < 0xF0) {
+        switch (status & 0xF0) {
+            case 0xC0:
+            case 0xD0:
+                return 2;
+            default:
+                return 3;
+        }
+    }
+
+    switch (status) {
+        case 0xF1:
+        case 0xF3:
+            return 2;
+        case 0xF2:
+            return 3;
+        case 0xF6:
+        case 0xF8:
+        case 0xFA:
+        case 0xFB:
+        case 0xFC:
+        case 0xFE:
+        case 0xFF:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+#if defined(__linux__)
+typedef struct zt_alsa_midi_out_handle {
+    snd_seq_t *seq;
+    int src_port;
+    int dest_client;
+    int dest_port;
+} zt_alsa_midi_out_handle;
+
+static inline int zt_alsa_find_output_port_by_index(UINT index, int *client, int *port, char *name, size_t name_len) {
+    snd_seq_t *seq = NULL;
+    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+        return 0;
+    }
+
+    snd_seq_client_info_t *cinfo = NULL;
+    snd_seq_port_info_t *pinfo = NULL;
+    snd_seq_client_info_malloc(&cinfo);
+    snd_seq_port_info_malloc(&pinfo);
+    if (!cinfo || !pinfo) {
+        if (cinfo) snd_seq_client_info_free(cinfo);
+        if (pinfo) snd_seq_port_info_free(pinfo);
+        snd_seq_close(seq);
+        return 0;
+    }
+
+    UINT count = 0;
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        const int cl = snd_seq_client_info_get_client(cinfo);
+        snd_seq_port_info_set_client(pinfo, cl);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if ((caps & SND_SEQ_PORT_CAP_WRITE) == 0 || (caps & SND_SEQ_PORT_CAP_SUBS_WRITE) == 0) {
+                continue;
+            }
+            if (count == index) {
+                if (client) *client = cl;
+                if (port) *port = snd_seq_port_info_get_port(pinfo);
+                if (name && name_len > 0) {
+                    const char *cn = snd_seq_client_info_get_name(cinfo);
+                    const char *pn = snd_seq_port_info_get_name(pinfo);
+                    snprintf(name, name_len, "%s:%s", cn ? cn : "ALSA", pn ? pn : "MIDI");
+                    name[name_len - 1] = '\0';
+                }
+                snd_seq_client_info_free(cinfo);
+                snd_seq_port_info_free(pinfo);
+                snd_seq_close(seq);
+                return 1;
+            }
+            count++;
+        }
+    }
+
+    snd_seq_client_info_free(cinfo);
+    snd_seq_port_info_free(pinfo);
+    snd_seq_close(seq);
+    return 0;
+}
+
+static inline UINT midiOutGetNumDevs(void) {
+    UINT count = 0;
+    snd_seq_t *seq = NULL;
+    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+        return 0;
+    }
+    snd_seq_client_info_t *cinfo = NULL;
+    snd_seq_port_info_t *pinfo = NULL;
+    snd_seq_client_info_malloc(&cinfo);
+    snd_seq_port_info_malloc(&pinfo);
+    if (!cinfo || !pinfo) {
+        if (cinfo) snd_seq_client_info_free(cinfo);
+        if (pinfo) snd_seq_port_info_free(pinfo);
+        snd_seq_close(seq);
+        return 0;
+    }
+
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        const int cl = snd_seq_client_info_get_client(cinfo);
+        snd_seq_port_info_set_client(pinfo, cl);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if ((caps & SND_SEQ_PORT_CAP_WRITE) && (caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
+                count++;
+            }
+        }
+    }
+
+    snd_seq_client_info_free(cinfo);
+    snd_seq_port_info_free(pinfo);
+    snd_seq_close(seq);
+    return count;
+}
+#elif !defined(__APPLE__)
+static inline UINT midiOutGetNumDevs(void) { return 0; }
+#endif
+
+#if defined(__linux__)
+static inline MMRESULT midiOutGetDevCaps(UINT dev, MIDIOUTCAPS *caps, UINT) {
+    int client = -1;
+    int port = -1;
+    if (!caps) {
+        return MMSYSERR_ERROR;
+    }
+    caps->szPname[0] = '\0';
+    if (!zt_alsa_find_output_port_by_index(dev, &client, &port, caps->szPname, sizeof(caps->szPname))) {
+        return MMSYSERR_ERROR;
+    }
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutOpen(HMIDIOUT *h, UINT dev, DWORD_PTR, DWORD_PTR, DWORD) {
+    int dest_client = -1;
+    int dest_port = -1;
+    if (h) {
+        *h = 0;
+    }
+    if (!h || !zt_alsa_find_output_port_by_index(dev, &dest_client, &dest_port, NULL, 0)) {
+        return MIDIERR_NODEVICE;
+    }
+
+    zt_alsa_midi_out_handle *ctx = (zt_alsa_midi_out_handle *)calloc(1, sizeof(zt_alsa_midi_out_handle));
+    if (!ctx) {
+        return MMSYSERR_NOMEM;
+    }
+    if (snd_seq_open(&ctx->seq, "default", SND_SEQ_OPEN_OUTPUT, 0) < 0) {
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    snd_seq_set_client_name(ctx->seq, "zTracker");
+    ctx->src_port = snd_seq_create_simple_port(
+        ctx->seq,
+        "zTracker Out",
+        SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+        SND_SEQ_PORT_TYPE_APPLICATION
+    );
+    if (ctx->src_port < 0) {
+        snd_seq_close(ctx->seq);
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    if (snd_seq_connect_to(ctx->seq, ctx->src_port, dest_client, dest_port) < 0) {
+        snd_seq_close(ctx->seq);
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    ctx->dest_client = dest_client;
+    ctx->dest_port = dest_port;
+    *h = (HMIDIOUT)ctx;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutClose(HMIDIOUT h) {
+    zt_alsa_midi_out_handle *ctx = (zt_alsa_midi_out_handle *)h;
+    if (!ctx) {
+        return MMSYSERR_ERROR;
+    }
+    snd_seq_disconnect_to(ctx->seq, ctx->src_port, ctx->dest_client, ctx->dest_port);
+    snd_seq_close(ctx->seq);
+    free(ctx);
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutShortMsg(HMIDIOUT h, DWORD msg) {
+    zt_alsa_midi_out_handle *ctx = (zt_alsa_midi_out_handle *)h;
+    if (!ctx || !ctx->seq) {
+        return MMSYSERR_ERROR;
+    }
+
+    const unsigned char status = (unsigned char)(msg & 0xFF);
+    const unsigned char data1 = (unsigned char)((msg >> 8) & 0x7F);
+    const unsigned char data2 = (unsigned char)((msg >> 16) & 0x7F);
+    const unsigned char chan = (unsigned char)(status & 0x0F);
+    snd_seq_event_t ev;
+    snd_seq_ev_clear(&ev);
+    snd_seq_ev_set_source(&ev, ctx->src_port);
+    snd_seq_ev_set_subs(&ev);
+    snd_seq_ev_set_direct(&ev);
+
+    switch (status & 0xF0) {
+        case 0x80: snd_seq_ev_set_noteoff(&ev, chan, data1, data2); break;
+        case 0x90: snd_seq_ev_set_noteon(&ev, chan, data1, data2); break;
+        case 0xA0: snd_seq_ev_set_keypress(&ev, chan, data1, data2); break;
+        case 0xB0: snd_seq_ev_set_controller(&ev, chan, data1, data2); break;
+        case 0xC0: snd_seq_ev_set_pgmchange(&ev, chan, data1); break;
+        case 0xD0: snd_seq_ev_set_chanpress(&ev, chan, data1); break;
+        case 0xE0: {
+            const int bend = ((int)data1 | ((int)data2 << 7)) - 8192;
+            snd_seq_ev_set_pitchbend(&ev, chan, bend);
+            break;
+        }
+        default:
+            if (status == 0xF8) ev.type = SND_SEQ_EVENT_CLOCK;
+            else if (status == 0xFA) ev.type = SND_SEQ_EVENT_START;
+            else if (status == 0xFB) ev.type = SND_SEQ_EVENT_CONTINUE;
+            else if (status == 0xFC) ev.type = SND_SEQ_EVENT_STOP;
+            else return MMSYSERR_NOERROR;
+            break;
+    }
+
+    if (snd_seq_event_output_direct(ctx->seq, &ev) < 0) {
+        return MMSYSERR_ERROR;
+    }
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_NOERROR; }
+#elif defined(__APPLE__)
+typedef void (CALLBACK *zt_midi_in_callback_fn)(HMIDIIN, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+
+typedef struct zt_coremidi_out_handle {
+    MIDIClientRef client;
+    MIDIPortRef out_port;
+    MIDIEndpointRef endpoint;
+} zt_coremidi_out_handle;
+
+typedef struct zt_coremidi_in_handle {
+    MIDIClientRef client;
+    MIDIPortRef in_port;
+    MIDIEndpointRef endpoint;
+    zt_midi_in_callback_fn callback;
+    DWORD_PTR instance;
+    int started;
+    unsigned char running_status;
+} zt_coremidi_in_handle;
+
+static inline int zt_coremidi_endpoint_name(MIDIEndpointRef endpoint, char *name, size_t name_len) {
+    if (!name || name_len == 0 || endpoint == 0) {
+        return 0;
+    }
+    name[0] = '\0';
+
+    CFStringRef cf_name = NULL;
+    OSStatus err = MIDIObjectGetStringProperty(endpoint, kMIDIPropertyDisplayName, &cf_name);
+    if (err != noErr || !cf_name) {
+        err = MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, &cf_name);
+    }
+    if (err != noErr || !cf_name) {
+        snprintf(name, name_len, "CoreMIDI");
+        name[name_len - 1] = '\0';
+        return 0;
+    }
+    if (!CFStringGetCString(cf_name, name, (CFIndex)name_len, kCFStringEncodingUTF8)) {
+        snprintf(name, name_len, "CoreMIDI");
+        name[name_len - 1] = '\0';
+    }
+    CFRelease(cf_name);
+    return 1;
+}
+
+static inline UINT midiOutGetNumDevs(void) {
+    return (UINT)MIDIGetNumberOfDestinations();
+}
+
+static inline MMRESULT midiOutGetDevCaps(UINT dev, MIDIOUTCAPS *caps, UINT) {
+    if (!caps) {
+        return MMSYSERR_ERROR;
+    }
+    caps->szPname[0] = '\0';
+    MIDIEndpointRef endpoint = MIDIGetDestination((ItemCount)dev);
+    if (endpoint == 0) {
+        return MMSYSERR_ERROR;
+    }
+    zt_coremidi_endpoint_name(endpoint, caps->szPname, sizeof(caps->szPname));
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutOpen(HMIDIOUT *h, UINT dev, DWORD_PTR, DWORD_PTR, DWORD) {
+    if (h) {
+        *h = 0;
+    }
+    if (!h) {
+        return MMSYSERR_ERROR;
+    }
+
+    MIDIEndpointRef endpoint = MIDIGetDestination((ItemCount)dev);
+    if (endpoint == 0) {
+        return MIDIERR_NODEVICE;
+    }
+
+    zt_coremidi_out_handle *ctx = (zt_coremidi_out_handle *)calloc(1, sizeof(zt_coremidi_out_handle));
+    if (!ctx) {
+        return MMSYSERR_NOMEM;
+    }
+
+    if (MIDIClientCreate(CFSTR("zTracker"), NULL, NULL, &ctx->client) != noErr) {
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    if (MIDIOutputPortCreate(ctx->client, CFSTR("zTracker Out"), &ctx->out_port) != noErr) {
+        MIDIClientDispose(ctx->client);
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+
+    ctx->endpoint = endpoint;
+    *h = (HMIDIOUT)ctx;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutClose(HMIDIOUT h) {
+    zt_coremidi_out_handle *ctx = (zt_coremidi_out_handle *)h;
+    if (!ctx) {
+        return MMSYSERR_ERROR;
+    }
+    if (ctx->out_port) {
+        MIDIPortDispose(ctx->out_port);
+    }
+    if (ctx->client) {
+        MIDIClientDispose(ctx->client);
+    }
+    free(ctx);
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiOutShortMsg(HMIDIOUT h, DWORD msg) {
+    zt_coremidi_out_handle *ctx = (zt_coremidi_out_handle *)h;
+    if (!ctx || !ctx->out_port || !ctx->endpoint) {
+        return MMSYSERR_ERROR;
+    }
+
+    const unsigned char status = (unsigned char)(msg & 0xFF);
+    const unsigned char data1 = (unsigned char)((msg >> 8) & 0x7F);
+    const unsigned char data2 = (unsigned char)((msg >> 16) & 0x7F);
+    const int len = zt_midi_message_length(status);
+    if (len <= 0) {
+        return MMSYSERR_NOERROR;
+    }
+
+    unsigned char bytes[3];
+    bytes[0] = status;
+    bytes[1] = data1;
+    bytes[2] = data2;
+
+    MIDIPacketList packet_list;
+    MIDIPacket *packet = MIDIPacketListInit(&packet_list);
+    packet = MIDIPacketListAdd(&packet_list, sizeof(packet_list), packet, 0, (UInt16)len, bytes);
+    if (!packet) {
+        return MMSYSERR_ERROR;
+    }
+
+    return MIDISend(ctx->out_port, ctx->endpoint, &packet_list) == noErr ? MMSYSERR_NOERROR : MMSYSERR_ERROR;
+}
+
+static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_NOERROR; }
+
+static inline void zt_coremidi_emit_data(zt_coremidi_in_handle *ctx, unsigned int packed_msg) {
+    if (!ctx || !ctx->callback) {
+        return;
+    }
+    ctx->callback((HMIDIIN)ctx, MIM_DATA, ctx->instance, (DWORD_PTR)packed_msg, 0);
+}
+
+static inline void zt_coremidi_read_proc(const MIDIPacketList *packet_list, void *read_proc_ref_con, void *) {
+    zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)read_proc_ref_con;
+    if (!ctx || !packet_list) {
+        return;
+    }
+
+    const MIDIPacket *packet = &packet_list->packet[0];
+    for (UInt32 p = 0; p < packet_list->numPackets; ++p) {
+        const unsigned char *data = packet->data;
+        UInt16 i = 0;
+        while (i < packet->length) {
+            unsigned char b = data[i];
+            if ((b & 0x80U) != 0U) {
+                if (b < 0xF0) {
+                    ctx->running_status = b;
+                } else if (b != 0xF7) {
+                    ctx->running_status = 0;
+                }
+
+                int len = zt_midi_message_length(b);
+                if (len <= 0 || i + (UInt16)len > packet->length) {
+                    i++;
+                    continue;
+                }
+                unsigned int msg = (unsigned int)b;
+                if (len > 1) {
+                    msg |= ((unsigned int)(data[i + 1] & 0x7F)) << 8;
+                }
+                if (len > 2) {
+                    msg |= ((unsigned int)(data[i + 2] & 0x7F)) << 16;
+                }
+                zt_coremidi_emit_data(ctx, msg);
+                i = (UInt16)(i + len);
+                continue;
+            }
+
+            if (ctx->running_status != 0) {
+                int len = zt_midi_message_length(ctx->running_status);
+                if (len == 2 && i < packet->length) {
+                    unsigned int msg = (unsigned int)ctx->running_status |
+                                       ((unsigned int)(data[i] & 0x7F) << 8);
+                    zt_coremidi_emit_data(ctx, msg);
+                    i++;
+                    continue;
+                }
+                if (len == 3 && i + 1 < packet->length) {
+                    unsigned int msg = (unsigned int)ctx->running_status |
+                                       ((unsigned int)(data[i] & 0x7F) << 8) |
+                                       ((unsigned int)(data[i + 1] & 0x7F) << 16);
+                    zt_coremidi_emit_data(ctx, msg);
+                    i += 2;
+                    continue;
+                }
+            }
+            i++;
+        }
+        packet = MIDIPacketNext(packet);
+    }
+}
+
+static inline UINT midiInGetNumDevs(void) {
+    return (UINT)MIDIGetNumberOfSources();
+}
+
+static inline MMRESULT midiInGetDevCaps(UINT dev, MIDIINCAPS *caps, UINT) {
+    if (!caps) {
+        return MMSYSERR_ERROR;
+    }
+    caps->szPname[0] = '\0';
+    MIDIEndpointRef endpoint = MIDIGetSource((ItemCount)dev);
+    if (endpoint == 0) {
+        return MMSYSERR_ERROR;
+    }
+    zt_coremidi_endpoint_name(endpoint, caps->szPname, sizeof(caps->szPname));
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInOpen(HMIDIIN *h, UINT dev, DWORD_PTR callback, DWORD_PTR instance, DWORD flags) {
+    if (h) {
+        *h = 0;
+    }
+    if (!h) {
+        return MMSYSERR_ERROR;
+    }
+    if ((flags & CALLBACK_FUNCTION) == 0) {
+        return MMSYSERR_ERROR;
+    }
+
+    MIDIEndpointRef endpoint = MIDIGetSource((ItemCount)dev);
+    if (endpoint == 0) {
+        return MIDIERR_NODEVICE;
+    }
+
+    zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)calloc(1, sizeof(zt_coremidi_in_handle));
+    if (!ctx) {
+        return MMSYSERR_NOMEM;
+    }
+
+    if (MIDIClientCreate(CFSTR("zTracker In"), NULL, NULL, &ctx->client) != noErr) {
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    if (MIDIInputPortCreate(ctx->client, CFSTR("zTracker Input"), zt_coremidi_read_proc, ctx, &ctx->in_port) != noErr) {
+        MIDIClientDispose(ctx->client);
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+
+    ctx->endpoint = endpoint;
+    ctx->callback = (zt_midi_in_callback_fn)callback;
+    ctx->instance = instance;
+    ctx->started = 0;
+    ctx->running_status = 0;
+    *h = (HMIDIIN)ctx;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInClose(HMIDIIN h) {
+    zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)h;
+    if (!ctx) {
+        return MMSYSERR_ERROR;
+    }
+
+    if (ctx->started && ctx->in_port && ctx->endpoint) {
+        (void)MIDIPortDisconnectSource(ctx->in_port, ctx->endpoint);
+        ctx->started = 0;
+    }
+    if (ctx->callback) {
+        ctx->callback(h, MIM_CLOSE, ctx->instance, 0, 0);
+    }
+    if (ctx->in_port) {
+        MIDIPortDispose(ctx->in_port);
+    }
+    if (ctx->client) {
+        MIDIClientDispose(ctx->client);
+    }
+    free(ctx);
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInPrepareHeader(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_NOERROR; }
+static inline MMRESULT midiInUnprepareHeader(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_NOERROR; }
+static inline MMRESULT midiInAddBuffer(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_NOERROR; }
+
+static inline MMRESULT midiInStart(HMIDIIN h) {
+    zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)h;
+    if (!ctx || !ctx->in_port || !ctx->endpoint) {
+        return MMSYSERR_ERROR;
+    }
+    if (!ctx->started) {
+        if (MIDIPortConnectSource(ctx->in_port, ctx->endpoint, NULL) != noErr) {
+            return MMSYSERR_ERROR;
+        }
+        ctx->started = 1;
+        if (ctx->callback) {
+            ctx->callback(h, MIM_OPEN, ctx->instance, 0, 0);
+        }
+    }
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInStop(HMIDIIN h) {
+    zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)h;
+    if (!ctx) {
+        return MMSYSERR_ERROR;
+    }
+    if (ctx->started && ctx->in_port && ctx->endpoint) {
+        if (MIDIPortDisconnectSource(ctx->in_port, ctx->endpoint) != noErr) {
+            return MMSYSERR_ERROR;
+        }
+        ctx->started = 0;
+    }
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInReset(HMIDIIN h) {
+    zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)h;
+    if (!ctx) {
+        return MMSYSERR_ERROR;
+    }
+    ctx->running_status = 0;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInGetErrorText(MMRESULT, char *buffer, UINT size) {
+    if (buffer && size > 0) {
+        snprintf(buffer, size, "CoreMIDI error");
+        buffer[size - 1] = '\0';
+    }
+    return MMSYSERR_NOERROR;
+}
+#else
+static inline MMRESULT midiOutGetDevCaps(UINT, MIDIOUTCAPS *caps, UINT) {
+    if (caps) {
+        caps->szPname[0] = '\0';
+    }
+    return MMSYSERR_ERROR;
+}
+static inline MMRESULT midiOutOpen(HMIDIOUT *h, UINT, DWORD_PTR, DWORD_PTR, DWORD) {
+    if (h) {
+        *h = 0;
+    }
+    return MMSYSERR_ERROR;
+}
+static inline MMRESULT midiOutClose(HMIDIOUT) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiOutShortMsg(HMIDIOUT, DWORD) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_ERROR; }
+#endif
+
+#if !defined(__APPLE__)
+static inline UINT midiInGetNumDevs(void) { return 0; }
+static inline MMRESULT midiInGetDevCaps(UINT, MIDIINCAPS *caps, UINT) {
+    if (caps) {
+        caps->szPname[0] = '\0';
+    }
+    return MMSYSERR_ERROR;
+}
+static inline MMRESULT midiInOpen(HMIDIIN *h, UINT, DWORD_PTR, DWORD_PTR, DWORD) {
+    if (h) {
+        *h = 0;
+    }
+    return MMSYSERR_ERROR;
+}
+static inline MMRESULT midiInClose(HMIDIIN) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInPrepareHeader(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInUnprepareHeader(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInAddBuffer(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInStart(HMIDIIN) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInStop(HMIDIIN) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInReset(HMIDIIN) { return MMSYSERR_ERROR; }
+static inline MMRESULT midiInGetErrorText(MMRESULT, char *buffer, UINT size) {
+    if (buffer && size > 0) {
+        buffer[0] = '\0';
+    }
+    return MMSYSERR_ERROR;
+}
+#endif
+
+static inline MMRESULT timeGetDevCaps(TIMECAPS *tc, UINT) {
+    if (tc) {
+        tc->wPeriodMin = 1;
+        tc->wPeriodMax = 16;
+    }
+    return TIMERR_NOERROR;
+}
+static inline MMRESULT timeBeginPeriod(UINT) { return TIMERR_NOERROR; }
+static inline MMRESULT timeEndPeriod(UINT) { return TIMERR_NOERROR; }
+static inline UINT timeSetEvent(UINT, UINT, LPTIMECALLBACK, DWORD_PTR, UINT) { return 1; }
+static inline MMRESULT timeKillEvent(UINT) { return TIMERR_NOERROR; }
+
+#endif
+
+#endif
