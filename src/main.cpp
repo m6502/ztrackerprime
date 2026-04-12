@@ -2722,6 +2722,7 @@ int main(int argc, char *argv[])
       }
     }
     zt_directory = strdup("");
+    if (!cur_dir) cur_dir = (char*)malloc(256);
     GetCurrentDirectory(256, (char*)cur_dir);
 #elif defined(_WIN32)
     const char pathsep = '\\';
