@@ -2268,20 +2268,24 @@ int ListBox::update() {
         
         switch(key) {
             case DIK_TAB: ret = 1; act++; break;
-            case DIK_UP: 
+            case DIK_UP:
                 if (cur_sel>0)
                     cur_sel--;
                 else
                 if (y_start>0)
                     y_start--;
-                act++; 
+                else
+                    ret = -1;  // At top of list, pass focus to previous element
+                act++;
                 break;
-            case DIK_DOWN: 
+            case DIK_DOWN:
                 if (cur_sel+y_start<num_elements-1) {
                     if (cur_sel<ysize)
                         cur_sel++;
                     else
                         y_start++;
+                } else {
+                    ret = 1;  // At bottom of list, pass focus to next element
                 }
                 act++;
                 break;
