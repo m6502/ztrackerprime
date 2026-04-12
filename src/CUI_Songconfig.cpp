@@ -10,7 +10,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
     
 //    CommentEditor *ce;
 
-    int base_y = 13;
+    int base_y = TRACKS_ROW_Y;
 
     tpb_tab[0] = 2;
     tpb_tab[1] = 4;
@@ -182,7 +182,7 @@ void CUI_Songconfig::update()
 }
 
 void CUI_Songconfig::draw(Drawable *S) {
-    int base_y = 13;
+    int base_y = TRACKS_ROW_Y;
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);

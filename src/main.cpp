@@ -2536,11 +2536,13 @@ SDL_Surface *initSDL(void)
   
   
   if((SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)==-1)) {
-    
     sprintf(errstr,"Could not initialize SDL: %s.\n", SDL_GetError());
     MessageBox(NULL,errstr,"Error",MB_ICONERROR | MB_OK);
     return(NULL);
   }
+
+  // Enable key repeat so holding cursor keys works on all platforms.
+  SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 
 
 #ifdef __DESACTIVADO_HASTA_ACTUALIZAR_SDL
