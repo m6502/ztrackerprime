@@ -3137,7 +3137,19 @@ void CUI_Patterneditor::draw(Drawable *S)
     o=0;
     
     draw_status_vars(S);
-    
+
+    // Show playback position at bottom of pattern area when playing
+    if (ztPlayer->playing) {
+        static char playinfo[128];
+        sprintf(playinfo, " Playing: Ord %03d  Pat %03d  Row %03d/%03d  BPM %d  TPB %d  Step %d ",
+            ztPlayer->playing_cur_order,
+            ztPlayer->playing_cur_pattern,
+            ztPlayer->playing_cur_row,
+            song->patterns[ztPlayer->playing_cur_pattern] ? song->patterns[ztPlayer->playing_cur_pattern]->length : 0,
+            song->bpm, song->tpb, cur_step);
+        print(row(1), col(CHARS_Y - 2), playinfo, COLORS.Data, S);
+    }
+
     printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
     
     switch(mode) {
