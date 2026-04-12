@@ -877,6 +877,7 @@ CUI_Patterneditor::~CUI_Patterneditor(void)
 void CUI_Patterneditor::enter(void)
 {
   need_refresh = 1;
+  clear = 1;
   cur_state = STATE_PEDIT;
   mousedrawing=0;
   //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
@@ -3126,12 +3127,11 @@ void CUI_Patterneditor::draw(Drawable *S)
   if (S->lock()==0) {
 
 
-    // Innecesario?
-    //if (clear) {
-    //
-    //  S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),0xFF0000FF/*COLORS.Background*/);
-    //  clear=0;
-    //}
+    if (clear) {
+
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),COLORS.Background);
+      clear=0;
+    }
 
     o=0;
     

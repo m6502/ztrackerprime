@@ -83,7 +83,7 @@ void CUI_Playsong::enter(void)
 //
 //
 void CUI_Playsong::leave(void) {
-
+    need_refresh = 1;
 }
 
 

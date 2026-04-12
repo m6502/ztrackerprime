@@ -74,7 +74,7 @@ void CUI_Help::update() {
     if (Keys.size()) {
         key = Keys.getkey();
         if (key == DIK_F1 || key == DIK_ESCAPE) {
-            switch_page(LastPage);
+            switch_page(UIP_Patterneditor);
         }
     }
 }
