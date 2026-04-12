@@ -4,6 +4,14 @@ All changes on top of m6502/ztrackerprime (last upstream commit: `dba2320`, Aug 
 
 ## Recent fixes (2026-04-12, post-initial-port)
 
+- **All pages aligned to TRACKS_ROW_Y** — System Config, Song Config, Instrument Editor content now starts at the same row as Pattern Editor
+- **Version string moved up** — HEADER_ROW changed from 2 to 1, centers properly in top bar
+- **SDL key repeat enabled** — holding cursor keys now repeats on all platforms (SDL_EnableKeyRepeat)
+- **F11/F12 title labels corrected** — Song Config says (F11), System Config says (F12)
+- **Screen bleed fixed** — switch_page() fills background, Pattern Editor clears on enter, Play Song triggers refresh on leave (#17)
+- **Help ESC goes to Pattern Editor** — no more garbled System Config view when pressing ESC from Help
+- **Pattern Editor uses full window height** — PATTERN_EDIT_ROWS computed dynamically from CHARS_Y, shows ~6 more rows (#15)
+- **ListBox cursor clamped on resize** — cursor stays visible when window shrinks (#13)
 - **macOS .app bundle** with icon (zt.icns), Info.plist, bundled zt.conf/skins/doc in Resources (#10)
 - **macOS startup crash fixed** — cur_dir was NULL when GetCurrentDirectory called during init
 - **Skin switching crash fixed** — guard against double-free of SDL surfaces via sdl12-compat

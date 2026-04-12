@@ -2199,6 +2199,7 @@ void CUI_Patterneditor::update()
           break;
         
         // -------------------------------------------
+        case DIK_BACK:   // Mac "delete" key (backspace) — same as Delete
         case DIK_DELETE:
 
           if (kstate == KS_CTRL) {
