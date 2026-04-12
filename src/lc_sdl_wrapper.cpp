@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -76,8 +76,10 @@
         free_surface_on_delete = free_surface;      
     }
     Drawable::~Drawable() {
-        if (surface && free_surface_on_delete)
+        if (surface && free_surface_on_delete) {
             SDL_FreeSurface(surface);
+            surface = NULL;
+        }
     }
 
     TColor* Drawable::getLine(int y) {
