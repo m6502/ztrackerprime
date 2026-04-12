@@ -31,31 +31,41 @@
  CTRL-1 => 0: Change the step-value in the pattern editor
  ALT-`      : Set previous note's length to distance between 
               note and current cursor position
- ScrollLock : Pattern-follow mode (cursor follows
-              playback)
+ ScrollLock : Follow playback toggle (cursor follows playback position)
+
+|L|%==|H|Pattern Operations|L|==%|U|
+
+ CTRL-SHIFT-G : Double Pattern (duplicate all rows, doubling length)
+ CTRL-SHIFT-H : Halve Pattern (keep every other row, halving length)
+ CTRL-SHIFT-D : Clone Pattern (copy to next empty pattern and jump)
+ CTRL-SHIFT-R : Reverse Selection (reverse order of rows in selected block)
+ CTRL-SHIFT-Down : Rotate Track Down (last row wraps to first)
+ CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
+ CTRL-F9      : Track Solo (mute all other tracks; repeat to unsolo all)
 
 |L|%==|H|Block Functions|L|==%|U|
 
  CTRL-B     : Marks the beginning of a select block.
  CTRL-E     : Marks the end of a select block.
- CTRL-L     : Select whole track, pressing it again will select the entire 
+ CTRL-L     : Select whole track, pressing it again will select the entire
               pattern.
  CTRL-U     : Unselect block
  ALT-D      : Select one beat (press multiple times to select next beats)
- 
+
  CTRL-C     : Copy the selected block to the clipboard.
- CTRL-P     : Copy pattern, paste to next empty pattern, 
+ CTRL-P     : Copy pattern, paste to next empty pattern,
               and jump to new pattern
  CTRL-V     : Paste the contents of the clipboard to the cursor location.
  CTRL-O     : Overwrite paste
- CTRL-M     : Merge paste the contents of the clipboard with the contents 
+ CTRL-M     : Merge paste the contents of the clipboard with the contents
               of the location you're pasting to.
  CTRL-X     : Cut the selected block. (remove and copy to clipboard)
  CTRL-Z     : Clear block (hold this one)
- 
+
  CTRL-N     : Set length of first row of block to length of block
  CTRL-W     : Clear unused volumes
- CTRL-I     : Interpolate effect data thru block
+ CTRL-I     : Interpolate values through selection (note, vol, or fx param,
+              depending on which column the cursor is on)
  CTRL-T     : Set all effect and effect data fields of block to same
               value as first row in block
  CTRL-K     : Interpolate volume (block)
@@ -65,7 +75,7 @@
  CTRL-A     : Popup Naturalizing window (1-100%)
  CTRL-[     : Decrease all volumes in block by 8
  CTRL-]     : Increase all volumes in block by 8
- CTRL-`     : Set all note's lengths in selection to distance 
+ CTRL-`     : Set all note's lengths in selection to distance
               between note and next note
   ALT-S     : Set instruments in block to current instrument
  SHIFT-move : Block selection (movements are arrows and PgUp/PgDn)
@@ -106,7 +116,7 @@
  SHIFT-F7   : Play song from the current order
  F8         : Stop playback
  F9         : Panic (all midi-off/SHIFT-F9 performs a hard driver panic)
- CTRL-F9    : Load Song...
+ CTRL-F9    : Track Solo (pattern editor)
  CTRL-F10   : Save Song As...
  F11        : Song Configuration and Order editor
  F12        : System Configuration (midi dev select)

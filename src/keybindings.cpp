@@ -62,6 +62,13 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "step_8",               // ZT_ACTION_STEP_8
     "step_9",               // ZT_ACTION_STEP_9
     "switch_lua_console",   // ZT_ACTION_SWITCH_LUA_CONSOLE
+    "halve_pattern",        // ZT_ACTION_HALVE_PATTERN
+    "interpolate_selection",// ZT_ACTION_INTERPOLATE_SELECTION
+    "follow_playback",      // ZT_ACTION_FOLLOW_PLAYBACK
+    "track_solo",           // ZT_ACTION_TRACK_SOLO
+    "reverse_selection",    // ZT_ACTION_REVERSE_SELECTION
+    "rotate_down",          // ZT_ACTION_ROTATE_DOWN
+    "rotate_up",            // ZT_ACTION_ROTATE_UP
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -127,6 +134,15 @@ void KeyBindings::setDefaults()
 
     // Lua console — Ctrl+Alt+L (avoids collision with Ctrl+L load shortcut)
     bindings[ZT_ACTION_SWITCH_LUA_CONSOLE] = { DIK_L,  KS_CTRL | KS_ALT };
+
+    // New Paketti/IT features
+    bindings[ZT_ACTION_HALVE_PATTERN]        = { DIK_H,        KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_INTERPOLATE_SELECTION]= { DIK_I,        KS_CTRL };
+    bindings[ZT_ACTION_FOLLOW_PLAYBACK]      = { DIK_SCROLL,   0 };
+    bindings[ZT_ACTION_TRACK_SOLO]           = { DIK_F9,       KS_CTRL };
+    bindings[ZT_ACTION_REVERSE_SELECTION]    = { DIK_R,        KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_ROTATE_DOWN]          = { DIK_DOWN,     KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_ROTATE_UP]            = { DIK_UP,       KS_CTRL | KS_SHIFT };
 }
 
 // -----------------------------------------------------------------------

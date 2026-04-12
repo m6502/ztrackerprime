@@ -853,6 +853,13 @@ void update_status(Drawable *S)
     }
 
     statusmsg = szStatmsg;
+
+    // --- Follow Playback (Scroll Lock) ---
+    if (bScrollLock && cur_state == STATE_PEDIT) {
+      cur_edit_pattern = ztPlayer->playing_cur_pattern;
+      cur_edit_row     = ztPlayer->playing_cur_row;
+      need_refresh++;
+    }
   }
 
   if (S->lock() == 0) {
@@ -1283,6 +1290,12 @@ void global_keys(Drawable *S)
                 case ZT_ACTION_SWITCH_LUA_CONSOLE:
                     command = CMD_SWITCH_LUA_CONSOLE;
                     break;
+                case ZT_ACTION_FOLLOW_PLAYBACK:
+                    bScrollLock = !bScrollLock;
+                    statusmsg = bScrollLock ? "Follow playback ON" : "Follow playback OFF";
+                    status_change = 1; need_refresh++;
+                    key = Keys.getkey();
+                    break;
                 default:
                     break;
             }
@@ -1324,6 +1337,8 @@ void global_keys(Drawable *S)
                     bScrollLock = 0;
                 else
                     bScrollLock = 1;
+                statusmsg = bScrollLock ? "Follow playback ON" : "Follow playback OFF";
+                status_change = 1; need_refresh++;
                 break;
             case DIK_Q:
                 if (kstate & KS_ALT && kstate & KS_CTRL) {

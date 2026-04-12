@@ -1682,6 +1682,167 @@ void CUI_Patterneditor::update()
           statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
         }
 
+        // --- Halve Pattern: Ctrl+Shift+H (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_HALVE_PATTERN) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          int new_len = pat_len / 2;
+          if (new_len >= 32) {
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              for (int r = 0; r < new_len; r++) {
+                event *ev = trk->get_event(r * 2);
+                if (ev) trk->update_event(r, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
+                else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+              }
+            }
+            song->patterns[cur_edit_pattern]->resize(new_len);
+            if (cur_edit_row >= new_len) cur_edit_row = new_len - 1;
+            sprintf(szStatmsg, "Pattern halved: %d -> %d rows", pat_len, new_len);
+          } else {
+            sprintf(szStatmsg, "Cannot halve: minimum pattern length is 32 rows");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Interpolate Selection: Ctrl+I (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_INTERPOLATE_SELECTION) {
+          if (selected) {
+            UNDO_SAVE();
+            int rows = select_row_end - select_row_start;
+            if (rows >= 1) {
+              for (int t = select_track_start; t <= select_track_end; t++) {
+                track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+                if (!trk) continue;
+                event *e_start = trk->get_event(select_row_start);
+                event *e_end   = trk->get_event(select_row_end);
+                if (!e_start || !e_end) continue;
+                int ctype = edit_cols[cur_edit_col].type;
+                int v0 = 0, v1 = 0;
+                if (ctype == T_VOL) {
+                  v0 = (e_start->vol < 0x80) ? e_start->vol : 0;
+                  v1 = (e_end->vol   < 0x80) ? e_end->vol   : 0;
+                } else if (ctype == T_FXP) {
+                  v0 = e_start->effect_data;
+                  v1 = e_end->effect_data;
+                } else if (ctype == T_NOTE) {
+                  v0 = (e_start->note < 0x80) ? e_start->note : -1;
+                  v1 = (e_end->note   < 0x80) ? e_end->note   : -1;
+                } else {
+                  continue; // unsupported column type
+                }
+                if (v0 < 0 || v1 < 0) continue;
+                for (int r = select_row_start + 1; r < select_row_end; r++) {
+                  int pos = r - select_row_start;
+                  int val = v0 + (v1 - v0) * pos / rows;
+                  if (ctype == T_VOL)
+                    trk->update_event(r, -1, -1, val, -1, -1, -1);
+                  else if (ctype == T_FXP)
+                    trk->update_event(r, -1, -1, -1, -1, -1, val);
+                  else if (ctype == T_NOTE)
+                    trk->update_event(r, val, -1, -1, -1, -1, -1);
+                }
+              }
+              statusmsg = "Interpolated selection";
+            } else {
+              statusmsg = "Need at least 2 rows selected to interpolate";
+            }
+          } else {
+            statusmsg = "No selection";
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Track Solo: Ctrl+F9 (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_TRACK_SOLO) {
+          // Check if all other tracks are already muted (i.e. already soloed)
+          bool all_others_muted = true;
+          for (int t = 0; t < MAX_TRACKS; t++) {
+            if (t != cur_edit_track && !song->track_mute[t]) {
+              all_others_muted = false;
+              break;
+            }
+          }
+          if (all_others_muted) {
+            // Unmute all
+            for (int t = 0; t < MAX_TRACKS; t++) { unmutetrack(t); }
+            statusmsg = "Unsolo: all tracks unmuted";
+          } else {
+            // Mute all except current track
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              if (t == cur_edit_track) { unmutetrack(t); }
+              else                     { mutetrack(t);   }
+            }
+            sprintf(szStatmsg, "Solo track %d", cur_edit_track + 1);
+            statusmsg = szStatmsg;
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Reverse Selection: Ctrl+Shift+R (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_REVERSE_SELECTION) {
+          if (selected) {
+            UNDO_SAVE();
+            int rlen = select_row_end - select_row_start + 1;
+            for (int t = select_track_start; t <= select_track_end; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              int lo = select_row_start;
+              int hi = select_row_end;
+              while (lo < hi) {
+                event *ea = trk->get_event(lo);
+                event *eb = trk->get_event(hi);
+                event tmp_a = ea ? *ea : blank_event;
+                event tmp_b = eb ? *eb : blank_event;
+                trk->update_event(lo, tmp_b.note, tmp_b.inst, tmp_b.vol, tmp_b.length, tmp_b.effect, tmp_b.effect_data);
+                trk->update_event(hi, tmp_a.note, tmp_a.inst, tmp_a.vol, tmp_a.length, tmp_a.effect, tmp_a.effect_data);
+                lo++; hi--;
+              }
+            }
+            statusmsg = "Selection reversed";
+          } else {
+            statusmsg = "No selection";
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Rotate Track Down: Ctrl+Shift+Down (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_ROTATE_DOWN) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          track *trk = song->patterns[cur_edit_pattern]->tracks[cur_edit_track];
+          if (trk && pat_len > 1) {
+            event *last = trk->get_event(pat_len - 1);
+            event saved = last ? *last : blank_event;
+            for (int r = pat_len - 1; r > 0; r--) {
+              event *ep = trk->get_event(r - 1);
+              if (ep) trk->update_event(r, ep->note, ep->inst, ep->vol, ep->length, ep->effect, ep->effect_data);
+              else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+            }
+            trk->update_event(0, saved.note, saved.inst, saved.vol, saved.length, saved.effect, saved.effect_data);
+          }
+          statusmsg = "Rotated track down"; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // --- Rotate Track Up: Ctrl+Shift+Up (configurable) ---
+        if (g_keybindings.match(key, kstate) == ZT_ACTION_ROTATE_UP) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          track *trk = song->patterns[cur_edit_pattern]->tracks[cur_edit_track];
+          if (trk && pat_len > 1) {
+            event *first = trk->get_event(0);
+            event saved = first ? *first : blank_event;
+            for (int r = 0; r < pat_len - 1; r++) {
+              event *ep = trk->get_event(r + 1);
+              if (ep) trk->update_event(r, ep->note, ep->inst, ep->vol, ep->length, ep->effect, ep->effect_data);
+              else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+            }
+            trk->update_event(pat_len - 1, saved.note, saved.inst, saved.vol, saved.length, saved.effect, saved.effect_data);
+          }
+          statusmsg = "Rotated track up"; status_change = 1; need_refresh++; key = 0;
+        }
+
         // --- Remappable pattern-editor keybindings (step + octave) ---
         bool pe_kb_handled = false;
         {
