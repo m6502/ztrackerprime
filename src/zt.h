@@ -13,6 +13,14 @@
 #include <math.h>
 #include <iostream>
 
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+  #include <mmsystem.h>
+#endif
+
+#include "platform/platform.h"
+
 #include <sdl.h>
 #include <SDL_main.h>
 //#include "sdl_mixer.h"  // this is for audio testing
@@ -571,8 +579,8 @@ extern bool bMouseIsDown;
     extern BarGraph *playbuff1_bg,*playbuff2_bg,*keybuff_bg;
 #endif
 
-int lock_mutex(HANDLE hMutex, int timeout = 2000L);
-int unlock_mutex(HANDLE hMutex);
+int lock_mutex(std::timed_mutex &mtx, int timeout = 2000L);
+int unlock_mutex(std::timed_mutex &mtx);
 
 void reset_editor(void);
 
@@ -721,7 +729,7 @@ extern void do_save(void);
 extern int already_changed_default_directory;
 void draw_status_vars(Drawable *S); 
 void begin_save(void);
-extern LPSTR cur_dir;
+extern char* cur_dir;
 
 extern int pe_modification;
 extern Drawable * pe_buf;

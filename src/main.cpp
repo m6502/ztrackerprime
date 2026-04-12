@@ -113,7 +113,7 @@ ResourceStream *Skin = NULL;
 BitmapCache *BM_Cache = NULL;
 */
 
-LPSTR cur_dir = NULL;
+char* cur_dir = NULL;
 
 int file_changed = 0;
 char *file_directory;
@@ -305,24 +305,21 @@ void reset_editor(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int lock_mutex(HANDLE hMutex, int timeout) 
+int lock_mutex(std::timed_mutex &mtx, int timeout)
 {
-    int result;
-    result = WaitForSingleObject(hMutex, timeout);
-    if (result == WAIT_OBJECT_0)
+    if (mtx.try_lock_for(std::chrono::milliseconds(timeout)))
         return 1;
     return 0;
 }
 
 
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-int unlock_mutex(HANDLE hMutex) 
+int unlock_mutex(std::timed_mutex &mtx)
 {
-    return ReleaseMutex(hMutex);
+    mtx.unlock();
+    return 1;
 }
 
 
@@ -859,7 +856,7 @@ void update_status(Drawable *S)
 
       if (cur_edit_pattern == ztPlayer->playing_cur_pattern) {
 
-        //<Manu> Hecho así este bucle pintaba números de línea sin comprobar cuántas tenía el pattern actual
+        //<Manu> Hecho asï¿½ este bucle pintaba nï¿½meros de lï¿½nea sin comprobar cuï¿½ntas tenï¿½a el pattern actual
 //        for(i = cur_edit_row_disp; i < (cur_edit_row_disp + PATTERN_EDIT_ROWS); i++) {
 
         //int max_row = song->patterns[cur_edit_pattern]->length ;
@@ -2359,7 +2356,7 @@ int action(Screen *S)
             if (S->lock()==0) {
 
                 // Clean UI page background
-                // <Manu> Creo que este clean es mejorable y según cómo redundante
+                // <Manu> Creo que este clean es mejorable y segï¿½n cï¿½mo redundante
                 S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X-CHARACTER_SIZE_X,INTERNAL_RESOLUTION_Y - (480-424),/*0x00FF00*/COLORS.Background);
                 S->unlock();
                 
@@ -2878,7 +2875,7 @@ int main(int argc, char *argv[])
 
 
 
-    // <Manu> Hay un problema de orden de cosas aquí, de momento hacemos un pequeño parche pero habrá que mirar cómo hacerlo bien
+    // <Manu> Hay un problema de orden de cosas aquï¿½, de momento hacemos un pequeï¿½o parche pero habrï¿½ que mirar cï¿½mo hacerlo bien
     static int next_frame_redraw_all = 0 ;
 
     if(next_frame_redraw_all) {

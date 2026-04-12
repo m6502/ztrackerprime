@@ -3,11 +3,11 @@
 
 #include "midi-io.h"
 
+class RtMidiOut; // forward declaration — avoids pulling RtMidi.h into every TU
 
 class MidiOutputDevice : public OutputDevice {
     public:
-        HMIDIOUT handle;
-        MIDIOUTCAPS caps;
+        RtMidiOut *rtMidiOut;
         int devNum;
         int reverse_bank_select;
          MidiOutputDevice(int devIndex);
@@ -24,26 +24,13 @@ class MidiOutputDevice : public OutputDevice {
         virtual void progChange(int program, int bank, unsigned char chan);
         virtual void sendCC(unsigned char cc, unsigned char value,unsigned char chan);
 
-
-	private:
-
-		virtual void midiOutMsg(unsigned char status, unsigned char data1, unsigned char data2) {
-			if (this->opened)
-//				if (status == m_runningStatus) {
-//					::midiOutShortMsg( handle, (data1 + (data2<<8)));
-//				} else {
-					::midiOutShortMsg( handle, (status + (data1<<8) + (data2<<16)) );
-//					this->m_runningStatus = status;
-//				}
-		}
-
-		unsigned char m_runningStatus;
-
+    private:
+        void midiOutMsg(unsigned char status, unsigned char data1, unsigned char data2);
+        unsigned char m_runningStatus;
 };
 
 
-
-#ifdef _ENABLE_AUDIO    
+#ifdef _ENABLE_AUDIO
 
 class TestToneOutputDevice : public AudioOutputDevice {
     public:

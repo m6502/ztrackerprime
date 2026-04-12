@@ -38,21 +38,21 @@
  *
  ******/
 #include "zt.h"
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 int mctr = 0;
 
-#define TARGET_RESOLUTION 1         // 1-millisecond target resolution
-
-void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, DWORD dw2);
-
 
 // ------------------------------------------------------------------------------------------------
-//
-//
-void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, DWORD dw2)
+// Portable player_callback — called periodically by the timer thread.
+// Replaces the Win32 CALLBACK that was invoked by timeSetEvent.
+// ------------------------------------------------------------------------------------------------
+static void player_callback_portable()
 {
-  if(!ztPlayer) return ;
-  if(!ztPlayer->playing) return ;
+  if(!ztPlayer) return;
+  if(!ztPlayer->playing) return;
 
   ztPlayer->counter += ztPlayer->wTimerRes*1000;
 
@@ -63,13 +63,8 @@ void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, 
       if (mctr >= 4) {
 
         if (g_midi_in_clocks_received) {
-        
           g_midi_in_clocks_received--;
           mctr = 0;
-        }
-        else {
-        
-          //goto skip ;
         }
       }
       else mctr++;
@@ -86,24 +81,41 @@ void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD dwUser, DWORD dw1, 
 
     if (ztPlayer->subtick_error >= 500) ztPlayer->subtick_add = 1000;
     else ztPlayer->subtick_add = 0;
-
-//skip: ;
-
   }
-} 
-
-
+}
 
 
 // ------------------------------------------------------------------------------------------------
-//
-//
-void counter_thread(void) {
+// Timer thread — replaces Win32 timeSetEvent periodic callback.
+// Fires player_callback_portable() at the configured interval.
+// ------------------------------------------------------------------------------------------------
+void player::timerThreadFunc(unsigned int intervalMs)
+{
+    using clock = std::chrono::steady_clock;
+    auto interval = std::chrono::milliseconds(intervalMs);
+    auto next_tick = clock::now() + interval;
+
+    while (timerRunning.load(std::memory_order_relaxed)) {
+        std::this_thread::sleep_until(next_tick);
+        player_callback_portable();
+        next_tick += interval;
+
+        // If we've fallen behind, catch up instead of queueing many rapid fires.
+        auto now = clock::now();
+        if (next_tick < now) next_tick = now + interval;
+    }
+}
+
+
+// ------------------------------------------------------------------------------------------------
+// Counter thread — prebuffers playback data.
+// Replaces the Win32 CreateThread + THREAD_PRIORITY_TIME_CRITICAL version.
+// ------------------------------------------------------------------------------------------------
+static void counter_thread_func() {
     int buf;
-    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_TIME_CRITICAL );
     while(1) {
          if (ztPlayer && ztPlayer->playing) {
-            buf = ztPlayer->cur_buf; 
+            buf = ztPlayer->cur_buf;
             if (buf) buf=0; else buf=1;
             if (ztPlayer->play_buffer[buf]->ready_to_play == 0) {
                 ztPlayer->playback(ztPlayer->play_buffer[buf],ztPlayer->prebuffer);
@@ -112,7 +124,6 @@ void counter_thread(void) {
         }
         SDL_Delay(1);
     }
-
 }
 
 
@@ -233,7 +244,10 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
 //  this->tpb = song->tpb; this->bpm = song->bpm;
     this->song = ztm;
     this->wTimerRes = res;
-    this->fillbuff = this->playing = this->counter = this->wTimerID = 0;
+    this->fillbuff = this->playing = this->counter = 0;
+    this->timerThread = nullptr;
+    this->timerRunning.store(false);
+    this->counterThread = nullptr;
 //  this->hr_timer = new hires_timer;
     this->playing_cur_row = 1;
     init();
@@ -257,31 +271,23 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
 //
 //
 player::~player(void) {
-    //this->edit_lock = 0;
     unlock_mutex(song->hEditMutex);
     this->stop_timer();
-//  delete this->hr_timer;
-    this->wTimerID = 0;
     delete this->play_buffer[1];
     delete this->play_buffer[0];
     delete[] this->noteoff_eventlist;
 }
 
 
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-UINT player::SetTimerCallback(UINT msInterval) { 
-    wTimerID = timeSetEvent(msInterval,TARGET_RESOLUTION,player_callback,0x0,TIME_PERIODIC);
-    if(!wTimerID)
-        return -1;
-    else
-        return 0;
-} 
-
-
+unsigned int player::SetTimerCallback(unsigned int msInterval) {
+    timerIntervalMs = msInterval;
+    timerRunning.store(true, std::memory_order_relaxed);
+    timerThread = new std::thread(&player::timerThreadFunc, this, msInterval);
+    return 0;
+}
 
 
 // ------------------------------------------------------------------------------------------------
@@ -289,20 +295,30 @@ UINT player::SetTimerCallback(UINT msInterval) {
 //
 int player::start_timer(void) {
     SetTimerCallback(wTimerRes);
-    hThread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)counter_thread,NULL,0,&iID);
+    counterThread = new std::thread(counter_thread_func);
     return 0;
 }
-
-
 
 
 // ------------------------------------------------------------------------------------------------
 //
 //
 int player::stop_timer(void) {
-    if (wTimerID) 
-        timeKillEvent(wTimerID);
-    TerminateThread(hThread,0);
+    // Stop the timer thread gracefully.
+    timerRunning.store(false, std::memory_order_relaxed);
+    if (timerThread && timerThread->joinable()) {
+        timerThread->join();
+    }
+    delete timerThread;
+    timerThread = nullptr;
+
+    // The counter thread runs forever — detach it (it checks ztPlayer->playing).
+    if (counterThread) {
+        counterThread->detach();
+        delete counterThread;
+        counterThread = nullptr;
+    }
+
     clear_noel();
     return 0;
 }
@@ -314,10 +330,10 @@ int player::stop_timer(void) {
 //
 //
 int player::init(void) {
-    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR)
-        return -1;
-    wTimerRes = std::min(std::max(tc.wPeriodMin, wTimerRes), tc.wPeriodMax);
-    timeBeginPeriod(wTimerRes); 
+    // Portable timer resolution — 1ms is the target, matching the old timeBeginPeriod(1).
+    // On modern systems std::chrono::steady_clock has sub-ms resolution.
+    wTimerRes = 1;  // 1ms timer resolution
+
     cur_row = 0;
     cur_pattern = 0;
     playmode = 0; //loop
@@ -325,7 +341,6 @@ int player::init(void) {
     this->bpm = song->bpm;
     set_speed();
     start_timer();
-//    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_HIGHEST );
     return 0;
 }
 

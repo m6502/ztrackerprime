@@ -1,14 +1,24 @@
 #ifndef _MIDI_DEVICE_H
 #define _MIDI_DEVICE_H
 
-#include <mmsystem.h>
+// No more #include <mmsystem.h> -- all MIDI goes through RtMidi now.
+// Portable error code definitions (matching the original Win32 values for zt.conf compat).
+#ifndef MIDIERR_NODEVICE
+#define MIDIERR_NODEVICE        68
+#endif
+#ifndef MMSYSERR_NOMEM
+#define MMSYSERR_NOMEM          7
+#endif
+#ifndef MMSYSERR_ALLOCATED
+#define MMSYSERR_ALLOCATED      4
+#endif
 
 #define NB_OFF    0x000000
 #define NB_ON     0x010000
 #define NB_MUTED  0x020000
 #define NB_RETRIG 0x040000
 
-#define MIDI_MSG( cmd, chan, data1, data2) ( (cmd+chan) + (data1<<8) + (data2<<16)) 
+#define MIDI_MSG( cmd, chan, data1, data2) ( (cmd+chan) + (data1<<8) + (data2<<16))
 
 extern int g_midi_in_clocks_received;
 
@@ -72,13 +82,13 @@ class OutputDevice {
         }
         virtual void hardpanic(void) {
         }
-        
+
         unsigned int notestates[128][16];
 
         void clear_notestates(void) {
             for(int i=0;i<128;i++)
                 for (int j=0;j<16;j++)
-                    this->notestates[i][j] = NB_OFF; 
+                    this->notestates[i][j] = NB_OFF;
         }
 
 
@@ -116,16 +126,15 @@ class midiOut {
         void set_bank_select(int dev, int bank_slecect);
         int get_bank_select(int dev);
 
-
         void set_alias(int dev, char *alias);
         const char *get_alias(int dev);
 
-        UINT AddDevice(int dev);
+        unsigned int AddDevice(int dev);
         int RemDevice(int dev);
         int QueryDevice(int dev); // 1 active 0 not active
         int GetNumOpenDevs(void);
         int GetDevID(int which);
-        
+
 
         void MixAudio(void *udata, Uint8 *stream, int len) {
             AudioOutputDevice *aod;
@@ -156,7 +165,7 @@ class midiOut {
         }
 
         inline void send(unsigned int dev,unsigned  int msg) {
-            if (dev>=numOuputDevices) 
+            if (dev>=numOuputDevices)
                 return;
             outputDevices[dev]->send(msg);
         }
@@ -166,8 +175,8 @@ class midiOut {
                 outputDevices[t->key]->send(msg);
                 t = t->next;
             }
-        } 
-        
+        }
+
         inline void noteOn(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol, unsigned char track, unsigned char muted, unsigned char flags = 0) {
             if (dev>=numOuputDevices) return;
             if (outputDevices[dev]->opened && !muted)
@@ -207,14 +216,14 @@ class midiOut {
         inline void clock(void) {
             sendGlobal(0xF8);
         }
-        
+
 
         inline void mute_track(unsigned char track) {
             unsigned char vol;
             int i,j, val;
             int flags = 0;
             intlist *t = devlist_head;
-            while(t) { 
+            while(t) {
                 for (i=0;i<128;i++) {
                     for (j=0;j<16;j++) {
                         val = outputDevices[t->key]->notestates[i][j];
@@ -237,7 +246,7 @@ class midiOut {
             unsigned char vol;
             int i,j;
             intlist *t = devlist_head;
-            while(t) { 
+            while(t) {
                 for (i=0;i<128;i++) {
                     for (j=0;j<16;j++) {
                         unsigned int ns = outputDevices[t->key]->notestates[i][j] & 0xFF00FF;
@@ -253,192 +262,24 @@ class midiOut {
             }
         }
 
-
-
-};
-/*
-class midiOutDevice {
-    public:
-        HMIDIOUT handle;
-        char *szName;
-        int devNum;
-        MIDIOUTCAPS caps;
-        int opened;     
-        int delay_ticks;
-        //int delay_ms;
-        
-        midiOutDevice(int i);
-        ~midiOutDevice(void);
-        
-        int open(void);
-        int close(void);
-        void clear_notestates(void);
-        void reset(void);
-        
-        
-        unsigned int notestates[128][16];
-
 };
 
-class midiOut {
-    public:
-        midiOutDevice *midiOutDev[MAX_MIDI_OUTS];
-        unsigned int numMidiDevs;
-        intlist *devlist_head;
-        midiOut();
-        ~midiOut();
-        UINT AddDevice(int dev);
-        int RemDevice(int dev);
-        int QueryDevice(int dev); // 1 active 0 not active
-        int GetNumOpenDevs(void);
-        int GetDevID(int which);
+// Forward declare RtMidiIn — full type only needed in midi-io.cpp
+class RtMidiIn;
 
-        void panic(void);
-        void hardpanic(void);
-        void set_delay_ticks(int dev, int ticks);
-        int get_delay_ticks(int dev);
-        
-        inline void send(unsigned int dev, int msg) {
-            if (dev>numMidiDevs) return;
-            if (midiOutDev[dev]->opened)
-                midiOutShortMsg(midiOutDev[dev]->handle,msg);
-        }
-        inline void sendGlobal(int msg) {
-            intlist *t = devlist_head;
-            while(t) {
-                midiOutShortMsg(midiOutDev[t->key]->handle,msg);
-                t = t->next;
-            }
-        }
-
-        inline void mute_track(unsigned char track) {
-            unsigned char vol;
-            int i,j, val;
-            int flags = 0;
-            intlist *t = devlist_head;
-            while(t) { 
-                for (i=0;i<128;i++) {
-                    for (j=0;j<16;j++) {
-                        val = midiOutDev[t->key]->notestates[i][j];
-                        flags = val & 0xFF0000;
-                        if ( ( (val & 0x0000FF) == track ) &&
-                             ( (flags) & NB_ON )
-                            ) {
-                            vol = (val & 0x00FF00)>>8;
-                            this->noteOff(t->key,i,j,0,0);
-                            flags |= NB_MUTED;
-                            midiOutDev[t->key]->notestates[i][j] = (vol<<8) + track + flags;
-                        }
-                    }
-                }
-                t = t->next;
-            }
-        }
-
-        inline void unmute_track(unsigned char track) {
-            unsigned char vol;
-            int i,j;
-            intlist *t = devlist_head;
-            while(t) { 
-                for (i=0;i<128;i++) {
-                    for (j=0;j<16;j++) {
-                        unsigned int ns = midiOutDev[t->key]->notestates[i][j] & 0xFF00FF;
-                        unsigned int fl = (track | NB_MUTED | NB_ON | NB_RETRIG);
-                        if (ns == fl) {
-                            vol = (midiOutDev[t->key]->notestates[i][j] & 0xFF00)>>8;
-                            this->noteOn(t->key,i,j,vol,track,0);
-                            midiOutDev[t->key]->notestates[i][j] = (vol<<8) | track | NB_ON | NB_RETRIG;
-                        }
-                    }
-                }
-                t = t->next;
-            }
-        }
-
-        inline void noteOn(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol, unsigned char track, unsigned char muted, unsigned char flags = 0) {
-            if (dev>=numMidiDevs) return;
-            if (midiOutDev[dev]->opened && !muted)
-                midiOutShortMsg(midiOutDev[dev]->handle,(0x90+(chan)) + ((note)<<8) + ((vol)<<16));
-            midiOutDev[dev]->notestates[note][chan] = track | (vol<<8) | NB_ON;
-            if (muted)
-                midiOutDev[dev]->notestates[note][chan] |= NB_MUTED;
-            if (flags & INSTFLAGS_REGRIGGER_NOTE_ON_UNMUTE)
-                midiOutDev[dev]->notestates[note][chan] |= NB_RETRIG;
-        }
-
-        inline void noteOff(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol,unsigned char muted) {
-            if (dev>=numMidiDevs) return;
-            if (midiOutDev[dev]->opened && !muted)
-                midiOutShortMsg(midiOutDev[dev]->handle,(0x80+(chan)) + ((note)<<8) + ((vol)<<16));
-            midiOutDev[dev]->notestates[note][chan] = NB_OFF;
-        }
-
-        inline void afterTouch(unsigned int dev, unsigned char note, unsigned char chan, unsigned char vol) {
-            if (dev>=numMidiDevs) return;
-            if (midiOutDev[dev]->opened)
-                midiOutShortMsg(midiOutDev[dev]->handle,(0xD0+(chan)) + ((note)<<8) + ((vol)<<16));
-        }
-
-        inline void pitchWheel(unsigned int dev, unsigned char chan, unsigned short int value) {
-            unsigned char d1,d2;
-            if (dev>=numMidiDevs) return;
-            value&=0x3FFF;
-            d1 = (value & 0x007F);
-            d2 = value>>7;
-            if (midiOutDev[dev]->opened)
-                midiOutShortMsg(midiOutDev[dev]->handle,(0xE0+(chan)) + (d1<<8) + (d2<<16));
-        }
-
-        inline void progChange(unsigned int dev, int program, int bank, unsigned char chan) {
-            unsigned short int b;
-            unsigned char hb,lb;
-            bank &= 0x3fff;
-            lb = bank&0x007F;
-            hb = bank>>7;
-            b = bank;
-            if (dev>=numMidiDevs) return;
-            if (midiOutDev[dev]->opened) {
-                if (bank >= 0) {
-                    midiOutShortMsg(midiOutDev[dev]->handle,(0xB0+(chan)) + (0x00 << 8) + (hb<<16)); // MSB Bank select (High 7 bits)
-                    midiOutShortMsg(midiOutDev[dev]->handle,(0xB0+(chan)) + (0x20 << 8) + (lb<<16)); // LSB Bank select (Low 7 bits)
-                }
-                if (program >= 0)
-                    midiOutShortMsg(midiOutDev[dev]->handle,(0xC0+(chan)) + (((unsigned char)program)<<8));                  // Program change
-            }           
-        }
-        inline void sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
-            if (dev>=numMidiDevs) return;
-            if (midiOutDev[dev]->opened)
-                midiOutShortMsg(midiOutDev[dev]->handle,(0xB0+chan) + (cc<<8) + (value<<16));
-        }
-        inline void clock(void) {
-            sendGlobal(0xF8);
-        }
-
-};
-
-
-
-*/
 class midiInDevice {
     public:
-        HMIDIIN handle;                       // Handle to the MIDI input device.
+        RtMidiIn *rtMidiIn;
         char *szName;
         int devNum;
-        MIDIINCAPS caps;                      // The MIDIINCAPS structure describes the capabilities of a MIDI input device.
-        int opened;     
-
-        MIDIHDR         midiHdr;              // The MIDIHDR structure defines the header used to identify a MIDI system-exclusive or stream buffer.
-        unsigned char SysXBuffer[256];
-        unsigned char SysXFlag;
+        int opened;
 
         midiInDevice(int i);
         ~midiInDevice(void);
-        
+
         int open(void);
         int close(void);
-        MMRESULT reset(void);
-        
+        int reset(void);
 };
 
 
@@ -449,12 +290,12 @@ class midiIn {
         intlist *devlist_head;
         midiIn();
         ~midiIn();
-        UINT AddDevice(int dev);
+        unsigned int AddDevice(int dev);
         int RemDevice(int dev);
         int QueryDevice(int dev); // 1 active 0 not active
         int GetNumOpenDevs(void);
         int GetDevID(int which);
-        midiInDevice *GetDevice(HMIDIIN hmi);
+        midiInDevice *GetDeviceByIndex(int idx);
 };
 
 

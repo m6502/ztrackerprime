@@ -2,7 +2,7 @@
 #define _UI_PAGE_H_
 
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <thread>
 
 class Button ;
 class CheckBox ;
@@ -247,7 +247,7 @@ class CUI_Savescreen : public CUI_Page {
 class CUI_LoadMsg : public CUI_Page {
     public:
 
-        HANDLE hThread;
+        std::thread *hThread;
         
         int OldPriority;
         unsigned long iID;
@@ -266,7 +266,7 @@ class CUI_LoadMsg : public CUI_Page {
 class CUI_SaveMsg : public CUI_Page {
     public:
 
-        HANDLE hThread;
+        std::thread *hThread;
         int OldPriority;
         unsigned long iID;
         int strselect;

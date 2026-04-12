@@ -26,7 +26,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -42,9 +42,7 @@
 #define _MODULE_H
 
 #include <fstream>
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include <mutex>
 
 
 class CDataBuf ;
@@ -131,7 +129,7 @@ public:
 
 public:
 
-  // <Manu> Flag que indica si el instrumento se ha utilizado en la última reproducción
+  // <Manu> Flag que indica si el instrumento se ha utilizado en la ï¿½ltima reproducciï¿½n
   bool bHasBeenUsed ;
 
   signed char patch;
@@ -318,7 +316,7 @@ class zt_module
         instrument *instruments[ZTM_MAX_INSTS];
         int orderlist[ZTM_ORDERLIST_LEN];
 
-        HANDLE hEditMutex;
+        std::timed_mutex hEditMutex;
 
         unsigned char track_mute[ZTM_MAX_TRACKS];
 

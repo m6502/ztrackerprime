@@ -1,51 +1,26 @@
 /*************************************************************************
  *
  * FILE  playback.h
- * $Id: playback.h,v 1.8 2002/04/11 22:39:09 zonaj Exp $
  *
- * DESCRIPTION 
+ * DESCRIPTION
  *   definitions for the ztracker player code.
+ *   Ported to use std::thread + std::chrono instead of Win32 multimedia timers.
  *
- * This file is part of ztracker - a tracker-style MIDI sequencer.
- *
- * Copyright (c) 2000-2001, Christopher Micali <micali@concentric.net>
- * Copyright (c) 2001, Daniel Kahlin <tlr@users.sourceforge.net>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the names of the copyright holders nor the names of their
- *    contributors may be used to endorse or promote products derived 
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2000-2001, Christopher Micali
+ * Copyright (c) 2001, Daniel Kahlin
+ * All rights reserved. (BSD-3-Clause)
  *
  ******/
 #ifndef __PLAYBACK_H
 #define __PLAYBACK_H
 
-#include <mmsystem.h>
+#include <thread>
+#include <atomic>
+#include <chrono>
 
-//#include "zt.h"
-class zt_module ;
+class zt_module;
 
-enum Emeventtypes { 
+enum Emeventtypes {
     ET_NOTE_ON,
     ET_NOTE_OFF,
     ET_CC,
@@ -59,13 +34,13 @@ enum Emeventtypes {
     ET_PATT,
     ET_PITCH,
     ET_MSTART,
-    ET_LOOP                   // <Manu> definimos el evento de loop
+    ET_LOOP
 };
 
 struct midi_event {
     short int tick;
     unsigned int device;
-    Emeventtypes type;//unsigned char type;
+    Emeventtypes type;
     unsigned char command;
     unsigned short data1;
     unsigned short data2;
@@ -93,9 +68,13 @@ class midi_buf {
 
 class player {
     private:
-        MMRESULT wTimerID;
-        TIMECAPS tc;
-        UINT SetTimerCallback(UINT msInterval);
+        // Portable timer â€” replaces Win32 timeSetEvent / TIMECAPS / wTimerID.
+        std::thread *timerThread;
+        std::atomic<bool> timerRunning;
+        unsigned int timerIntervalMs;
+        void timerThreadFunc(unsigned int intervalMs);
+
+        unsigned int SetTimerCallback(unsigned int msInterval);
 
         struct s_note_off {
             signed char note;
@@ -106,23 +85,21 @@ class player {
         };
 
     public:
-        UINT     wTimerRes;
-        
+        unsigned int wTimerRes;
+
         s_note_off *noteoff_eventlist;
         int noteoff_size, noteoff_cur;
         int tpb, bpm, starts;
 
-        HANDLE hThread;
+        std::thread *counterThread;
         unsigned long iID;
-
-//      hires_timer *hr_timer;
 
         int cur_buf,playing_cur_row,playing_cur_pattern,playing_cur_order;
         int prebuffer,playing_tick,num_real_orders;
 
         midi_buf *play_buffer[2],*playing_buffer;
 
-        int playmode; // 0 = loop / 1 = song
+        int playmode;
         int cur_subtick;
         int cur_row;
         int cur_pattern;
@@ -131,9 +108,7 @@ class player {
         int subticks;
         int pinit;
 
-//      int edit_lock;
-
-        int subtick_len_ms;//, subtick_count;
+        int subtick_len_ms;
         int subtick_len_mms;
         int subtick_error,subtick_add;
         int tick_len_ms;
@@ -149,28 +124,26 @@ class player {
 
         zt_module *song;
         pattern patt_memory;
-//      int clock_counter,clock_len_ms,clock_len_mms,clock_error,clock_error_flag;
-        
+
         player(int res,int prebuffer_rows, zt_module *ztm);
         ~player(void);
 
         int init(void);
         int start_timer(void);
         int stop_timer(void);
-        
+
         void prepare_play(int row, int pattern,int pm, int loopmode);
         void play(int row, int pattern, int pm, int loopmode=1);
         void play_current_row();
         void play_current_note();
         void stop(void);
-        void callback(void); // reads buffers and actually plays them
-        void playback(midi_buf *buffer, int ticks); // fills buffer with x ticks
+        void callback(void);
+        void playback(midi_buf *buffer, int ticks);
         int calc_pos(int midi_songpos, int *rowptr, int *orderptr);
 
         void insert_no(unsigned char note, unsigned char chan, short int len, unsigned char track);
         void process_noel(midi_buf *buffer,int p_tick);
         void clear_noel(void);
-        //event *get_noel(unsigned note, unsigned chan);
         int get_noel(unsigned char note, unsigned char inst);
         int kill_noel_with_midiout(unsigned char note, unsigned char inst);
         int kill_noel(unsigned char note, unsigned char inst);

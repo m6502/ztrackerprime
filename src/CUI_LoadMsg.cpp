@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -91,11 +91,8 @@ void CUI_LoadMsg::enter(void) {
     load_finished = 0;
 //    setWindowTitle("zt - loading file...");
     SDL_WM_SetCaption("zt - [loading file]","zt - [loading file]");
-    OldPriority = GetThreadPriority(GetCurrentThread());
     strtimer = strselect = 0;
-    strtimer = SetTimer(NULL,strtimer,500,(TIMERPROC)TP_Load_Inc_Str);
-    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
-    hThread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)load_thread,NULL,0,&iID); 
+    hThread = new std::thread(load_thread);
     while(load_lock) {
         SDL_Delay(1);
     }
@@ -103,9 +100,9 @@ void CUI_LoadMsg::enter(void) {
 
 void CUI_LoadMsg::leave(void) {
     FileList *fl;
-    SetThreadPriority(GetCurrentThread(),OldPriority);
-    KillTimer(NULL,strtimer);
-    CloseHandle(hThread);
+    if (hThread && hThread->joinable()) hThread->join();
+    delete hThread;
+    hThread = nullptr;
 //    setWindowTitle("zt");
     SDL_WM_SetCaption("zt","zt");
     fl = (FileList *)UIP_Savescreen->UI->get_element(0);

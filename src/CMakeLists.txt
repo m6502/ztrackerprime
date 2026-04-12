@@ -1,6 +1,7 @@
 # ztracker main executable.
 
 set(ZT_SOURCES
+    third_party/rtmidi/RtMidi.cpp
     Button.cpp
     CDataBuf.cpp
     conf.cpp
@@ -70,7 +71,17 @@ target_include_directories(zt PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}
     ${SDL12_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rtmidi
 )
+
+# RtMidi backend selection — tells RtMidi which platform MIDI API to compile.
+if(WIN32)
+    target_compile_definitions(zt PRIVATE __WINDOWS_MM__)
+elseif(APPLE)
+    target_compile_definitions(zt PRIVATE __MACOSX_CORE__)
+else()
+    target_compile_definitions(zt PRIVATE __LINUX_ALSA__)
+endif()
 
 # Win32 resource compile works automatically when the .rc is listed in target sources
 # and CMake has the RC compiler from the toolchain file.

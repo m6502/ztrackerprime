@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -88,23 +88,18 @@ CUI_SaveMsg::~CUI_SaveMsg(void) {
 void CUI_SaveMsg::enter(void) {
     need_refresh = 1;
     save_finished= 0;
-//    setWindowTitle("zt - saving...");
     SDL_WM_SetCaption("zt - [saving file]","zt - [saving file]");
-    OldPriority = GetThreadPriority(GetCurrentThread());
     strselect = 0;
-    strtimer = SetTimer(NULL,strtimer,500,(TIMERPROC)TP_Save_Inc_Str);
-    hThread = CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)save_thread,NULL,0,&iID); 
-    SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_BELOW_NORMAL);
-    SetThreadPriority(hThread,THREAD_PRIORITY_ABOVE_NORMAL);
+    hThread = new std::thread(save_thread);
 }
 
 void CUI_SaveMsg::leave(void) {
     FileList *fl;
     DirList *dl;
 
-    SetThreadPriority(GetCurrentThread(),OldPriority);
-    KillTimer(NULL,strtimer);
-    CloseHandle(hThread);
+    if (hThread && hThread->joinable()) hThread->join();
+    delete hThread;
+    hThread = nullptr;
 
     need_refresh++;
 
