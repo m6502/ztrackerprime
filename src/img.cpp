@@ -1,4 +1,5 @@
 #include <png.h>
+#include <cassert>
 #include "zt.h"
 
 // This was lifted from the SDL_Image package
@@ -100,7 +101,7 @@ SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
   if more than one index has transparency, use full alpha channel */
   if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS)) {
     int num_trans;
-    //		Uint8 *trans;         // <MANU> No compilaba, asi que he tenido que cambiarle el tipo ¿?
+    //		Uint8 *trans;         // <MANU> No compilaba, asi que he tenido que cambiarle el tipo ï¿½?
     unsigned char *trans;
     
     num_trans=sizeof(Uint8) ;
@@ -159,7 +160,7 @@ SDL_Surface *IMG_LoadPNG_RW(SDL_RWops *src)
     
     if(color_type != PNG_COLOR_TYPE_PALETTE) {
 
-      _ASSERT(transv) ;
+      assert(transv) ;
 
       /* FIXME: Should these be truncated or shifted down? */
       ckey = SDL_MapRGB(surface->format, (Uint8)transv->red, (Uint8)transv->green, (Uint8)transv->blue) ;

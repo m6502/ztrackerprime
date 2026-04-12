@@ -1,6 +1,7 @@
 #include "zt.h"
 #include "FileList.h"
 
+#include <cassert>
 #include <filesystem>
 
 
@@ -297,7 +298,7 @@ void FileList::draw(Drawable *S, int active)
   unsigned char *str;
 
   str = (unsigned char *)malloc(xsize+1+2);
-  _ASSERT(str) ;
+  assert(str) ;
 
   LBNode *node = getNode(y_start);
 
@@ -378,7 +379,7 @@ void FileList::OnChange()
     AddFiles(".zt", COLORS.Data);
     AddFiles(".it", COLORS.Highlight);
     
-    // <Manu> Quiero que muestre tambien los .mid, asi que añado esta linea
+    // <Manu> Quiero que muestre tambien los .mid, asi que aï¿½ado esta linea
     AddFiles(".mid", COLORS.Highlight);
     
     need_redraw++;

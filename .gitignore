@@ -1,0 +1,8 @@
+build-win32/
+build-macos/
+build-linux/
+.DS_Store
+*.swp
+*.swo
+*~
+third_party/SDL-devel-1.2.15-mingw32.tar.gz

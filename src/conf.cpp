@@ -25,7 +25,7 @@
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * ``AS IS´´ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * ``AS ISï¿½ï¿½ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
  * A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -210,7 +210,7 @@ ZTConf::ZTConf() {
     conf_filename = "zt.conf";
 
     Config = new conf;//NULL;
-    full_screen = 1;
+    full_screen = 0;
 //    do_fade = 1; // fade_in_out ?
     auto_open_midi = 1;
     strcpy(skin, "default");
@@ -221,7 +221,7 @@ ZTConf::ZTConf() {
     highlight_increment = 8;
     lowlight_increment = 8;
 
-    // <Manu> Por  defecto siempre tamaño 64!! ----------------
+    // <Manu> Por  defecto siempre tamaï¿½o 64!! ----------------
 
     //    pattern_length = 128;
     pattern_length = 64;
