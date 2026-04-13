@@ -3,9 +3,9 @@
 #define ZT_LUA_ENGINE_H
 
 extern "C" {
-#include "third_party/lua/lua.h"
-#include "third_party/lua/lualib.h"
-#include "third_party/lua/lauxlib.h"
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
 }
 
 // Maximum lines kept in the console scrollback

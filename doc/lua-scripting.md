@@ -85,7 +85,7 @@ zt.set_bpm(zt.get_bpm() * 2)
 
 ## Files Added
 
-- `src/third_party/lua/` — Lua 5.4.7 source (MIT license)
+- `extlibs/lua/` — Lua 5.4.7 source (MIT license)
 - `src/lua_engine.h` / `src/lua_engine.cpp` — engine + API bindings
 - `src/CUI_LuaConsole.cpp` — REPL console page
 

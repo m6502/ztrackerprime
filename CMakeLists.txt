@@ -35,9 +35,9 @@ set(SDL3_LIBRARY "" CACHE FILEPATH "Full path to SDL3 library (libSDL3*.a/.so/.d
 set(SDL3MAIN_LIBRARY "" CACHE FILEPATH "Full path to SDL3main library (Windows/MinGW only)")
 
 # --- Lua 5.4 static library ---------------------------------------------------
-file(GLOB LUA_SOURCES "${CMAKE_SOURCE_DIR}/src/third_party/lua/*.c")
+file(GLOB LUA_SOURCES "${CMAKE_SOURCE_DIR}/extlibs/lua/*.c")
 add_library(lua_static STATIC ${LUA_SOURCES})
-target_include_directories(lua_static PUBLIC "${CMAKE_SOURCE_DIR}/src/third_party/lua")
+target_include_directories(lua_static PUBLIC "${CMAKE_SOURCE_DIR}/extlibs/lua")
 target_compile_definitions(lua_static PRIVATE _CRT_SECURE_NO_WARNINGS)
 if(UNIX)
   target_link_libraries(lua_static PRIVATE m)
@@ -134,7 +134,7 @@ if(WIN32)
 else()
   add_executable(zt ${ZT_SOURCES})
 endif()
-target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib src/third_party/lua)
+target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib extlibs/lua)
 target_link_libraries(zt PRIVATE lua_static)
 
 if(MSVC)
