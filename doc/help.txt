@@ -44,6 +44,7 @@
  CTRL-SHIFT-Down : Rotate Track Down (last row wraps to first)
  CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
  CTRL-F9         : Track Solo (mute all other tracks; repeat to unsolo all)
+ ALT-H           : Humanize Velocities in selection (randomize +/- 15)
 
 |L|%==|H|Block Functions|L|==%|U|
 

@@ -1647,6 +1647,37 @@ void CUI_Patterneditor::update()
           statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
         }
 
+        // Humanize Velocities: Alt+H — randomize volume column within selection
+        // by +/- HUMANIZE_RANGE on each row that has a note. Paketti-inspired.
+        if ((kstate & KS_ALT) && !(kstate & KS_SHIFT) && !(kstate & KS_CTRL) && key == SDLK_H) {
+          if (selected) {
+            UNDO_SAVE();
+            const int HUMANIZE_RANGE = 15; // +/- steps around current value
+            int touched = 0;
+            for (int t = select_track_start; t <= select_track_end; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              for (int r = select_row_start; r <= select_row_end; r++) {
+                event *ev = trk->get_event(r);
+                if (!ev) continue;
+                if (ev->note >= 0x80) continue;      // skip rows without a real note
+                int v = (ev->vol < 0x80) ? ev->vol : 64; // treat blank vol as 64
+                int delta = (rand() % (2 * HUMANIZE_RANGE + 1)) - HUMANIZE_RANGE;
+                int nv = v + delta;
+                if (nv < 0) nv = 0;
+                if (nv > 127) nv = 127;
+                trk->update_event(r, -1, -1, nv, -1, -1, -1);
+                touched++;
+              }
+            }
+            sprintf(szStatmsg, "Humanized %d note velocit%s (+/- %d)",
+                    touched, touched == 1 ? "y" : "ies", HUMANIZE_RANGE);
+          } else {
+            sprintf(szStatmsg, "Humanize: select a block first (SHIFT+arrow)");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
         // Clone Pattern + jump to it: Ctrl+Shift+D
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_D) {
           int src = cur_edit_pattern;
