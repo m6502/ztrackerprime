@@ -1,3 +1,15 @@
+    }
+    // One-time stderr diagnostic so we can identify exactly which scancode
+    // the § key sends on a given keyboard. Prints once per unique scancode.
+    if (pressed) {
+      static int seen[512] = {0};
+      int sc = (int)e->scancode;
+      if (sc >= 0 && sc < 512 && !seen[sc]) {
+        seen[sc] = 1;
+        fprintf(stderr, "[zt-key] scancode=%d keycode=0x%X mod=0x%X\n",
+                sc, (unsigned)e->key, (unsigned)e->mod);
+        fflush(stderr);
+      }
   }
   else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
     // Keep statusmsg quiet on non-Pattern pages while playing.
@@ -2350,11 +2362,16 @@ void keyhandler(SDL_KeyboardEvent *e) {
     if (id == SDLK_KP_ENTER)
       id = SDLK_RETURN;
 
-    // EU/Finnish ISO keyboards: the § key (above Tab, left of '1') is the
-    // physical "non-US backslash" scancode. Map it to SDLK_GRAVE so the
-    // existing GRAVE bindings (Shift+§ -> drawmode toggle, plain § -> Note
-    // Off) work without a US keyboard layout.
-    if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH) {
+    // EU/Finnish ISO keyboards: the § key. Different layouts map it to
+    // different scancodes — on some it's NONUSBACKSLASH, on others it's
+    // INTERNATIONAL1/2 or even GRAVE itself. Force any of those to SDLK_GRAVE
+    // so the existing GRAVE handlers (plain § -> Note Off, Shift+§ -> drawmode
+    // toggle) work without a US keyboard layout.
+    if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH ||
+        e->scancode == SDL_SCANCODE_INTERNATIONAL1 ||
+        e->scancode == SDL_SCANCODE_INTERNATIONAL2 ||
+        e->scancode == SDL_SCANCODE_INTERNATIONAL3 ||
+        e->scancode == SDL_SCANCODE_NONUSHASH) {
       id = SDLK_GRAVE;
     }
 

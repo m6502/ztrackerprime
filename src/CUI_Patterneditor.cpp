@@ -1,3 +1,27 @@
+          case SDLK_R: /* Replicate at Cursor (from Paketti) */
+          {
+            int pat_len = song->patterns[cur_edit_pattern]->length;
+            int chunk_len = cur_edit_row + 1;
+            if (chunk_len > 0 && cur_edit_row < pat_len - 1) {
+              for (j = cur_edit_row + 1; j < pat_len; j++) {
+                int src_row = (j - (cur_edit_row + 1)) % chunk_len;
+                event *src = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(src_row);
+                if (src) {
+                  song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                    j, src->note, src->inst, src->vol, src->length, src->effect, src->effect_data);
+                } else {
+                  song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                    j, 0x80, MAX_INSTS, 0x80, 0, 0xFF, 0);
+                }
+              }
+              need_refresh++;
+              sprintf(szStatmsg, "Replicated rows 0-%d across pattern (%d rows)", cur_edit_row, pat_len);
+              statusmsg = szStatmsg;
+              status_change = 1;
+            }
+          }
+          break;
+
 #include "zt.h"
 #include "platform/undo.h"
 
