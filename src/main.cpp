@@ -1314,6 +1314,32 @@ void global_keys(Drawable *S)
                     key = Keys.getkey();
                 }
                 break;
+            case SDLK_M: // Quick MIDI export
+                if (kstate & KS_CTRL) {
+                    // Export current song as .mid file
+                    char midfn[512];
+                    if (song->filename[0]) {
+                        strncpy(midfn, (const char*)song->filename, 500);
+                        midfn[500] = 0;
+                        // Replace extension with .mid
+                        char *dot = strrchr(midfn, '.');
+                        if (dot) strcpy(dot, ".mid");
+                        else strcat(midfn, ".mid");
+                    } else {
+                        strcpy(midfn, "export.mid");
+                    }
+                    ZTImportExport zie;
+                    if (zie.ExportMID(midfn, 1) == 0) {
+                        sprintf(szStatmsg, "Exported MIDI: %s", midfn);
+                    } else {
+                        sprintf(szStatmsg, "MIDI export failed");
+                    }
+                    statusmsg = szStatmsg;
+                    status_change = 1;
+                    need_refresh++;
+                    key = Keys.getkey();
+                }
+                break;
             case SDLK_N: // new song
                 if (kstate & KS_ALT) {
                     popup_window(UIP_NewSong);
