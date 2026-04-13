@@ -1,6 +1,14 @@
+
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "zt-screenshot.sh requires macOS (uses AppleScript + screencapture)."
+  echo "For Linux try xdotool + scrot; for Windows try AutoHotkey + nircmd."
+  exit 1
+fi
 #!/bin/bash
-# Launches zt.app, presses each navigation key, screenshots zt's window only.
-# Uses AppleScript to read window position + size, then screencapture -R.
+# macOS-ONLY: Launches zt.app, presses each navigation key, screenshots zt's
+# window only. Uses AppleScript (System Events) + screencapture, neither of
+# which exist on Windows or Linux. Intended for developer self-verification
+# of UI layout changes on macOS.
 
 set -e
 
