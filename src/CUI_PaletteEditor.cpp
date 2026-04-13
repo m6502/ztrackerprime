@@ -58,10 +58,14 @@
 #define PE_PRESET_W         22
 #define PE_PRESET_VISIBLE   24   // visible preset rows (1-row pitch)
 
-// Global controls strip — sits below the swatch grid.
+// Global controls strip — single horizontal row above the swatch grid,
+// well clear of the toolbar at the bottom of the screen.
+#define PE_GLOBAL_ROW_Y     10   // char-row directly under the page title
 #define PE_GLOBAL_X         2
-#define PE_GLOBAL_BAR_W     20   // chars
-#define PE_GLOBAL_LABEL_W   12
+#define PE_GLOBAL_BAR_W     14   // chars per slider
+#define PE_GLOBAL_LABEL_W   12   // label cells before each bar
+#define PE_GLOBAL_NUMBER_W  4    // value readout after each bar
+#define PE_GLOBAL_GROUP_W   (PE_GLOBAL_LABEL_W + PE_GLOBAL_BAR_W + PE_GLOBAL_NUMBER_W + 2)
 
 struct PaletteSlot {
     const char *name;
@@ -411,10 +415,11 @@ static void rgb_slider_rect(int slot, int channel, int *x0, int *y0, int *x1, in
 
 static void global_slider_rect(int which, int *x0, int *y0, int *x1, int *y1) {
     // which: 0 = brightness, 1 = contrast, 2 = tint amount
-    int gy = row(PE_GRID_ROW_Y + PE_GRID_ROWS * PE_GRID_ROW_STEP);
-    *y0 = gy + which * row(1);
+    // Three groups laid out horizontally on PE_GLOBAL_ROW_Y.
+    int group_x = PE_GLOBAL_X + which * PE_GLOBAL_GROUP_W;
+    *y0 = row(PE_GLOBAL_ROW_Y);
     *y1 = *y0 + row(1) - 2;
-    *x0 = col(PE_GLOBAL_X + PE_GLOBAL_LABEL_W);
+    *x0 = col(group_x + PE_GLOBAL_LABEL_W);
     *x1 = *x0 + col(PE_GLOBAL_BAR_W);
 }
 
@@ -582,27 +587,46 @@ void CUI_PaletteEditor::update(void) {
         case SDLK_UP:
             reset_accum();
             if (focus_panel == 0) {
-                int rr = selected_slot / PE_GRID_COLS;
-                int cc = selected_slot % PE_GRID_COLS;
-                if (rr > 0) selected_slot = (rr - 1) * PE_GRID_COLS + cc;
+                // Walk up through R/G/B sliders within a slot, then jump to
+                // the previous row's B slider (and so on). This mirrors what
+                // the eye does when scanning the column visually.
+                if (channel_edit > 1) {
+                    channel_edit--;
+                } else if (channel_edit == 1) {
+                    channel_edit = 0;
+                } else {
+                    int rr = selected_slot / PE_GRID_COLS;
+                    int cc = selected_slot % PE_GRID_COLS;
+                    if (rr > 0) {
+                        selected_slot = (rr - 1) * PE_GRID_COLS + cc;
+                        channel_edit = 3;   // land on previous row's B
+                    }
+                }
             } else {
                 if (selected_slot > 0) selected_slot--;
             }
-            channel_edit = 0;
             need_refresh++;
             return;
 
         case SDLK_DOWN:
             reset_accum();
             if (focus_panel == 0) {
-                int rr = selected_slot / PE_GRID_COLS;
-                int cc = selected_slot % PE_GRID_COLS;
-                int next = (rr + 1) * PE_GRID_COLS + cc;
-                if (next < NUM_PALETTE_SLOTS) selected_slot = next;
+                if (channel_edit == 0) {
+                    channel_edit = 1;       // swatch -> R
+                } else if (channel_edit < 3) {
+                    channel_edit++;         // R -> G -> B
+                } else {
+                    int rr = selected_slot / PE_GRID_COLS;
+                    int cc = selected_slot % PE_GRID_COLS;
+                    int next = (rr + 1) * PE_GRID_COLS + cc;
+                    if (next < NUM_PALETTE_SLOTS) {
+                        selected_slot = next;
+                        channel_edit = 0;   // land on the next swatch
+                    }
+                }
             } else {
                 if (selected_slot < num_presets - 1) selected_slot++;
             }
-            channel_edit = 0;
             need_refresh++;
             return;
 
@@ -843,13 +867,14 @@ static void draw_global_slider(Drawable *S, int which, const char *label,
                                TColor fill) {
     int x0, y0, x1, y1;
     global_slider_rect(which, &x0, &y0, &x1, &y1);
-    print(col(PE_GLOBAL_X), y0, label, COLORS.Text, S);
+    int label_x = col(PE_GLOBAL_X + which * PE_GLOBAL_GROUP_W);
+    print(label_x, y0, label, COLORS.Text, S);
     int range = max_v - min_v;
     int v = value - min_v;
     draw_slider_bar(S, x0, y0, x1, y1, v, range, fill, 0);
     char buf[16];
     snprintf(buf, sizeof(buf), "%+5d", value);
-    print(x1 + col(1) - 4, y0, buf, COLORS.Text, S);
+    print(x1 + 2, y0, buf, COLORS.Text, S);
 }
 
 void CUI_PaletteEditor::draw(Drawable *S) {
@@ -891,30 +916,34 @@ void CUI_PaletteEditor::draw(Drawable *S) {
         printBG(px, py + row(2 + i), line, fg, bg, S);
     }
 
-    // Global brightness / contrast / tint slider strip.
-    draw_global_slider(S, 0, "Brightness ",  brightness, -128, 127, 0xFFE0E0E0);
-    draw_global_slider(S, 1, "Contrast   ",  contrast,   -100, 100, 0xFFD0D080);
+    // Global brightness / contrast / tint slider strip — single horizontal
+    // row positioned above the swatch grid so it can never collide with the
+    // toolbar at the bottom of the screen.
+    draw_global_slider(S, 0, "Brightness  ", brightness, -128, 127, 0xFFE0E0E0);
+    draw_global_slider(S, 1, "Contrast    ", contrast,   -100, 100, 0xFFD0D080);
     {
         int x0, y0, x1, y1;
         global_slider_rect(2, &x0, &y0, &x1, &y1);
+        int label_x = col(PE_GLOBAL_X + 2 * PE_GLOBAL_GROUP_W);
         char lbl[32];
         snprintf(lbl, sizeof(lbl), "Tint %-7s", g_tints[tint_index].label);
-        print(col(PE_GLOBAL_X), y0, lbl, COLORS.Text, S);
+        print(label_x, y0, lbl, COLORS.Text, S);
         TColor fill = (tint_index == 0) ? COLORS.Lowlight : g_tints[tint_index].color;
         draw_slider_bar(S, x0, y0, x1, y1, tint_amount, 255, fill, 0);
         char buf[16];
         snprintf(buf, sizeof(buf), "%5d", tint_amount);
-        print(x1 + col(1) - 4, y0, buf, COLORS.Text, S);
+        print(x1 + 2, y0, buf, COLORS.Text, S);
     }
 
-    // Hint / status line beneath the global controls.
-    int hy = row(PE_GRID_ROW_Y + PE_GRID_ROWS * PE_GRID_ROW_STEP) + row(3) + 4;
+    // Hint / status line at the bottom of the page area (rows 60–61, well
+    // above the toolbar which starts around row 62).
+    int hy = row(PE_GRID_ROW_Y + PE_GRID_ROWS * PE_GRID_ROW_STEP);
     const char *hint;
     if (focus_panel == 0) {
         if (channel_edit) {
-            hint = "Editing channel: type 0-9 or use +/- (Shift x16). Click any RGB bar to scrub. Tab cancels.";
+            hint = "Editing channel: 0-9 or +/- (Shift x16). Up/Down step R/G/B. Click bar to scrub. Tab cancels.";
         } else {
-            hint = "Click swatch / RGB bar / preset / global slider. R/G/B keys + 0-9. [/] brightness ;/' contrast T tint Y/U amount Ctrl+S save ESC revert";
+            hint = "Click swatch / RGB bar / preset / global. Up/Down step R/G/B. R/G/B keys. [/] bright ;/' contrast T tint Y/U amount Ctrl+S save ESC revert";
         }
     } else {
         hint = "Click preset / Arrows: move  Enter: load  Tab/Left: back to grid  ESC: revert";
@@ -924,7 +953,7 @@ void CUI_PaletteEditor::draw(Drawable *S) {
         print(col(2), hy + row(1), status_line, COLORS.Brighttext, S);
     }
     if (dirty) {
-        print(col(2), hy + row(2), "[modified]", COLORS.LCDHigh, S);
+        print(col(70), hy, "[modified]", COLORS.LCDHigh, S);
     }
 
     need_refresh = 0;
