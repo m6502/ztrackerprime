@@ -2342,6 +2342,14 @@ void keyhandler(SDL_KeyboardEvent *e) {
     if (id == SDLK_KP_ENTER)
       id = SDLK_RETURN;
 
+    // EU/Finnish ISO keyboards: the § key (above Tab, left of '1') is the
+    // physical "non-US backslash" scancode. Map it to SDLK_GRAVE so the
+    // existing GRAVE bindings (Shift+§ -> drawmode toggle, plain § -> Note
+    // Off) work without a US keyboard layout.
+    if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH) {
+      id = SDLK_GRAVE;
+    }
+
     if (pressed && id == SDLK_RETURN) {
         actual_ch = 10;
     }
