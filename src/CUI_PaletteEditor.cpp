@@ -25,10 +25,13 @@
 // ---------------------------------------------------------------------------
 
 // Layout constants (character cells are 8x8 px).
+// Each slot occupies: 1 row label + PE_SWATCH_H rows swatch + 3 rows R/G/B.
+// PE_GRID_ROW_STEP must be >= 1 + PE_SWATCH_H + 3 to avoid the next row's
+// label colliding with this row's RGB readout (8 leaves a 1-row gap).
 #define PE_GRID_COL_X       6     // first swatch column (in char cells)
 #define PE_GRID_COL_STEP    23    // spacing between swatch columns
 #define PE_GRID_ROW_Y       12    // first swatch row (in char cells)
-#define PE_GRID_ROW_STEP    5     // spacing between swatch rows
+#define PE_GRID_ROW_STEP    8     // spacing between swatch rows
 #define PE_GRID_COLS        3
 #define PE_GRID_ROWS        ((NUM_PALETTE_SLOTS + PE_GRID_COLS - 1) / PE_GRID_COLS)
 
@@ -231,6 +234,53 @@ void CUI_PaletteEditor::update(void) {
         digit_channel = 0;
     };
 
+    // Mouse: left-click selects a swatch in the grid or loads a preset.
+    if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
+        int mx = MousePressX;
+        int my = MousePressY;
+
+        // Preset panel hit-test (same geometry as draw()).
+        int ppx = col(PE_PRESET_X);
+        int ppy = row(PE_PRESET_Y);
+        int ppw = col(PE_PRESET_W);
+        for (int i = 0; i < NUM_PALETTE_PRESETS; ++i) {
+            int ly = ppy + row(2 + i * 2);
+            if (mx >= ppx && mx < ppx + ppw && my >= ly && my < ly + row(1)) {
+                focus_panel = 1;
+                selected_slot = i;
+                channel_edit = 0;
+                load_palette_file(g_presets[i].file);
+                reset_accum();
+                need_refresh++;
+                return;
+            }
+        }
+
+        // Swatch grid hit-test.
+        for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
+            int gr = i / PE_GRID_COLS;
+            int gc = i % PE_GRID_COLS;
+            int cx = PE_GRID_COL_X + gc * PE_GRID_COL_STEP;
+            int cy = PE_GRID_ROW_Y + gr * PE_GRID_ROW_STEP;
+            int x0 = col(cx);
+            int y0 = row(cy);
+            int x1 = col(cx + PE_SWATCH_W);
+            int y1 = row(cy + PE_SWATCH_H);
+            if (mx >= x0 && mx < x1 && my >= y0 && my < y1) {
+                focus_panel = 0;
+                selected_slot = i;
+                channel_edit = 0;
+                reset_accum();
+                snprintf(status_line, sizeof(status_line),
+                         "Selected %s — press R/G/B then 0-9 or +/- to edit",
+                         g_slots[i].name);
+                need_refresh++;
+                return;
+            }
+        }
+        return;
+    }
+
     switch (key) {
         case SDLK_ESCAPE:
             for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
@@ -248,6 +298,10 @@ void CUI_PaletteEditor::update(void) {
         case SDLK_TAB:
             focus_panel = (focus_panel + 1) % 2;
             channel_edit = 0;
+            // Reset selection to the start of the panel we just switched into,
+            // otherwise selected_slot can index out of range (e.g. slot 17 in
+            // the 7-entry preset list).
+            selected_slot = 0;
             reset_accum();
             need_refresh++;
             return;
@@ -497,10 +551,10 @@ void CUI_PaletteEditor::draw(Drawable *S) {
         if (channel_edit) {
             hint = "Editing channel: type 0-9 or use +/- (Shift for x16). Tab cancels.";
         } else {
-            hint = "Arrows: move  Tab: presets  R/G/B: edit channel  Ctrl+S: save  ESC: revert";
+            hint = "Click swatch / Arrows: move  Tab: presets  R/G/B: edit channel  Ctrl+S: save  ESC: revert";
         }
     } else {
-        hint = "Arrows: move  Enter: load preset  Tab/Left: back to grid  ESC: revert";
+        hint = "Click preset / Arrows: move  Enter: load preset  Tab/Left: back to grid  ESC: revert";
     }
     print(col(2), hy, hint, COLORS.Text, S);
     if (status_line[0]) {
