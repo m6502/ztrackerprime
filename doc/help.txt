@@ -29,10 +29,21 @@
               Use TAB here to switch edit mode
  
  CTRL-1 => 0: Change the step-value in the pattern editor
- ALT-`      : Set previous note's length to distance between 
+ ALT-`      : Set previous note's length to distance between
               note and current cursor position
- ScrollLock : Pattern-follow mode (cursor follows
-              playback)
+ ScrollLock : Follow playback toggle (cursor follows playback position)
+
+|L|%==|H|Pattern Operations|L|==%|U|
+
+ ALT-R / Cmd-R   : Replicate at Cursor (rows 0..cursor repeat across rest)
+ ALT-Z / Cmd-Z   : Undo last destructive pattern operation (single level)
+ CTRL-SHIFT-G    : Double Pattern (duplicate rows, max 256)
+ CTRL-SHIFT-H    : Halve Pattern (keep every other row, min 32)
+ CTRL-SHIFT-D    : Clone Pattern (copy to next empty slot and jump to it)
+ CTRL-SHIFT-R    : Reverse Selection (reverse row order in selected block)
+ CTRL-SHIFT-Down : Rotate Track Down (last row wraps to first)
+ CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
+ CTRL-F9         : Track Solo (mute all other tracks; repeat to unsolo all)
 
 |L|%==|H|Block Functions|L|==%|U|
 
@@ -55,7 +66,9 @@
  
  CTRL-N     : Set length of first row of block to length of block
  CTRL-W     : Clear unused volumes
- CTRL-I     : Interpolate effect data thru block
+ CTRL-I     : Interpolate values through selection (note, vol, or fx param,
+              depending on which column the cursor is on; falls back to
+              effect-data interpolation when no selection column applies)
  CTRL-T     : Set all effect and effect data fields of block to same
               value as first row in block
  CTRL-K     : Interpolate volume (block)
@@ -106,7 +119,7 @@
  SHIFT-F7   : Play song from the current order
  F8         : Stop playback
  F9         : Panic (all midi-off/SHIFT-F9 performs a hard driver panic)
- CTRL-F9    : Load Song...
+ CTRL-F9    : Track Solo (pattern editor)
  CTRL-F10   : Save Song As...
  F11        : Song Configuration and Order editor
  F12        : System Configuration (midi dev select)
