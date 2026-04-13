@@ -186,7 +186,7 @@ CUI_Config::CUI_Config(void) {
     tb = new TextBox;
     UI->add_element(tb, 9);
     tb->x = 1;
-    tb->y = 23;
+    tb->y = 24;
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
