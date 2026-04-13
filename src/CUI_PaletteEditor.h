@@ -5,7 +5,10 @@
 // Must match the entries listed in colors.conf (and colorset).
 #define NUM_PALETTE_SLOTS  18
 
-// Number of predefined palette preset buttons.
-#define NUM_PALETTE_PRESETS 7
+// Maximum predefined presets (palettes/*.conf + skins/*/colors.conf).
+#define MAX_PALETTE_PRESETS 64
+
+// Path-buffer size for preset entries.
+#define PE_PRESET_PATH_LEN  512
 
 #endif

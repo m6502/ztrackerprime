@@ -129,8 +129,27 @@ class CUI_PaletteEditor : public CUI_Page {
         int focus_panel;       // 0 = swatch grid, 1 = preset panel
         int channel_edit;      // 0 = none, 1 = R, 2 = G, 3 = B
         int dirty;             // unsaved changes vs. snapshot
-        TColor snapshot[32];   // saved COLORS.* on entry; up to 32 slots
+        TColor snapshot[32];   // saved COLORS.* on entry (the "anchor" the
+                               // global brightness/contrast/tint operate on)
         char status_line[128];
+
+        // Dynamic preset list — built at enter() from palettes/*.conf and
+        // skins/*/colors.conf so users can switch between every shipped look
+        // without leaving the editor.
+        int  num_presets;
+        char preset_label[64][32];
+        char preset_path[64][512];
+        int  preset_is_skin[64];
+
+        // Global adjustments applied on top of the snapshot so they're
+        // composable and reversible. Brightness in [-255..255] is added per
+        // channel, contrast in [-100..+100] scales around mid-grey,
+        // tint_index selects one of g_tints (0 = none), tint_amount in
+        // [0..255] is the blend weight toward the tint color.
+        int brightness;
+        int contrast;
+        int tint_index;
+        int tint_amount;
 
         CUI_PaletteEditor();
         ~CUI_PaletteEditor();
@@ -140,10 +159,14 @@ class CUI_PaletteEditor : public CUI_Page {
         void update(void);
         void draw(Drawable *S);
 
-        void load_palette_file(const char *fname);
+        void load_palette_file(const char *path_or_fname);
         void save_palette_file(const char *fname);
         void apply_channel_delta(int delta);
         void apply_channel_set(int value);
+
+        // Globals: recomputes COLORS from snapshot + brightness/contrast/tint.
+        void recompute_globals(void);
+        void rebuild_preset_list(void);
 };
 
 class CUI_Config : public CUI_Page {
