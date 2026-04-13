@@ -63,8 +63,6 @@
 */
 
 
-#include "zt.h"
-#include "keybindings.h"
 #include <cmath>
 #include <ctime>
 #include <algorithm>
@@ -72,6 +70,10 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+
+#include "zt.h"
+#include "lua_engine.h"
+#include "keybindings.h"
 
 
 // zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
@@ -317,6 +319,7 @@ CUI_SongDuration *UIP_SongDuration = NULL;
 CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
+CUI_LuaConsole *UIP_LuaConsole = NULL;
 
 
 
@@ -1297,11 +1300,11 @@ void global_keys(Drawable *S)
                 statusmsg = (char*)(bScrollLock ? "Follow playback ON" : "Follow playback OFF");
                 status_change = 1; need_refresh++;
                 break;
-            case SDLK_Q: 
+            case SDLK_Q:
                 if (kstate & KS_ALT && kstate & KS_CTRL) {
-                    command=CMD_QUIT; 
+                    command=CMD_QUIT;
                     key = Keys.getkey();
-                }               
+                }
                 break;
             case SDLK_N: // new song
                 if (kstate & KS_ALT) {
@@ -1334,11 +1337,14 @@ void global_keys(Drawable *S)
 
 
             //case SDLK_F9: // load
-            case SDLK_L: // load
-                if (kstate & KS_CTRL) {
+            case SDLK_L: // load (Ctrl+L) or Lua console (Ctrl+Alt+L)
+                if ((kstate & KS_CTRL) && (kstate & KS_ALT)) {
+                    command = CMD_SWITCH_LUA_CONSOLE;
+                    key = Keys.getkey();
+                } else if (kstate & KS_CTRL) {
                     command = CMD_SWITCH_LOAD;
                     key = Keys.getkey();
-                } 
+                }
                 break;
 
 #ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
@@ -1575,9 +1581,14 @@ void global_keys(Drawable *S)
             doredraw++; clear++; 
             break;
         // ------------------------------------------------------------------------
-        case CMD_SWITCH_HELP: 
+        case CMD_SWITCH_HELP:
             switch_page(UIP_Help);
-            doredraw++; clear++; 
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_LUA_CONSOLE:
+            switch_page(UIP_LuaConsole);
+            doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
         case CMD_PLAY: 
@@ -2192,7 +2203,9 @@ int postAction ()
     delete UIP_SongMessage;
     delete UIP_Arpeggioeditor;
     delete UIP_Midimacroeditor;
-    delete ztPlayer;    
+    delete UIP_LuaConsole;
+    g_lua.shutdown();
+    delete ztPlayer;
     delete MidiIn;
     delete MidiOut;
     delete song;
@@ -3093,6 +3106,8 @@ int initSDL(void)
     UIP_RUSure = new CUI_RUSure;
     UIP_Help = new CUI_Help;
     UIP_SongDuration = new CUI_SongDuration;
+    UIP_LuaConsole = new CUI_LuaConsole;
+    g_lua.init();
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
     return 1;
