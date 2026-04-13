@@ -63,8 +63,6 @@
 */
 
 
-#include "zt.h"
-#include "lua_engine.h"
 #include <cmath>
 #include <ctime>
 #include <algorithm>
@@ -73,9 +71,24 @@
 #include <unordered_map>
 #include <vector>
 
+#include "zt.h"
+#include "lua_engine.h"
+#include "keybindings.h"
 
-#if defined(_WIN32) && !defined(main)
-#define main SDL_main
+
+// zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
+// every translation unit (which would emit WinMain in every TU on Windows and
+// cause LNK2005). On Windows -- in the single TU that owns main() -- we undo
+// the define and include <SDL_main.h> exactly once so SDL can emit its
+// WinMain -> SDL_main entry shim into this object file only.
+#if defined(_WIN32)
+#  ifdef SDL_MAIN_HANDLED
+#    undef SDL_MAIN_HANDLED
+#  endif
+#  include <SDL_main.h>
+#  ifndef main
+#    define main SDL_main
+#  endif
 #endif
 
 
@@ -408,7 +421,7 @@ void close_popup_window(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void switch_page(CUI_Page *page) 
+void switch_page(CUI_Page *page)
 {
     LastPage = ActivePage;
     if (LastPage)
@@ -417,7 +430,11 @@ void switch_page(CUI_Page *page)
     ActivePage->enter();
     if (ActivePage->UI)
         ActivePage->UI->full_refresh();
+    // Force full screen clear to prevent previous page from bleeding through (#17).
+    if (screen_buffer)
+        screen_buffer->fillRect(0, 0, INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, COLORS.Background);
     screenmanager.UpdateAll();
+    doredraw++;
     need_refresh++;
 }
 
@@ -904,6 +921,14 @@ void update_status(Drawable *S)
     }
 
     statusmsg = szStatmsg;
+
+    // Follow Playback (Scroll Lock): in pattern editor, cursor follows
+    // the playhead in real time.
+    if (bScrollLock && cur_state == STATE_PEDIT) {
+      cur_edit_pattern = ztPlayer->playing_cur_pattern;
+      cur_edit_row     = ztPlayer->playing_cur_row;
+      need_refresh++;
+    }
   }
 
   if (S->lock() == 0) {
@@ -963,6 +988,8 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
         zt_show_error("zt: error", "Fatal: Unable to load zt.conf");
         return -1;
     }
+    g_keybindings.setDefaults();
+    g_keybindings.load(zt_config_globals.Config);
     Skin = newResourceStream(skinfile);
     if (!Skin) {
         sprintf(str,"Fatal: Could not load skin resource: %s\n",skinfile);
@@ -1270,6 +1297,8 @@ void global_keys(Drawable *S)
                     bScrollLock = 0;
                 else
                     bScrollLock = 1;
+                statusmsg = (char*)(bScrollLock ? "Follow playback ON" : "Follow playback OFF");
+                status_change = 1; need_refresh++;
                 break;
             case SDLK_Q:
                 if (kstate & KS_ALT && kstate & KS_CTRL) {
@@ -2051,9 +2080,14 @@ int initGFX ()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int postAction () 
+int postAction ()
 {  // Deinit functions
-    
+
+    // Guard against cleanup crashes when initialization failed (e.g. zt.conf not found).
+    if (!cur_dir || !MidiOut || !MidiIn) {
+        return 0;
+    }
+
     intlist *mod;
     OutputDevice *m;
     midiInDevice *mi;

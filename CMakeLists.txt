@@ -75,6 +75,7 @@ set(ZT_SOURCES
   src/edit_cols.cpp
   src/font.cpp
   src/img_sdl3.cpp
+  src/keybindings.cpp
   src/keybuffer.cpp
   src/lc_sdl_wrapper.cpp
   src/list.cpp
@@ -280,4 +281,14 @@ endif()
 
 set_target_properties(zt PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Program"
+)
+
+# Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
+add_custom_command(TARGET zt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
 )
