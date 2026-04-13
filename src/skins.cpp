@@ -293,92 +293,24 @@ static inline void lerp_rgb(int t, int *r0, int *g0, int *b0,
     *b0 = (*b0 * inv + b1 * t) / 255;
 }
 
-static int luminance_of(int r, int g, int b) {
-    int L = (r * 299 + g * 587 + b * 114) / 1000;
-    if (L < 0) L = 0;
-    if (L > 255) L = 255;
-    return L;
+static inline int clamp_byte(int v) {
+    if (v < 0)   return 0;
+    if (v > 255) return 255;
+    return v;
 }
 
-// Build a 256-entry "luminance -> output color" lookup using the ORIGINAL
-// skin's color luminances as gradient anchor points. This is the key trick:
-// pixels in the source PNG that match the skin's authored Background end up
-// exactly at the user's target Background (not somewhere between Background
-// and Highlight, which is what a fixed 0/128/255 anchor produces).
-//
-// Anchor points are sorted by source luminance into [a0, a1, a2, a3, a4],
-// each with a corresponding target color, so the LUT is a piecewise linear
-// remap with up to 4 segments.
-static void build_lut_anchored(Uint8 lut_r[256], Uint8 lut_g[256], Uint8 lut_b[256],
-                               int origLoL, int origMidL, int origHiL,
-                               int targLoR, int targLoG, int targLoB,
-                               int targMidR, int targMidG, int targMidB,
-                               int targHiR, int targHiG, int targHiB) {
-    // Force valid ordering: pure black anchor at L=0, pure white anchor at
-    // L=255, and the skin's three authoring colors in between. If two
-    // anchors collapse, drop the duplicate so the lerp stays well-defined.
-    struct Anchor { int L, r, g, b; };
-    Anchor stops[5] = {
-        {   0,                0,        0,        0        },
-        { origLoL,            targLoR,  targLoG,  targLoB  },
-        { origMidL,           targMidR, targMidG, targMidB },
-        { origHiL,            targHiR,  targHiG,  targHiB  },
-        { 255,                255,      255,      255      },
-    };
-    // Edge stops blend toward the matching authored color at full saturation
-    // so very dark / very bright source pixels don't flatten to pure black or
-    // pure white — they stay tinted.
-    stops[0].r = targLoR / 2; stops[0].g = targLoG / 2; stops[0].b = targLoB / 2;
-    stops[4].r = (targHiR + 255) / 2;
-    stops[4].g = (targHiG + 255) / 2;
-    stops[4].b = (targHiB + 255) / 2;
+// (No LUT. The new shift-based remap doesn't need one — each output pixel
+//  is just the source pixel plus a constant per-channel signed delta, so the
+//  PNG's gradient structure is preserved perfectly with no banding.)
 
-    // Sort + dedupe by L.
-    for (int i = 0; i < 5; ++i)
-      for (int j = i + 1; j < 5; ++j)
-        if (stops[j].L < stops[i].L) { Anchor t = stops[i]; stops[i] = stops[j]; stops[j] = t; }
-    int n = 0;
-    Anchor uniq[5];
-    for (int i = 0; i < 5; ++i) {
-        if (n == 0 || stops[i].L > uniq[n-1].L) uniq[n++] = stops[i];
-        else uniq[n-1] = stops[i];   // same L -> later anchor wins
-    }
-
-    int seg = 0;
-    for (int L = 0; L < 256; ++L) {
-        while (seg < n - 1 && L > uniq[seg + 1].L) seg++;
-        if (seg >= n - 1) {
-            lut_r[L] = (Uint8)uniq[n-1].r;
-            lut_g[L] = (Uint8)uniq[n-1].g;
-            lut_b[L] = (Uint8)uniq[n-1].b;
-            continue;
-        }
-        const Anchor &a = uniq[seg];
-        const Anchor &b = uniq[seg + 1];
-        int span = b.L - a.L;
-        if (span <= 0) { lut_r[L] = (Uint8)a.r; lut_g[L] = (Uint8)a.g; lut_b[L] = (Uint8)a.b; continue; }
-        int t = ((L - a.L) * 255) / span;
-        int inv = 255 - t;
-        lut_r[L] = (Uint8)((a.r * inv + b.r * t) / 255);
-        lut_g[L] = (Uint8)((a.g * inv + b.g * t) / 255);
-        lut_b[L] = (Uint8)((a.b * inv + b.b * t) / 255);
-    }
-}
-
+// Recolor by per-pixel signed delta: out = src + (target_bg - orig_bg).
+// Pixels at the skin's authored Background land EXACTLY at the target
+// Background. All other pixels shift by the same vector so the toolbar's
+// internal contrast and gradients are preserved with zero banding.
 static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
-                          int origLoL, int origMidL, int origHiL,
-                          int lor, int log_, int lob,
-                          int midr, int midg, int midb,
-                          int hir, int hig, int hib) {
+                          int dr, int dg, int db) {
     if (!src || !dst) return;
     if (src->w != dst->w || src->h != dst->h) return;
-
-    Uint8 lut_r[256], lut_g[256], lut_b[256];
-    build_lut_anchored(lut_r, lut_g, lut_b,
-                       origLoL, origMidL, origHiL,
-                       lor, log_, lob,
-                       midr, midg, midb,
-                       hir, hig, hib);
 
     if (!SDL_LockSurface(src)) return;
     if (!SDL_LockSurface(dst)) { SDL_UnlockSurface(src); return; }
@@ -388,15 +320,12 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
     SDL_Palette *spal = SDL_GetSurfacePalette(src);
     SDL_Palette *dpal = SDL_GetSurfacePalette(dst);
 
-    // Fast path: src/dst share the same 32-bit format and the byte offsets
-    // for R/G/B/A can be derived from the format masks. Covers the typical
-    // case where Skin::load cached origToolbar with the same pixel format
-    // as bmToolbar->surface.
+    // Fast path: src/dst share the same 32-bit format. Walk pixels by raw
+    // byte offsets derived from the format masks.
     bool fast = sf == df
                 && sf->bytes_per_pixel == 4
                 && sf->Rmask && sf->Gmask && sf->Bmask;
     if (fast) {
-        // Convert mask -> byte offset in the 32-bit pixel.
         auto mask_to_byte = [](Uint32 m) -> int {
             if (m == 0x000000FFu) return 0;
             if (m == 0x0000FF00u) return 1;
@@ -415,12 +344,9 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
                 for (int x = 0; x < src->w; ++x) {
                     Uint8 *sp = srow + x * 4;
                     Uint8 *dp = drow + x * 4;
-                    Uint8 sr = sp[rb], sg = sp[gb], sbv = sp[bb_];
-                    int lum = (sr * 299 + sg * 587 + sbv * 114) / 1000;
-                    if (lum > 255) lum = 255;
-                    dp[rb] = lut_r[lum];
-                    dp[gb] = lut_g[lum];
-                    dp[bb_] = lut_b[lum];
+                    dp[rb] = (Uint8)clamp_byte((int)sp[rb] + dr);
+                    dp[gb] = (Uint8)clamp_byte((int)sp[gb] + dg);
+                    dp[bb_] = (Uint8)clamp_byte((int)sp[bb_] + db);
                     if (ab >= 0) dp[ab] = sp[ab];
                 }
             }
@@ -430,8 +356,7 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
         }
     }
 
-    // Fallback: format-agnostic via SDL_GetRGBA / SDL_MapRGBA. Slower but
-    // safe regardless of pixel layout.
+    // Fallback: format-agnostic.
     for (int y = 0; y < src->h; ++y) {
         Uint8 *srow = (Uint8 *)src->pixels + y * src->pitch;
         Uint8 *drow = (Uint8 *)dst->pixels + y * dst->pitch;
@@ -446,10 +371,11 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
                 for (int k = 0; k < bpp; ++k) px |= srow[x * bpp + k] << (8 * k);
             }
             SDL_GetRGBA(px, sf, spal, &sr, &sg, &sbv, &sa);
-            int lum = (sr * 299 + sg * 587 + sbv * 114) / 1000;
-            if (lum > 255) lum = 255;
             Uint32 outpx = SDL_MapRGBA(df, dpal,
-                                       lut_r[lum], lut_g[lum], lut_b[lum], sa);
+                                       (Uint8)clamp_byte((int)sr + dr),
+                                       (Uint8)clamp_byte((int)sg + dg),
+                                       (Uint8)clamp_byte((int)sbv + db),
+                                       sa);
             int dbpp = df->bytes_per_pixel;
             if (dbpp == 4) {
                 ((Uint32 *)drow)[x] = outpx;
@@ -462,31 +388,23 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
     SDL_UnlockSurface(src);
 }
 
-void Skin::recolor_to_palette(TColor lo, TColor mid, TColor hi) {
-    int lor, log_, lob, midr, midg, midb, hir, hig, hib;
-    unpack_color(lo,  &lor,  &log_, &lob);
-    unpack_color(mid, &midr, &midg, &midb);
-    unpack_color(hi,  &hir,  &hig,  &hib);
-
-    // Read the original skin's authoring colors so we know which source
-    // luminances correspond to "this is meant to be the background color".
-    int oLoR, oLoG, oLoB, oMidR, oMidG, oMidB, oHiR, oHiG, oHiB;
-    unpack_color(origColors.Lowlight,   &oLoR,  &oLoG,  &oLoB);
-    unpack_color(origColors.Background, &oMidR, &oMidG, &oMidB);
-    unpack_color(origColors.Highlight,  &oHiR,  &oHiG,  &oHiB);
-    int origLoL  = luminance_of(oLoR,  oLoG,  oLoB);
-    int origMidL = luminance_of(oMidR, oMidG, oMidB);
-    int origHiL  = luminance_of(oHiR,  oHiG,  oHiB);
+void Skin::recolor_to_palette(TColor /*lo*/, TColor mid, TColor /*hi*/) {
+    // Compute the per-channel signed shift between the skin's authored
+    // Background and the user's target Background. Apply it to every cached
+    // source pixel — fast, banding-free, and the toolbar's main field
+    // matches COLORS.Background exactly because that's the anchor.
+    int omR, omG, omB, tmR, tmG, tmB;
+    unpack_color(origColors.Background, &omR, &omG, &omB);
+    unpack_color(mid,                   &tmR, &tmG, &tmB);
+    int dr = tmR - omR;
+    int dg = tmG - omG;
+    int db = tmB - omB;
 
     if (origToolbar && bmToolbar && bmToolbar->surface) {
-        remap_surface(origToolbar, bmToolbar->surface,
-                      origLoL, origMidL, origHiL,
-                      lor, log_, lob, midr, midg, midb, hir, hig, hib);
+        remap_surface(origToolbar, bmToolbar->surface, dr, dg, db);
     }
     if (origButtons && bmButtons && bmButtons->surface) {
-        remap_surface(origButtons, bmButtons->surface,
-                      origLoL, origMidL, origHiL,
-                      lor, log_, lob, midr, midg, midb, hir, hig, hib);
+        remap_surface(origButtons, bmButtons->surface, dr, dg, db);
     }
 }
 
