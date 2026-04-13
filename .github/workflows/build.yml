@@ -22,8 +22,15 @@
 #   * macOS: ship two separate single-arch artifacts instead of a universal
 #     binary, because Homebrew's SDL3 is single-arch -- combining would
 #     require building SDL3 from source twice, which is overkill.
-#   * Linux: apt's libsdl3-dev (3.2.x) is sufficient; the source uses only
-#     core SDL3 APIs.
+#   * Linux: Ubuntu 24.04's apt does not yet ship libsdl3-dev, so we build
+#     SDL3 from source (same tarball as Windows) into a local prefix and
+#     pass -DSDL3_INCLUDE_DIR / -DSDL3_LIBRARY like Windows does.
+#   * The upstream source tree does NOT ship extlibs/libpng and extlibs/zlib;
+#     the maintainer expects contributors to drop curated copies in place.
+#     CI fetches libpng 1.6.44 and zlib 1.3.1 tarballs on every run and
+#     extracts them flat into extlibs/libpng and extlibs/zlib so that
+#     extlibs/libpng/png.c and extlibs/zlib/adler32.c (etc.) exist at the
+#     paths CMakeLists.txt references.
 
 name: Build
 
@@ -40,6 +47,8 @@ concurrency:
 
 env:
   SDL3_VERSION: "3.4.4"
+  LIBPNG_VERSION: "1.6.44"
+  ZLIB_VERSION: "1.3.1"
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -57,12 +66,57 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config \
-            libsdl3-dev libasound2-dev
+            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libdecor-0-dev libdbus-1-dev libibus-1.0-dev \
+            libudev-dev libsndio-dev
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
+
+      - name: Cache SDL3 source tarball
+        id: cache-sdl3-src
+        uses: actions/cache@v4
+        with:
+          path: sdl3-src-cache
+          key: sdl3-src-${{ env.SDL3_VERSION }}
+
+      - name: Download + build SDL3 from source
+        id: sdl3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sdl3-src-cache
+          TARBALL="sdl3-src-cache/SDL3-${SDL3_VERSION}.tar.gz"
+          if [ ! -f "$TARBALL" ]; then
+            curl -fL -o "$TARBALL" \
+              "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz"
+          fi
+          rm -rf sdl3-src
+          mkdir -p sdl3-src
+          tar xf "$TARBALL" -C sdl3-src --strip-components=1
+          cmake -S sdl3-src -B sdl3-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$(pwd)/sdl3-prefix" \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF \
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build sdl3-build -j
+          cmake --install sdl3-build
+          PREFIX="$(pwd)/sdl3-prefix"
+          {
+            echo "include=$PREFIX/include"
+            echo "lib=$PREFIX/lib/libSDL3.so"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" \
+            -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
 
       - name: Build
         run: cmake --build build --config Release -j
@@ -74,6 +128,9 @@ jobs:
           cp zt.conf                 dist/ztrackerprime-linux-x86_64/
           cp -R skins                dist/ztrackerprime-linux-x86_64/
           cp -R doc                  dist/ztrackerprime-linux-x86_64/
+          # Ship libSDL3.so.0 next to the binary so the artifact is self-
+          # contained -- the system apt does not yet provide SDL3.
+          cp -a sdl3-prefix/lib/libSDL3.so*  dist/ztrackerprime-linux-x86_64/ || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -96,6 +153,12 @@ jobs:
         run: |
           brew update
           brew install cmake ninja pkg-config sdl3
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
 
       - name: Configure
         run: |
@@ -137,6 +200,12 @@ jobs:
         run: |
           brew update
           brew install cmake ninja pkg-config sdl3
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
 
       - name: Configure
         run: |
@@ -184,6 +253,12 @@ jobs:
             cmake ninja-build \
             mingw-w64 mingw-w64-tools \
             curl unzip zip
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
 
       - name: Cache SDL3 MinGW devel zip
         id: cache-sdl3-mingw
@@ -270,6 +345,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
 
       - name: Cache SDL3 VC devel zip
         id: cache-sdl3-vc
