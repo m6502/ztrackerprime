@@ -84,7 +84,7 @@ void Skin::makepath(char *dst, const char *filename)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void Skin::setpath(const char *name)
+void Skin::setpath(char *name) 
 {
   static char str[MAX_PATH + 1];
 
@@ -125,6 +125,24 @@ int Skin::load(const char *name, bool quiet)
 
   pngLoad("toolbar.png");
   bmToolbar = new Bitmap( s , true );
+  // Cache an untouched copy of the toolbar PNG so the Palette Editor can
+  // re-recolor on every palette change without losing source pixels.
+  if (bmToolbar->surface) {
+    origToolbar = SDL_CreateSurface(bmToolbar->surface->w,
+                                    bmToolbar->surface->h,
+                                    bmToolbar->surface->format);
+    if (origToolbar && SDL_LockSurface(origToolbar)) {
+      if (SDL_LockSurface(bmToolbar->surface)) {
+        for (int y = 0; y < bmToolbar->surface->h; ++y) {
+          memcpy((Uint8 *)origToolbar->pixels + y * origToolbar->pitch,
+                 (Uint8 *)bmToolbar->surface->pixels + y * bmToolbar->surface->pitch,
+                 bmToolbar->surface->w * 4);
+        }
+        SDL_UnlockSurface(bmToolbar->surface);
+      }
+      SDL_UnlockSurface(origToolbar);
+    }
+  }
 
 #ifdef _ENABLE_LOAD_SAVE_DECORATION
   pngLoad("load.png");
@@ -136,6 +154,22 @@ int Skin::load(const char *name, bool quiet)
 
   pngLoad("buttons.png");
   bmButtons = new Bitmap( s , true );
+  if (bmButtons->surface) {
+    origButtons = SDL_CreateSurface(bmButtons->surface->w,
+                                    bmButtons->surface->h,
+                                    bmButtons->surface->format);
+    if (origButtons && SDL_LockSurface(origButtons)) {
+      if (SDL_LockSurface(bmButtons->surface)) {
+        for (int y = 0; y < bmButtons->surface->h; ++y) {
+          memcpy((Uint8 *)origButtons->pixels + y * origButtons->pitch,
+                 (Uint8 *)bmButtons->surface->pixels + y * bmButtons->surface->pitch,
+                 bmButtons->surface->w * 4);
+        }
+        SDL_UnlockSurface(bmButtons->surface);
+      }
+      SDL_UnlockSurface(origButtons);
+    }
+  }
   
   pngLoad("about.png");
   bmAbout = new Bitmap( s , true );
@@ -213,6 +247,8 @@ void Skin::unload()
   if (bmButtons) { delete bmButtons; bmButtons = NULL; }
   if (bmAbout)   { delete bmAbout;   bmAbout   = NULL; }
   if (bmLogo)    { delete bmLogo;    bmLogo    = NULL; }
+  if (origToolbar) { zt_destroy_surface(origToolbar); origToolbar = NULL; }
+  if (origButtons) { zt_destroy_surface(origButtons); origButtons = NULL; }
   reset();
 
 }
@@ -224,6 +260,108 @@ void Skin::unload()
 //
 void Skin::reset(void) {
     bmButtons = bmAbout = bmLogo = bmLoad = bmSave = bmToolbar = NULL;
+    origToolbar = NULL;
+    origButtons = NULL;
+}
+
+// ---------------------------------------------------------------------------
+// Recolor cached PNGs into bmToolbar / bmButtons by remapping each pixel's
+// luminance through a 3-stop gradient (lo -> mid -> hi).
+//
+// This is the "skin follows the palette" trick used by FT2/IT and friends:
+// instead of vector graphics or per-skin colors.conf substitutions, we treat
+// the toolbar/buttons PNG as a luminance template and tint it to whatever
+// colors the user picked in the Palette Editor. Antialiased edges, button
+// shadows and embossing all survive because we only touch chroma, not luma.
+// ---------------------------------------------------------------------------
+
+static inline void unpack_color(TColor c, int *r, int *g, int *b) {
+    *r = (c >> 16) & 0xFF;
+    *g = (c >>  8) & 0xFF;
+    *b = (c      ) & 0xFF;
+}
+
+static inline void lerp_rgb(int t, int *r0, int *g0, int *b0,
+                            int r1, int g1, int b1) {
+    // t in [0..255]
+    int inv = 255 - t;
+    *r0 = (*r0 * inv + r1 * t) / 255;
+    *g0 = (*g0 * inv + g1 * t) / 255;
+    *b0 = (*b0 * inv + b1 * t) / 255;
+}
+
+static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
+                          int lor, int log_, int lob,
+                          int midr, int midg, int midb,
+                          int hir, int hig, int hib) {
+    if (!src || !dst) return;
+    if (src->w != dst->w || src->h != dst->h) return;
+    if (!SDL_LockSurface(src)) return;
+    if (!SDL_LockSurface(dst)) { SDL_UnlockSurface(src); return; }
+
+    const SDL_PixelFormatDetails *sf = SDL_GetPixelFormatDetails(src->format);
+    const SDL_PixelFormatDetails *df = SDL_GetPixelFormatDetails(dst->format);
+    SDL_Palette *spal = SDL_GetSurfacePalette(src);
+    SDL_Palette *dpal = SDL_GetSurfacePalette(dst);
+
+    for (int y = 0; y < src->h; ++y) {
+        Uint8 *srow = (Uint8 *)src->pixels + y * src->pitch;
+        Uint8 *drow = (Uint8 *)dst->pixels + y * dst->pitch;
+        for (int x = 0; x < src->w; ++x) {
+            Uint8 sr, sg, sb, sa;
+            // ARGB8888 / RGBA32 are both 4 bytes per pixel; use the slow but
+            // format-agnostic path so this works on whatever SDL gave us.
+            Uint32 px;
+            int bpp = sf->bytes_per_pixel;
+            if (bpp == 4) {
+                px = ((Uint32 *)srow)[x];
+            } else {
+                px = 0;
+                for (int k = 0; k < bpp; ++k) px |= srow[x * bpp + k] << (8 * k);
+            }
+            SDL_GetRGBA(px, sf, spal, &sr, &sg, &sb, &sa);
+
+            // Luminance (Rec.601) of source pixel.
+            int lum = (sr * 299 + sg * 587 + sb * 114) / 1000;
+            int rr, gg, bb;
+            if (lum < 128) {
+                int t = lum * 2;            // 0..254
+                rr = lor; gg = log_; bb = lob;
+                lerp_rgb(t, &rr, &gg, &bb, midr, midg, midb);
+            } else {
+                int t = (lum - 128) * 2;    // 0..254
+                rr = midr; gg = midg; bb = midb;
+                lerp_rgb(t, &rr, &gg, &bb, hir, hig, hib);
+            }
+
+            Uint32 outpx = SDL_MapRGBA(df, dpal,
+                                       (Uint8)rr, (Uint8)gg, (Uint8)bb, sa);
+            int dbpp = df->bytes_per_pixel;
+            if (dbpp == 4) {
+                ((Uint32 *)drow)[x] = outpx;
+            } else {
+                for (int k = 0; k < dbpp; ++k) drow[x * dbpp + k] = (outpx >> (8 * k)) & 0xFF;
+            }
+        }
+    }
+    SDL_UnlockSurface(dst);
+    SDL_UnlockSurface(src);
+}
+
+void Skin::recolor_to_palette(TColor lo, TColor mid, TColor hi) {
+    int lor, log_, lob, midr, midg, midb, hir, hig, hib;
+    unpack_color(lo,  &lor,  &log_, &lob);
+    unpack_color(mid, &midr, &midg, &midb);
+    unpack_color(hi,  &hir,  &hig,  &hib);
+
+    if (origToolbar && bmToolbar && bmToolbar->surface) {
+        remap_surface(origToolbar, bmToolbar->surface,
+                      lor, log_, lob, midr, midg, midb, hir, hig, hib);
+    }
+    if (origButtons && bmButtons && bmButtons->surface) {
+        remap_surface(origButtons, bmButtons->surface,
+                      lor, log_, lob, midr, midg, midb, hir, hig, hib);
+    }
 }
 
 

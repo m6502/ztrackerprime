@@ -1,11 +1,14 @@
 #include "zt.h"
 #include "CUI_PaletteEditor.h"
+#include "skins.h"
 #include <stdio.h>
 #include <string.h>
 #include <filesystem>
 #include <algorithm>
 #include <vector>
 #include <string>
+
+extern void make_toolbar(void);
 
 // ---------------------------------------------------------------------------
 // Palette Editor (Shift+Ctrl+F12)
@@ -303,6 +306,12 @@ void CUI_PaletteEditor::load_palette_file(const char *path_or_fname) {
         tint_amount = 0;
         dirty = 1;
         snprintf(status_line, sizeof(status_line), "Loaded: %s", path);
+        if (CurrentSkin) {
+            CurrentSkin->recolor_to_palette(COLORS.Lowlight,
+                                            COLORS.Background,
+                                            COLORS.Highlight);
+            make_toolbar();
+        }
         doredraw++;
         need_refresh++;
         screenmanager.UpdateAll();
@@ -340,6 +349,12 @@ void CUI_PaletteEditor::recompute_globals(void) {
         TColor *c = slot_color_ptr(i);
         if (!c) continue;
         *c = apply_xform(snapshot[i], brightness, contrast, tint_index, tint_amount);
+    }
+    if (CurrentSkin) {
+        CurrentSkin->recolor_to_palette(COLORS.Lowlight,
+                                        COLORS.Background,
+                                        COLORS.Highlight);
+        make_toolbar();
     }
     dirty = 1;
     doredraw++;
