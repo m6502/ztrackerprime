@@ -167,6 +167,11 @@ endif()
 
 target_compile_definitions(zt PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
 target_compile_definitions(zt PRIVATE PNG_ARM_NEON_OPT=0)
+
+# Inject build date as ZT_BUILD_DATE so the version string in the UI reflects
+# when the binary was actually built, instead of a stale hardcoded value.
+string(TIMESTAMP ZT_BUILD_DATE "%Y_%m_%d" UTC)
+target_compile_definitions(zt PRIVATE ZT_BUILD_DATE="${ZT_BUILD_DATE}")
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
   pkg_check_modules(SDL3PC QUIET IMPORTED_TARGET sdl3)

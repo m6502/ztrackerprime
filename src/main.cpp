@@ -3263,11 +3263,13 @@ int main(int argc, char *argv[])
 #endif
 
   bool launched_from_bundle = false;
+  char bundle_resources_path[PATH_MAX] = "";
 #if defined(__APPLE__)
   // When launched as a .app bundle (double-clicked in Finder), argv[0] points
   // at zt.app/Contents/MacOS/zt and the CWD is '/'. Jump into Contents/Resources
-  // so relative skin/doc/zt.conf lookups work, and suppress the later
-  // zt_set_current_directory(argv[0]) call that would override this chdir.
+  // so relative skin/doc/zt.conf lookups work, remember the absolute Resources
+  // path for zt_directory (CUI_Help.cpp and others build absolute paths from it),
+  // and suppress the later zt_set_current_directory(argv[0]) override.
   {
     char exe_path[PATH_MAX];
     uint32_t size = sizeof(exe_path);
@@ -3276,9 +3278,9 @@ int main(int argc, char *argv[])
       char *marker = strstr(exe_path, macos_marker);
       if (marker) {
         *marker = '\0';
-        char res_path[PATH_MAX];
-        snprintf(res_path, sizeof(res_path), "%s/Contents/Resources", exe_path);
-        if (chdir(res_path) == 0) launched_from_bundle = true;
+        snprintf(bundle_resources_path, sizeof(bundle_resources_path),
+                 "%s/Contents/Resources", exe_path);
+        if (chdir(bundle_resources_path) == 0) launched_from_bundle = true;
       }
     }
   }
@@ -3300,14 +3302,19 @@ int main(int argc, char *argv[])
     last_sep = last_slash;
   }
 
-  if(last_sep) {
+  if (launched_from_bundle) {
+    // Inside a .app: set zt_directory to Contents/Resources so help.txt and
+    // other <zt_directory>/... lookups resolve to bundled files. cwd is
+    // already Contents/Resources (done above), so don't call zt_set_current_directory.
+    zt_directory = strdup(bundle_resources_path);
+  }
+  else if(last_sep) {
     w = last_sep;
 
     if(w != argv[0]) {
       *w = '\0';
       zt_directory = strdup(argv[0]);
-      // Skip when launched from .app — we've already chdir'd to Contents/Resources.
-      if (!launched_from_bundle) zt_set_current_directory(argv[0]);
+      zt_set_current_directory(argv[0]);
       *w = path_sep;
     }
   }
