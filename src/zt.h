@@ -286,26 +286,27 @@ public:
 
 
 
-enum state { 
-  
-  STATE_PEDIT, 
-  STATE_IEDIT, 
-  STATE_PLAY, 
-  STATE_LOGO, 
-  STATE_ABOUT, 
-  STATE_SONG_CONFIG, 
+enum state {
+
+  STATE_PEDIT,
+  STATE_IEDIT,
+  STATE_PLAY,
+  STATE_LOGO,
+  STATE_ABOUT,
+  STATE_SONG_CONFIG,
   STATE_SYSTEM_CONFIG,
-  STATE_CONFIG, 
-  STATE_ORDER, 
-  STATE_PEDIT_WIN, 
+  STATE_CONFIG,
+  STATE_ORDER,
+  STATE_PEDIT_WIN,
   STATE_HELP,
-  STATE_LOAD, 
-  STATE_SAVE, 
-  STATE_STATUS, 
+  STATE_LOAD,
+  STATE_SAVE,
+  STATE_STATUS,
   STATE_SLIDER_INPUT,
-  STATE_SONG_MESSAGE, 
-  STATE_ARPEDIT, 
-  STATE_MIDIMACEDIT
+  STATE_SONG_MESSAGE,
+  STATE_ARPEDIT,
+  STATE_MIDIMACEDIT,
+  STATE_LUA_CONSOLE
 } ;
 
 
@@ -548,7 +549,7 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
     enum Ecmd {
         CMD_NONE,
         CMD_SWITCH_HELP,
-        CMD_SWITCH_PEDIT, 
+        CMD_SWITCH_PEDIT,
         CMD_SWITCH_IEDIT,
         CMD_SWITCH_SONGCONF,
         CMD_SWITCH_ORDERLIST,
@@ -578,8 +579,10 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
 #endif
 
 #ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
-        CMD_SWITCH_MIDIMACEDIT
+        CMD_SWITCH_MIDIMACEDIT,
 #endif
+
+        CMD_SWITCH_LUA_CONSOLE
 
     };
 
@@ -732,6 +735,7 @@ extern CUI_SongDuration *UIP_SongDuration;
 extern CUI_SongMessage *UIP_SongMessage;
 extern CUI_Arpeggioeditor *UIP_Arpeggioeditor;
 extern CUI_Midimacroeditor *UIP_Midimacroeditor;
+extern CUI_LuaConsole *UIP_LuaConsole;
 
 extern void switch_page(CUI_Page *page);
 extern int need_update;
