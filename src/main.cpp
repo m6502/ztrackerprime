@@ -902,6 +902,14 @@ void update_status(Drawable *S)
     }
 
     statusmsg = szStatmsg;
+
+    // Follow Playback (Scroll Lock): in pattern editor, cursor follows
+    // the playhead in real time.
+    if (bScrollLock && cur_state == STATE_PEDIT) {
+      cur_edit_pattern = ztPlayer->playing_cur_pattern;
+      cur_edit_row     = ztPlayer->playing_cur_row;
+      need_refresh++;
+    }
   }
 
   if (S->lock() == 0) {
@@ -1268,6 +1276,8 @@ void global_keys(Drawable *S)
                     bScrollLock = 0;
                 else
                     bScrollLock = 1;
+                statusmsg = (char*)(bScrollLock ? "Follow playback ON" : "Follow playback OFF");
+                status_change = 1; need_refresh++;
                 break;
             case SDLK_Q: 
                 if (kstate & KS_ALT && kstate & KS_CTRL) {
