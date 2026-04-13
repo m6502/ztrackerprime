@@ -190,7 +190,7 @@ CUI_Config::CUI_Config(void) {
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
-        int remain = max_rows - tb->y - 1 - 6;
+        int remain = max_rows - tb->y - 1 - 9;
         if (remain < 1) remain = 1;
         tb->ysize = remain;
     }
