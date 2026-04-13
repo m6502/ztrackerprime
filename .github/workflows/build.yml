@@ -1,0 +1,429 @@
+# GitHub Actions CI for zTracker Prime
+#
+# Builds `zt` on every push and every PR against master, across:
+#   - Windows x86 (32-bit, XP-compatible) -- MinGW-w64 cross from Ubuntu
+#   - Windows x64 (modern)                -- MSVC on windows-latest
+#   - macOS arm64                          -- Apple Silicon (macos-14)
+#   - macOS x86_64                         -- Intel (macos-26-intel)
+#   - Linux x86_64                         -- ubuntu-24.04
+#
+# Each job uploads an artifact containing:
+#   zt(.exe), zt.conf, skins/, doc/   (plus required runtime DLLs on Windows)
+#
+# Design notes:
+#   * Each platform is a separate job (not a deep matrix axis) for clarity --
+#     the install / SDL3 sourcing logic differs enough per platform that a
+#     unified matrix would be harder to read than 5 small jobs.
+#   * Windows x86 XP compatibility: cross-compile with MinGW-w64 from Ubuntu,
+#     define _WIN32_WINNT=0x0501 (Windows XP). SDL3 ships official MinGW
+#     binaries that work on XP per upstream docs.
+#   * Windows x64 uses MSVC + the SDL3-devel-VC release zip (the standard
+#     modern Windows path).
+#   * macOS: ship two separate single-arch artifacts instead of a universal
+#     binary, because Homebrew's SDL3 is single-arch -- combining would
+#     require building SDL3 from source twice, which is overkill.
+#   * Linux: Ubuntu 24.04's apt does not yet ship libsdl3-dev, so we build
+#     SDL3 from source (same tarball as Windows) into a local prefix and
+#     pass -DSDL3_INCLUDE_DIR / -DSDL3_LIBRARY like Windows does.
+#   * The upstream source tree does NOT ship extlibs/libpng and extlibs/zlib;
+#     the maintainer expects contributors to drop curated copies in place.
+#     CI fetches libpng 1.6.44 and zlib 1.3.1 tarballs on every run and
+#     extracts them flat into extlibs/libpng and extlibs/zlib so that
+#     extlibs/libpng/png.c and extlibs/zlib/adler32.c (etc.) exist at the
+#     paths CMakeLists.txt references.
+
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [master]
+
+# Allow only one concurrent run per branch / PR; cancel older runs.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SDL3_VERSION: "3.4.4"
+  LIBPNG_VERSION: "1.6.44"
+  ZLIB_VERSION: "1.3.1"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Linux x86_64
+  # ---------------------------------------------------------------------------
+  linux-x86_64:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libxss-dev libxxf86vm-dev libxfixes-dev \
+            libxrender-dev \
+            libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libdecor-0-dev libdbus-1-dev libibus-1.0-dev \
+            libudev-dev libsndio-dev
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
+
+      - name: Cache SDL3 source tarball
+        id: cache-sdl3-src
+        uses: actions/cache@v4
+        with:
+          path: sdl3-src-cache
+          key: sdl3-src-${{ env.SDL3_VERSION }}
+
+      - name: Download + build SDL3 from source
+        id: sdl3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sdl3-src-cache
+          TARBALL="sdl3-src-cache/SDL3-${SDL3_VERSION}.tar.gz"
+          if [ ! -f "$TARBALL" ]; then
+            curl -fL -o "$TARBALL" \
+              "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz"
+          fi
+          rm -rf sdl3-src
+          mkdir -p sdl3-src
+          tar xf "$TARBALL" -C sdl3-src --strip-components=1
+          # Disable optional X11 extensions zTracker doesn't use, so we don't have
+          # to chase a growing list of libX*-dev packages on the Ubuntu runner.
+          cmake -S sdl3-src -B sdl3-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$(pwd)/sdl3-prefix" \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF \
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+            -DSDL_X11_XCURSOR=OFF -DSDL_X11_XINPUT=OFF \
+            -DSDL_X11_XRANDR=OFF -DSDL_X11_XSCRNSAVER=OFF \
+            -DSDL_X11_XSHAPE=OFF -DSDL_X11_XFIXES=OFF \
+            -DSDL_X11_XTEST=OFF
+          cmake --build sdl3-build -j
+          cmake --install sdl3-build
+          PREFIX="$(pwd)/sdl3-prefix"
+          {
+            echo "include=$PREFIX/include"
+            echo "lib=$PREFIX/lib/libSDL3.so"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" \
+            -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Stage release
+        run: |
+          mkdir -p dist/ztrackerprime-linux-x86_64
+          cp build/Program/zt        dist/ztrackerprime-linux-x86_64/
+          cp zt.conf                 dist/ztrackerprime-linux-x86_64/
+          cp -R skins                dist/ztrackerprime-linux-x86_64/
+          cp -R doc                  dist/ztrackerprime-linux-x86_64/
+          # Ship libSDL3.so.0 next to the binary so the artifact is self-
+          # contained -- the system apt does not yet provide SDL3.
+          cp -a sdl3-prefix/lib/libSDL3.so*  dist/ztrackerprime-linux-x86_64/ || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrackerprime-linux-x86_64
+          path: dist/ztrackerprime-linux-x86_64
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # macOS arm64 (Apple Silicon)
+  # ---------------------------------------------------------------------------
+  macos-arm64:
+    name: macOS arm64
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          brew update
+          brew install cmake ninja pkg-config sdl3
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Stage release
+        run: |
+          mkdir -p dist/ztrackerprime-macos-arm64
+          cp build/Program/zt        dist/ztrackerprime-macos-arm64/
+          cp zt.conf                 dist/ztrackerprime-macos-arm64/
+          cp -R skins                dist/ztrackerprime-macos-arm64/
+          cp -R doc                  dist/ztrackerprime-macos-arm64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrackerprime-macos-arm64
+          path: dist/ztrackerprime-macos-arm64
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # macOS x86_64 (Intel)
+  # ---------------------------------------------------------------------------
+  macos-x86_64:
+    name: macOS x86_64
+    # macos-13 / macos-12 Intel runners have been retired; macos-26-intel is
+    # the supported Intel image. (macos-14+ are Apple Silicon.)
+    runs-on: macos-26-intel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          brew update
+          brew install cmake ninja pkg-config sdl3
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Stage release
+        run: |
+          mkdir -p dist/ztrackerprime-macos-x86_64
+          cp build/Program/zt        dist/ztrackerprime-macos-x86_64/
+          cp zt.conf                 dist/ztrackerprime-macos-x86_64/
+          cp -R skins                dist/ztrackerprime-macos-x86_64/
+          cp -R doc                  dist/ztrackerprime-macos-x86_64/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrackerprime-macos-x86_64
+          path: dist/ztrackerprime-macos-x86_64
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows x86 (32-bit, XP-compatible) -- cross from Ubuntu via MinGW-w64
+  # ---------------------------------------------------------------------------
+  # Why cross from Linux instead of MSYS2 on windows-latest:
+  #   * Faster spin-up (Linux runners boot quicker than Windows runners).
+  #   * Easier caching of the SDL3 mingw zip.
+  #   * MSYS2 setup on Windows runners adds several minutes of toolchain
+  #     bootstrap on every run.
+  windows-x86-xp:
+    name: Windows x86 (XP-compat, MinGW)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 (i686) + tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            mingw-w64 mingw-w64-tools \
+            curl unzip zip
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
+
+      - name: Cache SDL3 MinGW devel zip
+        id: cache-sdl3-mingw
+        uses: actions/cache@v4
+        with:
+          path: sdl3-mingw
+          key: sdl3-mingw-${{ env.SDL3_VERSION }}
+
+      - name: Download SDL3 MinGW devel
+        if: steps.cache-sdl3-mingw.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p sdl3-mingw
+          cd sdl3-mingw
+          curl -fLO "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-devel-${SDL3_VERSION}-mingw.tar.gz"
+          tar xf "SDL3-devel-${SDL3_VERSION}-mingw.tar.gz"
+
+      - name: Locate SDL3 i686 prefix
+        id: sdl3
+        run: |
+          SDL3_DIR="$(pwd)/sdl3-mingw/SDL3-${SDL3_VERSION}/i686-w64-mingw32"
+          if [ ! -d "$SDL3_DIR" ]; then
+            echo "SDL3 i686 prefix not found at $SDL3_DIR"
+            find sdl3-mingw -maxdepth 4 -print | head -50
+            exit 1
+          fi
+          {
+            echo "prefix=$SDL3_DIR"
+            echo "include=$SDL3_DIR/include"
+            echo "lib=$SDL3_DIR/lib/libSDL3.dll.a"
+            echo "dll=$SDL3_DIR/bin/SDL3.dll"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write MinGW i686 toolchain file
+        run: |
+          cat > toolchain-mingw-i686.cmake <<'EOF'
+          set(CMAKE_SYSTEM_NAME Windows)
+          set(CMAKE_SYSTEM_PROCESSOR i686)
+          set(TOOLCHAIN_PREFIX i686-w64-mingw32)
+          set(CMAKE_C_COMPILER   ${TOOLCHAIN_PREFIX}-gcc-posix)
+          set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}-g++-posix)
+          set(CMAKE_RC_COMPILER  ${TOOLCHAIN_PREFIX}-windres)
+          set(CMAKE_FIND_ROOT_PATH /usr/${TOOLCHAIN_PREFIX})
+          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+          # XP target: 0x0501 == Windows XP
+          add_compile_definitions(_WIN32_WINNT=0x0501 WINVER=0x0501)
+          EOF
+
+      - name: Configure (MinGW i686, XP target)
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$(pwd)/toolchain-mingw-i686.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" \
+            -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Stage release
+        run: |
+          mkdir -p dist/ztrackerprime-windows-x86-xp
+          cp build/Program/zt.exe                dist/ztrackerprime-windows-x86-xp/
+          cp "${{ steps.sdl3.outputs.dll }}"     dist/ztrackerprime-windows-x86-xp/
+          cp zt.conf                             dist/ztrackerprime-windows-x86-xp/
+          cp -R skins                            dist/ztrackerprime-windows-x86-xp/
+          cp -R doc                              dist/ztrackerprime-windows-x86-xp/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrackerprime-windows-x86-xp
+          path: dist/ztrackerprime-windows-x86-xp
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows x64 -- MSVC, modern Windows 10/11 target
+  # ---------------------------------------------------------------------------
+  windows-x64:
+    name: Windows x64 (MSVC)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch extlibs (libpng + zlib)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-extlibs.sh
+
+      - name: Cache SDL3 VC devel zip
+        id: cache-sdl3-vc
+        uses: actions/cache@v4
+        with:
+          path: sdl3-vc
+          key: sdl3-vc-${{ env.SDL3_VERSION }}
+
+      - name: Download SDL3 VC devel
+        if: steps.cache-sdl3-vc.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path sdl3-vc | Out-Null
+          $url  = "https://github.com/libsdl-org/SDL/releases/download/release-$env:SDL3_VERSION/SDL3-devel-$env:SDL3_VERSION-VC.zip"
+          $zip  = "sdl3-vc/SDL3-devel.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath sdl3-vc -Force
+
+      - name: Locate SDL3 (VC)
+        id: sdl3
+        shell: pwsh
+        run: |
+          $root = "$(Get-Location)\sdl3-vc\SDL3-$env:SDL3_VERSION"
+          if (-not (Test-Path $root)) {
+            Write-Host "SDL3 root not found at $root"
+            Get-ChildItem sdl3-vc -Recurse | Select-Object -First 50 FullName
+            exit 1
+          }
+          $inc = "$root\include"
+          $lib = "$root\lib\x64\SDL3.lib"
+          $dll = "$root\lib\x64\SDL3.dll"
+          "include=$inc" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "lib=$lib"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "dll=$dll"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Configure (MSVC x64)
+        shell: pwsh
+        run: |
+          cmake -S . -B build -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" `
+            -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release -j
+
+      - name: Stage release
+        shell: pwsh
+        run: |
+          $dest = "dist\ztrackerprime-windows-x64"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          # MSVC multi-config places the exe in build/Program/Release
+          $exe = "build\Program\Release\zt.exe"
+          if (-not (Test-Path $exe)) { $exe = "build\Program\zt.exe" }
+          Copy-Item $exe                       $dest
+          Copy-Item "${{ steps.sdl3.outputs.dll }}" $dest
+          Copy-Item zt.conf                    $dest
+          Copy-Item skins -Recurse             $dest
+          Copy-Item doc   -Recurse             $dest
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrackerprime-windows-x64
+          path: dist/ztrackerprime-windows-x64
+          if-no-files-found: error

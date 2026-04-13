@@ -146,6 +146,15 @@ void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char) {
         c |= KS_CTRL;
     if (state & SDL_KMOD_SHIFT)
         c |= KS_SHIFT;
+#ifdef __APPLE__
+    // On macOS, map Cmd (SDL_KMOD_GUI) to KS_META AND KS_ALT so that
+    // Cmd+key works everywhere ALT+key does (Cmd is the primary modifier on Mac).
+    if (state & SDL_KMOD_GUI)
+        c |= KS_META | KS_ALT;
+#else
+    if (state & SDL_KMOD_GUI)
+        c |= KS_META;
+#endif
     if (state == KS_LAST_STATE) {
         buffer[head].actual_char = last_actual_char;
         buffer[head].state = ls;

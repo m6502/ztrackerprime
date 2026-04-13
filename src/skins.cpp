@@ -201,18 +201,18 @@ void Skin::freeLogo(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void Skin::unload() 
+void Skin::unload()
 {
-  delete bmToolbar;
+  if (bmToolbar) { delete bmToolbar; bmToolbar = NULL; }
 
 #ifdef _ENABLE_LOAD_SAVE_DECORATION
-  delete bmLoad;
-  delete bmSave;
+  if (bmLoad)    { delete bmLoad;    bmLoad    = NULL; }
+  if (bmSave)    { delete bmSave;    bmSave    = NULL; }
 #endif
 
-  delete bmButtons;
-  delete bmAbout;
-  delete bmLogo;
+  if (bmButtons) { delete bmButtons; bmButtons = NULL; }
+  if (bmAbout)   { delete bmAbout;   bmAbout   = NULL; }
+  if (bmLogo)    { delete bmLogo;    bmLogo    = NULL; }
   reset();
 
 }

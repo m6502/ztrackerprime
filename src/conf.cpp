@@ -46,6 +46,7 @@
 #include <SDL.h>
 
 #include "conf.h"
+#include "keybindings.h"
 
 #include "zt.h"
 
@@ -431,6 +432,8 @@ int ZTConf::save() {
 
     sprintf(s, "%s", default_directory);
     Config->set("default_directory", s);
-    
+
+    g_keybindings.save(Config);
+
     return Config->save(conf_filename) ? 0 : -1;
 }

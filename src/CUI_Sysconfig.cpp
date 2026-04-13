@@ -253,6 +253,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
     TextInput *ti;
 
     int tabindex=0;
+    int base_y = TRACKS_ROW_Y;  // Align controls with Pattern Editor content start
     UI = new UserInterface;
     // MIDI Devices
 
@@ -261,7 +262,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
         vs->x = 4 + 15;
-        vs->y = 14;
+        vs->y = base_y;
         vs->xsize = 15+1;
         vs->ysize = 1;
         vs->value = zt_config_globals.prebuffer_rows;
@@ -271,7 +272,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 15;
-        cb->y = 16;
+        cb->y = base_y + 2;
         cb->xsize = 5;
         cb->value = &zt_config_globals.auto_send_panic;
         cb->frame = 1;
@@ -279,7 +280,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 15;
-        cb->y = 18;
+        cb->y = base_y + 4;
         cb->xsize = 5;
         cb->value = &zt_config_globals.midi_in_sync;
         cb->frame = 1;
@@ -287,7 +288,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 15;
-        cb->y = 20;
+        cb->y = base_y + 6;
         cb->xsize = 5;
         cb->value = &zt_config_globals.auto_open_midi;
         cb->frame = 1;
@@ -296,7 +297,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(cb,tabindex++); // id:4
         cb->frame = 0;
         cb->x = 4+15;
-        cb->y = 22;
+        cb->y = base_y + 8;
         cb->xsize = 5;
         cb->value = &zt_config_globals.full_screen;
         cb->frame = 1;
@@ -305,7 +306,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
         vs->x = 4+15;
-        vs->y = 24;
+        vs->y = base_y + 10;
         vs->xsize = 15+4;
         vs->ysize = 1;
         vs->value = zt_config_globals.key_repeat_time;
@@ -315,7 +316,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
         vs->x = 4+15;
-        vs->y = 26;
+        vs->y = base_y + 12;
         vs->xsize = 15+4;
         vs->ysize = 1;
         vs->value = zt_config_globals.key_wait_time;
@@ -326,7 +327,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         sk = new SkinSelector;
         UI->add_element(sk,tabindex++);
         sk->x = 4+35 +10;
-        sk->y = 16;
+        sk->y = base_y + 2;
         sk->xsize = 19+4;
         sk->ysize = 10;
 
@@ -490,18 +491,18 @@ void CUI_Sysconfig::draw(Drawable *S) {
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"System Configuration (F12)",COLORS.Text,COLORS.Background,S);
-        print(row(4),col(14),"     Prebuffer",COLORS.Text,S);
-        print(row(4),col(16)," Panic on stop",COLORS.Text,S);
-        print(row(4),col(18)," MIDI-IN Slave",COLORS.Text,S);
-        print(row(4),col(20),"Auto-open MIDI",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y),"     Prebuffer",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+2)," Panic on stop",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+4)," MIDI-IN Slave",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+6),"Auto-open MIDI",COLORS.Text,S);
 
-        print(row(4),col(22),"   Full Screen",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+8),"   Full Screen",COLORS.Text,S);
         //print(row(4),col(24),"  Step Editing",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
-        print(row(4),col(24),"    Key Repeat",COLORS.Text,S);
-        print(row(4),col(26),"      Key Wait",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+10),"    Key Repeat",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+12),"      Key Wait",COLORS.Text,S);
 #endif
-        print(row(4+37+8),col(14),"Skin Selection",COLORS.Text,S);
+        print(row(4+37+8),col(TRACKS_ROW_Y+2),"Skin Selection",COLORS.Text,S);
 
         print(row(4),col(30),"MIDI Out Device Selection",COLORS.Text,S);
         print(row(4+37),col(30),"MIDI In Device Selection",COLORS.Text,S);
