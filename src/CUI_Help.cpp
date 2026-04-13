@@ -70,7 +70,7 @@ void CUI_Help::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Help",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Help (F1)",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
         S->unlock();

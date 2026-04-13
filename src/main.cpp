@@ -415,6 +415,9 @@ void switch_page(CUI_Page *page)
     ActivePage->enter();
     if (ActivePage->UI)
         ActivePage->UI->full_refresh();
+    // Clear any stale status message from the previous page so it
+    // doesn't bleed onto the newly activated page.
+    statusmsg = (char*)" ";
     screenmanager.UpdateAll();
     need_refresh++;
 }
