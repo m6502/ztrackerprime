@@ -81,14 +81,24 @@ struct PalettePreset {
     const char *file;
 };
 
+// Two kinds of preset entries: a .conf in palettes/ (prefix "p/") or a
+// skin colors.conf (prefix "s/"). load_palette_file() strips the prefix
+// and routes to the right path.
 static const PalettePreset g_presets[NUM_PALETTE_PRESETS] = {
-    { "Light Blue",        "light_blue.conf" },
-    { "Gold",              "gold.conf" },
-    { "Camouflage",        "camouflage.conf" },
-    { "Midnight Tracking", "midnight_tracking.conf" },
-    { "Pine Colours",      "pine_colours.conf" },
-    { "Soundtracker",      "soundtracker.conf" },
-    { "Volcanic",          "volcanic.conf" },
+    { "Light Blue",        "p/light_blue.conf" },
+    { "Gold",              "p/gold.conf" },
+    { "Camouflage",        "p/camouflage.conf" },
+    { "Midnight Tracking", "p/midnight_tracking.conf" },
+    { "Pine Colours",      "p/pine_colours.conf" },
+    { "Soundtracker",      "p/soundtracker.conf" },
+    { "Volcanic",          "p/volcanic.conf" },
+    { "Skin: default",      "s/default" },
+    { "Skin: professional", "s/professional" },
+    { "Skin: blue-c64",     "s/blue-c64" },
+    { "Skin: reaktor",      "s/reaktor" },
+    { "Skin: tekstyle",     "s/tekstyle" },
+    { "Skin: x.seed",       "s/x.seed" },
+    { "Skin: xt-g01",       "s/xt-g01" },
 };
 
 static TColor *slot_color_ptr(int slot) {
@@ -142,11 +152,21 @@ void CUI_PaletteEditor::leave(void) {
 
 void CUI_PaletteEditor::load_palette_file(const char *fname) {
     char path[MAX_PATH + 1];
+    const char *base = cur_dir ? cur_dir : ".";
+    const char *sep =
 #if defined(_WIN32)
-    snprintf(path, sizeof(path), "%s\\palettes\\%s", cur_dir ? cur_dir : ".", fname);
+        "\\";
 #else
-    snprintf(path, sizeof(path), "%s/palettes/%s", cur_dir ? cur_dir : ".", fname);
+        "/";
 #endif
+    // Route by prefix: "p/<file>" -> palettes/<file>, "s/<name>" -> skins/<name>/colors.conf
+    if (strncmp(fname, "p/", 2) == 0) {
+        snprintf(path, sizeof(path), "%s%spalettes%s%s", base, sep, sep, fname + 2);
+    } else if (strncmp(fname, "s/", 2) == 0) {
+        snprintf(path, sizeof(path), "%s%sskins%s%s%scolors.conf", base, sep, sep, fname + 2, sep);
+    } else {
+        snprintf(path, sizeof(path), "%s%spalettes%s%s", base, sep, sep, fname);
+    }
     if (COLORS.load(path)) {
         dirty = 1;
         snprintf(status_line, sizeof(status_line), "Loaded palette: %s", fname);

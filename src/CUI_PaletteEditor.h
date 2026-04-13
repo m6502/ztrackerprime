@@ -6,6 +6,7 @@
 #define NUM_PALETTE_SLOTS  18
 
 // Number of predefined palette preset buttons.
-#define NUM_PALETTE_PRESETS 7
+// 7 hardcoded palettes + 7 shipped skins = 14.
+#define NUM_PALETTE_PRESETS 14
 
 #endif

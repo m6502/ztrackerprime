@@ -325,7 +325,10 @@ if(APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy
       "${CMAKE_SOURCE_DIR}/zt_icon.png"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt_icon.png"
-    COMMENT "Copying skins/, doc/, zt.conf, and zt_icon.png into zt.app/Contents/Resources"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_SOURCE_DIR}/palettes"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/palettes"
+    COMMENT "Copying skins/, doc/, zt.conf, zt_icon.png, and palettes/ into zt.app/Contents/Resources"
     VERBATIM
   )
 else()
