@@ -74,10 +74,13 @@ static void palette_changed(void);
 #define PE_GLOBAL_NUMBER_W  4    // value readout after each bar
 #define PE_GLOBAL_GROUP_W   (PE_GLOBAL_LABEL_W + PE_GLOBAL_BAR_W + PE_GLOBAL_NUMBER_W + 2)
 
-// Checkbox: "[X] Reset skin to default on palette load" — shown on row 11.
-#define PE_CHECKBOX_X       2
-#define PE_CHECKBOX_Y       11
-#define PE_CHECKBOX_LABEL   "Reset skin to default on palette load"
+// Checkbox: "[X] Reset skin" — shares row 10 with the global slider strip,
+// to the right of the tint slider. Keeping it on row 10 means swatch slot
+// labels (which are printed at PE_GRID_ROW_Y - 1 = row 11) don't overlap
+// with the checkbox.
+#define PE_CHECKBOX_X       (PE_GLOBAL_X + 3 * PE_GLOBAL_GROUP_W + 1)
+#define PE_CHECKBOX_Y       PE_GLOBAL_ROW_Y
+#define PE_CHECKBOX_LABEL   "Reset skin"
 #define PE_CHECKBOX_W       (3 + 1 + (int)sizeof(PE_CHECKBOX_LABEL))
 
 struct PaletteSlot {
