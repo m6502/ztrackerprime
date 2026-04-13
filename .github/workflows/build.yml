@@ -68,7 +68,7 @@ jobs:
             build-essential cmake ninja-build pkg-config \
             libasound2-dev libpulse-dev \
             libx11-dev libxext-dev libxcursor-dev libxrandr-dev \
-            libxi-dev libxscrnsaver-dev libxxf86vm-dev libxfixes-dev \
+            libxi-dev libxss-dev libxxf86vm-dev libxfixes-dev \
             libxrender-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
             libdecor-0-dev libdbus-1-dev libibus-1.0-dev \
