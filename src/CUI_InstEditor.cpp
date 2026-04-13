@@ -102,7 +102,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vso->x = 36;    vso->y = 15;    vso->xsize = 14;    vso->ysize = 1; vso->min = -1;  vso->max = 0x3fff;    vso->value = -1; 
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=12; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=35; fm->y=13; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
@@ -111,7 +111,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vso->x = 58;    vso->y = 15;    vso->xsize = 16;    vso->ysize = 1; vso->min = -1;  vso->max = 127; vso->value = -1;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=12; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=57; fm->y=13; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
@@ -121,7 +121,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vs->x = 36; vs->y = 20; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=17; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=35; fm->y=18; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
@@ -131,7 +131,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vsd->x = 58;    vsd->y = 20;    vsd->xsize = 16;    vsd->ysize = 1; vsd->min = 1;   vsd->max = 1000;    vsd->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=17; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=57; fm->y=18; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
     
 
@@ -141,7 +141,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vs->x = 36; vs->y = 25; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=22; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=35; fm->y=23; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
     
 
 
@@ -151,7 +151,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vs->x = 58; vs->y = 25; vs->xsize = 16; vs->ysize = 1;  vs->min = -127; vs->max = 127;  vs->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=22; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=57; fm->y=23; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
@@ -161,7 +161,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     vs->x = 36; vs->y = 30; vs->xsize = 16; vs->ysize = 1;  vs->min = 1;    vs->max = 16;   vs->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=27; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
+    fm->x=35; fm->y=28; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
     
     ////////////////////////////////////////////////////////////////////////////
 
@@ -197,7 +197,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     fm = new Frame;  //frame for buttons
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=27; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
+    fm->x=57; fm->y=28; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
 
 
 
@@ -563,7 +563,7 @@ void CUI_InstEditor::draw(Drawable *S)
         UI->draw(S);
         draw_status(S);
         status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"(F3) Sample Editor",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"(F3) Instrument Editor",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(13),"Bank",COLORS.Text,COLORS.Background,S);
         printBG(col(58),row(13),"Patch",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(18),"Default Volume",COLORS.Text,COLORS.Background,S);
