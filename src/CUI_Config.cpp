@@ -338,7 +338,7 @@ void CUI_Config::draw(Drawable *S) {
 #endif
         draw_status(S);
         status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Global Configuration",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
         print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
         print(row(2),col(15),"Autoload File",COLORS.Text,S);
         print(row(2),col(17),"Default Dir",COLORS.Text,S);

@@ -122,7 +122,7 @@ void CUI_About::draw(Drawable *S) {
     */
     UI->full_refresh();
     if (S->lock()==0) {
-        printtitle(PAGE_TITLE_ROW_Y,"About zt",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"About zTracker (Alt+F12)",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         UI->draw(S);
         S->unlock();

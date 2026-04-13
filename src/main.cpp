@@ -430,9 +430,17 @@ void switch_page(CUI_Page *page)
     ActivePage->enter();
     if (ActivePage->UI)
         ActivePage->UI->full_refresh();
-    // Force full screen clear to prevent previous page from bleeding through (#17).
+    // Clear any stale status message from the previous page so it
+    // doesn't bleed onto the newly activated page.
+    statusmsg = (char*)" ";
+    
+  
+  // <Manu> TO-DO Check if still needed, but not problematic if not
+  // Force full screen clear to prevent previous page from bleeding through (#17).
     if (screen_buffer)
         screen_buffer->fillRect(0, 0, INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, COLORS.Background);
+  
+  
     screenmanager.UpdateAll();
     doredraw++;
     need_refresh++;

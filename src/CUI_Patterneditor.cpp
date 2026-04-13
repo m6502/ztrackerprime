@@ -409,17 +409,17 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       
         if (var_row==ztPlayer->playing_cur_row && ztPlayer->playing_cur_pattern==cur_edit_pattern) {
           
-          printBG(col(1),row(15+num_displayed_rows),str,COLORS.Highlight,COLORS.Background,S);
+          printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Highlight,COLORS.Background,S);
         }
         else {
           
-          printBG(col(1),row(15+num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
+          printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
         }
       } 
-      else printBG(col(1),row(15+num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
+      else printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
       
-      printchar(col(4),row(15+num_displayed_rows),146,COLORS.Lowlight,S);
-      printchar(col(4+(tracks_shown*(field_size+1))),row(15+num_displayed_rows),145,COLORS.Highlight,S);
+      printchar(col(4),row(TRACKS_ROW_Y + 1 + num_displayed_rows),146,COLORS.Lowlight,S);
+      printchar(col(4+(tracks_shown*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),145,COLORS.Highlight,S);
     }
     
     
@@ -435,7 +435,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       if (!(e = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(var_row))) e = &blank_event;
       
       //          printNote(str,e,cur_edit_mode);
-      //          printBG(col(5+(num_displayed_tracks*(field_size+1))),row(15+num_displayed_rows),str,fg,bg,S);
+      //          printBG(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,fg,bg,S);
       
       if (upd_one && e != which_e && upd_one==1) goto please_skip; // ...
 
@@ -471,13 +471,13 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 
       case MD_FX_SIGNED:
         
-        draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(15+num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
         
         break;
 
       default:
         
-        draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(15+num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
         
         break;
       } ;
@@ -485,7 +485,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       
       if (var_track<(cur_edit_track_disp+tracks_shown-1)) {
         
-        printchar(col(5+((num_displayed_tracks+1)*(field_size+1))-1),row(15+num_displayed_rows),168,COLORS.Lowlight,S) ;
+        printchar(col(5+((num_displayed_tracks+1)*(field_size+1))-1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),168,COLORS.Lowlight,S) ;
       }
 
 please_skip:
@@ -675,7 +675,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 //bg = COLORS.EditBG;
 
                 //printBlankNote(str, zt_config_globals.cur_edit_mode) ;
-                //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(15+num_displayed_rows), str, fg, bg, S) ;
+                //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(TRACKS_ROW_Y + 1 + num_displayed_rows), str, fg, bg, S) ;
 
                 // Lo dibujamos un píxel a la izquierda y un píxel más largo para comernos la posible línea del marco de los tracks
 
@@ -1272,8 +1272,8 @@ void CUI_Patterneditor::update()
         case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
           if (    MousePressX >= col(5) 
             && MousePressX <  col(5+(tracks_shown*(field_size+1)))
-            && MousePressY >= row(15)
-            && MousePressY <= row(15+PATTERN_EDIT_ROWS)
+            && MousePressY >= row(TRACKS_ROW_Y + 1)
+            && MousePressY <= row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS)
             ) {
             //int x;
             //x = (MousePressX - col(5)) / 8;
@@ -1287,8 +1287,8 @@ void CUI_Patterneditor::update()
         case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
           if (    MousePressX >= col(5) 
                 && MousePressX <  col(5+(tracks_shown*(field_size+1)))
-                && MousePressY >= row(15)
-                && MousePressY <= row(15+PATTERN_EDIT_ROWS)
+                && MousePressY >= row(TRACKS_ROW_Y + 1)
+                && MousePressY <= row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS)
                 ) {
             //int x;
             //x = (MousePressX - col(5)) / 8;
@@ -3303,17 +3303,17 @@ wrap:;
         
         if (   LastX >= col(5) 
           && LastX <  col(5+(tracks_shown*(field_size+1)))
-          && LastY >= row(15)
-          && LastY <= row(15+PATTERN_EDIT_ROWS)
+          && LastY >= row(TRACKS_ROW_Y + 1)
+          && LastY <= row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS)
           ) {
           int x,y,data,track;
           x = (LastX - col(5)) / 8;
-          y = (LastY - row(15)) / 8;
+          y = (LastY - row(TRACKS_ROW_Y + 1)) / 8;
           track = (x/(field_size+1));
           FU_x = LastX-((field_size+1)*8);//col(5) + ((field_size+1)*track*8);
           FU_y = LastY-16;// row(15);
           FU_dx = LastX+((field_size+1)*8);//FU_x + (field_size+1)*8;
-          FU_dy = LastY+16;//row(15+PATTERN_EDIT_ROWS);
+          FU_dy = LastY+16;//row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS);
           if (FU_x<0) FU_x = 0;
           if (FU_dx > INTERNAL_RESOLUTION_X) FU_dx = INTERNAL_RESOLUTION_X-1;
           //x -= (field_size+1)*track;
@@ -3425,7 +3425,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     draw_status_vars(S);
     
-    printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor",COLORS.Text,COLORS.Background,S);
+    printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
     
     switch(mode) {
       
