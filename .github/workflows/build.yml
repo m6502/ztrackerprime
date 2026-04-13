@@ -66,7 +66,10 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config \
-            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libasound2-dev libpulse-dev \
+            libx11-dev libxext-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libxscrnsaver-dev libxxf86vm-dev libxfixes-dev \
+            libxrender-dev \
             libwayland-dev libxkbcommon-dev libdrm-dev libgbm-dev \
             libdecor-0-dev libdbus-1-dev libibus-1.0-dev \
             libudev-dev libsndio-dev
