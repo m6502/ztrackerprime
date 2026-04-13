@@ -117,7 +117,7 @@ static inline void zt_text_input_stop(void) {
 
 #define INITIAL_ROW 1 // <Manu> Never set to 0, there are some -1 in calculations
 #define PAGE_TITLE_ROW_Y                (INITIAL_ROW + 8)
-#define TRACKS_ROW_Y                    (PAGE_TITLE_ROW_Y + 2)
+#define TRACKS_ROW_Y                    (PAGE_TITLE_ROW_Y + 1)
 #define HEADER_ROW                      1
 
 #define BASE_OCTAVE_MIN                 0

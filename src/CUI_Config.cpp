@@ -37,7 +37,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,0);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 12;
+    cb->y = 11;
     cb->xsize = 5;
     cb->value = &zt_config_globals.autoload_ztfile;
     cb->frame = 1;
@@ -46,7 +46,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,1);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 13;
+    ti->y = 12;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.autoload_ztfile_filename;
@@ -55,7 +55,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,2);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 15;
+    ti->y = 14;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
@@ -64,7 +64,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,3);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 17;
+    cb->y = 16;
     cb->xsize = 5;
     cb->value = &zt_config_globals.record_velocity;
     cb->frame = 1;
@@ -72,7 +72,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,4);
     vs->x = 20;
-    vs->y = 18;
+    vs->y = 17;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.autosave_interval_seconds;
@@ -82,7 +82,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 19;
+    vs->y = 18;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.cur_edit_mode;
@@ -99,7 +99,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,6);
     vs->x = 20;
-    vs->y = 20;
+    vs->y = 19;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.highlight_increment;
@@ -109,7 +109,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,7);
     vs->x = 20;
-    vs->y = 21;
+    vs->y = 20;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
@@ -119,7 +119,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,8);
     vs->x = 20;
-    vs->y = 22;
+    vs->y = 21;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -140,7 +140,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,1);
     cb->frame = 0;
     cb->x = 17;
-    cb->y = 14;
+    cb->y = 13;
     cb->xsize = 5;
     cb->value = &zt_config_globals.do_fade;
 */
@@ -151,7 +151,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,3);
     ti->frame = 1;
     ti->x = 17; 
-    ti->y = 18;
+    ti->y = 17;
     ti->xsize=50;
     ti->length=50;
     ti->str = (unsigned char*)zt_config_globals.skin;
@@ -159,7 +159,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,4);
     ti->frame = 1;
     ti->x = 17;
-    ti->y = 20;
+    ti->y = 19;
     ti->xsize=50;
     ti->length=50;
     ti->str = (unsigned char*)COLORFILE;
@@ -169,7 +169,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,6);
     ti->frame = 1;
     ti->x = 17; 
-    ti->y = 24;
+    ti->y = 23;
     ti->xsize=50;
     ti->length=50;
     ti->str = (unsigned char*)zt_config_globals.work_directory;
@@ -177,7 +177,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(b,7);
     b->caption = " Save instance";
     b->x = 17;
-    b->y = 27;
+    b->y = 26;
     b->xsize = 15;
     b->ysize = 1;
     b->OnClick = (ActFunc)BTNCLK_SaveSettings; 
@@ -186,7 +186,7 @@ CUI_Config::CUI_Config(void) {
     tb = new TextBox;
     UI->add_element(tb, 9);
     tb->x = 1;
-    tb->y = 24;
+    tb->y = 23;
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
