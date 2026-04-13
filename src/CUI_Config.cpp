@@ -131,7 +131,7 @@ CUI_Config::CUI_Config(void) {
     b->caption = " Return to page 1 ";
     b->xsize = 18;
     b->x = 2;
-    b->y = 9;
+    b->y = 11;
     b->ysize = 1;
     b->OnClick = (ActFunc)BTNCLK_GotoSystemConfig;
 
@@ -345,19 +345,19 @@ void CUI_Config::draw(Drawable *S) {
 #endif
         draw_status(S);
         status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"(Ctrl+F12) Global Configuration",COLORS.Text,COLORS.Background,S);
-        print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
-        print(row(2),col(15),"Autoload File",COLORS.Text,S);
-        print(row(2),col(17),"Default Dir",COLORS.Text,S);
-        print(row(2),col(19),"Record Velocity",COLORS.Text,S);
-        print(row(2),col(20),"Autosave (sec)",COLORS.Text,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Global Configuration",COLORS.Text,COLORS.Background,S);
+        print(row(2),col(11),"Autoload .ZT",COLORS.Text,S);
+        print(row(2),col(12),"Autoload File",COLORS.Text,S);
+        print(row(2),col(14),"Default Dir",COLORS.Text,S);
+        print(row(2),col(16),"Record Velocity",COLORS.Text,S);
+        print(row(2),col(17),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(2),col(21),"Default View",COLORS.Text,S);
+        print(row(2),col(18),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(22),"Default Highlight",COLORS.Text,S);
-        print(row(2),col(23),"Default Lowlight",COLORS.Text,S);
-        print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
-//        print(row(2),col(26)," .ZT directory",COLORS.Text,S);
+        print(row(2),col(19),"Default Highlight",COLORS.Text,S);
+        print(row(2),col(20),"Default Lowlight",COLORS.Text,S);
+        print(row(2),col(21),"Default Pat Len",COLORS.Text,S);
+//        print(row(2),col(23)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
 

@@ -104,7 +104,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         oe = new OrderEditor;
         UI->add_element(oe,5);
         oe->x = 59;
-        oe->y = 12;
+        oe->y = 13;
         oe->xsize = 9;
         oe->ysize = 32 ;
 }
