@@ -9,6 +9,8 @@
 #include <string>
 
 extern void make_toolbar(void);
+extern void redrawscreen(Drawable *S);
+extern Screen *screen_buffer;
 
 static void palette_changed(void);
 
@@ -312,6 +314,63 @@ void CUI_PaletteEditor::load_palette_file(const char *path_or_fname) {
     }
 }
 
+// Pull the skin name out of a path like "<cur_dir>/skins/<name>/colors.conf".
+static void extract_skin_name(const char *path, char *out, size_t outsz) {
+    out[0] = '\0';
+    const char *colors = strstr(path, "colors.conf");
+    if (!colors || colors == path) return;
+    const char *sep_after = colors - 1;
+    if (*sep_after != '/' && *sep_after != '\\') return;
+    const char *sep_before = sep_after - 1;
+    while (sep_before > path && *sep_before != '/' && *sep_before != '\\') sep_before--;
+    if (sep_before <= path) return;
+    size_t len = (size_t)(sep_after - sep_before - 1);
+    if (len >= outsz) len = outsz - 1;
+    memcpy(out, sep_before + 1, len);
+    out[len] = '\0';
+}
+
+// Full skin switch — same code path as the F12 Sysconfig skin selector. Loads
+// new toolbar.png/buttons.png/font.fnt etc., updates CurrentSkin, frees the
+// old skin. Must be used (not COLORS.load alone) when the user picks a
+// "[skin] xxx" preset, otherwise the new skin's authoring colors and PNG
+// templates never get adopted.
+void CUI_PaletteEditor::load_skin_full(const char *colors_conf_path) {
+    char skin_name[64];
+    extract_skin_name(colors_conf_path, skin_name, sizeof(skin_name));
+    if (!skin_name[0] || !CurrentSkin) {
+        // Fall back to plain palette load if we can't parse the path.
+        load_palette_file(colors_conf_path);
+        return;
+    }
+    Skin *old = CurrentSkin;
+    Skin *todel = CurrentSkin->switchskin(skin_name);
+    if (old == todel) {
+        // Success — switchskin set CurrentSkin to the new instance and
+        // returned the old `this` for us to delete.
+        strcpy(zt_config_globals.skin, CurrentSkin->strSkinName);
+    }
+    delete todel;
+
+    // Bring the snapshot in sync with the new skin's authoring colors and
+    // reset global adjustments so the user starts fresh on this skin.
+    for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
+        snapshot[i] = *slot_color_ptr(i);
+    }
+    brightness = 0;
+    contrast = 0;
+    tint_index = 0;
+    tint_amount = 0;
+    dirty = 0;
+    snprintf(status_line, sizeof(status_line), "Switched to skin: %s", skin_name);
+    // No recolor needed — switchskin already loaded the new PNGs at their
+    // authored colors. Just force a redraw so the new toolbar paints.
+    if (screen_buffer) redrawscreen(screen_buffer);
+    doredraw++;
+    need_refresh++;
+    screenmanager.UpdateAll();
+}
+
 void CUI_PaletteEditor::save_palette_file(const char *fname) {
     char path[PE_PRESET_PATH_LEN];
 #if defined(_WIN32)
@@ -340,12 +399,21 @@ void CUI_PaletteEditor::save_palette_file(const char *fname) {
 // stays in sync with COLORS.* no matter which path edited it (per-slot RGB
 // slider drag, R/G/B + 0-9 keystroke entry, global brightness/contrast/tint,
 // preset load, or ESC revert).
+//
+// Crucially, this calls redrawscreen() inline so the PNG recolor, the
+// page-background fill, and the toolbar PNG re-blit all land in the same
+// frame as the input event. Without the inline redraw the user would see
+// the PNG flash recolored on frame N and the page background catch up on
+// frame N+1 — a visible 2-step transition for what should be one update.
 static void palette_changed(void) {
     if (CurrentSkin) {
         CurrentSkin->recolor_to_palette(COLORS.Lowlight,
                                         COLORS.Background,
                                         COLORS.Highlight);
         make_toolbar();
+    }
+    if (screen_buffer) {
+        redrawscreen(screen_buffer);
     }
     doredraw++;
     need_refresh++;
@@ -511,7 +579,11 @@ void CUI_PaletteEditor::update(void) {
                 focus_panel = 1;
                 selected_slot = i;
                 channel_edit = 0;
-                load_palette_file(preset_path[i]);
+                if (preset_is_skin[i]) {
+                    load_skin_full(preset_path[i]);
+                } else {
+                    load_palette_file(preset_path[i]);
+                }
                 reset_accum();
                 need_refresh++;
                 return;
@@ -674,7 +746,11 @@ void CUI_PaletteEditor::update(void) {
         case SDLK_RETURN:
             reset_accum();
             if (focus_panel == 1 && selected_slot >= 0 && selected_slot < num_presets) {
-                load_palette_file(preset_path[selected_slot]);
+                if (preset_is_skin[selected_slot]) {
+                    load_skin_full(preset_path[selected_slot]);
+                } else {
+                    load_palette_file(preset_path[selected_slot]);
+                }
             }
             return;
 

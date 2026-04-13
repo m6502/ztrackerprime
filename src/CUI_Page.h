@@ -160,6 +160,10 @@ class CUI_PaletteEditor : public CUI_Page {
         void draw(Drawable *S);
 
         void load_palette_file(const char *path_or_fname);
+        // Full skin switch — same code path as F12 Sysconfig skin selector.
+        // Used when the user picks a "[skin] xxx" preset so the new skin's
+        // PNG templates are loaded from disk, not just the colors.conf.
+        void load_skin_full(const char *colors_conf_path);
         void save_palette_file(const char *fname);
         void apply_channel_delta(int delta);
         void apply_channel_set(int value);
