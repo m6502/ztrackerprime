@@ -34,6 +34,16 @@ set(SDL3_INCLUDE_DIR "" CACHE PATH "Path containing SDL3/SDL.h (or SDL.h with SD
 set(SDL3_LIBRARY "" CACHE FILEPATH "Full path to SDL3 library (libSDL3*.a/.so/.dylib or SDL3.lib)")
 set(SDL3MAIN_LIBRARY "" CACHE FILEPATH "Full path to SDL3main library (Windows/MinGW only)")
 
+# --- Lua 5.4 static library ---------------------------------------------------
+file(GLOB LUA_SOURCES "${CMAKE_SOURCE_DIR}/extlibs/lua/*.c")
+add_library(lua_static STATIC ${LUA_SOURCES})
+target_include_directories(lua_static PUBLIC "${CMAKE_SOURCE_DIR}/extlibs/lua")
+target_compile_definitions(lua_static PRIVATE _CRT_SECURE_NO_WARNINGS)
+if(UNIX)
+  target_link_libraries(lua_static PRIVATE m)
+endif()
+# ------------------------------------------------------------------------------
+
 set(ZT_SOURCES
   extlibs/libpng/png.c
   extlibs/libpng/pngerror.c
@@ -65,6 +75,7 @@ set(ZT_SOURCES
   src/edit_cols.cpp
   src/font.cpp
   src/img_sdl3.cpp
+  src/keybindings.cpp
   src/keybuffer.cpp
   src/lc_sdl_wrapper.cpp
   src/list.cpp
@@ -111,6 +122,8 @@ set(ZT_SOURCES
   src/PatternDisplay.cpp
   src/Sliders.cpp
   src/UserInterface.cpp
+  src/lua_engine.cpp
+  src/CUI_LuaConsole.cpp
 )
 
 if(WIN32)
@@ -122,7 +135,8 @@ if(WIN32)
 else()
   add_executable(zt ${ZT_SOURCES})
 endif()
-target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib)
+target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib extlibs/lua)
+target_link_libraries(zt PRIVATE lua_static)
 
 if(MSVC)
   target_compile_options(zt PRIVATE /W3 /MP /wd4103)
@@ -267,4 +281,14 @@ endif()
 
 set_target_properties(zt PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Program"
+)
+
+# Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
+add_custom_command(TARGET zt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
 )

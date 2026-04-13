@@ -2444,20 +2444,24 @@ int ListBox::update() {
         
         switch(key) {
             case SDLK_TAB: ret = 1; act++; break;
-            case SDLK_UP: 
+            case SDLK_UP:
                 if (cur_sel>0)
                     cur_sel--;
                 else
                 if (y_start>0)
                     y_start--;
-                act++; 
+                else
+                    ret = -1;  // At top of list, pass focus to previous element (#18)
+                act++;
                 break;
-            case SDLK_DOWN: 
+            case SDLK_DOWN:
                 if (cur_sel+y_start<num_elements-1) {
                     if (cur_sel<ysize)
                         cur_sel++;
                     else
                         y_start++;
+                } else {
+                    ret = 1;  // At bottom of list, pass focus to next element (#18)
                 }
                 act++;
                 break;
@@ -2555,6 +2559,13 @@ void ListBox::draw(Drawable *S, int active) {
     int cy;
     TColor f,b;
     unsigned char *str;
+
+    // Clamp cursor after window resize - prevent cursor from being off-screen (#13).
+    if (cur_sel > ysize) cur_sel = ysize;
+    if (y_start + cur_sel >= num_elements && num_elements > 0)
+        y_start = (num_elements - 1) - cur_sel;
+    if (y_start < 0) y_start = 0;
+
     str = (unsigned char *)malloc(xsize+1+2);
     LBNode *node = getNode(y_start);
     for (cy=0;cy<=ysize;cy++) {

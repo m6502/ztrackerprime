@@ -1,4 +1,18 @@
 #include "zt.h"
+#include "platform/undo.h"
+
+// KS_META stub for Cmd key support (SDL3 maps macOS Cmd to SDL_KMOD_GUI).
+// Currently keybuffer does not translate GUI -> KS_META, so KS_META is a
+// compile-time no-op here. PR-C (configurable keybindings) defines the real
+// bits; keeping this stub lets the same source compile on both branches.
+#ifndef KS_META
+#define KS_META 0
+#endif
+
+static PatternUndo g_undo;
+
+// Save undo snapshot before destructive pattern operations
+#define UNDO_SAVE() g_undo.save(song, cur_edit_pattern)
 
 #define LEFT_MARGIN                     40
 #define RIGHT_MARGIN                    2
@@ -6,7 +20,7 @@
 #define TRACKS_POS_Y                    row(TRACKS_ROW_Y)
 #define TRACKS_FIRST_NOTE_POS_Y         row(TRACKS_ROW_Y + 1)
 
-#define SPACE_IN_CHARACTERS_AT_BOTTOM   20
+#define SPACE_AT_BOTTOM                 4  // rows reserved below pattern for border/padding
 
 
 int PATTERN_EDIT_ROWS = 100;
@@ -395,17 +409,17 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       
         if (var_row==ztPlayer->playing_cur_row && ztPlayer->playing_cur_pattern==cur_edit_pattern) {
           
-          printBG(col(1),row(15+num_displayed_rows),str,COLORS.Highlight,COLORS.Background,S);
+          printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Highlight,COLORS.Background,S);
         }
         else {
           
-          printBG(col(1),row(15+num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
+          printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
         }
       } 
-      else printBG(col(1),row(15+num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
+      else printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
       
-      printchar(col(4),row(15+num_displayed_rows),146,COLORS.Lowlight,S);
-      printchar(col(4+(tracks_shown*(field_size+1))),row(15+num_displayed_rows),145,COLORS.Highlight,S);
+      printchar(col(4),row(TRACKS_ROW_Y + 1 + num_displayed_rows),146,COLORS.Lowlight,S);
+      printchar(col(4+(tracks_shown*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),145,COLORS.Highlight,S);
     }
     
     
@@ -421,7 +435,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       if (!(e = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(var_row))) e = &blank_event;
       
       //          printNote(str,e,cur_edit_mode);
-      //          printBG(col(5+(num_displayed_tracks*(field_size+1))),row(15+num_displayed_rows),str,fg,bg,S);
+      //          printBG(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,fg,bg,S);
       
       if (upd_one && e != which_e && upd_one==1) goto please_skip; // ...
 
@@ -457,13 +471,13 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 
       case MD_FX_SIGNED:
         
-        draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(15+num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
         
         break;
 
       default:
         
-        draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(15+num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
         
         break;
       } ;
@@ -471,7 +485,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       
       if (var_track<(cur_edit_track_disp+tracks_shown-1)) {
         
-        printchar(col(5+((num_displayed_tracks+1)*(field_size+1))-1),row(15+num_displayed_rows),168,COLORS.Lowlight,S) ;
+        printchar(col(5+((num_displayed_tracks+1)*(field_size+1))-1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),168,COLORS.Lowlight,S) ;
       }
 
 please_skip:
@@ -661,7 +675,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 //bg = COLORS.EditBG;
 
                 //printBlankNote(str, zt_config_globals.cur_edit_mode) ;
-                //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(15+num_displayed_rows), str, fg, bg, S) ;
+                //printBG(col(poscharx_tracks+(num_displayed_tracks*(field_size+1))), row(TRACKS_ROW_Y + 1 + num_displayed_rows), str, fg, bg, S) ;
 
                 // Lo dibujamos un píxel a la izquierda y un píxel más largo para comernos la posible línea del marco de los tracks
 
@@ -877,14 +891,14 @@ CUI_Patterneditor::~CUI_Patterneditor(void)
 void CUI_Patterneditor::enter(void)
 {
   need_refresh = 1;
+  clear = 1;
   cur_state = STATE_PEDIT;
   mousedrawing=0;
   //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
   
-  // <Manu> 180 es el espacio que queda más o menos para las notas descontando dónde empiezan los tracks, la toolbar, etc.
-  //        No sería mala idea calcular esto de una manera un poco más clara.
+  // Dynamic row count based on current window height - see issue #15.
 
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+  PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
   //  this->mode = PEM_REGULARKEYS;
 }
@@ -912,9 +926,9 @@ void CUI_Patterneditor::leave(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void CUI_Patterneditor::update() 
+void CUI_Patterneditor::update()
 {
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+  PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
   int i,j,o=0,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
@@ -1241,7 +1255,7 @@ void CUI_Patterneditor::update()
 /*
       if (kstate == KS_SHIFT) {
       }
-      if (kstate == KS_ALT) {
+      if (KS_HAS_ALT(kstate)) {
       }
       if (kstate == KS_CTRL) {
       }
@@ -1258,8 +1272,8 @@ void CUI_Patterneditor::update()
         case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
           if (    MousePressX >= col(5) 
             && MousePressX <  col(5+(tracks_shown*(field_size+1)))
-            && MousePressY >= row(15)
-            && MousePressY <= row(15+PATTERN_EDIT_ROWS)
+            && MousePressY >= row(TRACKS_ROW_Y + 1)
+            && MousePressY <= row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS)
             ) {
             //int x;
             //x = (MousePressX - col(5)) / 8;
@@ -1273,8 +1287,8 @@ void CUI_Patterneditor::update()
         case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
           if (    MousePressX >= col(5) 
                 && MousePressX <  col(5+(tracks_shown*(field_size+1)))
-                && MousePressY >= row(15)
-                && MousePressY <= row(15+PATTERN_EDIT_ROWS)
+                && MousePressY >= row(TRACKS_ROW_Y + 1)
+                && MousePressY <= row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS)
                 ) {
             //int x;
             //x = (MousePressX - col(5)) / 8;
@@ -1564,11 +1578,239 @@ void CUI_Patterneditor::update()
                   
                   // END NEW SHIFT SELECTION
                   ////////////////////////////////////////////////////////////////////////////////////////
-                  
+
             }
         }
 
 
+        // ------------------------------------------------------------------
+        // Pattern operations (ported from master: Undo, Double, Halve, Clone,
+        // Interpolate Selection, Reverse Selection, Rotate Up/Down, Track Solo).
+        // Keys are hardcoded here; PR-C (#8) makes them remappable once merged.
+        // ------------------------------------------------------------------
+
+        // Undo: ALT+Z / Cmd+Z (Ctrl+Z is already block-clear)
+        if ((kstate & KS_ALT || kstate & KS_META) && !(kstate & KS_CTRL) && !(kstate & KS_SHIFT) && key == SDLK_Z) {
+          int restored = g_undo.restore(song);
+          if (restored >= 0) {
+            cur_edit_pattern = restored;
+            statusmsg = "Undo";
+          } else {
+            statusmsg = "Nothing to undo";
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Double Pattern: Ctrl+Shift+G
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          int new_len = pat_len * 2;
+          if (new_len <= 256) {
+            song->patterns[cur_edit_pattern]->resize(new_len);
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              for (int r = 0; r < pat_len; r++) {
+                event *ev = trk->get_event(r);
+                if (ev) trk->update_event(r + pat_len, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
+              }
+            }
+            sprintf(szStatmsg, "Pattern doubled: %d -> %d rows", pat_len, new_len);
+          } else {
+            sprintf(szStatmsg, "Cannot double: max 256 rows");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Halve Pattern: Ctrl+Shift+H
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_H) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          int new_len = pat_len / 2;
+          if (new_len >= 32) {
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              for (int r = 0; r < new_len; r++) {
+                event *ev = trk->get_event(r * 2);
+                if (ev) trk->update_event(r, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
+                else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+              }
+            }
+            song->patterns[cur_edit_pattern]->resize(new_len);
+            if (cur_edit_row >= new_len) cur_edit_row = new_len - 1;
+            sprintf(szStatmsg, "Pattern halved: %d -> %d rows", pat_len, new_len);
+          } else {
+            sprintf(szStatmsg, "Cannot halve: minimum pattern length is 32 rows");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Clone Pattern + jump to it: Ctrl+Shift+D
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_D) {
+          int src = cur_edit_pattern;
+          int dest = -1;
+          for (int p = 0; p < 256; p++) {
+            if (p != src && song->patterns[p] && song->patterns[p]->isempty()) { dest = p; break; }
+          }
+          if (dest < 0) {
+            for (int p = 0; p < 256; p++) {
+              if (p != src && !song->patterns[p]) {
+                song->patterns[p] = new pattern(song->patterns[src]->length);
+                dest = p; break;
+              }
+            }
+          }
+          if (dest >= 0) {
+            int pat_len = song->patterns[src]->length;
+            song->patterns[dest]->resize(pat_len);
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              track *st = song->patterns[src]->tracks[t];
+              track *dt = song->patterns[dest]->tracks[t];
+              if (!st || !dt) continue;
+              for (int r = 0; r < pat_len; r++) {
+                event *ev = st->get_event(r);
+                if (ev) dt->update_event(r, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
+              }
+            }
+            cur_edit_pattern = dest;
+            sprintf(szStatmsg, "Cloned pattern %03d -> %03d", src, dest);
+          } else {
+            sprintf(szStatmsg, "No empty pattern slot");
+          }
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Interpolate Selection: Ctrl+I
+        // (Note: the plain Ctrl+I inside the KS_CTRL switch below is the
+        // legacy "Interpolate effect" op; this one is richer — it picks the
+        // column type from where the cursor is.)
+        if (kstate == KS_CTRL && key == SDLK_I && selected) {
+          UNDO_SAVE();
+          int rows = select_row_end - select_row_start;
+          if (rows >= 1) {
+            for (int t = select_track_start; t <= select_track_end; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              event *e_start = trk->get_event(select_row_start);
+              event *e_end   = trk->get_event(select_row_end);
+              if (!e_start || !e_end) continue;
+              int ctype = edit_cols[cur_edit_col].type;
+              int v0 = 0, v1 = 0;
+              if (ctype == T_VOL) {
+                v0 = (e_start->vol < 0x80) ? e_start->vol : 0;
+                v1 = (e_end->vol   < 0x80) ? e_end->vol   : 0;
+              } else if (ctype == T_FXP) {
+                v0 = e_start->effect_data;
+                v1 = e_end->effect_data;
+              } else if (ctype == T_NOTE) {
+                v0 = (e_start->note < 0x80) ? e_start->note : -1;
+                v1 = (e_end->note   < 0x80) ? e_end->note   : -1;
+              } else {
+                continue; // unsupported column type, skip track
+              }
+              if (v0 < 0 || v1 < 0) continue;
+              for (int r = select_row_start + 1; r < select_row_end; r++) {
+                int pos = r - select_row_start;
+                int val = v0 + (v1 - v0) * pos / rows;
+                if (ctype == T_VOL)
+                  trk->update_event(r, -1, -1, val, -1, -1, -1);
+                else if (ctype == T_FXP)
+                  trk->update_event(r, -1, -1, -1, -1, -1, val);
+                else if (ctype == T_NOTE)
+                  trk->update_event(r, val, -1, -1, -1, -1, -1);
+              }
+            }
+            statusmsg = "Interpolated selection";
+            status_change = 1; need_refresh++; key = 0;
+          }
+        }
+
+        // Track Solo: Ctrl+F9
+        if ((kstate & KS_CTRL) && !(kstate & KS_SHIFT) && !(kstate & KS_ALT) && key == SDLK_F9) {
+          bool all_others_muted = true;
+          for (int t = 0; t < MAX_TRACKS; t++) {
+            if (t != cur_edit_track && !song->track_mute[t]) {
+              all_others_muted = false;
+              break;
+            }
+          }
+          if (all_others_muted) {
+            for (int t = 0; t < MAX_TRACKS; t++) { unmutetrack(t); }
+            statusmsg = "Unsolo: all tracks unmuted";
+          } else {
+            for (int t = 0; t < MAX_TRACKS; t++) {
+              if (t == cur_edit_track) { unmutetrack(t); }
+              else                     { mutetrack(t);   }
+            }
+            sprintf(szStatmsg, "Solo track %d", cur_edit_track + 1);
+            statusmsg = szStatmsg;
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Reverse Selection: Ctrl+Shift+R
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_R) {
+          if (selected) {
+            UNDO_SAVE();
+            for (int t = select_track_start; t <= select_track_end; t++) {
+              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+              if (!trk) continue;
+              int lo = select_row_start;
+              int hi = select_row_end;
+              while (lo < hi) {
+                event *ea = trk->get_event(lo);
+                event *eb = trk->get_event(hi);
+                event tmp_a = ea ? *ea : blank_event;
+                event tmp_b = eb ? *eb : blank_event;
+                trk->update_event(lo, tmp_b.note, tmp_b.inst, tmp_b.vol, tmp_b.length, tmp_b.effect, tmp_b.effect_data);
+                trk->update_event(hi, tmp_a.note, tmp_a.inst, tmp_a.vol, tmp_a.length, tmp_a.effect, tmp_a.effect_data);
+                lo++; hi--;
+              }
+            }
+            statusmsg = "Selection reversed";
+          } else {
+            statusmsg = "No selection";
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Rotate Track Down: Ctrl+Shift+Down
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_DOWN) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          track *trk = song->patterns[cur_edit_pattern]->tracks[cur_edit_track];
+          if (trk && pat_len > 1) {
+            event *last = trk->get_event(pat_len - 1);
+            event saved = last ? *last : blank_event;
+            for (int r = pat_len - 1; r > 0; r--) {
+              event *ep = trk->get_event(r - 1);
+              if (ep) trk->update_event(r, ep->note, ep->inst, ep->vol, ep->length, ep->effect, ep->effect_data);
+              else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+            }
+            trk->update_event(0, saved.note, saved.inst, saved.vol, saved.length, saved.effect, saved.effect_data);
+          }
+          statusmsg = "Rotated track down"; status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Rotate Track Up: Ctrl+Shift+Up
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_UP) {
+          UNDO_SAVE();
+          int pat_len = song->patterns[cur_edit_pattern]->length;
+          track *trk = song->patterns[cur_edit_pattern]->tracks[cur_edit_track];
+          if (trk && pat_len > 1) {
+            event *first = trk->get_event(0);
+            event saved = first ? *first : blank_event;
+            for (int r = 0; r < pat_len - 1; r++) {
+              event *ep = trk->get_event(r + 1);
+              if (ep) trk->update_event(r, ep->note, ep->inst, ep->vol, ep->length, ep->effect, ep->effect_data);
+              else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+            }
+            trk->update_event(pat_len - 1, saved.note, saved.inst, saved.vol, saved.length, saved.effect, saved.effect_data);
+          }
+          statusmsg = "Rotated track up"; status_change = 1; need_refresh++; key = 0;
+        }
 
 
         if (kstate == KS_CTRL ) {
@@ -1619,7 +1861,7 @@ void CUI_Patterneditor::update()
 
         }
 
-        if (kstate == KS_ALT ) {
+        if (KS_HAS_ALT(kstate)) {
         
           switch(key)
           {
@@ -2009,7 +2251,7 @@ void CUI_Patterneditor::update()
             
             }
         }       
-        if (kstate == KS_ALT) {
+        if (KS_HAS_ALT(kstate)) {
           switch(key) {
             
           case SDLK_GRAVE: 
@@ -2085,6 +2327,35 @@ void CUI_Patterneditor::update()
             
             
             break;
+          case SDLK_R: /* Replicate at Cursor (from Paketti, ALT+R / Cmd+R) */
+          {
+            UNDO_SAVE();
+            // Take rows 0..cur_edit_row-1 (above cursor, not including cursor)
+            // as the source chunk on the current track, then repeat that chunk
+            // from cur_edit_row to end of pattern.
+            int pat_len = song->patterns[cur_edit_pattern]->length;
+            int chunk_len = cur_edit_row; // rows 0 through cur_edit_row-1
+            if (chunk_len > 0 && cur_edit_row < pat_len) {
+              for (j = cur_edit_row; j < pat_len; j++) {
+                int src_row = (j - cur_edit_row) % chunk_len;
+                event *src = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(src_row);
+                if (src) {
+                  song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                    j, src->note, src->inst, src->vol, src->length, src->effect, src->effect_data);
+                } else {
+                  // Clear destination row if source is empty
+                  song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(
+                    j, 0x80, MAX_INSTS, 0x80, 0, 0xFF, 0);
+                }
+              }
+              need_refresh++;
+              sprintf(szStatmsg, "Replicated rows 0-%d from cursor (%d rows)", cur_edit_row - 1, pat_len);
+              statusmsg = szStatmsg;
+              status_change = 1;
+            }
+          }
+          break;
+
           case SDLK_Q: /* Transpose up */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++)
@@ -2212,7 +2483,8 @@ void CUI_Patterneditor::update()
           break;
         
         // -------------------------------------------
-        case SDLK_DELETE:
+                case SDLK_BACKSPACE:   // Mac "delete" key (backspace) - same as Delete
+case SDLK_DELETE:
 
           if (kstate == KS_CTRL) {
 
@@ -3031,17 +3303,17 @@ wrap:;
         
         if (   LastX >= col(5) 
           && LastX <  col(5+(tracks_shown*(field_size+1)))
-          && LastY >= row(15)
-          && LastY <= row(15+PATTERN_EDIT_ROWS)
+          && LastY >= row(TRACKS_ROW_Y + 1)
+          && LastY <= row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS)
           ) {
           int x,y,data,track;
           x = (LastX - col(5)) / 8;
-          y = (LastY - row(15)) / 8;
+          y = (LastY - row(TRACKS_ROW_Y + 1)) / 8;
           track = (x/(field_size+1));
           FU_x = LastX-((field_size+1)*8);//col(5) + ((field_size+1)*track*8);
           FU_y = LastY-16;// row(15);
           FU_dx = LastX+((field_size+1)*8);//FU_x + (field_size+1)*8;
-          FU_dy = LastY+16;//row(15+PATTERN_EDIT_ROWS);
+          FU_dy = LastY+16;//row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS);
           if (FU_x<0) FU_x = 0;
           if (FU_dx > INTERNAL_RESOLUTION_X) FU_dx = INTERNAL_RESOLUTION_X-1;
           //x -= (field_size+1)*track;
@@ -3142,12 +3414,12 @@ void CUI_Patterneditor::draw(Drawable *S)
   if (S->lock()==0) {
 
 
-    // Innecesario?
-    //if (clear) {
-    //
-    //  S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),0xFF0000FF/*COLORS.Background*/);
-    //  clear=0;
-    //}
+    if (clear) {
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),COLORS.Background);
+      clear=0;
+    }
+
+
 
     o=0;
     
@@ -3156,7 +3428,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     // Show playback position at bottom of pattern area when playing
     if (ztPlayer->playing) {
         static char playinfo[128];
-        sprintf(playinfo, " Playing: Ord %03d  Pat %03d  Row %03d/%03d  BPM %d  TPB %d  Step %d ",
+        snprintf(playinfo, 128, " Playing: Ord %03d  Pat %03d  Row %03d/%03d  BPM %d  TPB %d  Step %d ",
             ztPlayer->playing_cur_order,
             ztPlayer->playing_cur_pattern,
             ztPlayer->playing_cur_row,

@@ -427,6 +427,17 @@ class CUI_SongDuration : public CUI_Page, public CUI_Popup {
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
+};
+
+class CUI_LuaConsole : public CUI_Page {
+    public:
+        CUI_LuaConsole();
+        ~CUI_LuaConsole();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
 };
 #endif

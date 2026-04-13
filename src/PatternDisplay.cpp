@@ -107,7 +107,7 @@ int PatternDisplay::update()
       }
     }
 
-    if (kstate == KS_ALT) {
+    if (KS_HAS_ALT(kstate)) {
 
       switch(key) 
       {
