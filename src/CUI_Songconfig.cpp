@@ -192,7 +192,11 @@ void CUI_Songconfig::draw(Drawable *S) {
         print(row(10),col(base_y+3),"TPB",COLORS.Text,S);
         print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
         print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
-        print(row(63),col(base_y),"Order List",COLORS.Text,S);
+        // Order List label: row 11 (one blank row below page title at 9),
+        // horizontally clear of the OE data (OE starts at column 59, so
+        // put label at column 60 which is inside the OE x-span so it
+        // visually belongs to the list).
+        print(row(60),col(11),"Order List",COLORS.Text,S);
         printchar(row(17 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
         printchar(row(17 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
 
