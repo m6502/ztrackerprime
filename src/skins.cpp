@@ -290,12 +290,44 @@ static inline void lerp_rgb(int t, int *r0, int *g0, int *b0,
     *b0 = (*b0 * inv + b1 * t) / 255;
 }
 
+// Build a 256-entry "luminance -> output color" lookup so the per-pixel hot
+// loop is just (lookup + write), no float math, no SDL_MapRGBA call.
+static void build_lut(Uint8 lut_r[256], Uint8 lut_g[256], Uint8 lut_b[256],
+                      int lor, int log_, int lob,
+                      int midr, int midg, int midb,
+                      int hir, int hig, int hib) {
+    for (int L = 0; L < 256; ++L) {
+        int rr, gg, bb;
+        if (L < 128) {
+            int t = L * 2;                 // 0..254
+            int inv = 255 - t;
+            rr = (lor  * inv + midr * t) / 255;
+            gg = (log_ * inv + midg * t) / 255;
+            bb = (lob  * inv + midb * t) / 255;
+        } else {
+            int t = (L - 128) * 2;         // 0..254
+            int inv = 255 - t;
+            rr = (midr * inv + hir * t) / 255;
+            gg = (midg * inv + hig * t) / 255;
+            bb = (midb * inv + hib * t) / 255;
+        }
+        lut_r[L] = (Uint8)rr;
+        lut_g[L] = (Uint8)gg;
+        lut_b[L] = (Uint8)bb;
+    }
+}
+
 static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
                           int lor, int log_, int lob,
                           int midr, int midg, int midb,
                           int hir, int hig, int hib) {
     if (!src || !dst) return;
     if (src->w != dst->w || src->h != dst->h) return;
+
+    Uint8 lut_r[256], lut_g[256], lut_b[256];
+    build_lut(lut_r, lut_g, lut_b,
+              lor, log_, lob, midr, midg, midb, hir, hig, hib);
+
     if (!SDL_LockSurface(src)) return;
     if (!SDL_LockSurface(dst)) { SDL_UnlockSurface(src); return; }
 
@@ -304,13 +336,55 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
     SDL_Palette *spal = SDL_GetSurfacePalette(src);
     SDL_Palette *dpal = SDL_GetSurfacePalette(dst);
 
+    // Fast path: src/dst share the same 32-bit format and the byte offsets
+    // for R/G/B/A can be derived from the format masks. Covers the typical
+    // case where Skin::load cached origToolbar with the same pixel format
+    // as bmToolbar->surface.
+    bool fast = sf == df
+                && sf->bytes_per_pixel == 4
+                && sf->Rmask && sf->Gmask && sf->Bmask;
+    if (fast) {
+        // Convert mask -> byte offset in the 32-bit pixel.
+        auto mask_to_byte = [](Uint32 m) -> int {
+            if (m == 0x000000FFu) return 0;
+            if (m == 0x0000FF00u) return 1;
+            if (m == 0x00FF0000u) return 2;
+            if (m == 0xFF000000u) return 3;
+            return -1;
+        };
+        int rb = mask_to_byte(sf->Rmask);
+        int gb = mask_to_byte(sf->Gmask);
+        int bb_ = mask_to_byte(sf->Bmask);
+        int ab = sf->Amask ? mask_to_byte(sf->Amask) : -1;
+        if (rb >= 0 && gb >= 0 && bb_ >= 0) {
+            for (int y = 0; y < src->h; ++y) {
+                Uint8 *srow = (Uint8 *)src->pixels + y * src->pitch;
+                Uint8 *drow = (Uint8 *)dst->pixels + y * dst->pitch;
+                for (int x = 0; x < src->w; ++x) {
+                    Uint8 *sp = srow + x * 4;
+                    Uint8 *dp = drow + x * 4;
+                    Uint8 sr = sp[rb], sg = sp[gb], sbv = sp[bb_];
+                    int lum = (sr * 299 + sg * 587 + sbv * 114) / 1000;
+                    if (lum > 255) lum = 255;
+                    dp[rb] = lut_r[lum];
+                    dp[gb] = lut_g[lum];
+                    dp[bb_] = lut_b[lum];
+                    if (ab >= 0) dp[ab] = sp[ab];
+                }
+            }
+            SDL_UnlockSurface(dst);
+            SDL_UnlockSurface(src);
+            return;
+        }
+    }
+
+    // Fallback: format-agnostic via SDL_GetRGBA / SDL_MapRGBA. Slower but
+    // safe regardless of pixel layout.
     for (int y = 0; y < src->h; ++y) {
         Uint8 *srow = (Uint8 *)src->pixels + y * src->pitch;
         Uint8 *drow = (Uint8 *)dst->pixels + y * dst->pitch;
         for (int x = 0; x < src->w; ++x) {
-            Uint8 sr, sg, sb, sa;
-            // ARGB8888 / RGBA32 are both 4 bytes per pixel; use the slow but
-            // format-agnostic path so this works on whatever SDL gave us.
+            Uint8 sr, sg, sbv, sa;
             Uint32 px;
             int bpp = sf->bytes_per_pixel;
             if (bpp == 4) {
@@ -319,23 +393,11 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
                 px = 0;
                 for (int k = 0; k < bpp; ++k) px |= srow[x * bpp + k] << (8 * k);
             }
-            SDL_GetRGBA(px, sf, spal, &sr, &sg, &sb, &sa);
-
-            // Luminance (Rec.601) of source pixel.
-            int lum = (sr * 299 + sg * 587 + sb * 114) / 1000;
-            int rr, gg, bb;
-            if (lum < 128) {
-                int t = lum * 2;            // 0..254
-                rr = lor; gg = log_; bb = lob;
-                lerp_rgb(t, &rr, &gg, &bb, midr, midg, midb);
-            } else {
-                int t = (lum - 128) * 2;    // 0..254
-                rr = midr; gg = midg; bb = midb;
-                lerp_rgb(t, &rr, &gg, &bb, hir, hig, hib);
-            }
-
+            SDL_GetRGBA(px, sf, spal, &sr, &sg, &sbv, &sa);
+            int lum = (sr * 299 + sg * 587 + sbv * 114) / 1000;
+            if (lum > 255) lum = 255;
             Uint32 outpx = SDL_MapRGBA(df, dpal,
-                                       (Uint8)rr, (Uint8)gg, (Uint8)bb, sa);
+                                       lut_r[lum], lut_g[lum], lut_b[lum], sa);
             int dbpp = df->bytes_per_pixel;
             if (dbpp == 4) {
                 ((Uint32 *)drow)[x] = outpx;

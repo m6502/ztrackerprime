@@ -10,6 +10,8 @@
 
 extern void make_toolbar(void);
 
+static void palette_changed(void);
+
 // ---------------------------------------------------------------------------
 // Palette Editor (Shift+Ctrl+F12)
 //
@@ -295,8 +297,6 @@ void CUI_PaletteEditor::load_palette_file(const char *path_or_fname) {
 #endif
     }
     if (COLORS.load(path)) {
-        // Loading a preset becomes the new anchor and zeroes the global
-        // adjustments so the user starts fresh.
         for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
             snapshot[i] = *slot_color_ptr(i);
         }
@@ -306,15 +306,7 @@ void CUI_PaletteEditor::load_palette_file(const char *path_or_fname) {
         tint_amount = 0;
         dirty = 1;
         snprintf(status_line, sizeof(status_line), "Loaded: %s", path);
-        if (CurrentSkin) {
-            CurrentSkin->recolor_to_palette(COLORS.Lowlight,
-                                            COLORS.Background,
-                                            COLORS.Highlight);
-            make_toolbar();
-        }
-        doredraw++;
-        need_refresh++;
-        screenmanager.UpdateAll();
+        palette_changed();
     } else {
         snprintf(status_line, sizeof(status_line), "Failed to load %s", path);
     }
@@ -344,22 +336,30 @@ void CUI_PaletteEditor::save_palette_file(const char *fname) {
     snprintf(status_line, sizeof(status_line), "Saved palette to palettes/%s", fname);
 }
 
-void CUI_PaletteEditor::recompute_globals(void) {
-    for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
-        TColor *c = slot_color_ptr(i);
-        if (!c) continue;
-        *c = apply_xform(snapshot[i], brightness, contrast, tint_index, tint_amount);
-    }
+// Single funnel for "the palette just changed" so the toolbar/buttons PNG
+// stays in sync with COLORS.* no matter which path edited it (per-slot RGB
+// slider drag, R/G/B + 0-9 keystroke entry, global brightness/contrast/tint,
+// preset load, or ESC revert).
+static void palette_changed(void) {
     if (CurrentSkin) {
         CurrentSkin->recolor_to_palette(COLORS.Lowlight,
                                         COLORS.Background,
                                         COLORS.Highlight);
         make_toolbar();
     }
-    dirty = 1;
     doredraw++;
     need_refresh++;
     screenmanager.UpdateAll();
+}
+
+void CUI_PaletteEditor::recompute_globals(void) {
+    for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
+        TColor *c = slot_color_ptr(i);
+        if (!c) continue;
+        *c = apply_xform(snapshot[i], brightness, contrast, tint_index, tint_amount);
+    }
+    dirty = 1;
+    palette_changed();
 }
 
 void CUI_PaletteEditor::apply_channel_delta(int delta) {
@@ -381,9 +381,7 @@ void CUI_PaletteEditor::apply_channel_delta(int delta) {
     // tweaks don't undo manual work.
     snapshot[selected_slot] = *c;
     dirty = 1;
-    doredraw++;
-    need_refresh++;
-    screenmanager.UpdateAll();
+    palette_changed();
 }
 
 void CUI_PaletteEditor::apply_channel_set(int value) {
@@ -399,9 +397,7 @@ void CUI_PaletteEditor::apply_channel_set(int value) {
     *c = pack_rgb(r, g, b);
     snapshot[selected_slot] = *c;
     dirty = 1;
-    doredraw++;
-    need_refresh++;
-    screenmanager.UpdateAll();
+    palette_changed();
 }
 
 // Geometry helpers used by both draw() and update() so click hit-tests stay
@@ -585,9 +581,11 @@ void CUI_PaletteEditor::update(void) {
             }
             dirty = 0;
             channel_edit = 0;
-            screenmanager.UpdateAll();
+            // Re-tint the toolbar/buttons back to the snapshot colors before
+            // we leave the page, so the pattern editor doesn't briefly show
+            // mid-edit colors on the bottom frame.
+            palette_changed();
             switch_page(UIP_Patterneditor);
-            doredraw++;
             reset_accum();
             return;
 
@@ -912,20 +910,27 @@ void CUI_PaletteEditor::draw(Drawable *S) {
     int py = row(PE_PRESET_Y);
     int visible = num_presets < PE_PRESET_VISIBLE ? num_presets : PE_PRESET_VISIBLE;
     int panel_height_rows = 2 + visible + 1;
+    // IT-style listbox: black panel background under the title, with the
+    // header row using the panel chrome color so the list reads as a
+    // self-contained widget.
     S->fillRect(px - 2, py - 2,
                 px + col(PE_PRESET_W) + 2,
                 py + row(panel_height_rows),
-                COLORS.Background);
+                COLORS.Black);
     S->drawHLine(py - 2,                                  px - 2, px + col(PE_PRESET_W) + 2, COLORS.Lowlight);
     S->drawHLine(py + row(panel_height_rows) - 1,         px - 2, px + col(PE_PRESET_W) + 2, COLORS.Lowlight);
     S->drawVLine(px - 2,                                  py - 2, py + row(panel_height_rows), COLORS.Lowlight);
     S->drawVLine(px + col(PE_PRESET_W) + 1,               py - 2, py + row(panel_height_rows), COLORS.Lowlight);
 
-    print(px, py, "Palettes & Skins", COLORS.Brighttext, S);
+    {
+        char head[32];
+        snprintf(head, sizeof(head), " %-20s ", "Palettes & Skins");
+        printBG(px, py, head, COLORS.Brighttext, COLORS.Black, S);
+    }
     for (int i = 0; i < visible; ++i) {
         int sel = (focus_panel == 1 && i == selected_slot);
-        TColor fg = sel ? COLORS.Highlight : COLORS.Text;
-        TColor bg = sel ? COLORS.SelectedBGHigh : COLORS.Background;
+        TColor fg = sel ? COLORS.Highlight : COLORS.EditText;
+        TColor bg = sel ? COLORS.SelectedBGHigh : COLORS.Black;
         char line[64];
         snprintf(line, sizeof(line), " %-20.20s ", preset_label[i]);
         printBG(px, py + row(2 + i), line, fg, bg, S);
