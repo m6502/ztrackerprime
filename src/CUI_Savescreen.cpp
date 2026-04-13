@@ -46,7 +46,10 @@
 
 
 char save_filename[MAX_PATH + 1];
-extern volatile int is_saving;
+// Must match the definition in CUI_SaveMsg.cpp -- declaring this as
+// `extern volatile int` produced an LNK2019 on MSVC because C++ name
+// mangling differs between `volatile int` and `std::atomic<int>`.
+extern std::atomic<int> is_saving;
 
 
 // ------------------------------------------------------------------------------------------------
