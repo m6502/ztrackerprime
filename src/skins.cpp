@@ -122,6 +122,9 @@ int Skin::load(const char *name, bool quiet)
     if (!quiet) zt_show_error("Error", d) ;
     return(0) ;
   }
+  // Snapshot the as-shipped palette so recolor_to_palette can anchor its
+  // gradient to the skin's actual authoring colors.
+  origColors = Colors;
 
   pngLoad("toolbar.png");
   bmToolbar = new Bitmap( s , true );
@@ -290,34 +293,80 @@ static inline void lerp_rgb(int t, int *r0, int *g0, int *b0,
     *b0 = (*b0 * inv + b1 * t) / 255;
 }
 
-// Build a 256-entry "luminance -> output color" lookup so the per-pixel hot
-// loop is just (lookup + write), no float math, no SDL_MapRGBA call.
-static void build_lut(Uint8 lut_r[256], Uint8 lut_g[256], Uint8 lut_b[256],
-                      int lor, int log_, int lob,
-                      int midr, int midg, int midb,
-                      int hir, int hig, int hib) {
+static int luminance_of(int r, int g, int b) {
+    int L = (r * 299 + g * 587 + b * 114) / 1000;
+    if (L < 0) L = 0;
+    if (L > 255) L = 255;
+    return L;
+}
+
+// Build a 256-entry "luminance -> output color" lookup using the ORIGINAL
+// skin's color luminances as gradient anchor points. This is the key trick:
+// pixels in the source PNG that match the skin's authored Background end up
+// exactly at the user's target Background (not somewhere between Background
+// and Highlight, which is what a fixed 0/128/255 anchor produces).
+//
+// Anchor points are sorted by source luminance into [a0, a1, a2, a3, a4],
+// each with a corresponding target color, so the LUT is a piecewise linear
+// remap with up to 4 segments.
+static void build_lut_anchored(Uint8 lut_r[256], Uint8 lut_g[256], Uint8 lut_b[256],
+                               int origLoL, int origMidL, int origHiL,
+                               int targLoR, int targLoG, int targLoB,
+                               int targMidR, int targMidG, int targMidB,
+                               int targHiR, int targHiG, int targHiB) {
+    // Force valid ordering: pure black anchor at L=0, pure white anchor at
+    // L=255, and the skin's three authoring colors in between. If two
+    // anchors collapse, drop the duplicate so the lerp stays well-defined.
+    struct Anchor { int L, r, g, b; };
+    Anchor stops[5] = {
+        {   0,                0,        0,        0        },
+        { origLoL,            targLoR,  targLoG,  targLoB  },
+        { origMidL,           targMidR, targMidG, targMidB },
+        { origHiL,            targHiR,  targHiG,  targHiB  },
+        { 255,                255,      255,      255      },
+    };
+    // Edge stops blend toward the matching authored color at full saturation
+    // so very dark / very bright source pixels don't flatten to pure black or
+    // pure white — they stay tinted.
+    stops[0].r = targLoR / 2; stops[0].g = targLoG / 2; stops[0].b = targLoB / 2;
+    stops[4].r = (targHiR + 255) / 2;
+    stops[4].g = (targHiG + 255) / 2;
+    stops[4].b = (targHiB + 255) / 2;
+
+    // Sort + dedupe by L.
+    for (int i = 0; i < 5; ++i)
+      for (int j = i + 1; j < 5; ++j)
+        if (stops[j].L < stops[i].L) { Anchor t = stops[i]; stops[i] = stops[j]; stops[j] = t; }
+    int n = 0;
+    Anchor uniq[5];
+    for (int i = 0; i < 5; ++i) {
+        if (n == 0 || stops[i].L > uniq[n-1].L) uniq[n++] = stops[i];
+        else uniq[n-1] = stops[i];   // same L -> later anchor wins
+    }
+
+    int seg = 0;
     for (int L = 0; L < 256; ++L) {
-        int rr, gg, bb;
-        if (L < 128) {
-            int t = L * 2;                 // 0..254
-            int inv = 255 - t;
-            rr = (lor  * inv + midr * t) / 255;
-            gg = (log_ * inv + midg * t) / 255;
-            bb = (lob  * inv + midb * t) / 255;
-        } else {
-            int t = (L - 128) * 2;         // 0..254
-            int inv = 255 - t;
-            rr = (midr * inv + hir * t) / 255;
-            gg = (midg * inv + hig * t) / 255;
-            bb = (midb * inv + hib * t) / 255;
+        while (seg < n - 1 && L > uniq[seg + 1].L) seg++;
+        if (seg >= n - 1) {
+            lut_r[L] = (Uint8)uniq[n-1].r;
+            lut_g[L] = (Uint8)uniq[n-1].g;
+            lut_b[L] = (Uint8)uniq[n-1].b;
+            continue;
         }
-        lut_r[L] = (Uint8)rr;
-        lut_g[L] = (Uint8)gg;
-        lut_b[L] = (Uint8)bb;
+        const Anchor &a = uniq[seg];
+        const Anchor &b = uniq[seg + 1];
+        int span = b.L - a.L;
+        if (span <= 0) { lut_r[L] = (Uint8)a.r; lut_g[L] = (Uint8)a.g; lut_b[L] = (Uint8)a.b; continue; }
+        int t = ((L - a.L) * 255) / span;
+        int inv = 255 - t;
+        lut_r[L] = (Uint8)((a.r * inv + b.r * t) / 255);
+        lut_g[L] = (Uint8)((a.g * inv + b.g * t) / 255);
+        lut_b[L] = (Uint8)((a.b * inv + b.b * t) / 255);
     }
 }
 
 static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
+                          int origLoL, int origMidL, int origHiL,
                           int lor, int log_, int lob,
                           int midr, int midg, int midb,
                           int hir, int hig, int hib) {
@@ -325,8 +374,11 @@ static void remap_surface(SDL_Surface *src, SDL_Surface *dst,
     if (src->w != dst->w || src->h != dst->h) return;
 
     Uint8 lut_r[256], lut_g[256], lut_b[256];
-    build_lut(lut_r, lut_g, lut_b,
-              lor, log_, lob, midr, midg, midb, hir, hig, hib);
+    build_lut_anchored(lut_r, lut_g, lut_b,
+                       origLoL, origMidL, origHiL,
+                       lor, log_, lob,
+                       midr, midg, midb,
+                       hir, hig, hib);
 
     if (!SDL_LockSurface(src)) return;
     if (!SDL_LockSurface(dst)) { SDL_UnlockSurface(src); return; }
@@ -416,12 +468,24 @@ void Skin::recolor_to_palette(TColor lo, TColor mid, TColor hi) {
     unpack_color(mid, &midr, &midg, &midb);
     unpack_color(hi,  &hir,  &hig,  &hib);
 
+    // Read the original skin's authoring colors so we know which source
+    // luminances correspond to "this is meant to be the background color".
+    int oLoR, oLoG, oLoB, oMidR, oMidG, oMidB, oHiR, oHiG, oHiB;
+    unpack_color(origColors.Lowlight,   &oLoR,  &oLoG,  &oLoB);
+    unpack_color(origColors.Background, &oMidR, &oMidG, &oMidB);
+    unpack_color(origColors.Highlight,  &oHiR,  &oHiG,  &oHiB);
+    int origLoL  = luminance_of(oLoR,  oLoG,  oLoB);
+    int origMidL = luminance_of(oMidR, oMidG, oMidB);
+    int origHiL  = luminance_of(oHiR,  oHiG,  oHiB);
+
     if (origToolbar && bmToolbar && bmToolbar->surface) {
         remap_surface(origToolbar, bmToolbar->surface,
+                      origLoL, origMidL, origHiL,
                       lor, log_, lob, midr, midg, midb, hir, hig, hib);
     }
     if (origButtons && bmButtons && bmButtons->surface) {
         remap_surface(origButtons, bmButtons->surface,
+                      origLoL, origMidL, origHiL,
                       lor, log_, lob, midr, midg, midb, hir, hig, hib);
     }
 }

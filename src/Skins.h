@@ -44,7 +44,7 @@
 
 
 class Skin {
-        
+
     public:
 
         Bitmap *bmToolbar;
@@ -52,7 +52,21 @@ class Skin {
         Bitmap *bmButtons;
         Bitmap *bmAbout;
         Bitmap *bmLogo;
-        
+
+        // Untouched copies of the skin's PNGs taken at load time. The Palette
+        // Editor recolors bmToolbar/bmButtons in-place using these as the
+        // source so we can rerun the remap any time palette colors change.
+        SDL_Surface *origToolbar;
+        SDL_Surface *origButtons;
+
+        // The skin's colors AS SHIPPED — captured at load time before the
+        // user can mutate Colors via the Palette Editor. recolor_to_palette
+        // uses the luminances of origColors.Lowlight/Background/Highlight as
+        // the gradient anchor points so that toolbar pixels matching the
+        // skin's authored background end up exactly at the user's new
+        // Background color (not somewhere between Background and Highlight).
+        colorset origColors;
+
         colorset Colors;
         char strSkinPath[MAX_PATH + 1];
         char strSkinName[64];
@@ -67,7 +81,13 @@ class Skin {
         void makepath(char *dst, const char *filename);
         void getLogo(void);
         void freeLogo(void);
-        Skin * switchskin(const char *newskintitle);
+        Skin * switchskin(char *newskintitle);
+
+        // Recolor the cached PNGs onto bmToolbar/bmButtons by remapping each
+        // pixel's luminance through a 3-stop gradient (lo -> mid -> hi). Caller
+        // must trigger a redraw and call make_toolbar() after this so the
+        // per-button bitmaps get re-extracted from the recolored buttons sheet.
+        void recolor_to_palette(TColor lo, TColor mid, TColor hi);
 };
 
 #endif
