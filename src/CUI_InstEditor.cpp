@@ -480,7 +480,7 @@ void CUI_InstEditor::draw(Drawable *S)
 
     ie = (InstEditor *)UI->get_element(0);
 
-    ie->ysize = 39 + ((INTERNAL_RESOLUTION_Y-480)/8);
+    ie->ysize = 40 + ((INTERNAL_RESOLUTION_Y-480)/8);
     if(ie->ysize > MAX_INSTS) ie->ysize = MAX_INSTS ;
 
     if (ie->cursor+ie->list_start != cur_inst) {
