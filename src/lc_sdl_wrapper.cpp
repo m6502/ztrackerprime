@@ -77,6 +77,7 @@
     Drawable::~Drawable() {
         if (surface && free_surface_on_delete) {
             zt_destroy_surface(surface);
+            surface = NULL;
         }
     }
 

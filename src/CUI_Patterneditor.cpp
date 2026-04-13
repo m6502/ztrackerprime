@@ -20,7 +20,7 @@ static PatternUndo g_undo;
 #define TRACKS_POS_Y                    row(TRACKS_ROW_Y)
 #define TRACKS_FIRST_NOTE_POS_Y         row(TRACKS_ROW_Y + 1)
 
-#define SPACE_IN_CHARACTERS_AT_BOTTOM   20
+#define SPACE_AT_BOTTOM                 4  // rows reserved below pattern for border/padding
 
 
 int PATTERN_EDIT_ROWS = 100;
@@ -891,14 +891,14 @@ CUI_Patterneditor::~CUI_Patterneditor(void)
 void CUI_Patterneditor::enter(void)
 {
   need_refresh = 1;
+  clear = 1;
   cur_state = STATE_PEDIT;
   mousedrawing=0;
   //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
   
-  // <Manu> 180 es el espacio que queda más o menos para las notas descontando dónde empiezan los tracks, la toolbar, etc.
-  //        No sería mala idea calcular esto de una manera un poco más clara.
+  // Dynamic row count based on current window height - see issue #15.
 
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+  PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
   //  this->mode = PEM_REGULARKEYS;
 }
@@ -926,9 +926,9 @@ void CUI_Patterneditor::leave(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void CUI_Patterneditor::update() 
+void CUI_Patterneditor::update()
 {
-  PATTERN_EDIT_ROWS = (INTERNAL_RESOLUTION_Y / 8) - SPACE_IN_CHARACTERS_AT_BOTTOM ;
+  PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
   int i,j,o=0,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
@@ -1255,7 +1255,7 @@ void CUI_Patterneditor::update()
 /*
       if (kstate == KS_SHIFT) {
       }
-      if (kstate == KS_ALT) {
+      if (KS_HAS_ALT(kstate)) {
       }
       if (kstate == KS_CTRL) {
       }
@@ -1861,7 +1861,7 @@ void CUI_Patterneditor::update()
 
         }
 
-        if (kstate == KS_ALT ) {
+        if (KS_HAS_ALT(kstate)) {
         
           switch(key)
           {
@@ -2251,7 +2251,7 @@ void CUI_Patterneditor::update()
             
             }
         }       
-        if (kstate == KS_ALT) {
+        if (KS_HAS_ALT(kstate)) {
           switch(key) {
             
           case SDLK_GRAVE: 
@@ -2483,7 +2483,8 @@ void CUI_Patterneditor::update()
           break;
         
         // -------------------------------------------
-        case SDLK_DELETE:
+                case SDLK_BACKSPACE:   // Mac "delete" key (backspace) - same as Delete
+case SDLK_DELETE:
 
           if (kstate == KS_CTRL) {
 
@@ -3413,12 +3414,12 @@ void CUI_Patterneditor::draw(Drawable *S)
   if (S->lock()==0) {
 
 
-    // Innecesario?
-    //if (clear) {
-    //
-    //  S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),0xFF0000FF/*COLORS.Background*/);
-    //  clear=0;
-    //}
+    if (clear) {
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),COLORS.Background);
+      clear=0;
+    }
+
+
 
     o=0;
     

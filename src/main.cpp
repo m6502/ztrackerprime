@@ -417,7 +417,7 @@ void close_popup_window(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void switch_page(CUI_Page *page) 
+void switch_page(CUI_Page *page)
 {
     LastPage = ActivePage;
     if (LastPage)
@@ -426,7 +426,11 @@ void switch_page(CUI_Page *page)
     ActivePage->enter();
     if (ActivePage->UI)
         ActivePage->UI->full_refresh();
+    // Force full screen clear to prevent previous page from bleeding through (#17).
+    if (screen_buffer)
+        screen_buffer->fillRect(0, 0, INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, COLORS.Background);
     screenmanager.UpdateAll();
+    doredraw++;
     need_refresh++;
 }
 
@@ -2062,9 +2066,14 @@ int initGFX ()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int postAction () 
+int postAction ()
 {  // Deinit functions
-    
+
+    // Guard against cleanup crashes when initialization failed (e.g. zt.conf not found).
+    if (!cur_dir || !MidiOut || !MidiIn) {
+        return 0;
+    }
+
     intlist *mod;
     OutputDevice *m;
     midiInDevice *mi;
