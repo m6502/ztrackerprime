@@ -101,11 +101,17 @@ jobs:
           rm -rf sdl3-src
           mkdir -p sdl3-src
           tar xf "$TARBALL" -C sdl3-src --strip-components=1
+          # Disable optional X11 extensions zTracker doesn't use, so we don't have
+          # to chase a growing list of libX*-dev packages on the Ubuntu runner.
           cmake -S sdl3-src -B sdl3-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$(pwd)/sdl3-prefix" \
             -DSDL_SHARED=ON -DSDL_STATIC=OFF \
-            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+            -DSDL_X11_XCURSOR=OFF -DSDL_X11_XINPUT=OFF \
+            -DSDL_X11_XRANDR=OFF -DSDL_X11_XSCRNSAVER=OFF \
+            -DSDL_X11_XSHAPE=OFF -DSDL_X11_XFIXES=OFF \
+            -DSDL_X11_XTEST=OFF
           cmake --build sdl3-build -j
           cmake --install sdl3-build
           PREFIX="$(pwd)/sdl3-prefix"
