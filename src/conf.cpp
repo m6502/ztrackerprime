@@ -322,7 +322,10 @@ int ZTConf::load()
   
   if(Config->get("default_directory"))                strcpy(default_directory, Config->get("default_directory"));
   if(Config->get("autoload_ztfile_filename"))         strcpy(autoload_ztfile_filename, Config->get("autoload_ztfile_filename"));
-  
+
+  window_icon[0] = '\0';
+  if(Config->get("window_icon"))                      strncpy(window_icon, Config->get("window_icon"), MAX_PATH);
+
   return(0) ;
 }
 
@@ -434,6 +437,7 @@ int ZTConf::save() {
     Config->set("default_directory", s);
 
     g_keybindings.save(Config);
+
 
     return Config->save(conf_filename) ? 0 : -1;
 }

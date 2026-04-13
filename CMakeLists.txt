@@ -130,6 +130,14 @@ if(WIN32)
   list(APPEND ZT_SOURCES zt.rc)
 endif()
 
+if(APPLE)
+  # Embed the app icon into the bundle's Contents/Resources/.
+  set(ZT_MACOSX_ICON "${CMAKE_SOURCE_DIR}/zt.icns")
+  list(APPEND ZT_SOURCES ${ZT_MACOSX_ICON})
+  set_source_files_properties(${ZT_MACOSX_ICON} PROPERTIES
+    MACOSX_PACKAGE_LOCATION "Resources")
+endif()
+
 if(WIN32)
   add_executable(zt WIN32 ${ZT_SOURCES})
 else()
@@ -277,18 +285,51 @@ endif()
 
 if(APPLE)
   target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation")
+  # Turn the macOS build into a proper .app bundle with icon + Info.plist.
+  set_target_properties(zt PROPERTIES
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME "zTracker"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.m6502.ztrackerprime"
+    MACOSX_BUNDLE_BUNDLE_VERSION "2026.02.23"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "2026.02.23"
+    MACOSX_BUNDLE_LONG_VERSION_STRING "zTracker 2026.02.23"
+    MACOSX_BUNDLE_COPYRIGHT "(c) 2000-2026 zTracker contributors"
+    MACOSX_BUNDLE_ICON_FILE "zt.icns"
+    MACOSX_BUNDLE_INFO_STRING "zTracker - tracker-style music composition"
+  )
 endif()
 
 set_target_properties(zt PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Program"
 )
 
-# Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
-add_custom_command(TARGET zt POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+if(APPLE)
+  # Copy runtime resources (skins/, doc/, default zt.conf) into the .app
+  # so a double-clicked bundle has everything it needs at runtime.
+  add_custom_command(TARGET zt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+      "${CMAKE_SOURCE_DIR}/skins"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/skins"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
-)
+      "${CMAKE_SOURCE_DIR}/doc"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/doc"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${CMAKE_SOURCE_DIR}/zt.conf"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${CMAKE_SOURCE_DIR}/zt_icon.png"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt_icon.png"
+    COMMENT "Copying skins/, doc/, zt.conf, and zt_icon.png into zt.app/Contents/Resources"
+    VERBATIM
+  )
+else()
+  # Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
+  add_custom_command(TARGET zt POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
+  )
+endif()

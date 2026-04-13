@@ -75,6 +75,14 @@
 #include "lua_engine.h"
 #include "keybindings.h"
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <unistd.h>
+#include <limits.h>
+#include <cstring>
+#endif
+
+
 
 // zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
 // every translation unit (which would emit WinMain in every TU on Windows and
@@ -2923,6 +2931,20 @@ static int zt_backend_set_video_mode(char *errstr)
       zt_show_error("Error", errstr);
       return 0;
     }
+
+    // Load window icon (configurable via zt.conf 'window_icon'; default 'zt_icon.png').
+    // On macOS this also updates the Dock icon at runtime; a failure is silent.
+    {
+      const char *icon_path = zt_config_globals.window_icon[0]
+        ? zt_config_globals.window_icon
+        : "zt_icon.png";
+      SDL_Surface *icon = SDL_LoadPNG(icon_path);
+      if (icon) {
+        SDL_SetWindowIcon(zt_main_window, icon);
+        SDL_DestroySurface(icon);
+      }
+    }
+
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {
       snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
@@ -3240,6 +3262,28 @@ int main(int argc, char *argv[])
     '/';
 #endif
 
+  bool launched_from_bundle = false;
+#if defined(__APPLE__)
+  // When launched as a .app bundle (double-clicked in Finder), argv[0] points
+  // at zt.app/Contents/MacOS/zt and the CWD is '/'. Jump into Contents/Resources
+  // so relative skin/doc/zt.conf lookups work, and suppress the later
+  // zt_set_current_directory(argv[0]) call that would override this chdir.
+  {
+    char exe_path[PATH_MAX];
+    uint32_t size = sizeof(exe_path);
+    if (_NSGetExecutablePath(exe_path, &size) == 0) {
+      const char *macos_marker = "/Contents/MacOS/";
+      char *marker = strstr(exe_path, macos_marker);
+      if (marker) {
+        *marker = '\0';
+        char res_path[PATH_MAX];
+        snprintf(res_path, sizeof(res_path), "%s/Contents/Resources", exe_path);
+        if (chdir(res_path) == 0) launched_from_bundle = true;
+      }
+    }
+  }
+#endif
+
   // Get the zt directory and store it globally
   if(argc > 1) {
     if(argv[1] != NULL && argv[1][0] != '\0') {
@@ -3262,7 +3306,8 @@ int main(int argc, char *argv[])
     if(w != argv[0]) {
       *w = '\0';
       zt_directory = strdup(argv[0]);
-      zt_set_current_directory(argv[0]);
+      // Skip when launched from .app — we've already chdir'd to Contents/Resources.
+      if (!launched_from_bundle) zt_set_current_directory(argv[0]);
       *w = path_sep;
     }
   }
