@@ -187,7 +187,7 @@ void CUI_Songconfig::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"(F11) Song Configuration",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
         print(row(9),col(base_y),"Title",COLORS.Text,S);
         print(row(10),col(base_y+2),   "BPM",COLORS.Text,S);
         print(row(10),col(base_y+3),"TPB",COLORS.Text,S);

@@ -211,7 +211,7 @@ void CUI_Playsong::draw(Drawable *S)
       clear = 0 ;
     }
     
-    printtitle(PAGE_TITLE_ROW_Y,"(F5) Play Song",COLORS.Text,COLORS.Background,S);
+    printtitle(PAGE_TITLE_ROW_Y,"Play Song (F5)",COLORS.Text,COLORS.Background,S);
     need_refresh = 0;
     updated=2;
     

@@ -563,7 +563,7 @@ void CUI_InstEditor::draw(Drawable *S)
         UI->draw(S);
         draw_status(S);
         status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"(F3) Instrument Editor",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Instrument Editor (F3)",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(14),"Bank",COLORS.Text,COLORS.Background,S);
         printBG(col(58),row(14),"Patch",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(19),"Default Volume",COLORS.Text,COLORS.Background,S);
