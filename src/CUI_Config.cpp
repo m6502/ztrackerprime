@@ -37,7 +37,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,0);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 11;
+    cb->y = 13;
     cb->xsize = 5;
     cb->value = &zt_config_globals.autoload_ztfile;
     cb->frame = 1;
@@ -46,7 +46,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,1);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 12;
+    ti->y = 14;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.autoload_ztfile_filename;
@@ -55,7 +55,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,2);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 14;
+    ti->y = 16;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
@@ -64,7 +64,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,3);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 16;
+    cb->y = 18;
     cb->xsize = 5;
     cb->value = &zt_config_globals.record_velocity;
     cb->frame = 1;
@@ -72,7 +72,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,4);
     vs->x = 20;
-    vs->y = 17;
+    vs->y = 19;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.autosave_interval_seconds;
@@ -82,7 +82,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 18;
+    vs->y = 20;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.cur_edit_mode;
@@ -99,7 +99,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,6);
     vs->x = 20;
-    vs->y = 19;
+    vs->y = 21;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.highlight_increment;
@@ -109,7 +109,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,7);
     vs->x = 20;
-    vs->y = 20;
+    vs->y = 22;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
@@ -119,7 +119,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,8);
     vs->x = 20;
-    vs->y = 21;
+    vs->y = 23;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -345,19 +345,19 @@ void CUI_Config::draw(Drawable *S) {
 #endif
         draw_status(S);
         status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Global Configuration",COLORS.Text,COLORS.Background,S);
-        print(row(2),col(11),"Autoload .ZT",COLORS.Text,S);
-        print(row(2),col(12),"Autoload File",COLORS.Text,S);
-        print(row(2),col(14),"Default Dir",COLORS.Text,S);
-        print(row(2),col(16),"Record Velocity",COLORS.Text,S);
-        print(row(2),col(17),"Autosave (sec)",COLORS.Text,S);
+        printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
+        print(row(2),col(13),"Autoload .ZT",COLORS.Text,S);
+        print(row(2),col(14),"Autoload File",COLORS.Text,S);
+        print(row(2),col(16),"Default Dir",COLORS.Text,S);
+        print(row(2),col(18),"Record Velocity",COLORS.Text,S);
+        print(row(2),col(19),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(2),col(18),"Default View",COLORS.Text,S);
+        print(row(2),col(20),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(19),"Default Highlight",COLORS.Text,S);
-        print(row(2),col(20),"Default Lowlight",COLORS.Text,S);
-        print(row(2),col(21),"Default Pat Len",COLORS.Text,S);
-//        print(row(2),col(23)," .ZT directory",COLORS.Text,S);
+        print(row(2),col(21),"Default Highlight",COLORS.Text,S);
+        print(row(2),col(22),"Default Lowlight",COLORS.Text,S);
+        print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
+//        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
 
