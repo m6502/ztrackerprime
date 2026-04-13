@@ -388,8 +388,7 @@ void CUI_PaletteEditor::load_skin_full(const char *colors_conf_path) {
     dirty = 0;
     snprintf(status_line, sizeof(status_line), "Switched to skin: %s", skin_name);
     // No recolor needed — switchskin already loaded the new PNGs at their
-    // authored colors. Just force a redraw so the new toolbar paints.
-    if (screen_buffer) redrawscreen(screen_buffer);
+    // authored colors. Force a redraw on the next frame.
     doredraw++;
     need_refresh++;
     screenmanager.UpdateAll();
@@ -420,24 +419,21 @@ void CUI_PaletteEditor::save_palette_file(const char *fname) {
 }
 
 // Single funnel for "the palette just changed" so the toolbar/buttons PNG
-// stays in sync with COLORS.* no matter which path edited it (per-slot RGB
-// slider drag, R/G/B + 0-9 keystroke entry, global brightness/contrast/tint,
-// preset load, or ESC revert).
+// stays in sync with COLORS.* no matter which path edited it.
 //
-// Crucially, this calls redrawscreen() inline so the PNG recolor, the
-// page-background fill, and the toolbar PNG re-blit all land in the same
-// frame as the input event. Without the inline redraw the user would see
-// the PNG flash recolored on frame N and the page background catch up on
-// frame N+1 — a visible 2-step transition for what should be one update.
+// Earlier versions called redrawscreen() inline here to make the toolbar
+// and page-background update land in the same frame as the click, but that
+// re-enters the screen-draw pipeline while the page's own update() is still
+// running — the symptom was the Pattern Editor coming back from ESC with
+// its track frame pushed down the screen because layout state got
+// corrupted. Drop the inline redraw; the 1-frame delay is acceptable, the
+// crashed layout was not.
 static void palette_changed(void) {
     if (CurrentSkin) {
         CurrentSkin->recolor_to_palette(COLORS.Lowlight,
                                         COLORS.Background,
                                         COLORS.Highlight);
         make_toolbar();
-    }
-    if (screen_buffer) {
-        redrawscreen(screen_buffer);
     }
     doredraw++;
     need_refresh++;
