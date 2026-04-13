@@ -65,6 +65,7 @@ set(ZT_SOURCES
   src/edit_cols.cpp
   src/font.cpp
   src/img_sdl3.cpp
+  src/keybindings.cpp
   src/keybuffer.cpp
   src/lc_sdl_wrapper.cpp
   src/list.cpp

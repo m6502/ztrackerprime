@@ -64,6 +64,7 @@
 
 
 #include "zt.h"
+#include "keybindings.h"
 #include <cmath>
 #include <ctime>
 #include <algorithm>
@@ -961,6 +962,8 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
         zt_show_error("zt: error", "Fatal: Unable to load zt.conf");
         return -1;
     }
+    g_keybindings.setDefaults();
+    g_keybindings.load(zt_config_globals.Config);
     Skin = newResourceStream(skinfile);
     if (!Skin) {
         sprintf(str,"Fatal: Could not load skin resource: %s\n",skinfile);
