@@ -124,6 +124,7 @@
  CTRL-F10   : Save Song As...
  F11        : Song Configuration and Order editor
  F12        : System Configuration (midi dev select)
+ SHIFT-CTRL-F12 : Open Palette Editor (live color editing + presets)
  ALT-F12    : About
  CTRL-S     : Save Song
  CTRL-ALT-N : New Song

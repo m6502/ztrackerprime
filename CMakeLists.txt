@@ -112,6 +112,7 @@ set(ZT_SOURCES
   src/CUI_Songconfig.cpp
   src/CUI_SongDuration.cpp
   src/CUI_SongMessage.cpp
+  src/CUI_PaletteEditor.cpp
   src/CUI_Sysconfig.cpp
   src/import_export.cpp
   src/it.cpp
