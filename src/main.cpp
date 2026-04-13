@@ -73,8 +73,19 @@
 #include <vector>
 
 
-#if defined(_WIN32) && !defined(main)
-#define main SDL_main
+// zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
+// every translation unit (which would emit WinMain in every TU on Windows and
+// cause LNK2005). On Windows -- in the single TU that owns main() -- we undo
+// the define and include <SDL_main.h> exactly once so SDL can emit its
+// WinMain -> SDL_main entry shim into this object file only.
+#if defined(_WIN32)
+#  ifdef SDL_MAIN_HANDLED
+#    undef SDL_MAIN_HANDLED
+#  endif
+#  include <SDL_main.h>
+#  ifndef main
+#    define main SDL_main
+#  endif
 #endif
 
 

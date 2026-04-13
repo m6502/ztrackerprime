@@ -38,14 +38,16 @@
 
 
 // <Manu> Pequeño parche mientras miro qué hago con el main
-#ifndef _WIN32
-    #ifndef SDL_MAIN_HANDLED
-        #define SDL_MAIN_HANDLED
-    #endif
+// Define SDL_MAIN_HANDLED across every translation unit that includes zt.h
+// so <SDL_main.h> (pulled in only from main.cpp) is the single place that
+// emits the platform entry point (WinMain on Windows, main() elsewhere).
+// Without this, SDL3's header-only WinMain body would be emitted in every
+// TU on Windows and cause LNK2005 "WinMain already defined" link errors.
+#ifndef SDL_MAIN_HANDLED
+    #define SDL_MAIN_HANDLED
 #endif
 
 #include <SDL.h>
-#include <SDL_main.h>
 
 struct SDL_Window;
 extern SDL_Window *zt_main_window;
