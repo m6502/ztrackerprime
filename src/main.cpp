@@ -1594,14 +1594,24 @@ void global_keys(Drawable *S)
 #endif
 
         // ------------------------------------------------------------------------
-        case CMD_SWITCH_PEDIT: 
+        case CMD_SWITCH_PEDIT:
             if (cur_state == STATE_PEDIT) {
-                popup_window(UIP_PEParms); clear++;
+                // F2 again on Pattern Editor: toggle regular <-> effect-draw mode
+                // (otherwise reachable only via Shift+~ which is awkward on
+                // non-US keyboards).
+                if (UIP_Patterneditor->mode == PEM_MOUSEDRAW) {
+                    midiInQueue.clear();
+                    UIP_Patterneditor->mode = PEM_REGULARKEYS;
+                } else {
+                    UIP_Patterneditor->mode = PEM_MOUSEDRAW;
+                }
+                need_refresh++;
+                clear++;
                 doredraw++;
             } else {
                 switch_page(UIP_Patterneditor);
-                doredraw++; clear++; 
-            }                   
+                doredraw++; clear++;
+            }
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_IEDIT: 
