@@ -324,6 +324,12 @@ void CUI_Config::draw(Drawable *S) {
 #endif
 
         tb->text = strdup(buf);
+        // Auto-fit textbox height to actual content (count newlines + small pad).
+        {
+            int nlines = 1;
+            for (const char *p = buf; *p; p++) if (*p == '\n') nlines++;
+            tb->ysize = nlines + 1;
+        }
         UI->draw(S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         {
