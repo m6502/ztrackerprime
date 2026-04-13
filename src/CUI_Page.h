@@ -151,6 +151,13 @@ class CUI_PaletteEditor : public CUI_Page {
         int tint_index;
         int tint_amount;
 
+        // When true, clicking a palette preset (Light Blue, Gold, etc.)
+        // resets the skin to "default" first so the palette renders against
+        // its canonical PNG templates. When false, the palette is applied on
+        // top of whatever skin is currently loaded. Skin presets always
+        // do a full skin switch regardless of this toggle.
+        int reset_skin_on_palette;
+
         CUI_PaletteEditor();
         ~CUI_PaletteEditor();
 

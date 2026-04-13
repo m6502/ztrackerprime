@@ -74,6 +74,12 @@ static void palette_changed(void);
 #define PE_GLOBAL_NUMBER_W  4    // value readout after each bar
 #define PE_GLOBAL_GROUP_W   (PE_GLOBAL_LABEL_W + PE_GLOBAL_BAR_W + PE_GLOBAL_NUMBER_W + 2)
 
+// Checkbox: "[X] Reset skin to default on palette load" — shown on row 11.
+#define PE_CHECKBOX_X       2
+#define PE_CHECKBOX_Y       11
+#define PE_CHECKBOX_LABEL   "Reset skin to default on palette load"
+#define PE_CHECKBOX_W       (3 + 1 + (int)sizeof(PE_CHECKBOX_LABEL))
+
 struct PaletteSlot {
     const char *name;
     size_t      offset;
@@ -197,6 +203,7 @@ CUI_PaletteEditor::CUI_PaletteEditor(void) {
     contrast = 0;
     tint_index = 0;
     tint_amount = 0;
+    reset_skin_on_palette = 1;   // canonical look by default
 }
 
 CUI_PaletteEditor::~CUI_PaletteEditor(void) {
@@ -298,6 +305,23 @@ void CUI_PaletteEditor::load_palette_file(const char *path_or_fname) {
                  cur_dir ? cur_dir : ".", path_or_fname);
 #endif
     }
+
+    // Palette presets render against the default skin's PNG templates by
+    // default — that's the canonical look they were designed for. The user
+    // can disable this via the "Reset skin to default" checkbox to instead
+    // overlay the palette on whatever skin is currently loaded.
+    if (reset_skin_on_palette
+        && CurrentSkin
+        && strcmp(CurrentSkin->strSkinName, "default") != 0) {
+        Skin *old = CurrentSkin;
+        char def[] = "default";
+        Skin *todel = CurrentSkin->switchskin(def);
+        if (old == todel) {
+            strcpy(zt_config_globals.skin, CurrentSkin->strSkinName);
+        }
+        delete todel;
+    }
+
     if (COLORS.load(path)) {
         for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
             snapshot[i] = *slot_color_ptr(i);
@@ -541,7 +565,14 @@ void CUI_PaletteEditor::update(void) {
                 int frac = clampi((x - gx0) * 1000 / (gx1 - gx0 - 1), 0, 1000);
                 if (drag_kind == 10)      brightness = -128 + (frac * 256) / 1000;
                 else if (drag_kind == 11) contrast   = -100 + (frac * 200) / 1000;
-                else                       tint_amount = (frac * 255) / 1000;
+                else {
+                    tint_amount = (frac * 255) / 1000;
+                    // If the user is scrubbing the tint amount but no hue is
+                    // selected, the slider would silently do nothing. Bump
+                    // to the first real hue (Purple) so dragging visibly
+                    // tints the palette.
+                    if (tint_amount > 0 && tint_index == 0) tint_index = 1;
+                }
                 recompute_globals();
             }
         } else if (drag_kind && !bMouseIsDown) {
@@ -627,6 +658,24 @@ void CUI_PaletteEditor::update(void) {
             }
         }
 
+        // 3b. "Reset skin to default on palette load" checkbox.
+        {
+            int cbx0 = col(PE_CHECKBOX_X);
+            int cbx1 = cbx0 + col(PE_CHECKBOX_W);
+            int cby0 = row(PE_CHECKBOX_Y);
+            int cby1 = cby0 + row(1);
+            if (mx >= cbx0 && mx < cbx1 && my >= cby0 && my < cby1) {
+                reset_skin_on_palette = !reset_skin_on_palette;
+                snprintf(status_line, sizeof(status_line),
+                         "Reset skin to default on palette load: %s",
+                         reset_skin_on_palette ? "ON" : "OFF");
+                doredraw++;
+                need_refresh++;
+                screenmanager.UpdateAll();
+                return;
+            }
+        }
+
         // 4. Global brightness / contrast / tint sliders.
         for (int which = 0; which < 3; ++which) {
             int gx0, gy0, gx1, gy1;
@@ -635,7 +684,10 @@ void CUI_PaletteEditor::update(void) {
                 int frac = clampi((mx - gx0) * 1000 / (gx1 - gx0 - 1), 0, 1000);
                 if (which == 0)      brightness = -128 + (frac * 256) / 1000;
                 else if (which == 1) contrast   = -100 + (frac * 200) / 1000;
-                else                  tint_amount = (frac * 255) / 1000;
+                else {
+                    tint_amount = (frac * 255) / 1000;
+                    if (tint_amount > 0 && tint_index == 0) tint_index = 1;
+                }
                 drag_kind = 10 + which;
                 recompute_globals();
                 reset_accum();
@@ -1029,6 +1081,17 @@ void CUI_PaletteEditor::draw(Drawable *S) {
         char buf[16];
         snprintf(buf, sizeof(buf), "%5d", tint_amount);
         print(x1 + 2, y0, buf, COLORS.Text, S);
+    }
+
+    // "Reset skin to default on palette load" checkbox just under the
+    // global slider strip. Click anywhere on the row to toggle.
+    {
+        char box[64];
+        snprintf(box, sizeof(box), "[%c] %s",
+                 reset_skin_on_palette ? 'X' : ' ',
+                 PE_CHECKBOX_LABEL);
+        print(col(PE_CHECKBOX_X), row(PE_CHECKBOX_Y), box,
+              reset_skin_on_palette ? COLORS.Highlight : COLORS.Text, S);
     }
 
     // Hint / status line at the bottom of the page area (rows 60–61, well
