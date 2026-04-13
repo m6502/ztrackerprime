@@ -1596,17 +1596,7 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_PEDIT:
             if (cur_state == STATE_PEDIT) {
-                // F2 again on Pattern Editor: toggle regular <-> effect-draw mode
-                // (otherwise reachable only via Shift+~ which is awkward on
-                // non-US keyboards).
-                if (UIP_Patterneditor->mode == PEM_MOUSEDRAW) {
-                    midiInQueue.clear();
-                    UIP_Patterneditor->mode = PEM_REGULARKEYS;
-                } else {
-                    UIP_Patterneditor->mode = PEM_MOUSEDRAW;
-                }
-                need_refresh++;
-                clear++;
+                popup_window(UIP_PEParms); clear++;
                 doredraw++;
             } else {
                 switch_page(UIP_Patterneditor);

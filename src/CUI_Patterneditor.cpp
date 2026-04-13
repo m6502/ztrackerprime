@@ -1,3 +1,4 @@
+      case SDLK_NONUSBACKSLASH:
 #include "zt.h"
 #include "platform/undo.h"
 
@@ -2842,7 +2843,7 @@ case SDLK_DELETE:
                       case SDLK_M: set_note = (12*(base_octave-1))+11;break;
                         /* EDITING KEYS */
                       case SDLK_1: set_note = 0x81; break;      
-                      case SDLK_GRAVE: set_note = 0x82; break;  
+                      case SDLK_GRAVE: case SDLK_NONUSBACKSLASH: set_note = 0x82; break;  
                       case SDLK_PERIOD: 
                         if (kstate != KS_SHIFT) {
                           set_note = 0x80; 
