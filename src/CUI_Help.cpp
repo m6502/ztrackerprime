@@ -17,9 +17,22 @@ CUI_Help::CUI_Help(void) {
     FILE *fp;
     int fs=0;
     char *help_file;
-    help_file = (char*)malloc(strlen(zt_directory) + strlen("/doc/help.txt") + 1);
-    sprintf(help_file,"%s/doc/help.txt",zt_directory);
-    if (fp = fopen(help_file,"rt")) {
+    help_file = (char*)malloc(1024);
+    // Try multiple paths: zt_directory/doc, ./doc, then plain ./help.txt.
+    fp = NULL;
+    if (zt_directory[0]) {
+        sprintf(help_file,"%s/doc/help.txt",zt_directory);
+        fp = fopen(help_file,"r");
+    }
+    if (!fp) {
+        sprintf(help_file,"doc/help.txt");
+        fp = fopen(help_file,"r");
+    }
+    if (!fp) {
+        sprintf(help_file,"help.txt");
+        fp = fopen(help_file,"r");
+    }
+    if (fp) {
         while(!feof(fp)) {
             fgetc(fp);
             fs++;
@@ -59,6 +72,9 @@ void CUI_Help::update() {
     UI->update();
     if (Keys.size()) {
         key = Keys.getkey();
+        if (key == SDLK_F1 || key == SDLK_ESCAPE) {
+            switch_page(UIP_Patterneditor);
+        }
     }
 }
 
