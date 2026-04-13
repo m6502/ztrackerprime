@@ -141,7 +141,8 @@ void CUI_Songconfig::leave(void) {
 
 void CUI_Songconfig::update()
 {
-    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - 22) ;
+    // Bottom margin reduced so more orderlist items (incl. 038/039) are visible.
+    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 6) ;
 
     ValueSlider *vs;
     TextInput *t;

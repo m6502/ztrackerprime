@@ -88,7 +88,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     UI = new UserInterface;
     ie = new InstEditor;
     UI->add_element(ie,tabindex++);
-    ie->x = 5;
+    ie->x = 2;
     ie->y = TRACKS_ROW_Y;
     ie->xsize = 29;
 
@@ -99,75 +99,75 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     vso = new ValueSliderOFF(1); // Bank (ID: 1)
     UI->add_element(vso,tabindex++);
-    vso->x = 36;    vso->y = 15;    vso->xsize = 14;    vso->ysize = 1; vso->min = -1;  vso->max = 0x3fff;    vso->value = -1; 
+    vso->x = 33;    vso->y = 15;    vso->xsize = 14;    vso->ysize = 1; vso->min = -1;  vso->max = 0x3fff;    vso->value = -1; 
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=12; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=32; fm->y=12; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
     vso = new ValueSliderOFF(1); // Patch (ID: 2)
     UI->add_element(vso,tabindex++);
-    vso->x = 58;    vso->y = 15;    vso->xsize = 16;    vso->ysize = 1; vso->min = -1;  vso->max = 127; vso->value = -1;
+    vso->x = 55;    vso->y = 15;    vso->xsize = 16;    vso->ysize = 1; vso->min = -1;  vso->max = 127; vso->value = -1;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=12; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=54; fm->y=12; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
 
     vs = new ValueSlider(1); // Default Volume (ID: 3)
     UI->add_element(vs,tabindex++);
-    vs->x = 36; vs->y = 20; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
+    vs->x = 33; vs->y = 20; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=17; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=32; fm->y=17; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
 
     vsd = new ValueSliderDL(1); // Default Length (ID: 4)
     UI->add_element(vsd,tabindex++);
-    vsd->x = 58;    vsd->y = 20;    vsd->xsize = 16;    vsd->ysize = 1; vsd->min = 1;   vsd->max = 1000;    vsd->value = 0;
+    vsd->x = 55;    vsd->y = 20;    vsd->xsize = 16;    vsd->ysize = 1; vsd->min = 1;   vsd->max = 1000;    vsd->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=17; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=54; fm->y=17; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
     
 
     
     vs = new ValueSlider(1); // Global Volume (ID: 5)
     UI->add_element(vs,tabindex++);
-    vs->x = 36; vs->y = 25; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
+    vs->x = 33; vs->y = 25; vs->xsize = 16; vs->ysize = 1;  vs->min = 0;    vs->max = 0x7f; vs->value = 0x7f;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=22; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=32; fm->y=22; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
     
 
 
 
     vs = new ValueSlider(1); // Transpose (ID: 6)
     UI->add_element(vs,tabindex++);
-    vs->x = 58; vs->y = 25; vs->xsize = 16; vs->ysize = 1;  vs->min = -127; vs->max = 127;  vs->value = 0;
+    vs->x = 55; vs->y = 25; vs->xsize = 16; vs->ysize = 1;  vs->min = -127; vs->max = 127;  vs->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=22; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
+    fm->x=54; fm->y=22; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
 
 
 
 
     vs = new ValueSlider(1); // Channel (ID: 7)
     UI->add_element(vs,tabindex++);
-    vs->x = 36; vs->y = 30; vs->xsize = 16; vs->ysize = 1;  vs->min = 1;    vs->max = 16;   vs->value = 0;
+    vs->x = 33; vs->y = 30; vs->xsize = 16; vs->ysize = 1;  vs->min = 1;    vs->max = 16;   vs->value = 0;
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
-    fm->x=35; fm->y=27; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
+    fm->x=32; fm->y=27; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
     
     ////////////////////////////////////////////////////////////////////////////
 
     b = new Button;
     UI->add_element(b,tabindex++);
-    b->x = 58;
+    b->x = 55;
     b->y = 28;
     b->xsize = 20;
     b->ysize = 1;
@@ -176,7 +176,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     b = new Button;
     UI->add_element(b,tabindex++);
-    b->x = 58;
+    b->x = 55;
     b->y = 30;
     b->xsize = 20;
     b->ysize = 1;
@@ -185,7 +185,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     b = new Button;
     UI->add_element(b,tabindex++);
-    b->x = 58;
+    b->x = 55;
     b->y = 32;
     b->xsize = 20;
     b->ysize = 1;
@@ -197,7 +197,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     fm = new Frame;  //frame for buttons
     UI->add_gfx(fm,gfxindex++);
-    fm->x=57; fm->y=27; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
+    fm->x=54; fm->y=27; fm->xsize = 22; fm->ysize = 7; fm->type = 0;
 
 
 
@@ -205,7 +205,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     b = new Button;
     UI->add_element(b,tabindex++);
-    b->x = 35;
+    b->x = 32;
     b->y = 35;
     b->xsize = 15;
     b->ysize = 1;
@@ -215,7 +215,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     
     b = new Button;
     UI->add_element(b,tabindex++);
-    b->x = 35+16;
+    b->x = 32+16;
     b->y = 35;
     b->xsize = 12;
     b->ysize = 1;
@@ -225,14 +225,14 @@ CUI_InstEditor::CUI_InstEditor(void) {
 /*
     msl = new MidiDevSelectList;
     UI->add_element(msl,tabindex++);
-    msl->x=35;
+    msl->x=32;
     msl->y=37;
     msl->xsize = 44;
     msl->ysize = 5;
 */
     mds = new MidiOutDeviceSelector;
     UI->add_element(mds, tabindex++);
-    mds->x=35;
+    mds->x=32;
     mds->y=37;
     mds->xsize = 44;
     mds->ysize = 13;
@@ -564,13 +564,13 @@ void CUI_InstEditor::draw(Drawable *S)
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"(F3) Sample Editor",COLORS.Text,COLORS.Background,S);
-        printBG(col(36),row(13),"Bank",COLORS.Text,COLORS.Background,S);
-        printBG(col(58),row(13),"Patch",COLORS.Text,COLORS.Background,S);
-        printBG(col(36),row(18),"Default Volume",COLORS.Text,COLORS.Background,S);
-        printBG(col(58),row(18),"Default Length",COLORS.Text,COLORS.Background,S);
-        printBG(col(36),row(23),"Global Volume",COLORS.Text,COLORS.Background,S);
-        printBG(col(58),row(23),"Transpose",COLORS.Text,COLORS.Background,S);
-        printBG(col(36),row(28),"Channel",COLORS.Text,COLORS.Background,S);
+        printBG(col(33),row(13),"Bank",COLORS.Text,COLORS.Background,S);
+        printBG(col(55),row(13),"Patch",COLORS.Text,COLORS.Background,S);
+        printBG(col(33),row(18),"Default Volume",COLORS.Text,COLORS.Background,S);
+        printBG(col(55),row(18),"Default Length",COLORS.Text,COLORS.Background,S);
+        printBG(col(33),row(23),"Global Volume",COLORS.Text,COLORS.Background,S);
+        printBG(col(55),row(23),"Transpose",COLORS.Text,COLORS.Background,S);
+        printBG(col(33),row(28),"Channel",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; 
         updated=2;
         S->unlock();
