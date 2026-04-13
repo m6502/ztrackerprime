@@ -9,7 +9,7 @@ CUI_Help::CUI_Help(void) {
     tb = new TextBox;
     UI->add_element(tb, 0);
     tb->x = 1;
-    tb->y = 11;
+    tb->y = 12;
     tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
     // Bottom-anchor: fill from tb->y down to ~5 rows above screen bottom.
     tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 5;
