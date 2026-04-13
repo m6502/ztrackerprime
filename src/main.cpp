@@ -1,19 +1,3 @@
-    }
-    // One-time stderr diagnostic so we can identify exactly which scancode
-    // the § key sends on a given keyboard. Prints once per unique scancode.
-    if (pressed) {
-      static int seen[512] = {0};
-      int sc = (int)e->scancode;
-      if (sc >= 0 && sc < 512 && !seen[sc]) {
-        seen[sc] = 1;
-        fprintf(stderr, "[zt-key] scancode=%d keycode=0x%X mod=0x%X\n",
-                sc, (unsigned)e->key, (unsigned)e->mod);
-        fflush(stderr);
-      }
-  }
-  else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
-    // Keep statusmsg quiet on non-Pattern pages while playing.
-    statusmsg = (char*)" ";
 /*
 
     +:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+
@@ -97,7 +81,6 @@
 #include <limits.h>
 #include <cstring>
 #endif
-
 
 
 // zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
@@ -328,7 +311,6 @@ CUI_Ordereditor *UIP_Ordereditor = NULL;
 CUI_Playsong *UIP_Playsong = NULL;
 CUI_Songconfig *UIP_Songconfig = NULL;
 CUI_Sysconfig *UIP_Sysconfig = NULL;
-CUI_PaletteEditor *UIP_PaletteEditor = NULL;
 CUI_Config *UIP_Config = NULL;
 CUI_Patterneditor *UIP_Patterneditor = NULL;
 CUI_PEParms *UIP_PEParms = NULL;
@@ -345,6 +327,7 @@ CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
+CUI_PaletteEditor *UIP_PaletteEditor = NULL;
 
 
 
@@ -878,7 +861,7 @@ char *hex2note(char *str,unsigned char note)
         str[0]=szLetters[2*(note%12)];              
         str[1]=szLetters[2*(note%12)+1];            
         str[2]='0'+(note/12);                       
-    }
+    } 
     else {
 
         switch(note) {
@@ -951,7 +934,7 @@ void update_status(Drawable *S)
       sec = calcSongSeconds();
       sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
       sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time);
-    } 
+    }
     else {
 
       sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length);
@@ -966,6 +949,10 @@ void update_status(Drawable *S)
       cur_edit_row     = ztPlayer->playing_cur_row;
       need_refresh++;
     }
+  }
+  else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
+    // Keep statusmsg quiet on non-Pattern pages while playing.
+    statusmsg = (char*)" ";
   }
 
   if (S->lock() == 0) {
@@ -1107,7 +1094,6 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_Playsong = new CUI_Playsong;
     UIP_Songconfig = new CUI_Songconfig;
     UIP_Sysconfig = new CUI_Sysconfig;
-    UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
@@ -1116,7 +1102,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_NewSong = new CUI_NewSong;
     UIP_RUSure = new CUI_RUSure;
     UIP_Help = new CUI_Help;
-
+    
 
 
     setPreAction(preAction);
@@ -1500,7 +1486,7 @@ void global_keys(Drawable *S)
                 } else {
                     command = CMD_SWITCH_SYSCONF;
                 }
-                break;
+                break;          
 
         }
         
@@ -1610,14 +1596,14 @@ void global_keys(Drawable *S)
 #endif
 
         // ------------------------------------------------------------------------
-        case CMD_SWITCH_PEDIT:
+        case CMD_SWITCH_PEDIT: 
             if (cur_state == STATE_PEDIT) {
                 popup_window(UIP_PEParms); clear++;
                 doredraw++;
             } else {
                 switch_page(UIP_Patterneditor);
-                doredraw++; clear++;
-            }
+                doredraw++; clear++; 
+            }                   
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_IEDIT: 
@@ -1642,15 +1628,14 @@ void global_keys(Drawable *S)
             break;
 
         // ------------------------------------------------------------------------
+        case CMD_SWITCH_ABOUT:
+            switch_page(UIP_About);
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
         case CMD_SWITCH_PALETTE:
             switch_page(UIP_PaletteEditor);
             doredraw++; clear++;
-            break;
-
-        // ------------------------------------------------------------------------
-        case CMD_SWITCH_ABOUT: 
-            switch_page(UIP_About);
-            doredraw++; clear++; 
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_HELP:
@@ -2372,6 +2357,10 @@ void keyhandler(SDL_KeyboardEvent *e) {
     if (id == SDLK_KP_ENTER)
       id = SDLK_RETURN;
 
+    if (pressed && id == SDLK_RETURN) {
+        actual_ch = 10;
+    }
+
     // EU/Finnish ISO keyboards: the § key. Different layouts map it to
     // different scancodes — on some it's NONUSBACKSLASH, on others it's
     // INTERNATIONAL1/2 or even GRAVE itself. Force any of those to SDLK_GRAVE
@@ -2384,9 +2373,17 @@ void keyhandler(SDL_KeyboardEvent *e) {
         e->scancode == SDL_SCANCODE_NONUSHASH) {
       id = SDLK_GRAVE;
     }
-
-    if (pressed && id == SDLK_RETURN) {
-        actual_ch = 10;
+    // One-time stderr diagnostic so we can identify exactly which scancode
+    // the § key sends on a given keyboard. Prints once per unique scancode.
+    if (pressed) {
+      static int seen[512] = {0};
+      int sc = (int)e->scancode;
+      if (sc >= 0 && sc < 512 && !seen[sc]) {
+        seen[sc] = 1;
+        fprintf(stderr, "[zt-key] scancode=%d keycode=0x%X mod=0x%X\n",
+                sc, (unsigned)e->key, (unsigned)e->mod);
+        fflush(stderr);
+      }
     }
 
     if (id != SDLK_LALT && id != SDLK_RALT && id != SDLK_RCTRL && id != SDLK_LCTRL && id != SDLK_LSHIFT && id != SDLK_RSHIFT) {
@@ -2974,6 +2971,15 @@ static int zt_backend_set_video_mode(char *errstr)
       zt_show_error("Error", errstr);
       return 0;
     }
+    zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
+    if (!zt_renderer) {
+      snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
+      zt_show_error("Error", errstr);
+      return 0;
+    }
+    if (!SDL_SetRenderVSync(zt_renderer, 1)) {
+      ZT_DEBUG_LOG("Warning: couldn't enable renderer vsync: %s\n", SDL_GetError());
+    }
 
     // Load window icon (configurable via zt.conf 'window_icon'; default 'zt_icon.png').
     // On macOS this also updates the Dock icon at runtime; a failure is silent.
@@ -2986,16 +2992,6 @@ static int zt_backend_set_video_mode(char *errstr)
         SDL_SetWindowIcon(zt_main_window, icon);
         SDL_DestroySurface(icon);
       }
-    }
-
-    zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
-    if (!zt_renderer) {
-      snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
-      zt_show_error("Error", errstr);
-      return 0;
-    }
-    if (!SDL_SetRenderVSync(zt_renderer, 1)) {
-      ZT_DEBUG_LOG("Warning: couldn't enable renderer vsync: %s\n", SDL_GetError());
     }
   } else {
     SDL_SetWindowSize(zt_main_window, RESOLUTION_X, RESOLUTION_Y);
@@ -3200,7 +3196,6 @@ int initSDL(void)
     UIP_Playsong = new CUI_Playsong;
     UIP_Songconfig = new CUI_Songconfig;
     UIP_Sysconfig = new CUI_Sysconfig;
-    UIP_PaletteEditor = new CUI_PaletteEditor;
 // this guy has been moved to initGFX because the MIDI out devices are not setup yet
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;
@@ -3217,6 +3212,7 @@ int initSDL(void)
     UIP_SongDuration = new CUI_SongDuration;
     UIP_LuaConsole = new CUI_LuaConsole;
     g_lua.init();
+    UIP_PaletteEditor = new CUI_PaletteEditor;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
     return 1;
@@ -3306,6 +3302,15 @@ int main(int argc, char *argv[])
     '/';
 #endif
 
+  // Get the zt directory and store it globally
+  if(argc > 1) {
+    if(argv[1] != NULL && argv[1][0] != '\0') {
+      zt_get_current_directory(1024,zt_filename);
+      strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
+      strcat(zt_filename,argv[1]);
+    }
+  }
+
   bool launched_from_bundle = false;
   char bundle_resources_path[1024] = "";
 #if defined(__APPLE__)
@@ -3329,15 +3334,6 @@ int main(int argc, char *argv[])
     }
   }
 #endif
-
-  // Get the zt directory and store it globally
-  if(argc > 1) {
-    if(argv[1] != NULL && argv[1][0] != '\0') {
-      zt_get_current_directory(1024,zt_filename);
-      strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
-      strcat(zt_filename,argv[1]);
-    }
-  }
 
   char *last_backslash = strrchr(argv[0], '\\');
   char *last_slash = strrchr(argv[0], '/');
