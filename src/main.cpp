@@ -1,3 +1,7 @@
+  }
+  else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
+    // Keep statusmsg quiet on non-Pattern pages while playing.
+    statusmsg = (char*)" ";
 /*
 
     +:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+:+
@@ -861,7 +865,7 @@ char *hex2note(char *str,unsigned char note)
         str[0]=szLetters[2*(note%12)];              
         str[1]=szLetters[2*(note%12)+1];            
         str[2]='0'+(note/12);                       
-    } 
+    }
     else {
 
         switch(note) {
@@ -921,7 +925,9 @@ void update_status(Drawable *S)
   int i,o=0;
   char str[10];
 
-  if (ztPlayer->playing) {
+  // Only refresh the playing/looping status line when viewing the Pattern
+  // Editor; otherwise it bleeds over Help/Sample/Song/Sys Config pages.
+  if (ztPlayer->playing && cur_state == STATE_PEDIT) {
 
     if (ztPlayer->playmode) {
 

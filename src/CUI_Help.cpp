@@ -9,7 +9,7 @@ CUI_Help::CUI_Help(void) {
     tb = new TextBox;
     UI->add_element(tb, 0);
     tb->x = 1;
-    tb->y = 12;
+    tb->y = 11;
     tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
     // Bottom-anchor: fill from tb->y down to ~5 rows above screen bottom.
     tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
@@ -168,7 +168,7 @@ void CUI_Help::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Help (F1)",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"(F1) Help",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
         S->unlock();

@@ -474,7 +474,7 @@ void CUI_Savescreen::draw(Drawable *S)
 
     if (!is_saving) draw_status(S);
 
-    printtitle(PAGE_TITLE_ROW_Y, "File Save (Ctrl+S)", COLORS. Text, COLORS.Background, S) ;
+    printtitle(PAGE_TITLE_ROW_Y, "(Ctrl+S) File Save", COLORS. Text, COLORS.Background, S) ;
 
     need_refresh = 0;
     updated=2;

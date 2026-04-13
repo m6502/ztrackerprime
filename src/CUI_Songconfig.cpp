@@ -104,7 +104,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         oe = new OrderEditor;
         UI->add_element(oe,5);
         oe->x = 59;
-        oe->y = 15;
+        oe->y = 13;
         oe->xsize = 9;
         oe->ysize = 32 ;
 }
@@ -186,10 +186,10 @@ void CUI_Songconfig::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
-        print(row(11),col(base_y),"Title",COLORS.Text,S);
-        print(row(13),col(base_y+2),   "BPM",COLORS.Text,S);
-        print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
+        printtitle(PAGE_TITLE_ROW_Y,"(F11) Song Configuration",COLORS.Text,COLORS.Background,S);
+        print(row(9),col(base_y),"Title",COLORS.Text,S);
+        print(row(11),col(base_y+2),   "BPM",COLORS.Text,S);
+        print(row(11),col(base_y+3),"TPB",COLORS.Text,S);
         print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
         print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
         print(row(63),col(base_y),"Order List",COLORS.Text,S);

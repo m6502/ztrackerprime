@@ -288,7 +288,7 @@ void CUI_Loadscreen::draw(Drawable *S)
 
     if (!is_loading) draw_status(S);
 
-    printtitle(PAGE_TITLE_ROW_Y,"File Load (Ctrl+L)",COLORS.Text,COLORS.Background,S) ;
+    printtitle(PAGE_TITLE_ROW_Y,"(Ctrl+L) File Load",COLORS.Text,COLORS.Background,S) ;
     need_refresh = 0; updated=2;
     S->unlock();
   }

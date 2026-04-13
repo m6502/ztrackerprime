@@ -99,9 +99,10 @@ void CUI_SongMessage::leave(void) {
 }
 
 void CUI_SongMessage::update() {
+    int key=0;
     UI->update();
     if (Keys.size()) {
-        Keys.getkey();
+        key = Keys.getkey();
     }
 }
 
@@ -109,7 +110,7 @@ void CUI_SongMessage::draw(Drawable *S) {
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);
-        printtitle(PAGE_TITLE_ROW_Y,"Song Message (F10)",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"(F10) Song Message",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
         S->unlock();

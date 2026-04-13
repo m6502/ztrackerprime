@@ -100,9 +100,10 @@ void CUI_About::leave(void) {
 }
 
 void CUI_About::update() {
+    int key=0;
     UI->update();
     if (Keys.size()) {
-        Keys.getkey();
+        key = Keys.getkey();
     }
     //need_refresh++;
 }
@@ -121,7 +122,7 @@ void CUI_About::draw(Drawable *S) {
     */
     UI->full_refresh();
     if (S->lock()==0) {
-        printtitle(PAGE_TITLE_ROW_Y,"About zTracker (Alt+F12)",COLORS.Text,COLORS.Background,S);
+        printtitle(PAGE_TITLE_ROW_Y,"(Alt+F12) About zTracker",COLORS.Text,COLORS.Background,S);
         need_refresh = 0; updated=2;
         UI->draw(S);
         S->unlock();

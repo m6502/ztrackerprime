@@ -3473,7 +3473,7 @@ void CUI_Patterneditor::draw(Drawable *S)
         print(row(1), col(CHARS_Y - 2), playinfo, COLORS.Data, S);
     }
 
-    printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
+    printtitle(PAGE_TITLE_ROW_Y,"(F2) Pattern Editor",COLORS.Text,COLORS.Background,S);
     
     switch(mode) {
       

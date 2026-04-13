@@ -59,13 +59,17 @@ int textcenter(const char *str, int local) {
 //
 //
 int printtitle(int y, const char *str, TColor col,TColor bg,Drawable *S) {
-    int x;
+    // Left-aligned title bar: a few leading dots, then "(Fn) Name ", then a
+    // dotted line filling the remainder to the right edge.
+    const int left_gutter = 3;
     static char str2[256];
     str2[0] = ' '; str2[1] = 0; strcat(str2,str); strcat(str2," ");
-    x = textcenter(str2);
-    printBG(col(x),row(y),str2,col,bg,S);
-    printlineBG(col(1),row(y),154,x-1,col,bg,S);
-    printlineBG(col(x+strlen(str2)),row(y),154, (INTERNAL_RESOLUTION_X/8)-x-strlen(str2)-2  ,col,bg,S);
+    int text_start = left_gutter;
+    printlineBG(col(1),row(y),154, left_gutter - 1, col,bg,S);
+    printBG(col(text_start), row(y), str2, col, bg, S);
+    int text_end = text_start + (int)strlen(str2);
+    int screen_cols = INTERNAL_RESOLUTION_X / 8;
+    printlineBG(col(text_end), row(y), 154, screen_cols - text_end - 1, col, bg, S);
     return 0;
 }
 
@@ -98,6 +102,10 @@ int font_load(char *filename)
                 int line_char = vary & 0x7 ;
 
                 for (int varx = 0; varx < 128; varx++) {
+
+                    unsigned char *puntero = (unsigned char *)temp->pixels ;
+                    int bpp = SDL_BYTESPERPIXEL(temp->format);
+                    puntero += (vary * temp->pitch) + (varx * bpp);
 
                     unsigned char *puntero = (unsigned char *)temp->pixels ;
                     int bpp = SDL_BYTESPERPIXEL(temp->format);
