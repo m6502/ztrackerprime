@@ -235,7 +235,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     mds->x=35;
     mds->y=38;
     mds->xsize = 44;
-    mds->ysize = 13;
+    mds->ysize = 14;
     
     reset = 0;
 }
