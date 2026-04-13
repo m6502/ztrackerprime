@@ -328,6 +328,7 @@ CUI_Ordereditor *UIP_Ordereditor = NULL;
 CUI_Playsong *UIP_Playsong = NULL;
 CUI_Songconfig *UIP_Songconfig = NULL;
 CUI_Sysconfig *UIP_Sysconfig = NULL;
+CUI_PaletteEditor *UIP_PaletteEditor = NULL;
 CUI_Config *UIP_Config = NULL;
 CUI_Patterneditor *UIP_Patterneditor = NULL;
 CUI_PEParms *UIP_PEParms = NULL;
@@ -1106,6 +1107,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_Playsong = new CUI_Playsong;
     UIP_Songconfig = new CUI_Songconfig;
     UIP_Sysconfig = new CUI_Sysconfig;
+    UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
@@ -1114,7 +1116,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_NewSong = new CUI_NewSong;
     UIP_RUSure = new CUI_RUSure;
     UIP_Help = new CUI_Help;
-    
+
 
 
     setPreAction(preAction);
@@ -1484,8 +1486,10 @@ void global_keys(Drawable *S)
                     }
                 }
                 break;
-            case SDLK_F12: 
-                if (kstate & KS_ALT) {
+            case SDLK_F12:
+                if (kstate & KS_SHIFT) {
+                    command = CMD_SWITCH_PALETTE;
+                } else if (kstate & KS_ALT) {
                     command = CMD_SWITCH_ABOUT;
                 } else if (cur_state == STATE_SYSTEM_CONFIG) {
                     command = CMD_SWITCH_CONFIG;
@@ -1496,7 +1500,7 @@ void global_keys(Drawable *S)
                 } else {
                     command = CMD_SWITCH_SYSCONF;
                 }
-                break;          
+                break;
 
         }
         
@@ -1634,6 +1638,12 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_CONFIG:
             switch_page(UIP_Config);
+            doredraw++; clear++;
+            break;
+
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_PALETTE:
+            switch_page(UIP_PaletteEditor);
             doredraw++; clear++;
             break;
 
@@ -3190,6 +3200,7 @@ int initSDL(void)
     UIP_Playsong = new CUI_Playsong;
     UIP_Songconfig = new CUI_Songconfig;
     UIP_Sysconfig = new CUI_Sysconfig;
+    UIP_PaletteEditor = new CUI_PaletteEditor;
 // this guy has been moved to initGFX because the MIDI out devices are not setup yet
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;

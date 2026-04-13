@@ -2,6 +2,7 @@
 #define _UI_PAGE_H_
 
 #include "platform.h"
+#include "lc_sdl_wrapper.h"
 
 class Button ;
 class CheckBox ;
@@ -120,6 +121,29 @@ class CUI_Sysconfig : public CUI_Page {
         void leave(void);
         void update(void);
         void draw(Drawable *S);
+};
+
+class CUI_PaletteEditor : public CUI_Page {
+    public:
+        int selected_slot;     // index within the focused panel
+        int focus_panel;       // 0 = swatch grid, 1 = preset panel
+        int channel_edit;      // 0 = none, 1 = R, 2 = G, 3 = B
+        int dirty;             // unsaved changes vs. snapshot
+        TColor snapshot[32];   // saved COLORS.* on entry; up to 32 slots
+        char status_line[128];
+
+        CUI_PaletteEditor();
+        ~CUI_PaletteEditor();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+
+        void load_palette_file(const char *fname);
+        void save_palette_file(const char *fname);
+        void apply_channel_delta(int delta);
+        void apply_channel_set(int value);
 };
 
 class CUI_Config : public CUI_Page {

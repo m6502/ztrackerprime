@@ -313,7 +313,8 @@ enum state {
   STATE_SONG_MESSAGE,
   STATE_ARPEDIT,
   STATE_MIDIMACEDIT,
-  STATE_LUA_CONSOLE
+  STATE_LUA_CONSOLE,
+  STATE_PALETTE_EDITOR
 } ;
 
 
@@ -566,6 +567,7 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_SWITCH_SAVE,
 
         CMD_SWITCH_CONFIG,
+        CMD_SWITCH_PALETTE,
         CMD_PLAY,
         CMD_PLAY_PAT,
         CMD_PLAY_PAT_LINE,
@@ -728,6 +730,7 @@ extern CUI_Ordereditor *UIP_Ordereditor;
 extern CUI_Playsong *UIP_Playsong;
 extern CUI_Songconfig *UIP_Songconfig;
 extern CUI_Sysconfig *UIP_Sysconfig;
+extern CUI_PaletteEditor *UIP_PaletteEditor;
 extern CUI_Config *UIP_Config;
 extern CUI_Patterneditor *UIP_Patterneditor;
 extern CUI_PEParms *UIP_PEParms;
