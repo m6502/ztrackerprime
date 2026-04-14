@@ -1,6 +1,6 @@
 #include "zt.h"
 #include "CUI_PaletteEditor.h"
-#include "skins.h"
+#include "Skins.h"
 #include <stdio.h>
 #include <string.h>
 #include <filesystem>
