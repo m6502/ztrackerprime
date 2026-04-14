@@ -207,6 +207,7 @@ void CUI_Config::enter(void) {
     need_refresh = 1;
     cur_state = STATE_CONFIG;
     Keys.flush();
+    UI->focus_first_tab_stop();
 }
 
 void CUI_Config::leave(void) {

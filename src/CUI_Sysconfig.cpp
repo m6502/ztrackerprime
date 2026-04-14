@@ -449,6 +449,7 @@ void CUI_Sysconfig::enter(void) {
     need_refresh = 1;
     cur_state = STATE_SYSTEM_CONFIG;
     UI->enter();
+    UI->focus_first_tab_stop();
 }
 
 void CUI_Sysconfig::leave(void) {

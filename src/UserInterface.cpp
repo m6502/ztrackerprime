@@ -279,6 +279,25 @@ void UserInterface::set_focus(int id) {
 }
 
 
+// ------------------------------------------------------------------------------------------------
+//
+// Land cur_element on the lowest-ID element that reports is_tab_stop().
+// Called from page enter() so arrow-key nav has a valid starting point even
+// when ID 0 isn't tab-stoppable (hidden zero-size widget, read-only TextBox
+// etc.). No-op if no element is focusable.
+//
+void UserInterface::focus_first_tab_stop() {
+    for (int id = 0; id < num_elems; ++id) {
+        UserInterfaceElement *e = get_element(id);
+        if (e && e->is_tab_stop()) {
+            cur_element = id;
+            full_refresh();
+            return;
+        }
+    }
+}
+
+
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -310,6 +329,24 @@ void UserInterface::update()
     UserInterfaceElement *t = get_element(id);
     if (t) t->on_focus();
   };
+
+  // Sanitize: if cur_element points at a stale ID or a non-tab-stop
+  // element (hidden zero-size widget, read-only TextBox, freed widget,
+  // ListBox that has become empty), advance to the nearest real tab stop
+  // before we dispatch keys. Without this, landing on a non-focusable
+  // element traps arrow keys — its update() returns 0 for every press and
+  // the user can't escape except via Tab.
+  {
+    UserInterfaceElement *cur = get_element(cur_element);
+    if (!cur || !cur->is_tab_stop()) {
+      int recovered = advance_focus(cur_element, +1);
+      if (recovered != cur_element) {
+        cur_element = recovered;
+        notify_focus(cur_element);
+        full_refresh();
+      }
+    }
+  }
 
   while(e) {
 

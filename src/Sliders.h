@@ -20,6 +20,12 @@ class ValueSlider : public UserInterfaceElement {
         int mouseupdate(int cur_element);
         virtual int update();
         void draw(Drawable *S, int active);
+        // A zero-sized ValueSlider (xsize==0 or ysize==0) draws nothing and
+        // its update() early-returns 0 for every key, so landing focus on it
+        // produces a visibly-unfocused "dead" state the user can't escape
+        // with arrow keys. Declare it non-focusable so advance_focus skips
+        // past it entirely. See doc/design/ui-focus-nav.md.
+        bool is_tab_stop() const override { return xsize > 0 && ysize > 0; }
 };
  
 

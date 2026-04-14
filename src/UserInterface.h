@@ -73,6 +73,10 @@ class UserInterface {
         void add_element(UserInterfaceElement *uie, int ID);
         void add_gfx(UserInterfaceElement *uie, int ID);
         void set_focus(int id);
+        // Walks elements in ID order and focuses the first is_tab_stop() one.
+        // Called from page enter() so arrow-key nav always has somewhere
+        // valid to start. No-op if no element is tab-stoppable.
+        void focus_first_tab_stop();
         UserInterfaceElement *get_element(int ID);  
         UserInterfaceElement *get_gfx(int ID);
         bool has_text_focus() const;
@@ -231,6 +235,13 @@ class TextBox : public UserInterfaceElement {
         int update();
         void draw(Drawable *S, int active);
         int mouseupdate(int cur_element);
+        // TextBox is a read-only text display in this codebase (Help,
+        // Config's settings dump, SongMessage). Its update() consumes
+        // Up/Down for scrolling and always returns 0, so tabbing onto it
+        // traps arrow-key focus. Declare non-focusable; mouse wheel /
+        // click can still interact if needed. See
+        // doc/design/ui-focus-nav.md.
+        bool is_tab_stop() const override { return false; }
 };
 
 class CommentEditor : public TextBox {
