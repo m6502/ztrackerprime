@@ -59,10 +59,39 @@ unsigned long ZT_THREAD_CALL save_thread(void *) {
                 status_change = 1;
             }
             break;
-        case 2:
+        case 2: {
             ZTImportExport zie;
             zie.ExportMID((char *)song->filename,0);
             break;
+        }
+        case 3: {
+            ZTImportExport zie;
+            if (zie.ExportMultichannelMID((char *)song->filename)) {
+                sprintf(szStatmsg, "Exported multichannel MIDI to %s",
+                        (char *)song->filename);
+            } else {
+                sprintf(szStatmsg,
+                        "Multichannel MIDI export failed (no tracks with events)");
+            }
+            statusmsg = szStatmsg;
+            status_change = 1;
+            break;
+        }
+        case 4: {
+            ZTImportExport zie;
+            int n = zie.ExportPerTrackMID((char *)song->filename);
+            if (n > 0) {
+                sprintf(szStatmsg,
+                        "Exported %d per-track .MID files (e.g. *_track01.mid)",
+                        n);
+            } else {
+                sprintf(szStatmsg,
+                        "Per-track MIDI export failed (no tracks with events)");
+            }
+            statusmsg = szStatmsg;
+            status_change = 1;
+            break;
+        }
     }
     save_finished = 1;
     is_saving = 0;

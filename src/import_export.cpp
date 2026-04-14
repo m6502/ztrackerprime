@@ -485,6 +485,341 @@ int ZTImportExport::ExportMID(char *fn, int format)
 
 
 
+// ------------------------------------------------------------------------------------------------
+// Helper: scan all patterns/tracks and mark which zTracker tracks have any
+// event with an instrument assigned. Needed so empty tracks don't create
+// stub MTrks.
+//
+static void find_used_tracks(unsigned char tflag[MAX_TRACKS], zt_module *song)
+{
+  for (int i = 0; i < MAX_TRACKS; i++) tflag[i] = 0;
+
+  for (int p = 0; p < 256; p++) {
+
+    for (int t = 0; t < MAX_TRACKS; t++) {
+
+      event *e = song->patterns[p]->tracks[t]->event_list;
+
+      while (e) {
+
+        if (e->inst < MAX_INSTS) { tflag[t] = 1; break; }
+        e = e->next_event;
+      }
+    }
+  }
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+// Write a single MIDI event into a per-track CDataBuf. Mirrors the event
+// encoding used by ExportMID(). Returns nothing; mutates mp and dtime_ref.
+//
+static void push_midi_event(CDataBuf *mp, midi_event *e, int &dtime_ref)
+{
+  int stat;
+
+  switch (e->type) {
+
+    case ET_NOTE_OFF:
+      e->data2 = 0x0;
+      // fall through
+    case ET_NOTE_ON:
+      push_varlen(mp, dtime_ref);
+      dtime_ref = 0;
+      stat = (e->data1 & 0x0F) + 0x90;
+      mp->pushuc(stat);
+      mp->pushuc(e->command);
+      mp->pushuc((unsigned char)e->data2);
+      break;
+
+    case ET_PC:
+      if (e->data2 >= 0) {
+        unsigned short int bank;
+        unsigned char hb, lb;
+        bank = e->data2;
+        bank &= 0x3fff;
+        lb = bank & 0x007F;
+        hb = bank >> 7;
+        push_varlen(mp, dtime_ref);
+        dtime_ref = 0;
+        mp->pushuc(0xB0 + e->data2);
+        mp->pushuc(0x0);
+        mp->pushuc(lb);
+        push_varlen(mp, 0);
+        mp->pushuc(0xB0 + e->data2);
+        mp->pushuc(0x20);
+        mp->pushuc(hb);
+      }
+      push_varlen(mp, dtime_ref);
+      dtime_ref = 0;
+      mp->pushuc(0xC0 + e->data2);
+      mp->pushuc(e->command);
+      break;
+
+    case ET_CC:
+      push_varlen(mp, dtime_ref);
+      dtime_ref = 0;
+      mp->pushuc(0xB0 + e->data2);
+      mp->pushuc(e->command);
+      mp->pushuc((unsigned char)e->data1);
+      break;
+
+    case ET_PITCH: {
+      unsigned short int usi = (unsigned short int)e->data1 << 8;
+      usi += e->data2;
+      unsigned char d1, d2;
+      usi &= 0x3FFF;
+      d1 = (usi & 0x007F);
+      d2 = usi >> 7;
+      push_varlen(mp, dtime_ref);
+      dtime_ref = 0;
+      mp->pushuc(0xe0 + e->command);
+      mp->pushuc(d1);
+      mp->pushuc(d2);
+      break;
+    }
+
+    default:
+      break;
+  }
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+// ExportMultichannelMID: writes a MIDI Type 1 file where each zTracker
+// track that contains events becomes its own MIDI track. The MIDI channel
+// encoded in each status byte is preserved from the source event's
+// data1 low nybble (which playback populates from the instrument's
+// channel assignment).
+//
+int ZTImportExport::ExportMultichannelMID(char *fn)
+{
+  CDataBuf buffer;
+  CDataBuf mtrk[MAX_TRACKS + 1]; // track 0 = conductor, 1..N = per-track
+  midi_buf *buf;
+  midi_event *e;
+  FILE *fp;
+  int dtime[MAX_TRACKS + 1];
+  int mtrk_tmap[MAX_TRACKS]; // zt track idx -> mtrk idx (0 if unused)
+  unsigned char tflag[MAX_TRACKS];
+  int total_mtrks = 1; // conductor
+  int bpm;
+  char str[256];
+
+  for (int i = 0; i < MAX_TRACKS + 1; i++) dtime[i] = 0;
+  for (int i = 0; i < MAX_TRACKS; i++) mtrk_tmap[i] = 0;
+
+  find_used_tracks(tflag, song);
+
+  for (int t = 0; t < MAX_TRACKS; t++) {
+    if (tflag[t]) {
+      mtrk_tmap[t] = total_mtrks;
+      sprintf(str, "Track %02d", t + 1);
+      push_text(&mtrk[total_mtrks], MID_SEQNAME, (char *)&str[0]);
+      total_mtrks++;
+    }
+  }
+
+  if (total_mtrks <= 1) return 0; // nothing to export
+
+  if (!(fp = fopen(fn, "wb"))) return 0;
+
+  // MThd
+  buffer.write("MThd", 4);
+  push_le_int(&buffer, 6);
+  buffer.pushc(0); buffer.pushc(1);           // format 1
+  buffer.pushc((total_mtrks >> 8) & 0xFF);
+  buffer.pushc(total_mtrks & 0xFF);           // ntrks
+  buffer.pushc(0); buffer.pushc(96);          // 96 PPQN
+
+  // Conductor track: tempo
+  push_varlen(&mtrk[0], 0);
+  mtrk[0].pushc(0xFF);
+  mtrk[0].pushc(0x51);
+  mtrk[0].pushc(0x03);
+  bpm = 60000000 / song->bpm;
+  mtrk[0].pushc((bpm >> 16) & 0xff);
+  mtrk[0].pushc((bpm >> 8) & 0xff);
+  mtrk[0].pushc((bpm) & 0xff);
+
+  // Play through song, routing events by e->track.
+  ztPlayer->prepare_play(0, 0, 1, 0);
+  buf = new midi_buf;
+
+  while (ztPlayer->pinit) {
+
+    buf->reset();
+    ztPlayer->playback(buf, 1);
+
+    while ((e = buf->get_next_event())) {
+
+      if (e->type == ET_LOOP) continue; // skip, same as ExportMID
+      if (e->inst >= MAX_INSTS) continue;
+      if (e->track >= MAX_TRACKS) continue;
+
+      int ztrk = e->track;
+      int trk = mtrk_tmap[ztrk];
+      if (trk == 0) continue; // track wasn't tagged as used
+
+      CDataBuf *mp = &mtrk[trk];
+      push_midi_event(mp, e, dtime[trk]);
+    }
+
+    for (int i = 0; i < MAX_TRACKS + 1; i++) dtime[i]++;
+  }
+
+  delete buf;
+
+  // End-of-track + assemble chunks
+  for (int i = 0; i < total_mtrks; i++) {
+
+    push_varlen(&mtrk[i], 0);
+    mtrk[i].pushc(0xFF);
+    mtrk[i].pushc(0x2f);
+    mtrk[i].pushc(0x00);
+
+    buffer.write("MTrk", 4);
+    push_le_int(&buffer, mtrk[i].getsize());
+    buffer.write(mtrk[i].getbuffer(), mtrk[i].getsize());
+  }
+
+  fwrite(buffer.getbuffer(), buffer.getsize(), 1, fp);
+  fclose(fp);
+
+  return 1;
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+// ExportPerTrackMID: writes one Type 0 .mid file per zTracker track with
+// events. Output filenames: if fn ends in ".mid" (case-insensitive) the
+// suffix is stripped to form a basename; each file is then written to
+// "<basename>_track<NN>.mid".
+//
+int ZTImportExport::ExportPerTrackMID(char *fn)
+{
+  unsigned char tflag[MAX_TRACKS];
+  find_used_tracks(tflag, song);
+
+  int any = 0;
+  for (int t = 0; t < MAX_TRACKS; t++) if (tflag[t]) { any = 1; break; }
+  if (!any) return 0;
+
+  // Derive basename (strip trailing .mid if present).
+  char base[512];
+  {
+    int n = (int)strlen(fn);
+    if (n >= (int)sizeof(base)) n = (int)sizeof(base) - 1;
+    memcpy(base, fn, n);
+    base[n] = 0;
+    if (n >= 4 &&
+        (base[n-4] == '.') &&
+        (base[n-3] == 'm' || base[n-3] == 'M') &&
+        (base[n-2] == 'i' || base[n-2] == 'I') &&
+        (base[n-1] == 'd' || base[n-1] == 'D')) {
+      base[n-4] = 0;
+    }
+  }
+
+  // First, collect per-track deltas + event buffers by playing the song once.
+  CDataBuf mtrk[MAX_TRACKS];
+  int dtime[MAX_TRACKS];
+  for (int i = 0; i < MAX_TRACKS; i++) dtime[i] = 0;
+
+  // Seed each used track with its sequence name.
+  for (int t = 0; t < MAX_TRACKS; t++) {
+    if (tflag[t]) {
+      char str[64];
+      sprintf(str, "Track %02d", t + 1);
+      push_text(&mtrk[t], MID_SEQNAME, (char *)&str[0]);
+    }
+  }
+
+  // Tempo goes into each per-track file (Type 0 has exactly one track that
+  // must carry tempo if the file is to play standalone).
+  int bpm = 60000000 / song->bpm;
+  for (int t = 0; t < MAX_TRACKS; t++) {
+    if (!tflag[t]) continue;
+    push_varlen(&mtrk[t], 0);
+    mtrk[t].pushc(0xFF);
+    mtrk[t].pushc(0x51);
+    mtrk[t].pushc(0x03);
+    mtrk[t].pushc((bpm >> 16) & 0xff);
+    mtrk[t].pushc((bpm >> 8) & 0xff);
+    mtrk[t].pushc((bpm) & 0xff);
+  }
+
+  ztPlayer->prepare_play(0, 0, 1, 0);
+  midi_buf *buf = new midi_buf;
+
+  while (ztPlayer->pinit) {
+
+    buf->reset();
+    ztPlayer->playback(buf, 1);
+
+    midi_event *e;
+    while ((e = buf->get_next_event())) {
+
+      if (e->type == ET_LOOP) continue;
+      if (e->inst >= MAX_INSTS) continue;
+      if (e->track >= MAX_TRACKS) continue;
+      if (!tflag[e->track]) continue;
+
+      push_midi_event(&mtrk[e->track], e, dtime[e->track]);
+    }
+
+    for (int i = 0; i < MAX_TRACKS; i++) dtime[i]++;
+  }
+
+  delete buf;
+
+  // Write each used track to its own file.
+  int exported = 0;
+  for (int t = 0; t < MAX_TRACKS; t++) {
+
+    if (!tflag[t]) continue;
+
+    // End-of-track
+    push_varlen(&mtrk[t], 0);
+    mtrk[t].pushc(0xFF);
+    mtrk[t].pushc(0x2f);
+    mtrk[t].pushc(0x00);
+
+    char outname[600];
+    snprintf(outname, sizeof(outname), "%s_track%02d.mid", base, t + 1);
+
+    FILE *fp = fopen(outname, "wb");
+    if (!fp) continue;
+
+    CDataBuf file;
+    file.write("MThd", 4);
+    push_le_int(&file, 6);
+    file.pushc(0); file.pushc(0);   // format 0
+    file.pushc(0); file.pushc(1);   // 1 track
+    file.pushc(0); file.pushc(96);  // 96 PPQN
+
+    file.write("MTrk", 4);
+    push_le_int(&file, mtrk[t].getsize());
+    file.write(mtrk[t].getbuffer(), mtrk[t].getsize());
+
+    fwrite(file.getbuffer(), file.getsize(), 1, fp);
+    fclose(fp);
+
+    exported++;
+  }
+
+  return exported;
+}
+
+
+
+
 
 /*
 

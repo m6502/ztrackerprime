@@ -106,51 +106,32 @@ int file_exists(const char *fn)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// Save-format buttons live at element IDs 4..7 (ZT, MID, MID-Multichannel,
+// MID-PerTrack). Radio-style: clicking any one toggles it on and clears the
+// others.
+#define SAVEBTN_ID_FIRST 4
+#define SAVEBTN_ID_LAST  7
+
 void BTNCLK_ToggleZTMID(UserInterfaceElement *b)
 {
     Button *btn;
     btn = (Button *)b;
-    need_refresh++; 
+    need_refresh++;
 
     if (btn->updown == 0) {
 
-        btn->updown = !btn->updown;
+        btn->updown = 1;
 
-        if (btn->ID == 4) {
+        for (int id = SAVEBTN_ID_FIRST; id <= SAVEBTN_ID_LAST; id++) {
 
-            ((Button*)UIP_Savescreen->UI->get_element(5))->updown = 0;
-            ((Button*)UIP_Savescreen->UI->get_element(5))->state = 0;
-            ((Button*)UIP_Savescreen->UI->get_element(5))->need_redraw = 1;
+            if (id == btn->ID) continue;
 
-            /*((Button*)UIP_Savescreen->UI->get_element(6))->updown = 0;
-            ((Button*)UIP_Savescreen->UI->get_element(6))->state = 0;
-            ((Button*)UIP_Savescreen->UI->get_element(6))->need_redraw = 1;*/
-        }
-        else {
+            Button *other = (Button*)UIP_Savescreen->UI->get_element(id);
+            if (!other) continue;
 
-            if (btn->ID == 5) {
-
-                ((Button*)UIP_Savescreen->UI->get_element(4))->updown = 0;
-                ((Button*)UIP_Savescreen->UI->get_element(4))->state = 0;
-                ((Button*)UIP_Savescreen->UI->get_element(4))->need_redraw = 1;
-
-                /*((Button*)UIP_Savescreen->UI->get_element(6))->updown = 0;
-                ((Button*)UIP_Savescreen->UI->get_element(6))->state = 0;
-                ((Button*)UIP_Savescreen->UI->get_element(6))->need_redraw = 1;*/
-            }
-            /*else {
-
-                if (btn->ID == 6) {
-
-                    ((Button*)UIP_Savescreen->UI->get_element(4))->updown = 0;
-                    ((Button*)UIP_Savescreen->UI->get_element(4))->state = 0;
-                    ((Button*)UIP_Savescreen->UI->get_element(4))->need_redraw = 1;
-
-                    ((Button*)UIP_Savescreen->UI->get_element(5))->updown = 0;
-                    ((Button*)UIP_Savescreen->UI->get_element(5))->state = 0;
-                    ((Button*)UIP_Savescreen->UI->get_element(5))->need_redraw = 1;
-                }
-            }*/
+            other->updown = 0;
+            other->state = 0;
+            other->need_redraw = 1;
         }
     }
 }
@@ -245,6 +226,26 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid->xsize = strlen(b_mid->caption) + 1;
   b_mid->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
   b_mid->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
+
+  b_mid_mc = new Button;
+  UI->add_element(b_mid_mc, 6);
+  b_mid_mc->x = SAVE_MID_MC_BUTTON_POS_X;
+  b_mid_mc->y = SAVE_MID_MC_BUTTON_POS_Y;
+  b_mid_mc->caption = " Save as Multichannel .MID";
+  b_mid_mc->ysize = 1;
+  b_mid_mc->xsize = strlen(b_mid_mc->caption) + 1;
+  b_mid_mc->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_mid_mc->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
+
+  b_mid_pertrack = new Button;
+  UI->add_element(b_mid_pertrack, 7);
+  b_mid_pertrack->x = SAVE_MID_PT_BUTTON_POS_X;
+  b_mid_pertrack->y = SAVE_MID_PT_BUTTON_POS_Y;
+  b_mid_pertrack->caption = " Save per-track .MID";
+  b_mid_pertrack->ysize = 1;
+  b_mid_pertrack->xsize = strlen(b_mid_pertrack->caption) + 1;
+  b_mid_pertrack->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_mid_pertrack->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   /*b_gba = new Button;
   UI->add_element(b_gba, 6);
@@ -348,9 +349,17 @@ void begin_save(void)
     }
   }
 
-  if (((Button *)UIP_Savescreen->UI->get_element(5))->state) {
+  // MIDI exports: .MID (2), Multichannel .MID (3), per-track .MID (4).
+  // All three ensure a .mid extension; the per-track exporter appends its
+  // own _trackNN suffix per file.
+  int mid_filetype = 0;
+  if (((Button *)UIP_Savescreen->UI->get_element(5))->state) mid_filetype = 2;
+  else if (((Button *)UIP_Savescreen->UI->get_element(6))->state) mid_filetype = 3;
+  else if (((Button *)UIP_Savescreen->UI->get_element(7))->state) mid_filetype = 4;
 
-    UIP_SaveMsg->filetype = 2;
+  if (mid_filetype) {
+
+    UIP_SaveMsg->filetype = mid_filetype;
     int i=0;
 
     while(i<255 && save_filename[i] != 0) {
@@ -374,7 +383,13 @@ void begin_save(void)
       if (i>0) memcpy(&save_filename[i+4],".mid",4);
     }
 
-    if (file_exists(save_filename)) {
+    // Per-track mode writes to <basename>_trackNN.mid, not the raw
+    // filename, so the "File exists" check based on save_filename is
+    // meaningless there -- just proceed.
+    if (mid_filetype == 4) {
+      do_save();
+    }
+    else if (file_exists(save_filename)) {
 
       UIP_RUSure->str = " File exists, sure?";
       UIP_RUSure->OnYes = (VFunc)do_save;

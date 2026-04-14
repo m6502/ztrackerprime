@@ -28,7 +28,7 @@
 
 #define FILE_LIST_SIZE_X_CHARS             40
 #define LOAD_FILE_LIST_SIZE_Y_CHARS        (LISTS_MAX_NUMBER_OF_ELEMENTS)
-#define SAVE_FILE_LIST_SIZE_Y_CHARS        (LISTS_MAX_NUMBER_OF_ELEMENTS - 6) // We need extra space for the text input and the two buttons
+#define SAVE_FILE_LIST_SIZE_Y_CHARS        (LISTS_MAX_NUMBER_OF_ELEMENTS - 10) // text input + 4 save-format buttons
 
 
 // Directory list configuration (In characters)
@@ -66,6 +66,12 @@
 
 #define SAVE_MID_BUTTON_POS_X        FILE_LIST_POS_X_CHARS
 #define SAVE_MID_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1 + 1)
+
+#define SAVE_MID_MC_BUTTON_POS_X     FILE_LIST_POS_X_CHARS
+#define SAVE_MID_MC_BUTTON_POS_Y     (SAVE_MID_BUTTON_POS_Y + 1 + 1)
+
+#define SAVE_MID_PT_BUTTON_POS_X     FILE_LIST_POS_X_CHARS
+#define SAVE_MID_PT_BUTTON_POS_Y     (SAVE_MID_MC_BUTTON_POS_Y + 1 + 1)
 
 //#define SAVE_GBA_BUTTON_POS_X        FILE_LIST_POS_X_CHARS
 //#define SAVE_GBA_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1 + 1 + 1 + 1)
