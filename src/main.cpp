@@ -2506,9 +2506,18 @@ void mousewheelhandler(SDL_MouseWheelEvent *e) {
     }
 
     if (ZOOM != old_zoom) {
-        if (!set_video_mode(RESOLUTION_X, RESOLUTION_Y, errstr)) {
+        // Preserve the user's current window size across zoom changes.
+        // Previously we passed RESOLUTION_X/Y (initial size from zt.conf),
+        // which snapped the window back every time the user scrolled —
+        // any manual drag-resize was lost on the next zoom tick.
+        int win_w = RESOLUTION_X;
+        int win_h = RESOLUTION_Y;
+        if (zt_main_window) {
+            SDL_GetWindowSize(zt_main_window, &win_w, &win_h);
+        }
+        if (!set_video_mode(win_w, win_h, errstr)) {
             ZOOM = old_zoom;
-            (void)set_video_mode(RESOLUTION_X, RESOLUTION_Y, errstr);
+            (void)set_video_mode(win_w, win_h, errstr);
             return;
         }
         zt_request_ui_full_refresh();
