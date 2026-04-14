@@ -16,13 +16,13 @@ void InitInstrumentsOneDev(int dev) {
         SDL_Delay(5);
     }
 }
-void BTNCLK_InitInstruments(UserInterfaceElement *b) {
+void BTNCLK_InitInstruments(UserInterfaceElement*) {
     InitInstruments();
     sprintf(szStatmsg,"All instruments updated on all devices");
     statusmsg = szStatmsg;
     need_refresh++; 
 }
-void BTNCLK_InitInstrumentsOne(UserInterfaceElement *b) {
+void BTNCLK_InitInstrumentsOne(UserInterfaceElement*) {
     unsigned int dev = song->instruments[cur_inst]->midi_device;
     if (dev < MidiOut->numOuputDevices) {
         InitInstrumentsOneDev(dev);
@@ -241,7 +241,8 @@ CUI_InstEditor::CUI_InstEditor(void) {
 }
 
 CUI_InstEditor::~CUI_InstEditor(void) {
-    if (UI) delete UI; UI= NULL;
+    delete UI;
+    UI= NULL;
 }
 
 void CUI_InstEditor::enter(void) {

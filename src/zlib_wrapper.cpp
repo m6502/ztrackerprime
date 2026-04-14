@@ -285,7 +285,7 @@ DeflateStream::~DeflateStream()
     deflateEnd(&this->zstrm);
 }
 
-void DeflateStream::write(char *data, int size)
+void DeflateStream::write(const char *data, int size)
 {
     int status=0,flush;
 

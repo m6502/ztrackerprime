@@ -821,8 +821,6 @@ void ITPackedPattern::UnPackTo(ITPattern& pattern) {
     BYTE channel = 0;
     BYTE maskVariable = 0;
 
-    BYTE note = 0;
-
     int curPos = 0;
     bool done = FALSE;
 
@@ -1252,14 +1250,4 @@ inline void ITModule::UnpackPatterns(void) {
 inline void ITModule::PackPatterns(void) {
     patterns->PackTo(packedPatterns);
 }
-
-
-bool ITModule::GrowIfNeeded(int pattern, int channel, int row) {
-    // increase number of patterns, channels, or rows as necessary
-    // to have an event on specified row of specified channel of specified pattern.
-    // returns true if successful, false if unable to grow to specs.
-
-    return 0;
-}
-
 

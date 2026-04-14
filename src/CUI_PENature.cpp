@@ -26,7 +26,8 @@ CUI_PENature::CUI_PENature(void) {
 }
 
 CUI_PENature::~CUI_PENature(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 

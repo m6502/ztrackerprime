@@ -89,7 +89,7 @@ void fix_cols(void) {
 }
 
 void init_edit_cols(void) {
-    int i,o=0;
+    int i=0;
 
 enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN, 
                   T_FX1, T_FX1P, T_FX2, T_FX2P, T_FX3, T_FX3P, T_FX4, T_FX4P, T_FX5, T_FX5P };

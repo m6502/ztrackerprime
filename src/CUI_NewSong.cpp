@@ -53,7 +53,8 @@ CUI_NewSong::CUI_NewSong(void) {
 }
 
 CUI_NewSong::~CUI_NewSong(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 void CUI_NewSong::enter(void) {

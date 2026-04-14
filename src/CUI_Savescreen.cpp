@@ -143,9 +143,8 @@ void BTNCLK_ToggleZTMID(UserInterfaceElement *b)
 //
 void fl_enter(UserInterfaceElement *uie)
 {
-  char *f;
   FileList *fl = (FileList *)uie;
-  f = fl->getCurrentItem();
+  const char *f = fl->getCurrentItem();
   strcpy(&save_filename[0], f);
   begin_save();   
 }

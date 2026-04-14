@@ -99,8 +99,6 @@ int font_load(char *filename)
 
                 for (int varx = 0; varx < 128; varx++) {
 
-                    int charx = ((varx >> 3) ) ;
-
                     unsigned char *puntero = (unsigned char *)temp->pixels ;
                     int bpp = SDL_BYTESPERPIXEL(temp->format);
                     puntero += (vary * temp->pitch) + (varx * bpp);
@@ -369,7 +367,7 @@ int hex2dec(char c) {
 
 
 
-void printBGCC(int x, int y, char *str, TColor col, TColor bg, Drawable *S) {
+void printBGCC(int x, int y, const char *str, TColor col, TColor bg, Drawable *S) {
     TColor *buf,use;
     unsigned char byte;
     int c=0,i,j,pos=0;
@@ -545,7 +543,7 @@ void printlineBG(int xi, int y, unsigned char ch, int len, TColor col, TColor bg
         }
 }
 
-void printLCD(int x,int y, char *str, Drawable *S) {
+void printLCD(int x,int y, const char *str, Drawable *S) {
     TColor *buf;
     unsigned char byte;
     int c=0,i,j;

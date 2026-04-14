@@ -24,7 +24,7 @@ class CUI_Page {
         UserInterface *UI;
        
         CUI_Page();
-        ~CUI_Page();
+        virtual ~CUI_Page();
         virtual void enter(void)=0;
         virtual void leave(void)=0;
         virtual void update(void)=0;
@@ -407,7 +407,7 @@ class CUI_RUSure : public CUI_Page {
         Button *button_yes;
         Button *button_no;
 
-        char *str;
+        const char *str;
         VFunc OnYes;
 
         CUI_RUSure();

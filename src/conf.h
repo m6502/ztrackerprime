@@ -26,15 +26,15 @@ class conf {
         int hex2dec(char *c);
     public:
         conf();
-        conf(char *filen);
+        conf(const char *filen);
         ~conf();
         //int load(istream *is);
-        int load(char *filen);
-        int save(char *filen);
+        int load(const char *filen);
+        int save(const char *filen);
         char* get(const char *key);
         void set(const char *key, const char *value,int dat=0);
         int getcolor(const char *key, int part);
-        void remove(char *key);
+        void remove(const char *key);
 };
 
 class ZTConf {
@@ -44,11 +44,9 @@ class ZTConf {
         ~ZTConf();
         int load();
         int save();
-        int getFlag(char *key);
+        int getFlag(const char *key);
         
         // Here are the variables
-        char *conf_filename;
-
         conf *Config;
         int full_screen;
 //        int do_fade; // fade_in_out ?

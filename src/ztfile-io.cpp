@@ -64,7 +64,7 @@ extern std::atomic<int> load_lock;
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::writedata(char *data, int size, int compressed, std::ofstream &of, DeflateStream *o) 
+void zt_module::writedata(const char *data, int size, int compressed, std::ofstream &of, DeflateStream *o)
 {
   if(compressed) {
     if (o) o->write(data,size);
@@ -99,7 +99,7 @@ int zt_module::readdata(char *data, int size, int compressed, std::ifstream &ifs
 // ------------------------------------------------------------------------------------------------
 //
 //
-void zt_module::writeblock(char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o) 
+void zt_module::writeblock(const char *headid, CDataBuf *buf, int compressed, std::ofstream &of, DeflateStream *o)
 {
   int size;
   
@@ -540,7 +540,6 @@ void zt_module::load_ZT_event_list(CDataBuf *buf) {
     unsigned char cmd,c;
     unsigned short tmp_data;
     short int si;
-    int dint;
     unsigned char track=0,pattern=0;
     while(!buf->eob()) {
         cmd = buf->getuch();
@@ -603,7 +602,7 @@ void zt_module::load_ZT_event_list(CDataBuf *buf) {
             }
         } 
         else if (cmd < 0xC0) { // DWord event 
-            dint = buf->getuch();
+            buf->getuch();
         } 
         else { // Text event    
             si = buf->getusi();
@@ -730,7 +729,7 @@ int zt_module::save(char *fn, int compressed)
     return 0;
 }
 
-int zt_module::cmp_hd(char *s1,char *s2) {
+int zt_module::cmp_hd(const char *s1,const char *s2) {
     for(int i=0;i<4;i++)
         if (s1[i] != s2[i])
             return 0;
@@ -1025,9 +1024,6 @@ void zt_module::load_ZT_instrument(CDataBuf *buf) {
 //
 void instrument::load(CDataBuf *buf) 
 {
-    unsigned char c;
-    c = this->channel + (this->flags<<4);
-
     this->bank = buf->getsi();
     this->patch = buf->getuch();
     

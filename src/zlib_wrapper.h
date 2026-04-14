@@ -67,7 +67,7 @@ class DeflateStream
     public:
         DeflateStream(std::ofstream *ofs);
         ~DeflateStream();
-        void write(char *data, int size);
+        void write(const char *data, int size);
         int fail(void);
     private:
         std::ofstream *ofs;

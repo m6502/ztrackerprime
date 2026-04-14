@@ -153,12 +153,16 @@ int PatternDisplay::update()
           
               unmutetrack(i);
             }
-            else mutetrack(i);
+            else {
+              mutetrack(i);
+            }
           }
         } 
         else {
 
-          for(i=0;i<MAX_TRACKS;i++) unmutetrack(i);
+          for(i=0;i<MAX_TRACKS;i++) {
+            unmutetrack(i);
+          }
         }
 
 
@@ -206,7 +210,7 @@ int PatternDisplay::update()
 // ------------------------------------------------------------------------------------------------
 //
 //
-void PatternDisplay::draw(Drawable *S, int active) 
+void PatternDisplay::draw(Drawable *S, int)
 {
   if (ztPlayer->playing) this->disp_playing_pattern(S);
   else this->disp_track_headers(S);

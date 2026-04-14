@@ -100,10 +100,9 @@ void CUI_About::leave(void) {
 }
 
 void CUI_About::update() {
-    int key=0;
     UI->update();
     if (Keys.size()) {
-        key = Keys.getkey();
+        Keys.getkey();
     }
     //need_refresh++;
 }

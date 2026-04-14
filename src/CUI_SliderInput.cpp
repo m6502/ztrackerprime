@@ -26,7 +26,8 @@ CUI_SliderInput::CUI_SliderInput(void) {
 }
 
 CUI_SliderInput::~CUI_SliderInput(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 void CUI_SliderInput::setfirst(int val) {
@@ -37,8 +38,7 @@ void CUI_SliderInput::setfirst(int val) {
 }
 
 void CUI_SliderInput::enter(void) {
-    TextInput *ti;
-    ti = (TextInput *)UI->get_element(0);
+    UI->get_element(0);
     this->result = 0;
     this->canceled = 1;
     checked = 1;
@@ -48,8 +48,7 @@ void CUI_SliderInput::enter(void) {
 }
 
 void CUI_SliderInput::leave(void) {
-    TextInput *ti;
-    ti = (TextInput *)UI->get_element(0);
+    TextInput *ti = (TextInput *)UI->get_element(0);
     this->result = atoi(this->str);
     this->checked = 0;
     this->state = 0;

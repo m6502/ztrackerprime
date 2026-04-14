@@ -61,8 +61,10 @@ CUI_Playsong::CUI_Playsong(void)
 CUI_Playsong::~CUI_Playsong(void) 
 {
  //   if (UI) delete UI; UI = NULL;
-  if (UI_PatternDisplay) delete UI_PatternDisplay; UI_PatternDisplay = NULL;
-  if (UI_VUMeters) delete UI_VUMeters; UI_VUMeters = NULL;
+  delete UI_PatternDisplay;
+  UI_PatternDisplay = NULL;
+  delete UI_VUMeters;
+  UI_VUMeters = NULL;
   UI = NULL;
 }
 
@@ -128,7 +130,7 @@ void CUI_Playsong::update()
       if ((key==SDLK_LEFT && kstate == KS_CTRL) || key!=SDLK_RIGHT)
         if (ztPlayer->playing)
           ztPlayer->rewind();
-        break;
+      break;
 
 
       // ----------------------------------------------------------------------

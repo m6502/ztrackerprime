@@ -39,8 +39,8 @@ void printcharBG(int x, int y, unsigned char ch, TColor col, TColor bg, Drawable
 int printtitle(int y, const char *str, TColor col,TColor bg,Drawable *S);
 void printlineBG(int xi, int y, unsigned char ch, int len, TColor col, TColor bg, Drawable *S);
 
-void printLCD(int x,int y,char *str, Drawable *S);
+void printLCD(int x,int y, const char *str, Drawable *S);
 
-void printBGCC(int x, int y, char *str, TColor col, TColor bg, Drawable *S);
+void printBGCC(int x, int y, const char *str, TColor col, TColor bg, Drawable *S);
 
 #endif

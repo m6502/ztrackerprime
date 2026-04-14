@@ -171,7 +171,7 @@ void find_insts(unsigned char iflag[MAX_INSTS], zt_module *song)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int ZTImportExport::ExportMID(char *fn, int format) 
+int ZTImportExport::ExportMID(const char *fn, int format)
 {
   CDataBuf buffer, mtrk[MAX_INSTS+1], *mp;
   midi_buf *buf;
@@ -293,7 +293,7 @@ int ZTImportExport::ExportMID(char *fn, int format)
     
     //        buf->insert(0, ET_LOOP, 1, 0 , 0, 0, 0, 0, 0) ;
     
-    while(e = buf->get_next_event()) {
+    while((e = buf->get_next_event())) {
       
 
       if(0 && e->type == ET_LOOP) {     // <Manu> Por ahora lo dejo asi para evitar problemas
@@ -596,7 +596,7 @@ static void push_midi_event(CDataBuf *mp, midi_event *e, int &dtime_ref)
 // data1 low nybble (which playback populates from the instrument's
 // channel assignment).
 //
-int ZTImportExport::ExportMultichannelMID(char *fn)
+int ZTImportExport::ExportMultichannelMID(const char *fn)
 {
   CDataBuf buffer;
   CDataBuf mtrk[MAX_TRACKS + 1]; // track 0 = conductor, 1..N = per-track
@@ -702,7 +702,7 @@ int ZTImportExport::ExportMultichannelMID(char *fn)
 // suffix is stripped to form a basename; each file is then written to
 // "<basename>_track<NN>.mid".
 //
-int ZTImportExport::ExportPerTrackMID(char *fn)
+int ZTImportExport::ExportPerTrackMID(const char *fn)
 {
   unsigned char tflag[MAX_TRACKS];
   find_used_tracks(tflag, song);
@@ -1062,7 +1062,7 @@ int ZTImportExport::ExportMID(char *fn, int format) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-int ZTImportExport::ImportIT(char *fn, zt_module* zt) 
+int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
 {
   int note, ins, volpan, cmnd, cmndvalue, deflength ;
   int i ;

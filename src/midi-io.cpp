@@ -324,8 +324,12 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
 //	LPMIDIHDR		lpMIDIHeader;
 //	unsigned char *	ptr;
 
+    (void)dwInstance;
+    (void)dwParam2;
+
     midiInDevice *dev = MidiIn->GetDevice( handle );
-    
+    (void)dev;
+
     switch ( uMsg ) {
 
         case MIM_OPEN:
@@ -494,6 +498,7 @@ int midiInDevice::close(void) {
         midiInReset(handle);
         midiInUnprepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
         err = midiInClose(handle);
+        (void)err;
         //err = midiInGetErrorText(err, &buffer[0], 30000);
         handle = NULL; 
         opened = 0;

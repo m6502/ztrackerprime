@@ -50,12 +50,13 @@
 
 #include "zt.h"
 
+const char *conf_filename = "zt.conf";
 
 conf::conf() {
     filename = NULL;
     hash = new list;
 }
-conf::conf(char *filen) {
+conf::conf(const char *filen) {
     hash = new list;
     filename = NULL;
     load(filen);
@@ -77,7 +78,7 @@ void conf::stripspace(char *buf) {
         buf[o++] = buf[p];
     buf[l-i]=0;
 }
-int conf::load(char *filen) {
+int conf::load(const char *filen) {
     FILE *fp;
     char buf[512];
     char *p1,*p2,*p3;
@@ -174,7 +175,7 @@ int conf::getcolor(const char *key, int part) { /* 0=r 1=g 2=b */
     }
     return result;
 }
-int conf::save(char *filen) {
+int conf::save(const char *filen) {
     char *key;
     FILE *fp;
     hash->reset();
@@ -185,7 +186,7 @@ int conf::save(char *filen) {
     }
     if (!(fp=fopen(filename,"wt")))
         return 0;
-    while(key=hash->getnextkey())
+    while((key=hash->getnextkey()))
         fprintf(fp,"%s: %s\n",key,hash->getstrdata(key));
     fclose(fp);
     return 1;
@@ -194,7 +195,7 @@ int conf::save(char *filen) {
 char* conf::get(const char *key) {
     return hash->getstrdata(key);
 }
-void conf::remove(char *key) {
+void conf::remove(const char *key) {
     hash->remove(key);
 }
 void conf::set(const char *key, const char *value,int dat) {
@@ -208,8 +209,6 @@ void conf::set(const char *key, const char *value,int dat) {
 ZTConf::ZTConf() {
 
     // Initialize those global variables
-    conf_filename = "zt.conf";
-
     Config = new conf;//NULL;
     full_screen = 0;
 //    do_fade = 1; // fade_in_out ?
@@ -331,7 +330,7 @@ int ZTConf::load()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int ZTConf::getFlag(char *key) {
+int ZTConf::getFlag(const char *key) {
     char *a = Config->get(key);
     if (a) {
         if (zcmp(a,"yes"))
