@@ -309,15 +309,34 @@ set_target_properties(zt PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Program"
 )
 
-# Copy runtime data (zt.conf, skins, palettes, doc) next to the binary so it works out of the box.
-add_custom_command(TARGET zt POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+if(APPLE)
+  # Copy runtime resources into the .app bundle so a double-clicked app
+  # finds skins/, palettes/, doc/, and zt.conf.
+  add_custom_command(TARGET zt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/skins"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/skins"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/palettes" "$<TARGET_FILE_DIR:zt>/palettes"
+      "${CMAKE_SOURCE_DIR}/palettes"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/palettes"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
-)
+      "${CMAKE_SOURCE_DIR}/doc"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/doc"
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${CMAKE_SOURCE_DIR}/zt.conf"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt.conf"
+    VERBATIM
+  )
+else()
+  # Copy runtime data next to the binary so it works out of the box on Windows/Linux.
+  add_custom_command(TARGET zt POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/palettes" "$<TARGET_FILE_DIR:zt>/palettes"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
+  )
+endif()
