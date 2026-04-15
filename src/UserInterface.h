@@ -221,11 +221,11 @@ class AboutBox : public UserInterfaceElement {
 class TextBox : public UserInterfaceElement {
     public:
         bool bEof,bUseColors,bWordWrap;
-        int readonly, startline, soff,mousestate,starti,startl;
-        char *text;
+        int startline, soff,mousestate,starti,startl;
+        const char *text;
         Frame frm;
 
-        TextBox(int ro = 0);
+        TextBox();
         ~TextBox() = default ;
 
         int update();
