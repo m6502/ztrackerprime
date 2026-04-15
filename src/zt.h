@@ -89,7 +89,12 @@ static inline void zt_text_input_stop(void) {
 // <Manu> antes era 98
 //#define VER_MIN 986
 
-#define ZTRACKER_VERSION                "zTracker' v2026_02_23"
+// Version string is the build date (YYYY_MM_DD) injected by CMake at configure time.
+// Falls back to a hardcoded value if CMake didn't provide ZT_BUILD_DATE.
+#ifndef ZT_BUILD_DATE
+#define ZT_BUILD_DATE "2026_02_23"
+#endif
+#define ZTRACKER_VERSION                "zTracker' v" ZT_BUILD_DATE
  
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
