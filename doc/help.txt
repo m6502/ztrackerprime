@@ -35,8 +35,8 @@
 
 |L|%==|H|Pattern Operations|L|==%|U|
 
- ALT-R / Cmd-R   : Replicate at Cursor (rows 0..cursor repeat across rest)
- ALT-Z / Cmd-Z   : Undo last destructive pattern operation (single level)
+ ALT-R           : Replicate at Cursor (rows 0..cursor repeat across rest)
+ ALT-Z           : Undo last destructive pattern operation (single level)
  CTRL-SHIFT-G    : Double Pattern (duplicate rows, max 256)
  CTRL-SHIFT-H    : Halve Pattern (keep every other row, min 32)
  CTRL-SHIFT-D    : Clone Pattern (copy to next empty slot and jump to it)

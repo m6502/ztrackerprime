@@ -181,7 +181,7 @@ jobs:
       - name: Stage release
         run: |
           mkdir -p dist/ztrackerprime-macos-arm64
-          cp build/Program/zt        dist/ztrackerprime-macos-arm64/
+          cp -R build/Program/zt.app dist/ztrackerprime-macos-arm64/
           cp zt.conf                 dist/ztrackerprime-macos-arm64/
           cp -R skins                dist/ztrackerprime-macos-arm64/
           cp -R doc                  dist/ztrackerprime-macos-arm64/
@@ -228,7 +228,7 @@ jobs:
       - name: Stage release
         run: |
           mkdir -p dist/ztrackerprime-macos-x86_64
-          cp build/Program/zt        dist/ztrackerprime-macos-x86_64/
+          cp -R build/Program/zt.app dist/ztrackerprime-macos-x86_64/
           cp zt.conf                 dist/ztrackerprime-macos-x86_64/
           cp -R skins                dist/ztrackerprime-macos-x86_64/
           cp -R doc                  dist/ztrackerprime-macos-x86_64/

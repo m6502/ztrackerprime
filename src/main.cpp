@@ -75,6 +75,14 @@
 #include "lua_engine.h"
 #include "keybindings.h"
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <unistd.h>
+#include <limits.h>
+#include <cstring>
+#endif
+
+
 
 // zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
 // every translation unit (which would emit WinMain in every TU on Windows and
@@ -2336,6 +2344,14 @@ void keyhandler(SDL_KeyboardEvent *e) {
     if (id == SDLK_KP_ENTER)
       id = SDLK_RETURN;
 
+    // EU/Finnish ISO keyboards: the § key (above Tab, left of '1') is the
+    // physical "non-US backslash" scancode. Map it to SDLK_GRAVE so the
+    // existing GRAVE bindings (Shift+§ -> drawmode toggle, plain § -> Note
+    // Off) work without a US keyboard layout.
+    if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH) {
+      id = SDLK_GRAVE;
+    }
+
     if (pressed && id == SDLK_RETURN) {
         actual_ch = 10;
     }
@@ -2925,6 +2941,20 @@ static int zt_backend_set_video_mode(char *errstr)
       zt_show_error("Error", errstr);
       return 0;
     }
+
+    // Load window icon (configurable via zt.conf 'window_icon'; default 'zt_icon.png').
+    // On macOS this also updates the Dock icon at runtime; a failure is silent.
+    {
+      const char *icon_path = zt_config_globals.window_icon[0]
+        ? zt_config_globals.window_icon
+        : "zt_icon.png";
+      SDL_Surface *icon = SDL_LoadPNG(icon_path);
+      if (icon) {
+        SDL_SetWindowIcon(zt_main_window, icon);
+        SDL_DestroySurface(icon);
+      }
+    }
+
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {
       snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
@@ -3242,6 +3272,30 @@ int main(int argc, char *argv[])
     '/';
 #endif
 
+  bool launched_from_bundle = false;
+  char bundle_resources_path[1024] = "";
+#if defined(__APPLE__)
+  // When launched as a .app bundle (double-clicked in Finder), argv[0] points
+  // at zt.app/Contents/MacOS/zt and the CWD is '/'. Jump into Contents/Resources
+  // so relative skin/doc/zt.conf lookups work, remember the absolute Resources
+  // path for zt_directory (CUI_Help.cpp and others build absolute paths from it),
+  // and suppress the later zt_set_current_directory(argv[0]) override.
+  {
+    char exe_path[PATH_MAX];
+    uint32_t size = sizeof(exe_path);
+    if (_NSGetExecutablePath(exe_path, &size) == 0) {
+      const char *macos_marker = "/Contents/MacOS/";
+      char *marker = strstr(exe_path, macos_marker);
+      if (marker) {
+        *marker = '\0';
+        snprintf(bundle_resources_path, sizeof(bundle_resources_path),
+                 "%s/Contents/Resources", exe_path);
+        if (chdir(bundle_resources_path) == 0) launched_from_bundle = true;
+      }
+    }
+  }
+#endif
+
   // Get the zt directory and store it globally
   if(argc > 1) {
     if(argv[1] != NULL && argv[1][0] != '\0') {
@@ -3258,7 +3312,13 @@ int main(int argc, char *argv[])
     last_sep = last_slash;
   }
 
-  if(last_sep) {
+  if (launched_from_bundle) {
+    // Inside a .app: set zt_directory to Contents/Resources so help.txt and
+    // other <zt_directory>/... lookups resolve to bundled files. cwd is
+    // already Contents/Resources (done above), so don't call zt_set_current_directory.
+    zt_directory = strdup(bundle_resources_path);
+  }
+  else if(last_sep) {
     w = last_sep;
 
     if(w != argv[0]) {

@@ -79,6 +79,7 @@ class ZTConf {
         int control_navigation_amount;
         char default_directory[MAX_PATH + 1];
         int record_velocity;
+        char window_icon[MAX_PATH + 1];
 };
 
 #endif

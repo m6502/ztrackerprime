@@ -67,6 +67,21 @@ void CUI_RUSure::update() {
     int key=0;
 //  act = Keys.size(); 
 //  key = Keys.checkkey();
+    // Intercept Enter / KP-Enter BEFORE UI->update() runs. Button's
+    // two-frame press/release state machine can miss its fire point
+    // when the popup closes mid-frame, leaving the dialog up with
+    // Enter apparently doing nothing. Dispatch to the focused
+    // button's callback directly, matching the Y/N/Esc handling
+    // below.
+    {
+        KBKey peek = Keys.checkkey();
+        if (peek == SDLK_RETURN || peek == SDLK_KP_ENTER) {
+            Keys.getkey();
+            if (UI->cur_element == 0) BTNCLK_rusure_yes();
+            else                      BTNCLK_rusure_no();
+            return;
+        }
+    }
     UI->update();
     if (Keys.size()) {
         key = Keys.getkey();
