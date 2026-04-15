@@ -84,7 +84,7 @@ void Skin::makepath(char *dst, const char *filename)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void Skin::setpath(char *name) 
+void Skin::setpath(const char *name)
 {
   static char str[MAX_PATH + 1];
 

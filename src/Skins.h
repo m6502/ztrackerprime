@@ -81,7 +81,7 @@ class Skin {
         void makepath(char *dst, const char *filename);
         void getLogo(void);
         void freeLogo(void);
-        Skin * switchskin(char *newskintitle);
+        Skin * switchskin(const char *newskintitle);
 
         // Recolor the cached PNGs onto bmToolbar/bmButtons by remapping each
         // pixel's luminance through a 3-stop gradient (lo -> mid -> hi). Caller
