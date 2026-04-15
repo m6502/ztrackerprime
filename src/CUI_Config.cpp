@@ -214,13 +214,6 @@ void CUI_Config::leave(void) {
 }
 
 void CUI_Config::update() {
-    int key=0;
-
-void CUI_Config::leave(void) {
-
-}
-
-void CUI_Config::update() {
     UI->update();
     ValueSlider *vs;
     TextInput *ti;

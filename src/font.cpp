@@ -103,10 +103,6 @@ int font_load(char *filename)
                     int bpp = SDL_BYTESPERPIXEL(temp->format);
                     puntero += (vary * temp->pitch) + (varx * bpp);
 
-                    unsigned char *puntero = (unsigned char *)temp->pixels ;
-                    int bpp = SDL_BYTESPERPIXEL(temp->format);
-                    puntero += (vary * temp->pitch) + (varx * bpp);
-
                     if ((bpp == 1 && puntero[0]) || (bpp > 1 && (puntero[0] || puntero[1] || puntero[2])))
                     {
                         #define SIZE_PER_CHAR (8 * 1)
