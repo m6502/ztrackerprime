@@ -617,8 +617,8 @@ int unlock_mutex(zt_mutex_handle hMutex);
 
 void reset_editor(void);
 
-int zcmp(char *s1, char *s2);
-int zcmpi(char *s1, char *s2);
+int zcmp(const char *s1, const char *s2);
+int zcmpi(const char *s1, const char *s2);
 
 int checkclick(int x1, int y1, int x2, int y2);
 
@@ -632,7 +632,7 @@ extern int fast_update, FU_x, FU_y, FU_dx, FU_dy;
 extern zt_module *song;
 extern player *ztPlayer;
 extern int editing; // editing flag/mutex (so it doesnt play a null pointer or something 
-extern char *col_desc[41];
+extern const char *col_desc[41];
 extern int status_change;
 extern int cur_edit_row,cur_edit_row_disp,cur_edit_pattern;
 extern instrument blank_instrument;
@@ -646,12 +646,12 @@ extern char* zt_directory;
 
 extern bool bDontKeyRepeat;
 
-extern char *statusmsg;
+extern const char *statusmsg;
 extern char szStatmsg[1024];
 
 #define COLORS CurrentSkin->Colors
 
-void status(char *msg,Drawable *S);
+void status(const char *msg,Drawable *S);
 void status(Drawable *S);
 
 void force_status(char *msg);
@@ -684,7 +684,7 @@ extern int cur_step;
 extern int keypress;
 extern int keywait;
 extern zt_timer_handle keytimer;
-extern int keyID;
+extern unsigned int keyID;
 extern int status_change;
 
 extern event blank_event;
@@ -704,7 +704,7 @@ extern midiIn  *MidiIn;
 extern UserInterface *UI;
 
 
-extern int last_cmd_keyjazz,last_keyjazz;
+extern unsigned int last_cmd_keyjazz,last_keyjazz;
 
 void draw_status(Drawable *S); /* S MUST BE LOCKED! */
 extern Bitmap *load_cached_bitmap(char *name);
@@ -755,7 +755,6 @@ extern int light_pos, need_update_lights ;
 extern int checkmousepos(int x1, int y1, int x2, int y2);
 
 extern char *hex2note(char *str,unsigned char note);
-extern int zcmpi(char *s1, char *s2);
 
 extern int check_ext(const char *str, const char *ext);
 

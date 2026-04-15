@@ -54,7 +54,7 @@ unsigned long ZT_THREAD_CALL load_thread(void *) {
     ret=song->load(load_filename);
 
     /* if there was a status message, display it */
-    if (sstr=song->getstatusstr()) {
+    if ((sstr=song->getstatusstr())) {
         /* display if ret=0, this should do a popup on ret!=0 */
         statusmsg = sstr;
         status_change = 1;
@@ -84,7 +84,8 @@ CUI_LoadMsg::~CUI_LoadMsg(void) {
         zt_thread_close(hThread);
         hThread = NULL;
     }
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 void CUI_LoadMsg::enter(void) {
@@ -125,9 +126,8 @@ void CUI_LoadMsg::leave(void) {
 }
 
 void CUI_LoadMsg::update() {
-    int key=0;
     if (Keys.size()) {
-        key = Keys.getkey();
+        Keys.getkey();
     }
 
     if (load_finished) {

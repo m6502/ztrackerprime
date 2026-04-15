@@ -95,13 +95,13 @@ void dev_sel(int dev, MidiOutDeviceSelector *mds )
 //
 void midi_out_sel(int dev) {
     int a;
-    char *errmsg;
+    const char *errmsg;
     if ((unsigned int)dev < MidiOut->numOuputDevices) {
         if (MidiOut->QueryDevice(dev)) {
             MidiOut->RemDevice(dev);
             sprintf(szStatmsg,"Closed[out]: %s",(MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName);
         } else {
-            if (a = MidiOut->AddDevice(dev)) {
+            if ((a = MidiOut->AddDevice(dev))) {
                 switch(a) {
                 case MIDIERR_NODEVICE:
                     errmsg = "No device (mapper open?)";
@@ -134,13 +134,13 @@ void midi_out_sel(int dev) {
 //
 void midi_in_sel(int dev) {
     int a;
-    char *errmsg;
+    const char *errmsg;
     if ((unsigned int)dev < MidiIn->numMidiDevs) {
         if (MidiIn->QueryDevice(dev)) {
             MidiIn->RemDevice(dev);
             sprintf(szStatmsg,"Closed[in]: %s",MidiIn->midiInDev[dev]->szName);
         } else {
-            if (a = MidiIn->AddDevice(dev)) {
+            if ((a = MidiIn->AddDevice(dev))) {
                 switch(a) {
                 case MIDIERR_NODEVICE:
                     errmsg = "No device (mapper open?)";
@@ -1018,7 +1018,7 @@ int CheckBox::update() {
 void CheckBox::draw(Drawable *S, int active) {
     int cx,cy=y;
     TColor f,b;
-    char *str;
+    const char *str;
     for(cx=x;cx<x+xsize;cx++) {
         printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
     }
@@ -1070,7 +1070,7 @@ int Frame::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void Frame::draw(Drawable *S, int active) {
+void Frame::draw(Drawable *S, int) {
     int cy;
 
     if (type) {
@@ -1258,7 +1258,7 @@ int GfxButton::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void GfxButton::draw(Drawable *S, int active) {
+void GfxButton::draw(Drawable *S, int) {
 
 //  if (active) 
 //      print(col(x),row(y),caption,COLORS.Highlight,S);
@@ -1302,10 +1302,9 @@ VUPlay::VUPlay() {
 //
 int VUPlay::update() {
 
-    KBKey key,act=0;
-    int kstate;
+    KBKey key;
     key = Keys.checkkey();
-    kstate = Keys.getstate();
+    Keys.getstate();
     int SPEED = 2; // speed of fading
 
     switch(key)
@@ -1344,7 +1343,7 @@ int VUPlay::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void VUPlay::draw(Drawable *S, int active) 
+void VUPlay::draw(Drawable *S, int)
 {
   char str[72];
   int ctrack;
@@ -1353,7 +1352,6 @@ void VUPlay::draw(Drawable *S, int active)
   int pattern;
   int x = 4;
   int y = 15;
-  int tracksize = 128;
   int vol_len;
   int i;
   
@@ -1434,9 +1432,7 @@ int VUPlay::draw_one_row(char str[72], event *e, int track) {
 
     char *w;
     int measure;
-    char c[2] = { (char)'=', (char)0 };
 
-    //c = 155;
     measure = 0;
     sprintf(str,"");
     // New Data
@@ -1521,7 +1517,7 @@ int BarGraph::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void BarGraph::draw(Drawable *S, int active) {
+void BarGraph::draw(Drawable *S, int) {
     int howfar,maxlen;
 
     howfar = value*(xsize-1)/max;
@@ -1584,7 +1580,7 @@ int LCDDisplay::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void LCDDisplay::draw(Drawable *S, int active) {
+void LCDDisplay::draw(Drawable *S, int) {
     if (!xsize)
         xsize = length*8*3;
     printLCD(x+1,y+1,istr,S);
@@ -1642,7 +1638,7 @@ int AboutBox::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void AboutBox::draw(Drawable *S, int active) {
+void AboutBox::draw(Drawable *S, int) {
 /*
     if (!xsize)
         xsize = length*8*3;
@@ -1656,7 +1652,6 @@ void AboutBox::draw(Drawable *S, int active) {
 */  
     q += S->surface->pitch;
     int i=q;
-    Uint32 *b = (Uint32 *)S->surface->pixels;
     for (int iy = col(y); iy < col(y+ysize+1); iy++)
         for (int ix = col(x); ix < col(x+xsize); ix++) {
             int bpp = SDL_BYTESPERPIXEL(S->surface->format);
@@ -1832,7 +1827,7 @@ int nextline(char *str, int p) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void TextBox::draw(Drawable *S, int active) 
+void TextBox::draw(Drawable *S, int)
 {
   int line=0, done = 0, sc=0,d=0, cx;
   TColor use = COLORS.EditText;
@@ -2138,7 +2133,7 @@ int ListBox::mouseupdate(int cur_element)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int ListBox::sortstr(char *s1, char *s2) {
+int ListBox::sortstr(const char *s1, const char *s2) {
     int i=0;
     if (!s1 || !s2)
         return 0;
@@ -2162,7 +2157,7 @@ int ListBox::sortstr(char *s1, char *s2) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void ListBox::strc(char *dst, char *src) {
+void ListBox::strc(char *dst, const char *src) {
     int i=0;
     while (i<xsize && src[i]) {
         dst[i] = src[i];
@@ -2522,8 +2517,8 @@ int ListBox::update() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-char *ListBox::getCurrentItem(void) {
-    char * p = getItem(cur_sel + y_start);
+const char *ListBox::getCurrentItem(void) {
+    const char * p = getItem(cur_sel + y_start);
     if (!p) p = "";
     return p;
 }
@@ -2544,7 +2539,7 @@ int ListBox::getCurrentItemIndex(void) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void ListBox::OnSelect(LBNode *selected) {
+void ListBox::OnSelect(LBNode*) {
     mousestate = 0;
 }
 

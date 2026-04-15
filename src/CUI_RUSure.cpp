@@ -51,7 +51,8 @@ CUI_RUSure::CUI_RUSure(void) {
 }
 
 CUI_RUSure::~CUI_RUSure(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 void CUI_RUSure::enter(void) {

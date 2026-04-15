@@ -2,7 +2,7 @@
 #include "Button.h"
 
 void BTNCLK_SaveSettings(UserInterfaceElement *b) {
-
+    (void)b;
     //Config.save("zt.conf");
     zt_config_globals.save();
     need_refresh++; 
@@ -200,7 +200,8 @@ CUI_Config::CUI_Config(void) {
 }
 
 CUI_Config::~CUI_Config(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 void CUI_Config::enter(void) {
@@ -214,8 +215,6 @@ void CUI_Config::leave(void) {
 }
 
 void CUI_Config::update() {
-    int key=0;
-
     UI->update();
     ValueSlider *vs;
     TextInput *ti;
@@ -260,7 +259,7 @@ void CUI_Config::update() {
     }
 
     if (Keys.size()) {
-        key = Keys.getkey();    
+        Keys.getkey();
     }
 
     if (tb) {
@@ -271,6 +270,7 @@ void CUI_Config::update() {
 void CUI_Config::draw(Drawable *S) {
     char buf[1024];
     if (S->lock()==0) {
+#ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         const char *view_mode_name = "Regular";
         switch (zt_config_globals.cur_edit_mode) {
             case VIEW_SQUISH:  view_mode_name = "Squish"; break;
@@ -278,6 +278,7 @@ void CUI_Config::draw(Drawable *S) {
             case VIEW_FX:      view_mode_name = "FX"; break;
             case VIEW_BIG:     view_mode_name = "Big"; break;
         }
+#endif
         sprintf(buf,"\n|U|Current Settings in memory:\n");
         if(tb->text != NULL)
         {

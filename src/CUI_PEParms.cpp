@@ -94,7 +94,8 @@ CUI_PEParms::CUI_PEParms(void) {
 }
 
 CUI_PEParms::~CUI_PEParms(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 
@@ -154,15 +155,15 @@ void CUI_PEParms::update() {
     vs = (ValueSlider *)UI->get_element(3);
     if(vs->changed)
         zt_config_globals.lowlight_increment = vs->value;
-	cb = (CheckBox *)UI->get_element(4);
-	if(cb->changed)
-		zt_config_globals.centered_editing = *(cb->value);
-	cb = (CheckBox *)UI->get_element(5);
-	if(cb->changed)
-		zt_config_globals.step_editing = *(cb->value);
-	cb = (CheckBox *)UI->get_element(6);
-	if(cb->changed)
-		zt_config_globals.record_velocity = *(cb->value);
+    cb = (CheckBox *)UI->get_element(4);
+    if(cb->changed)
+        zt_config_globals.centered_editing = *(cb->value);
+    cb = (CheckBox *)UI->get_element(5);
+    if(cb->changed)
+        zt_config_globals.step_editing = *(cb->value);
+    cb = (CheckBox *)UI->get_element(6);
+    if(cb->changed)
+        zt_config_globals.record_velocity = *(cb->value);
 
     vs = (ValueSlider *)UI->get_element(7);
     if(vs->changed)

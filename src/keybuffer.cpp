@@ -86,7 +86,6 @@ KBKey KeyBuffer::checkkey(void) {
     return ret;
 }
 KBKey KeyBuffer::getkey(void) {
-    unsigned char a=0; 
     KBKey ret=0;
     if (head != tail) {
         ++tail;

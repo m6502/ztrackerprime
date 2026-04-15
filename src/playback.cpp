@@ -59,6 +59,12 @@ static void player_timer_callback_posix(void) {
 //
 void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2)
 {
+    (void)wTimerID;
+    (void)msg;
+    (void)dwUser;
+    (void)dw1;
+    (void)dw2;
+
   if(!ztPlayer) return ;
   if(!ztPlayer->playing) return ;
 
@@ -481,9 +487,6 @@ int player::calc_pos(int midi_songpos, int *rowptr, int *orderptr) {
 //
 void player::prepare_play(int row, int pattern, int pm, int loopmode)
 {
-  int pass=0;
-
-
   if (playing) {
     stop();
     SDL_Delay(50);
@@ -661,7 +664,7 @@ void player::play_current_row()
 
         if (set_note>0x7f) set_note = 0x7f;
 
-        if (song->instruments[pEvent->inst]->midi_device>=0 && song->instruments[pEvent->inst]->midi_device<=MAX_MIDI_DEVS) {
+        if (song->instruments[pEvent->inst]->midi_device!=0xff && song->instruments[pEvent->inst]->midi_device<=MAX_MIDI_DEVS) {
 
           MidiOut->noteOn(song->instruments[pEvent->inst]->midi_device,set_note,song->instruments[pEvent->inst]->channel,p1,MAX_TRACKS,0);            
           jazz_set_state(SDLK_8, set_note, song->instruments[pEvent->inst]->channel);
@@ -710,7 +713,7 @@ void player::play_current_note()
 
     if (set_note>0x7f) set_note = 0x7f;
 
-    if (song->instruments[e->inst]->midi_device>=0 && song->instruments[e->inst]->midi_device<=MAX_MIDI_DEVS) {
+    if (song->instruments[e->inst]->midi_device!=0xff && song->instruments[e->inst]->midi_device<=MAX_MIDI_DEVS) {
 
       MidiOut->noteOn(song->instruments[e->inst]->midi_device,set_note,song->instruments[e->inst]->channel,p1,MAX_TRACKS /*cur_edit_track*/,0);
 
@@ -964,7 +967,6 @@ void player::callback(void) {
     midi_event *e;
     int set=0;
     unsigned short int usi;
-    int Okok = 0;
 
     buf = play_buffer[cur_buf];
 
@@ -1119,7 +1121,7 @@ void player::num_orders(void) {
 //
 void player::playback(midi_buf *buffer, int ticks) 
 {
-  int t,pass,add,j,jstep ;
+  int t,add,j,jstep ;
   unsigned char vol,chan,inst,flags ;
   int unote,uvol ;
   short int len ;
@@ -1131,7 +1133,6 @@ void player::playback(midi_buf *buffer, int ticks)
 
 
   die=0 ;
-  pass=0 ;
 
 
 /*

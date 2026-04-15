@@ -50,7 +50,7 @@ Skin::Skin()
 // ------------------------------------------------------------------------------------------------
 //
 //
-Skin::Skin(char *name) 
+Skin::Skin(const char *name)
 {
   reset();
   load(name);
@@ -70,7 +70,7 @@ Skin::~Skin()
 // ------------------------------------------------------------------------------------------------
 //
 //
-void Skin::makepath(char *dst, char *filename) 
+void Skin::makepath(char *dst, const char *filename)
 {
   strcpy(&dst[0], strSkinPath); 
   strcat(&dst[0], filename);
@@ -84,7 +84,7 @@ void Skin::makepath(char *dst, char *filename)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void Skin::setpath(char *name) 
+void Skin::setpath(const char *name)
 {
   static char str[MAX_PATH + 1];
 
@@ -108,7 +108,7 @@ void Skin::setpath(char *name)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int Skin::load(char *name, bool quiet) 
+int Skin::load(const char *name, bool quiet)
 {
   char d[512];
   SDL_Surface *s;
@@ -233,7 +233,7 @@ extern void make_toolbar(void); // This is defined in main.cpp
 // ------------------------------------------------------------------------------------------------
 //
 //
-Skin *Skin::switchskin(char *newskintitle) 
+Skin *Skin::switchskin(const char *newskintitle)
 {
   Skin *newskin ;
   

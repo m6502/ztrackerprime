@@ -44,11 +44,9 @@ void DriveList::draw(Drawable *S, int active) {
 //
 void DriveList::OnChange() 
 {
-  int i ;
-
     clear();
-
 #ifdef _WIN32
+    int i;
     int r;
     char str[4];
     char cap[16],cur[512],save[16];

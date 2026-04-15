@@ -108,7 +108,7 @@ void MidiOutputDevice::hardpanic(void) {
     panic();
     if (this->opened)
         midiOutReset(handle);
-	m_runningStatus = 0;
+    m_runningStatus = 0;
 }
 
 
@@ -153,13 +153,11 @@ void MidiOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) 
 }
 void MidiOutputDevice::progChange(int program, int bank, unsigned char chan) {
     if (this->opened) {
-        unsigned short int b;
         unsigned char hb,lb;
         if (bank>=0) {
             bank &= 0x3fff;
             lb = bank&0x007F;
             hb = bank>>7;
-            b = bank;
             if (this->reverse_bank_select) {
                 // reverse
 				midiOutMsg( 0xB0 + chan, 0x00, lb);

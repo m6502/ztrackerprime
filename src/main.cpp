@@ -153,7 +153,7 @@ char *file_directory;
 int modal=0,sel_pat = 0x100,sel_order = 0x0;;
 int LastX=0,LastY=0,MousePressX=0,MousePressY=0,MouseBttnL=0,MouseBttnR=0;
 
-int last_cmd_keyjazz=0,last_keyjazz=0;
+unsigned int last_cmd_keyjazz=0,last_keyjazz=0;
 
 int fast_update=0, FU_x=0, FU_y=0, FU_dx=0, FU_dy=0;
 
@@ -184,12 +184,12 @@ int cur_edit_pattern = 0;
 int cur_edit_track_disp = 0;
 int cur_edit_column = 0;
 
-extern bool bMouseIsDown = false;
+bool bMouseIsDown = false;
 
 int cur_inst = 0;
     int fixmouse=0;
 
-char *col_desc[41];
+const char *col_desc[41];
 
 int base_octave = BASE_OCTAVE_DEFAULT ;
 int cur_step = DEFAULT_CURSOR_STEP ;
@@ -197,7 +197,7 @@ int cur_step = DEFAULT_CURSOR_STEP ;
 int keypress=0;
 int keywait = 0;
 zt_timer_handle keytimer = 0;
-int keyID = 0;
+unsigned int keyID = 0;
 
 int status_change = 0;
 
@@ -274,7 +274,7 @@ Bitmap *VS = NULL;
 //char *skinfile;
 //char *colorfile;
 
-char *statusmsg = " ";
+const char *statusmsg = " ";
 char szStatmsg[1024];
 
 //unsigned long numMidiDevs;
@@ -460,7 +460,7 @@ void switch_page(CUI_Page *page)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int zcmp(char *s1, char *s2) 
+int zcmp(const char *s1, const char *s2)
 {
     int i=0;
     if (!s1 || !s2) return 0;
@@ -479,7 +479,7 @@ int zcmp(char *s1, char *s2)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int zcmpi(char *s1, char *s2) 
+int zcmpi(const char *s1, const char *s2)
 {
     int i=0;
     if (!s1 || !s2) return 0;
@@ -529,6 +529,7 @@ int checkmousepos(int x1, int y1, int x2, int y2)
 //
 Bitmap *load_cached_bitmap(char *name) 
 {
+    (void)name;
     return NULL;
 }
 
@@ -539,6 +540,7 @@ Bitmap *load_cached_bitmap(char *name)
 //
 Bitmap *load_bitmap(char *name) 
 {
+    (void)name;
     return NULL;
 }
 
@@ -889,7 +891,7 @@ char *hex2note(char *str,unsigned char note)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void status(char *msg,Drawable *S)
+void status(const char *msg,Drawable *S)
 {
     printBG(col(3),row(INITIAL_ROW + 6),"                                                                            ",COLORS.Text,COLORS.Background,S);
     printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);
@@ -923,7 +925,7 @@ void update_status(Drawable *S)
 
     if (ztPlayer->playmode) {
 
-      char time[64],time2[64];
+      char time[128],time2[64];
       int sec;
       sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
       sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
@@ -1994,12 +1996,12 @@ void encode(char *str, char w[256])
 //
 void setup_midi() 
 {
-    char *name, *temp, szKey[256], tt[256];
+    char *name, *temp, szKey[512], tt[256];
     conf DeviceConfig((char *)"devices.conf");
     conf *Config = &DeviceConfig;
 
 //	tt = NULL;
-    for (int j=0;j<MidiOut->numOuputDevices;j++) {
+    for (unsigned j=0;j<MidiOut->numOuputDevices;j++) {
 
         name = MidiOut->outputDevices[j]->szName;
 //		if(tt != NULL)
@@ -2037,14 +2039,14 @@ void setup_midi()
   
   if (zt_config_globals.auto_open_midi) {
     
-    for (int i=0;i<MAX_MIDI_OUTS;i++){ 
+    for (unsigned i=0;i<MAX_MIDI_OUTS;i++){
 
       sprintf(szKey,"open_out_device_%d",i);
       name = Config->get(szKey);
       
       if (name) {
       
-        for (int j=0;j<MidiOut->numOuputDevices;j++) {
+        for (unsigned j=0;j<MidiOut->numOuputDevices;j++) {
         
           if (zcmp(MidiOut->outputDevices[j]->szName,name)) {
           
@@ -2056,14 +2058,14 @@ void setup_midi()
     
     
     
-    for (int i=0;i<MAX_MIDI_INS;i++){ 
+    for (unsigned i=0;i<MAX_MIDI_INS;i++){
     
       sprintf(szKey,"open_in_device_%d",i);
       name = Config->get(&szKey[0]);
       
       if (name) {
       
-        for (int j=0;j<MidiIn->numMidiDevs;j++) { 
+        for (unsigned j=0;j<MidiIn->numMidiDevs;j++) {
         
           if (zcmp(MidiIn->midiInDev[j]->szName,name)) {
           
@@ -2133,8 +2135,8 @@ int postAction ()
     intlist *mod;
     OutputDevice *m;
     midiInDevice *mi;
-    static char blah[256];
-    int i;
+    static char blah[1024];
+    unsigned i;
     static char name[256];
 	static char val[256];
 	static char tt[256];
@@ -2155,7 +2157,7 @@ int postAction ()
     }
 	//tt = NULL;
 
-    for (int j=0;j<MidiOut->numOuputDevices;j++) {
+    for (unsigned j=0;j<MidiOut->numOuputDevices;j++) {
 
         m = MidiOut->outputDevices[j];
         sprintf(name,"known_out_device_%d",j);
@@ -2195,7 +2197,7 @@ int postAction ()
                 mod = mod->next; i++;
             }
         }
-        for (int j=0; j<MidiIn->numMidiDevs; j++) {
+        for (unsigned j=0; j<MidiIn->numMidiDevs; j++) {
             mi = MidiIn->midiInDev[j];
             sprintf(name,"known_in_device_%d",j);
             DeviceConfig.set(&name[0], mi->szName,0);
@@ -2860,14 +2862,14 @@ int action(Screen *S)
     keybuff_bg->setvalue(Keys.cursize);
 #endif
 
-    if (need_popup_refresh)
+    if (need_popup_refresh) {
 //      if (PopupWindow)
 //          PopupWindow->draw(S);
         if (!window_stack.isempty())
             window_stack.draw(S);
         else
             need_popup_refresh = 0;
-
+    }
 
     if (need_refresh) {
         fixmouse++;

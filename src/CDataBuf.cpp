@@ -10,6 +10,7 @@
  *
  * Copyright (c) 2000-2001, Christopher Micali <micali@concentric.net>
  * Copyright (c) 2001, Daniel Kahlin <tlr@users.sourceforge.net>
+ * Copyright (c) 2026, megagrump <megagrump@pm.me>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -21,7 +22,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  * 3. Neither the names of the copyright holders nor the names of their
- *    contributors may be used to endorse or promote products derived 
+ *    contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -38,8 +39,9 @@
  *
  ******/
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
 #include <SDL.h>
 
 #include "CDataBuf.h"
@@ -110,7 +112,7 @@ void CDataBuf::pushstr(const char *str) {
 }
 
 void CDataBuf::pushc(const int c) {
-    this->pushc((const char) c);
+    this->pushc((char) c);
 }
 
 void CDataBuf::pushsi(const short int si) {
@@ -161,7 +163,7 @@ char CDataBuf::getch(void) {
         read_cursor+=sizeof(char);
         return c;
     }
-    return NULL;
+    return 0;
 }
 
 unsigned char CDataBuf::getuch(void) {
@@ -171,7 +173,7 @@ unsigned char CDataBuf::getuch(void) {
         read_cursor+=sizeof(unsigned char);
         return c;
     }
-    return NULL;
+    return 0;
 }
 
 
@@ -182,7 +184,7 @@ short int CDataBuf::getsi(void) {
         read_cursor+=sizeof(short int);
         return c;
     }
-    return NULL;
+    return 0;
 }
 unsigned short int CDataBuf::getusi(void) {
     unsigned short int c;
@@ -191,7 +193,7 @@ unsigned short int CDataBuf::getusi(void) {
         read_cursor+=sizeof(unsigned short int);
         return c;
     }
-    return NULL;
+    return 0;
 }
 int CDataBuf::geti(void) {
     int c;
@@ -200,7 +202,7 @@ int CDataBuf::geti(void) {
         read_cursor+=sizeof(int);
         return c;
     }
-    return NULL;
+    return 0;
 }
 unsigned int CDataBuf::getui(void) {
     unsigned int c;
@@ -209,7 +211,7 @@ unsigned int CDataBuf::getui(void) {
         read_cursor+=sizeof(unsigned int);
         return c;
     }
-    return NULL;
+    return 0;
 }
 
 void CDataBuf::reset_read(void) {
@@ -226,15 +228,19 @@ int CDataBuf::eob(void) {
 void CDataBuf::seek(int size, int mode) {
     switch(mode) {
         case CDB_SEEK_FROMSTART:
-            this->read_cursor = size;
+            this->read_cursor = std::min(this->buffsize, (unsigned)std::max(0, size));
             break;
         case CDB_SEEK_FROMEND:
-            this->read_cursor = this->buffsize - size;
+            this->read_cursor = this->buffsize - std::min(this->buffsize, (unsigned)std::max(0, size));
             break;
         case CDB_SEEK_FROMCUR:
-            this->read_cursor += size;
+            if(size >= 0) {
+                this->read_cursor = std::min(this->buffsize, this->read_cursor + size);
+            }
+            else {
+                this->read_cursor -= std::min(this->read_cursor, (unsigned)(std::abs(size)));
+            }
             break;
     }
-    if (this->read_cursor<0) this->read_cursor = 0;
-    if (this->read_cursor>=this->buffsize) this->read_cursor = this->buffsize;
+    this->read_cursor = std::min(this->buffsize, this->read_cursor);
 }

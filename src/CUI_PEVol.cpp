@@ -24,7 +24,8 @@ CUI_PEVol::CUI_PEVol(void) {
 }
 
 CUI_PEVol::~CUI_PEVol(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 

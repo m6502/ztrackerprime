@@ -31,7 +31,6 @@ InstEditor::~InstEditor(void) {
 //
 //
 int InstEditor::mouseupdate(int cur_element) {
-                        int i = (MousePressY/8) - this->y;
     KBKey key,act=0;
     key = Keys.checkkey();
 

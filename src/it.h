@@ -710,8 +710,6 @@ public:
 
     void Print(void);
 
-    bool GrowIfNeeded(int pattern, int channel, int row);
-
 };
 
 

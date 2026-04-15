@@ -110,7 +110,8 @@ CUI_Songconfig::CUI_Songconfig(void) {
 }
 
 CUI_Songconfig::~CUI_Songconfig(void) {
-    if (UI) delete UI; UI= NULL;
+    delete UI;
+    UI= NULL;
 }
 
 void CUI_Songconfig::enter(void) {
@@ -142,7 +143,6 @@ void CUI_Songconfig::update()
 {
     oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - 22) ;
 
-    int key=0;
     ValueSlider *vs;
     TextInput *t;
 
@@ -177,7 +177,7 @@ void CUI_Songconfig::update()
         file_changed++;
     }
     if (Keys.size()) {
-        key = Keys.getkey();
+        Keys.getkey();
     }
 }
 

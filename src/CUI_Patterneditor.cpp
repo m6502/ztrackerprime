@@ -389,6 +389,8 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
   event *e;
   char str[64];
 
+  (void)cols_shown;
+
   printline(col(5),row(TRACKS_ROW_Y),148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
   printline(col(5),row(TRACKS_ROW_Y+(PATTERN_EDIT_ROWS+1)),143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
   
@@ -518,6 +520,8 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   int posx_current_track ;
   int posy_current_row ;
   //  char note[4];
+
+  (void)cols_shown;
 
   max_displayable_rows = PATTERN_EDIT_ROWS ;
   if(max_displayable_rows > song->patterns[cur_edit_pattern]->length) max_displayable_rows = song->patterns[cur_edit_pattern]->length ;
@@ -930,10 +934,10 @@ void CUI_Patterneditor::update()
 {
   PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
 
-  int i,j,o=0,p=0,step=0,noplay=0,bump=0;
+  int i,j,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
   int key;
-  int temp,oktogo=0,keyed=0/*,dontc=0*/;
+  int temp,oktogo=0/*,dontc=0*/;
   short int p1,p2,p3;
   //  char str[256];
   event *e;
@@ -1465,6 +1469,7 @@ void CUI_Patterneditor::update()
                 case SDLK_PAGEDOWN:
                   
                   effective=zt_config_globals.highlight_increment * 4;
+                  // fall through
                 
                 case SDLK_DOWN:
                 
@@ -1535,6 +1540,7 @@ void CUI_Patterneditor::update()
                       effective = cur_edit_row ;
                     }
                   }
+                  // fall through
 
                 case SDLK_UP:
                   
@@ -2136,12 +2142,13 @@ void CUI_Patterneditor::update()
           case SDLK_X:
             if (!last_cmd_keyjazz && selected) {
               clipboard->copy();
-              for(i=select_track_start;i<=select_track_end;i++)
+              for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++)
                   song->patterns[cur_edit_pattern]->tracks[i]->update_event(j,0x80,MAX_INSTS,0x80,0x0,0xff,0x0);
-                need_refresh++;
-                last_keyjazz = SDLK_X;
-                last_cmd_keyjazz = 1;
+              }
+              need_refresh++;
+              last_keyjazz = SDLK_X;
+              last_cmd_keyjazz = 1;
             }
             break;
 
@@ -2307,14 +2314,15 @@ void CUI_Patterneditor::update()
             
           case SDLK_S: /* Set Instrument */
             if (selected) {
-              for(i=select_track_start;i<=select_track_end;i++)
+              for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++) {
-                  if (e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j)) {
+                  if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                     if (e->inst < MAX_INSTS)
                       e->inst = cur_inst;
                   }
                 }
-                need_refresh++;
+              }
+              need_refresh++;
             }
             break;
             
@@ -2389,26 +2397,28 @@ void CUI_Patterneditor::update()
 
           case SDLK_Q: /* Transpose up */
             if (selected) {
-              for(i=select_track_start;i<=select_track_end;i++)
+              for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++) {
-                  if (e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j)) {
+                  if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                     if (e->note < 0x7F)
                       e->note++;
                   }
                 }
-                need_refresh++;
+              }
+              need_refresh++;
             }
             break;
           case SDLK_A: /* Transpose down */
             if (selected) {
-              for(i=select_track_start;i<=select_track_end;i++)
+              for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++) {
-                  if (e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j)) {
+                  if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                     if (e->note > 0 && e->note < 0x80)
                       e->note--;
                   }
                 }
-                need_refresh++;
+              }
+              need_refresh++;
             }
             break;
             
@@ -2459,7 +2469,7 @@ void CUI_Patterneditor::update()
                 if (i==cur_edit_track) {
                   unmutetrack(i);
                 }
-                else mutetrack(i);
+                else { mutetrack(i); }
               }
             } 
             
@@ -2505,7 +2515,7 @@ void CUI_Patterneditor::update()
 
         // -------------------------------------------
         case SDLK_RETURN:
-          if (e = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)) {
+          if ((e = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row))) {
             if (e->inst < MAX_INSTS) {
               cur_inst = e->inst;
               need_refresh++;
@@ -2588,7 +2598,7 @@ case SDLK_DELETE:
                 }
                 p = p3 + (p2*10);
                 if (p<0) p=0;
-                if (p>=MAX_INSTS) p=MAX_INSTS-1; if (p<0) p=0;
+                if (p>=MAX_INSTS) p=MAX_INSTS-1;
               } else {
                 p = 0xff;
               }
@@ -2982,7 +2992,7 @@ case SDLK_DELETE:
                   else
                     song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,MAX_INSTS,zt_config_globals.record_velocity?p1:(-1),-1,-1,-1);
                 } else {
-                  if (e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row))
+                  if ((e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)))
                     song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,-1,zt_config_globals.record_velocity?p1:(-1),-1,-1,-1);
                 }
                 
@@ -2996,7 +3006,7 @@ case SDLK_DELETE:
                       p1 *= song->instruments[cur_inst]->global_volume;
                       p1 /= 0x7f;
                     }
-                    if (e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row))
+                    if ((e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)))
                       if (e->vol<0x80)
                         p1 = e->vol;
                   }
@@ -3439,7 +3449,6 @@ nevermind:;
 void CUI_Patterneditor::draw(Drawable *S) 
 {
   event *e;
-  int o=0;
   bool m_Fullupd = true;
   
   if (S->lock()==0) {
@@ -3449,10 +3458,6 @@ void CUI_Patterneditor::draw(Drawable *S)
       S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - (480-424),COLORS.Background);
       clear=0;
     }
-
-
-
-    o=0;
     
     draw_status_vars(S);
 

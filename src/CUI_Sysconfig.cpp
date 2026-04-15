@@ -8,15 +8,13 @@ Button *midiin_action_button;
 void midi_out_sel(int dev);
 void midi_in_sel(int dev);
 
-void BTNCLK_GotoGlobalConfig(UserInterfaceElement *b) {
-    (void)b;
+void BTNCLK_GotoGlobalConfig(UserInterfaceElement*) {
     switch_page(UIP_Config);
     need_refresh++;
     doredraw++;
 }
 
-void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement *b) {
-
+void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement*) {
     delete MidiOut;
     MidiOut = new midiOut;
     
@@ -28,7 +26,7 @@ void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement *b) {
     need_refresh++; 
     
 }
-void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement *b) {
+void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
 
     delete MidiIn;
     MidiIn = new midiIn;
@@ -442,7 +440,8 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 }
 
 CUI_Sysconfig::~CUI_Sysconfig(void) {
-    if (UI) delete UI; UI = NULL;
+    delete UI;
+    UI = NULL;
 }
 
 void CUI_Sysconfig::enter(void) {
@@ -461,7 +460,6 @@ extern bool bIsFullscreen;
 void CUI_Sysconfig::update() {
     ValueSlider *vs;
     CheckBox *cb;
-    int key=0;
     char val[8];
 
     UI->update();
@@ -481,7 +479,7 @@ void CUI_Sysconfig::update() {
         attempt_fullscreen_toggle();
     }
     if (Keys.size()) {
-        key = Keys.getkey();
+        Keys.getkey();
     }
 }
 

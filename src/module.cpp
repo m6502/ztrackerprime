@@ -201,7 +201,7 @@ void track::del_event(unsigned short int row, int needlock) {
             event_list = e;
             file_changed++;
         } else {
-            if (e=get_next_event(row)) {
+            if ((e=get_next_event(row))) {
                 e2 = (event *)e->next_event;
                 e->next_event = e2->next_event;
                 delete e2;
@@ -250,7 +250,7 @@ void track::update_event(unsigned short int row, int note, int inst, int vol, in
     if (lock_mutex(song->hEditMutex, EDIT_LOCK_TIMEOUT)) {
         
 
-        if (e = get_event(row))
+        if ((e = get_event(row)))
             a=0;
         else {
             e = new event;
@@ -293,7 +293,7 @@ void track::update_event_safe(unsigned short int row, int note, int inst, int vo
 
         if (row>=this->length) row=this->length-1;
 
-        if (e = get_event(row))
+        if ((e = get_event(row)))
             a=0;
         else {
             e = new event;
@@ -346,7 +346,7 @@ void track::update_event(unsigned short int row, event *src) {
     if (lock_mutex(song->hEditMutex, EDIT_LOCK_TIMEOUT)) {
         
 
-        if (e = get_event(row))
+        if ((e = get_event(row)))
             a=0;
         else {
             e = new event;
