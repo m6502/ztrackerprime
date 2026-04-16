@@ -83,7 +83,6 @@
 #endif
 
 
-
 // zt.h defines SDL_MAIN_HANDLED globally so <SDL_main.h> is not pulled into
 // every translation unit (which would emit WinMain in every TU on Windows and
 // cause LNK2005). On Windows -- in the single TU that owns main() -- we undo
@@ -922,7 +921,9 @@ void update_status(Drawable *S)
   int i,o=0;
   char str[10];
 
-  if (ztPlayer->playing) {
+  // Only refresh the playing/looping status line when viewing the Pattern
+  // Editor; otherwise it bleeds over Help/Sample/Song/Sys Config pages.
+  if (ztPlayer->playing && cur_state == STATE_PEDIT) {
 
     if (ztPlayer->playmode) {
 
@@ -948,6 +949,10 @@ void update_status(Drawable *S)
       cur_edit_row     = ztPlayer->playing_cur_row;
       need_refresh++;
     }
+  }
+  else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
+    // Keep statusmsg quiet on non-Pattern pages while playing.
+    statusmsg = (char*)" ";
   }
 
   if (S->lock() == 0) {
@@ -2354,16 +2359,33 @@ void keyhandler(SDL_KeyboardEvent *e) {
     if (id == SDLK_KP_ENTER)
       id = SDLK_RETURN;
 
-    // EU/Finnish ISO keyboards: the § key (above Tab, left of '1') is the
-    // physical "non-US backslash" scancode. Map it to SDLK_GRAVE so the
-    // existing GRAVE bindings (Shift+§ -> drawmode toggle, plain § -> Note
-    // Off) work without a US keyboard layout.
-    if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH) {
-      id = SDLK_GRAVE;
-    }
-
     if (pressed && id == SDLK_RETURN) {
         actual_ch = 10;
+    }
+
+    // EU/Finnish ISO keyboards: the § key. Different layouts map it to
+    // different scancodes — on some it's NONUSBACKSLASH, on others it's
+    // INTERNATIONAL1/2 or even GRAVE itself. Force any of those to SDLK_GRAVE
+    // so the existing GRAVE handlers (plain § -> Note Off, Shift+§ -> drawmode
+    // toggle) work without a US keyboard layout.
+    if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH ||
+        e->scancode == SDL_SCANCODE_INTERNATIONAL1 ||
+        e->scancode == SDL_SCANCODE_INTERNATIONAL2 ||
+        e->scancode == SDL_SCANCODE_INTERNATIONAL3 ||
+        e->scancode == SDL_SCANCODE_NONUSHASH) {
+      id = SDLK_GRAVE;
+    }
+    // One-time stderr diagnostic so we can identify exactly which scancode
+    // the § key sends on a given keyboard. Prints once per unique scancode.
+    if (pressed) {
+      static int seen[512] = {0};
+      int sc = (int)e->scancode;
+      if (sc >= 0 && sc < 512 && !seen[sc]) {
+        seen[sc] = 1;
+        fprintf(stderr, "[zt-key] scancode=%d keycode=0x%X mod=0x%X\n",
+                sc, (unsigned)e->key, (unsigned)e->mod);
+        fflush(stderr);
+      }
     }
 
     if (id != SDLK_LALT && id != SDLK_RALT && id != SDLK_RCTRL && id != SDLK_LCTRL && id != SDLK_LSHIFT && id != SDLK_RSHIFT) {
@@ -2951,6 +2973,15 @@ static int zt_backend_set_video_mode(char *errstr)
       zt_show_error("Error", errstr);
       return 0;
     }
+    zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
+    if (!zt_renderer) {
+      snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
+      zt_show_error("Error", errstr);
+      return 0;
+    }
+    if (!SDL_SetRenderVSync(zt_renderer, 1)) {
+      ZT_DEBUG_LOG("Warning: couldn't enable renderer vsync: %s\n", SDL_GetError());
+    }
 
     // Load window icon (configurable via zt.conf 'window_icon'; default 'zt_icon.png').
     // On macOS this also updates the Dock icon at runtime; a failure is silent.
@@ -2963,16 +2994,6 @@ static int zt_backend_set_video_mode(char *errstr)
         SDL_SetWindowIcon(zt_main_window, icon);
         SDL_DestroySurface(icon);
       }
-    }
-
-    zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
-    if (!zt_renderer) {
-      snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
-      zt_show_error("Error", errstr);
-      return 0;
-    }
-    if (!SDL_SetRenderVSync(zt_renderer, 1)) {
-      ZT_DEBUG_LOG("Warning: couldn't enable renderer vsync: %s\n", SDL_GetError());
     }
   } else {
     SDL_SetWindowSize(zt_main_window, RESOLUTION_X, RESOLUTION_Y);
@@ -3194,6 +3215,7 @@ int initSDL(void)
     UIP_SongDuration = new CUI_SongDuration;
     UIP_LuaConsole = new CUI_LuaConsole;
     g_lua.init();
+    UIP_PaletteEditor = new CUI_PaletteEditor;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
     return 1;
@@ -3283,6 +3305,15 @@ int main(int argc, char *argv[])
     '/';
 #endif
 
+  // Get the zt directory and store it globally
+  if(argc > 1) {
+    if(argv[1] != NULL && argv[1][0] != '\0') {
+      zt_get_current_directory(1024,zt_filename);
+      strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
+      strcat(zt_filename,argv[1]);
+    }
+  }
+
   bool launched_from_bundle = false;
   char bundle_resources_path[1024] = "";
 #if defined(__APPLE__)
@@ -3306,15 +3337,6 @@ int main(int argc, char *argv[])
     }
   }
 #endif
-
-  // Get the zt directory and store it globally
-  if(argc > 1) {
-    if(argv[1] != NULL && argv[1][0] != '\0') {
-      zt_get_current_directory(1024,zt_filename);
-      strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
-      strcat(zt_filename,argv[1]);
-    }
-  }
 
   char *last_backslash = strrchr(argv[0], '\\');
   char *last_slash = strrchr(argv[0], '/');

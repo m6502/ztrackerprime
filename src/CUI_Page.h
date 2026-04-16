@@ -385,6 +385,8 @@ class CUI_PEParms : public CUI_Page {
         CheckBox *cb_centered ;
         CheckBox *cb_stepedit ;
         CheckBox *cb_recveloc ;
+        CheckBox *cb_drawmode ;
+        int      drawmode_val ;
 
         ValueSlider *vs_speedup ;
 
