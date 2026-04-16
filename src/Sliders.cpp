@@ -3,28 +3,10 @@
 
 extern int needaclear ;
 
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-ValueSlider::ValueSlider(void) {
-
-  force_v = 0;
-  force_f = 0;
-  changed = 0;
-  ysize   = 1;
-  newclick= 1;
-  focus   = 0;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-ValueSlider::ValueSlider(int fset) 
+ValueSlider::ValueSlider(int fset)
 {
     force_v = 0;
     force_f = 0;
@@ -271,214 +253,13 @@ void ValueSlider::draw(Drawable *S, int active) {
     changed = 0;
 }
 
-
-
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-ValueSliderOFF::ValueSliderOFF(void) {
-    changed = 0;
-    ysize = 1;
-    newclick=1;
-    focus=0;
+
+ValueSliderOFF::ValueSliderOFF(int fset)
+    : ValueSliderDL(fset) {
 }
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-ValueSliderOFF::ValueSliderOFF(int fset) {
-    changed = 0;
-    ysize = 1;
-    newclick=1;
-    focus=fset;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-int ValueSliderOFF::mouseupdate(int cur_element) {
-    int newval;
-    float f;
-    KBKey key,act=0;
-    key = Keys.checkkey();
-    if (key) {
-        switch(key) {
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
-                if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
-                    mousestate = 1;
-                    act++;
-                    newclick=0; // unset click to focus
-                }
-                break;
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
-                if (mousestate) act++;
-                mousestate=0;
-                break;
-
-                ///////////////////////////////////////////////////
-                // Here is right click mouse focus
-
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
-                if(focus)
-                {
-                    if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
-                        newclick=1;
-                        mousestate=1;
-                    }
-                }
-                break;
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)):
-                if(focus)
-                {
-                    mousestate=0;
-                }
-                break;
-
-                ///////////////////////////////////////////////////
-        }
-    }
-    /////////////////////////////////////////
-    // click to focus stuff
-
-    if (mousestate) {
-        if(!newclick){
-            f = ((float)(LastX-col(this->x)) / (float)col(this->xsize));
-            f = (f * (float)(max-min)) + min;
-            if (f-floor(f) >= 0.5) f++;
-            newval = (int) floor(f);
-            if (newval<min) newval=min;
-            if (newval>max) newval=max;
-            if (newval != value) {
-                need_refresh++;
-                need_redraw++;
-    
-                fixmouse++;
-                changed++;
-                value = newval;
-            }
-        }
-        return this->ID;
-    }
-
-    //////////////////////////////////
-
-    if (act) {
-        key = Keys.getkey();
-        need_refresh++;
-        need_redraw++;
-
-        fixmouse++;
-    }
-    return cur_element;
-}
-
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-int ValueSliderOFF::update() {
-    KBKey key,act=0;
-    int ret=0,pop=0,c;
-    key = Keys.checkkey();
-    unsigned char kstate = Keys.getstate();
-
-    if (!UIP_SliderInput->checked){
-        c = UIP_SliderInput->getresult();
-        if (!UIP_SliderInput->canceled) {
-            changed++;
-            value = c;
-        }
-        needaclear++; need_refresh++;
-    }
-    
-    if (key) {
-        switch(key) {
-            case SDLK_UP: ret = -1; act++; break;
-            case SDLK_DOWN: ret = 1; act++; break;
-            case SDLK_LEFT: if (kstate&KS_CTRL) value-=(max/8); else value--;  act++; changed++; break;
-            case SDLK_RIGHT: if (kstate&KS_CTRL) value+=(max/8); else value++;  act++; changed++; break;
-            case SDLK_HOME: value=min; act++; changed++; break;
-            case SDLK_END: value=max; act++; changed++; break;
-
-            case SDLK_0: 
-                UIP_SliderInput->setfirst(0);
-                pop++;
-                break;
-            case SDLK_1:
-                UIP_SliderInput->setfirst(1);
-                pop++;
-                break;
-            case SDLK_2:
-                UIP_SliderInput->setfirst(2);
-                pop++;
-                break;
-            case SDLK_3:
-                UIP_SliderInput->setfirst(3);
-                pop++;
-                break;
-            case SDLK_4:
-                UIP_SliderInput->setfirst(4);
-                pop++;
-                break;
-            case SDLK_5:
-                UIP_SliderInput->setfirst(5);
-                pop++;
-                break;
-            case SDLK_6:
-                UIP_SliderInput->setfirst(6);
-                pop++;
-                break;
-            case SDLK_7:
-                UIP_SliderInput->setfirst(7);
-                pop++;
-                break;
-            case SDLK_8:
-                UIP_SliderInput->setfirst(8);
-                pop++;
-                break;
-            case SDLK_9:
-                UIP_SliderInput->setfirst(9);
-                pop++;
-                break;
-            case SDLK_MINUS:
-                UIP_SliderInput->setfirst(-1);
-                pop++;
-                break;
-        }
-        if (pop) {
-            key = Keys.getkey();    
-            if (cur_state != STATE_PEDIT_WIN) {
-                need_refresh++;
-                need_redraw++;
-
-                popup_window(UIP_SliderInput);          
-            }
-        }
-        if (act) {
-            key = Keys.getkey();
-            need_refresh++;
-            need_redraw++;
-
-        }
-    }
-    if (value<min) value=min;
-    if (value>max) value=max;
-    return ret;
-}
-
-
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -528,118 +309,12 @@ void ValueSliderOFF::draw(Drawable *S, int active) {
     changed = 0;
 }
 
-
-
-
 // ------------------------------------------------------------------------------------------------
 //
 //
-ValueSliderDL::ValueSliderDL(void) {
-    changed = 0;
-    ysize = 1;
-    newclick=1;     // NEW Click set
-    focus=0;
+ValueSliderDL::ValueSliderDL(int fset)
+    : ValueSlider(fset) {
 }
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-ValueSliderDL::ValueSliderDL(int fset) {
-    changed = 0;
-    ysize = 1;
-    newclick=1;     // NEW Click set
-    focus=fset;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-int ValueSliderDL::mouseupdate(int cur_element) {
-    int newval;
-    float f;
-    KBKey key,act=0;
-    key = Keys.checkkey();
-    if (key) {
-        switch(key) {
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
-                if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
-                    mousestate = 1;
-                    act++;
-                    newclick=0; // unset click to focus
-                }
-                break;
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
-                if (mousestate) act++;
-                mousestate=0;
-                break;
-
-                ///////////////////////////////////////////////////
-                // Here is right click mouse focus
-
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
-                if(focus)
-                {
-                    if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
-                        newclick=1;
-                        mousestate=1;
-                    }
-                }
-                break;
-            case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT)):
-                if(focus)
-                {
-                    mousestate=0;
-                }
-                break;
-
-                ///////////////////////////////////////////////////
-        }
-    }
-    /////////////////////////////////////////
-    // Click to focus
-
-    if (mousestate) {
-        if(!newclick)
-        {
-            f = ((float)(LastX-col(this->x)) / (float)col(this->xsize));
-            f = (f * (float)(max-min)) + min;
-            if (f-floor(f) >= 0.5) f++;
-            newval = (int) floor(f);
-            if (newval<min) newval=min;
-            if (newval>max) newval=max;
-            if (newval != value) {
-                need_refresh++;
-                need_redraw++;
-
-                fixmouse++;
-                changed++;
-                value = newval;
-            }
-        }
-        return this->ID;
-    }
-
-    /////////////////////////////////////////
-
-    if (act) {
-        key = Keys.getkey();
-        need_refresh++;
-        need_redraw++;
-
-        fixmouse++;
-    }
-    return cur_element;
-}
-
-
-
-
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -766,6 +441,3 @@ void ValueSliderDL::draw(Drawable *S, int active) {
     screenmanager.Update(col(x-1),row(y-1),col(x+xsize+5),row(y+1));
     changed = 0;
 }
-
-
-

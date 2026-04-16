@@ -14,52 +14,25 @@ class ValueSlider : public UserInterfaceElement {
         int clear;
         int newclick;
         int focus;  // new value here
-        ValueSlider();
-        ValueSlider(int fset); // new constructor
-        ~ValueSlider() = default ;
+        explicit ValueSlider(int fset = 0);
+        virtual ~ValueSlider() = default ;
         int mouseupdate(int cur_element);
         virtual int update();
-        void draw(Drawable *S, int active);
+        virtual void draw(Drawable *S, int active);
 };
  
-
-class ValueSliderDL : public UserInterfaceElement {
+class ValueSliderDL : public ValueSlider {
     public:
-        int min;
-        int max;
-        int value;
-        int changed;
-        int newclick;
-        int focus;  // new value here
-        ValueSliderDL();
-        ValueSliderDL(int fset); // new constructor
-        ~ValueSliderDL() = default ;
-        int mouseupdate(int cur_element);
-        int update();
-        void draw(Drawable *S, int active);
-};
-class ValueSliderOFF : public UserInterfaceElement {
-    public:
-        int min;
-        int max;
-        signed int value;
-        int changed;
-        int newclick;
-        int focus;  // new value here
-        ValueSliderOFF();
-        ValueSliderOFF(int fset); // new constructor
-        ~ValueSliderOFF() = default ;
-        int mouseupdate(int cur_element);
-        int update();
-        void draw(Drawable *S, int active);
+        explicit ValueSliderDL(int fset = 0);
+        virtual ~ValueSliderDL() = default ;
+        int update() override;
+        virtual void draw(Drawable *S, int active) override;
 };
 
-
-
-
-
-
-
-
+class ValueSliderOFF : public ValueSliderDL {
+    public:
+        explicit ValueSliderOFF(int fset);
+        void draw(Drawable *S, int active) override;
+};
 
 #endif
