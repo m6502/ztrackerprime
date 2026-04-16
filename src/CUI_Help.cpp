@@ -132,7 +132,7 @@ CUI_Help::CUI_Help(void) {
     free(help_file);
 }
 
-CUI_Help::~CUI_Help(void) {
+CUI_Help::~CUI_Help() {
     TextBox *tb;
     if (needfree) {
         tb = (TextBox *)UI->get_element(0);

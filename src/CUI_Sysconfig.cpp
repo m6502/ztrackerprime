@@ -439,11 +439,6 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
 }
 
-CUI_Sysconfig::~CUI_Sysconfig(void) {
-    delete UI;
-    UI = NULL;
-}
-
 void CUI_Sysconfig::enter(void) {
     need_refresh = 1;
     cur_state = STATE_SYSTEM_CONFIG;

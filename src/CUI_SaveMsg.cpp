@@ -117,8 +117,6 @@ CUI_SaveMsg::~CUI_SaveMsg(void) {
         zt_thread_close(hThread);
         hThread = NULL;
     }
-    if (UI) { delete UI; }
-    UI = NULL;
 }
 
 void CUI_SaveMsg::enter(void) {

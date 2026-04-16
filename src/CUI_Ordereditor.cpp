@@ -16,10 +16,6 @@ CUI_Ordereditor::CUI_Ordereditor(void) {
     oe->xsize = 9;
 }
 
-CUI_Ordereditor::~CUI_Ordereditor(void) {
-
-}
-
 void CUI_Ordereditor::enter(void) {
     need_refresh++;
     cur_state = STATE_ORDER;

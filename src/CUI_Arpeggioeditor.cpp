@@ -59,13 +59,6 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // END 
 }
 
-CUI_Arpeggioeditor::~CUI_Arpeggioeditor(void) {
-    if (UI) {
-        delete UI;
-        UI=NULL;
-    }
-}
-
 void CUI_Arpeggioeditor::enter(void) {
     need_refresh++;
     cur_state = STATE_ARPEDIT;
@@ -93,4 +86,3 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         S->unlock();
     }
 }
-/* eof */

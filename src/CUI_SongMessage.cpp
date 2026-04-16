@@ -62,7 +62,6 @@ CUI_SongMessage::~CUI_SongMessage(void) {
         tb = (TextBox *)UI->get_element(0);
         delete[] tb->text;
     }
-//    delete buffer;
 }
 
 void CUI_SongMessage::enter(void) {
@@ -115,4 +114,3 @@ void CUI_SongMessage::draw(Drawable *S) {
         S->unlock();
     }
 }
-/* eof */

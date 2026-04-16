@@ -1,13 +1,5 @@
 #include "zt.h"
 
-CUI_Logoscreen::CUI_Logoscreen(void) {
-
-}
-
-CUI_Logoscreen::~CUI_Logoscreen(void) {
-
-}
-
 void CUI_Logoscreen::enter(void) {
     cur_state = STATE_LOGO;
     faded = 0;

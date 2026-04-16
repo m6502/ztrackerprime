@@ -59,13 +59,6 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     // END 
 }
 
-CUI_Midimacroeditor::~CUI_Midimacroeditor(void) {
-    if (UI) {
-        delete UI;
-        UI=NULL;
-    }
-}
-
 void CUI_Midimacroeditor::enter(void) {
     need_refresh++;
     cur_state = STATE_ARPEDIT;
@@ -93,4 +86,3 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         S->unlock();
     }
 }
-/* eof */

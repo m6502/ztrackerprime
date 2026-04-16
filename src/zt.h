@@ -639,7 +639,6 @@ extern int status_change;
 extern int cur_edit_row,cur_edit_row_disp,cur_edit_pattern;
 extern instrument blank_instrument;
 extern KeyBuffer Keys;
-extern int cur_state,need_refresh;
 extern int cur_volume_percent;
 extern int cur_naturalization_percent;
 extern int fixmouse;

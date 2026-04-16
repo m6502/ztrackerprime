@@ -85,10 +85,6 @@ All rights reserved.
 )about_text";
 }
 
-CUI_About::~CUI_About(void) {
-
-}
-
 void CUI_About::enter(void) {
     cur_state = STATE_ABOUT;
     need_refresh = 1;
