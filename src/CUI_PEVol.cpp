@@ -23,13 +23,6 @@ CUI_PEVol::CUI_PEVol(void) {
 
 }
 
-CUI_PEVol::~CUI_PEVol(void) {
-    delete UI;
-    UI = NULL;
-}
-
-
-
 void CUI_PEVol::enter(void) {
     ValueSlider *vs;
     need_refresh = 1;

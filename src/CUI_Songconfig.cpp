@@ -109,11 +109,6 @@ CUI_Songconfig::CUI_Songconfig(void) {
         oe->ysize = 32 ;
 }
 
-CUI_Songconfig::~CUI_Songconfig(void) {
-    delete UI;
-    UI= NULL;
-}
-
 void CUI_Songconfig::enter(void) {
     ValueSlider *vs;
     need_refresh = 1;

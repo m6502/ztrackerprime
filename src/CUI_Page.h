@@ -32,12 +32,6 @@ class CUI_Page {
         virtual void draw(Drawable *S)=0;
 };
 
-class CUI_Popup {
-    public:
-        int x,y;
-        int xsize,ysize;
-};
-
 class CUI_InstEditor : public CUI_Page {
     public:
         int reset;
@@ -45,7 +39,6 @@ class CUI_InstEditor : public CUI_Page {
         InstEditor *ie;
 
         CUI_InstEditor();
-        ~CUI_InstEditor();
 
         void enter(void);
         void leave(void);
@@ -83,7 +76,6 @@ class CUI_About : public CUI_Page {
 //        char *texts[3];
 
         CUI_About();
-        ~CUI_About();
 
         void enter(void);
         void leave(void);
@@ -102,7 +94,6 @@ class CUI_Songconfig : public CUI_Page {
         int tpb_tab[9];// = ;
 
         CUI_Songconfig();
-        ~CUI_Songconfig();
 
         void enter(void);
         void leave(void);
@@ -115,7 +106,6 @@ class CUI_Sysconfig : public CUI_Page {
     public:
 
         CUI_Sysconfig();
-        ~CUI_Sysconfig();
 
         void enter(void);
         void leave(void);
@@ -184,7 +174,6 @@ class CUI_Config : public CUI_Page {
     public:
 
         CUI_Config();
-        ~CUI_Config();
 
         void enter(void);
         void leave(void);
@@ -198,7 +187,6 @@ class CUI_Ordereditor : public CUI_Page {
     public:
 
         CUI_Ordereditor();
-        ~CUI_Ordereditor();
 
         void enter(void);
         void leave(void);
@@ -241,7 +229,6 @@ class CUI_Arpeggioeditor : public CUI_Page {
     public:
 
         CUI_Arpeggioeditor();
-        ~CUI_Arpeggioeditor();
 
         void enter(void);
         void leave(void);
@@ -253,7 +240,6 @@ class CUI_Midimacroeditor : public CUI_Page {
     public:
 
         CUI_Midimacroeditor();
-        ~CUI_Midimacroeditor();
 
         void enter(void);
         void leave(void);
@@ -271,7 +257,6 @@ class CUI_Loadscreen : public CUI_Page {
         DriveList *dr;
 
         CUI_Loadscreen();
-        ~CUI_Loadscreen();
 
         void enter(void);
         void leave(void);
@@ -296,7 +281,6 @@ class CUI_Savescreen : public CUI_Page {
         //Button *b_gba;
 
         CUI_Savescreen();
-        ~CUI_Savescreen();
 
         void enter(void);
         void leave(void);
@@ -346,9 +330,6 @@ class CUI_Logoscreen : public CUI_Page {
 
         int ready_fade, faded;
 
-        CUI_Logoscreen();
-        ~CUI_Logoscreen();
-
         void enter(void);
         void leave(void);
         void update(void);
@@ -365,7 +346,6 @@ class CUI_Patterneditor : public CUI_Page {
         int last_pattern_size ;
 
         CUI_Patterneditor();
-        ~CUI_Patterneditor();
 
         void enter(void);
         void leave(void);
@@ -391,7 +371,6 @@ class CUI_PEParms : public CUI_Page {
         ValueSlider *vs_speedup ;
 
         CUI_PEParms();
-        ~CUI_PEParms();
 
         void enter(void);
         void leave(void);
@@ -403,7 +382,6 @@ class CUI_PEVol : public CUI_Page {
 public:
 
     CUI_PEVol();
-    ~CUI_PEVol();
 
     void enter(void);
     void leave(void);
@@ -415,7 +393,6 @@ class CUI_PENature : public CUI_Page {
 public:
 
     CUI_PENature();
-    ~CUI_PENature();
 
     void enter(void);
     void leave(void);
@@ -433,7 +410,6 @@ class CUI_SliderInput : public CUI_Page {
         int checked;
 
         CUI_SliderInput();
-        ~CUI_SliderInput();
 
         void enter(void);
         void leave(void);
@@ -452,7 +428,6 @@ class CUI_NewSong : public CUI_Page {
         Button *b_no;
 
         CUI_NewSong();
-        ~CUI_NewSong();
 
         void enter(void);
         void leave(void);
@@ -471,7 +446,6 @@ class CUI_RUSure : public CUI_Page {
         VFunc OnYes;
 
         CUI_RUSure();
-        ~CUI_RUSure();
 
         void enter(void);
         void leave(void);
@@ -479,12 +453,13 @@ class CUI_RUSure : public CUI_Page {
         void draw(Drawable *S);
 };
 
-class CUI_SongDuration : public CUI_Page, public CUI_Popup {
+class CUI_SongDuration : public CUI_Page {
     public:
+        int x,y;
+        int xsize,ysize;
         int seconds;
 
         CUI_SongDuration();
-        ~CUI_SongDuration();
 
         void enter(void);
         void leave(void);

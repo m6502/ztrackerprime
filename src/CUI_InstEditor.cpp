@@ -240,11 +240,6 @@ CUI_InstEditor::CUI_InstEditor(void) {
     reset = 0;
 }
 
-CUI_InstEditor::~CUI_InstEditor(void) {
-    delete UI;
-    UI= NULL;
-}
-
 void CUI_InstEditor::enter(void) {
     need_refresh = 1;
     cur_state = STATE_IEDIT;

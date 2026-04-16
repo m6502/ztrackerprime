@@ -52,11 +52,6 @@ CUI_NewSong::CUI_NewSong(void) {
 
 }
 
-CUI_NewSong::~CUI_NewSong(void) {
-    delete UI;
-    UI = NULL;
-}
-
 void CUI_NewSong::enter(void) {
     need_refresh = 1;
     UI->cur_element = 1;

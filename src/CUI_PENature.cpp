@@ -25,13 +25,6 @@ CUI_PENature::CUI_PENature(void) {
         vs->value = cur_naturalization_percent;
 }
 
-CUI_PENature::~CUI_PENature(void) {
-    delete UI;
-    UI = NULL;
-}
-
-
-
 void CUI_PENature::enter(void) {
     ValueSlider *vs;
     need_refresh = 1;

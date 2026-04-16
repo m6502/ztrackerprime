@@ -199,10 +199,6 @@ CUI_Config::CUI_Config(void) {
 
 }
 
-CUI_Config::~CUI_Config(void) {
-    if (UI) delete UI; UI = NULL;
-}
-
 void CUI_Config::enter(void) {
     need_refresh = 1;
     cur_state = STATE_CONFIG;

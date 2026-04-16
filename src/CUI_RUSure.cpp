@@ -50,11 +50,6 @@ CUI_RUSure::CUI_RUSure(void) {
     button_no->OnClick = (ActFunc)BTNCLK_rusure_no;
 }
 
-CUI_RUSure::~CUI_RUSure(void) {
-    delete UI;
-    UI = NULL;
-}
-
 void CUI_RUSure::enter(void) {
     need_refresh = 1;
     UI->cur_element = 1;

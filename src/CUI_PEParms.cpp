@@ -103,13 +103,6 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_drawmode->value = &drawmode_val;
 }
 
-CUI_PEParms::~CUI_PEParms(void) {
-    delete UI;
-    UI = NULL;
-}
-
-
-
 void CUI_PEParms::enter(void) {
     ValueSlider *vs;
 	CheckBox *cb;

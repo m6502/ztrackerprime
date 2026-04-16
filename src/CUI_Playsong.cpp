@@ -58,14 +58,11 @@ CUI_Playsong::CUI_Playsong(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-CUI_Playsong::~CUI_Playsong(void) 
+CUI_Playsong::~CUI_Playsong()
 {
- //   if (UI) delete UI; UI = NULL;
+  UI = nullptr;
   delete UI_PatternDisplay;
-  UI_PatternDisplay = NULL;
   delete UI_VUMeters;
-  UI_VUMeters = NULL;
-  UI = NULL;
 }
 
 

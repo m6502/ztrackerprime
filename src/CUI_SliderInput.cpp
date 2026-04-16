@@ -25,11 +25,6 @@ CUI_SliderInput::CUI_SliderInput(void) {
     this->checked = 1;
 }
 
-CUI_SliderInput::~CUI_SliderInput(void) {
-    delete UI;
-    UI = NULL;
-}
-
 void CUI_SliderInput::setfirst(int val) {
     TextInput *ti;
     ti = (TextInput *)UI->get_element(0);

@@ -78,14 +78,12 @@ CUI_LoadMsg::CUI_LoadMsg(void) {
     strtimer = 0;
 }
 
-CUI_LoadMsg::~CUI_LoadMsg(void) {
+CUI_LoadMsg::~CUI_LoadMsg() {
     if (hThread) {
         zt_thread_join(hThread);
         zt_thread_close(hThread);
         hThread = NULL;
     }
-    delete UI;
-    UI = NULL;
 }
 
 void CUI_LoadMsg::enter(void) {

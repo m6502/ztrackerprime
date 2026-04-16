@@ -173,20 +173,6 @@ CUI_Loadscreen::CUI_Loadscreen(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
-CUI_Loadscreen::~CUI_Loadscreen(void) 
-{
-  if (UI) {
-    
-    delete UI; 
-    UI = NULL;
-  }
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 void CUI_Loadscreen::enter(void) 
 {
   need_refresh = 1;
@@ -293,6 +279,3 @@ void CUI_Loadscreen::draw(Drawable *S)
     S->unlock();
   }
 }
-
-
-/* eof */
