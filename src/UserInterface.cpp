@@ -1671,9 +1671,8 @@ void AboutBox::draw(Drawable *S, int) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-TextBox::TextBox(int ro) 
+TextBox::TextBox()
 {
-  readonly = ro;
   mousestate = soff = startline = 0;
   bEof = false;
   bUseColors = 1;
@@ -1812,7 +1811,7 @@ int TextBox::update()
 // ------------------------------------------------------------------------------------------------
 //
 //
-int nextline(char *str, int p) {
+int nextline(const char *str, int p) {
     while(str[p]) {
         if (str[p]=='\n')
             return p+1;

@@ -15,76 +15,74 @@ CUI_About::CUI_About(void) {
     l->ysize = (int)((double)26*yscale);
     l->y = 25 + ((INTERNAL_RESOLUTION_Y-480)/8) - (l->ysize-26);
     l->bWordWrap = true ;
-    l->text = "\n"
+    l->text =R"about_text(
+|H|About|U|
 
-"|H|About|U|\n"
-"\n"
-"zTracker Prime is a fork of the original zTracker project from 2001, which was a clone of Impulse Tracker, itself a clone of Scream Tracker. The original zTracker was developed by Christopher Micali until 2002.\n"
-"\n"
-"It had become my go-to software for composing music, so I forked it in 2003. Over 20 years later, it remains my primary sequencer, and as of 2024 I continue to work on it.\n"
-"\n"
-"Check for new releases at the Github project page:\n"
-"\n"
-"https://github.com/m6502/ztrackerprime\n"
-"\n"
-"You can find an archived version of the old source code for the original version here:\n"
-"\n"
-"https://github.com/cmicali/ztracker\n"
-"\n"
-"|H|Contact|U|\n"
-"" "\n"
-"This fork is currently maintained by Manuel Montoto (Debvgger)" "\n"
-"" "\n"
-"Write me to |U|mail@manuelmontoto.com|U|" "\n"
-"" "\n"
-"|H|Credits:|U|\n"
-"\n"
-"  |H|Coding|U|" "\n"
-"" "\n"
-"    Austin Luminais" "\n"
-"    Christopher Micali" "\n"
-"    Daniel Kahlin" "\n"
-"    Manuel Montoto" "\n"
-"    Nic Soudee" "\n"
-"" "\n"
-"  |H|Support|U|" "\n"
-"" "\n"
-"    Amir Geva (libCON / TONS of help)" "\n"
-"    Jeffry Lim (Impulse Tracker)" "\n"
-"    libpng team" "\n"
-"    Sami Tammilehto (Scream Tracker 3)" "\n"
-"    SDL team" "\n"
-"    zlib team" "\n"
-"" "\n"
-"  |H|Testing and Help|U|" "\n"
-"" "\n"
-"    arguru (NTK source made zt happen)" "\n"
-"    Bammer" "\n"
-"    czer323" "\n"
-"    FSM" "\n"
-"    in_tense" "\n"
-"    Oguz Akin" "\n"
-"    Quasimojo" "\n"
-"    Raptorrvl" "\n"
-"    Scurvee" "\n"
-"" "\n"
-"" "\n"
-"|H|License|U|" "\n"
-"" "\n"
-"   ztracker  is released under the BSD license.   Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms." "\n"
-"" "\n"
-"Copyright (c) 2000-2001," "\n"
-"                    Christopher Micali " "\n"
-"Copyright (c) 2000-2001," "\n"
-"                    Austin Luminais" "\n"
-"Copyright (c) 2001, Nicolas Soudee" "\n"
-"Copyright (c) 2001, Daniel Kahlin" "\n"
-"Copyright (c) 2003-2025," "\n"
-"                    Manuel Montoto" "\n"
-"All rights reserved." "\n"
-"" "\n"
-"\0"
-;
+zTracker Prime is a fork of the original zTracker project from 2001, which was a clone of Impulse Tracker, itself a clone of Scream Tracker. The original zTracker was developed by Christopher Micali until 2002.
+
+It had become my go-to software for composing music, so I forked it in 2003. Over 20 years later, it remains my primary sequencer, and as of 2024 I continue to work on it.
+
+Check for new releases at the Github project page:
+
+https://github.com/m6502/ztrackerprime
+
+You can find an archived version of the old source code for the original version here:
+
+https://github.com/cmicali/ztracker
+
+|H|Contact|U|
+
+This fork is currently maintained by Manuel Montoto (Debvgger)
+
+Write me to |U|mail@manuelmontoto.com|U|
+
+|H|Credits:|U|
+
+  |H|Coding|U|
+
+    Austin Luminais
+    Christopher Micali
+    Daniel Kahlin
+    Manuel Montoto
+    Nic Soudee
+
+  |H|Support|U|
+
+    Amir Geva (libCON / TONS of help)
+    Jeffry Lim (Impulse Tracker)
+    libpng team
+    Sami Tammilehto (Scream Tracker 3)
+    SDL team
+    zlib team
+
+  |H|Testing and Help|U|
+
+    arguru (NTK source made zt happen)
+    Bammer
+    czer323
+    FSM
+    in_tense
+    Oguz Akin
+    Quasimojo
+    Raptorrvl
+    Scurvee
+
+
+|H|License|U|
+
+   ztracker  is released under the BSD license.   Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
+
+Copyright (c) 2000-2001,
+                    Christopher Micali
+Copyright (c) 2000-2001,
+                    Austin Luminais
+Copyright (c) 2001, Nicolas Soudee
+Copyright (c) 2001, Daniel Kahlin
+Copyright (c) 2003-2025,
+                    Manuel Montoto
+
+All rights reserved.
+)about_text";
 }
 
 CUI_About::~CUI_About(void) {

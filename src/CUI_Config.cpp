@@ -280,11 +280,6 @@ void CUI_Config::draw(Drawable *S) {
         }
 #endif
         sprintf(buf,"\n|U|Current Settings in memory:\n");
-        if(tb->text != NULL)
-        {
-            free(tb->text);
-            tb->text = NULL;
-        }
         sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Autoload .ZT  |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Autoload File |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile_filename);
@@ -317,6 +312,10 @@ void CUI_Config::draw(Drawable *S) {
         sprintf(buf+strlen(buf),"\n|U| Key Wait      |L|[|H|%d|L|]",zt_config_globals.key_wait_time);
 #endif
 
+        if(tb->text != NULL)
+        {
+            free((void*)tb->text);
+        }
         tb->text = strdup(buf);
         UI->draw(S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS

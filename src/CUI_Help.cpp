@@ -39,10 +39,11 @@ CUI_Help::CUI_Help(void) {
             fs++;
         }
         fseek(fp,0,SEEK_SET);
-        tb->text = new char[fs+10];
-        memset(tb->text,0,fs+10);
-        fread(tb->text, fs, 1, fp);
+        char *text = new char[fs + 10];
+        memset(text,0,fs+10);
+        fread(text, fs, 1, fp);
         fclose(fp);
+        tb->text = text;
         needfree = 1;
 #ifdef __APPLE__
         // On macOS every primary modifier (CTRL, ALT, Cmd) triggers the same
@@ -62,7 +63,7 @@ CUI_Help::CUI_Help(void) {
         // SHIFT combos naturally run wider and push the colon right.
         {
             int src_len = fs;
-            char *src = tb->text;
+            const char *src = tb->text;
             char *dst = new char[src_len * 3 + 32];
             int di = 0;
             int i = 0;
