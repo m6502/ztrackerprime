@@ -2,7 +2,7 @@
 #include "Button.h"
 
 void BTNCLK_SaveSettings(UserInterfaceElement *b) {
-
+    (void)b;
     //Config.save("zt.conf");
     zt_config_globals.save();
     need_refresh++; 

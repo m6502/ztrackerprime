@@ -76,10 +76,9 @@ void CUI_Arpeggioeditor::leave(void) {
 }
 
 void CUI_Arpeggioeditor::update() {
-    int key=0;
     UI->update();
     if (Keys.size()) {
-        key = Keys.getkey();
+        Keys.getkey();
     }
 }
 
