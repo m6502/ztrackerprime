@@ -2,7 +2,7 @@
 #include "Button.h"
 
 void BTNCLK_SaveSettings(UserInterfaceElement *b) {
-    (void)b;
+
     //Config.save("zt.conf");
     zt_config_globals.save();
     need_refresh++; 
@@ -37,7 +37,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,0);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 14;
+    cb->y = 13;
     cb->xsize = 5;
     cb->value = &zt_config_globals.autoload_ztfile;
     cb->frame = 1;
@@ -46,7 +46,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,1);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 15;
+    ti->y = 14;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.autoload_ztfile_filename;
@@ -55,7 +55,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,2);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 17;
+    ti->y = 16;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
@@ -64,7 +64,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,3);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 19;
+    cb->y = 18;
     cb->xsize = 5;
     cb->value = &zt_config_globals.record_velocity;
     cb->frame = 1;
@@ -72,7 +72,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,4);
     vs->x = 20;
-    vs->y = 20;
+    vs->y = 19;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.autosave_interval_seconds;
@@ -82,7 +82,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 21;
+    vs->y = 20;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.cur_edit_mode;
@@ -99,7 +99,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,6);
     vs->x = 20;
-    vs->y = 22;
+    vs->y = 21;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.highlight_increment;
@@ -109,7 +109,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,7);
     vs->x = 20;
-    vs->y = 23;
+    vs->y = 22;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
@@ -119,7 +119,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,8);
     vs->x = 20;
-    vs->y = 24;
+    vs->y = 23;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -140,7 +140,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,1);
     cb->frame = 0;
     cb->x = 17;
-    cb->y = 16;
+    cb->y = 13;
     cb->xsize = 5;
     cb->value = &zt_config_globals.do_fade;
 */
@@ -151,7 +151,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,3);
     ti->frame = 1;
     ti->x = 17; 
-    ti->y = 20;
+    ti->y = 17;
     ti->xsize=50;
     ti->length=50;
     ti->str = (unsigned char*)zt_config_globals.skin;
@@ -159,7 +159,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,4);
     ti->frame = 1;
     ti->x = 17;
-    ti->y = 22;
+    ti->y = 19;
     ti->xsize=50;
     ti->length=50;
     ti->str = (unsigned char*)COLORFILE;
@@ -169,7 +169,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,6);
     ti->frame = 1;
     ti->x = 17; 
-    ti->y = 26;
+    ti->y = 23;
     ti->xsize=50;
     ti->length=50;
     ti->str = (unsigned char*)zt_config_globals.work_directory;
@@ -177,7 +177,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(b,7);
     b->caption = " Save instance";
     b->x = 17;
-    b->y = 29;
+    b->y = 26;
     b->xsize = 15;
     b->ysize = 1;
     b->OnClick = (ActFunc)BTNCLK_SaveSettings; 
@@ -186,11 +186,11 @@ CUI_Config::CUI_Config(void) {
     tb = new TextBox;
     UI->add_element(tb, 9);
     tb->x = 1;
-    tb->y = 26;
+    tb->y = 25;
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
-        int remain = max_rows - tb->y - 1 - 6;
+        int remain = max_rows - tb->y - 1 - 9;
         if (remain < 1) remain = 1;
         tb->ysize = remain;
     }
@@ -200,8 +200,7 @@ CUI_Config::CUI_Config(void) {
 }
 
 CUI_Config::~CUI_Config(void) {
-    delete UI;
-    UI = NULL;
+    if (UI) delete UI; UI = NULL;
 }
 
 void CUI_Config::enter(void) {
@@ -317,6 +316,12 @@ void CUI_Config::draw(Drawable *S) {
             free((void*)tb->text);
         }
         tb->text = strdup(buf);
+        // Auto-fit textbox height to actual content (count newlines + small pad).
+        {
+            int nlines = 1;
+            for (const char *p = buf; *p; p++) if (*p == '\n') nlines++;
+            tb->ysize = nlines + 1;
+        }
         UI->draw(S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         {
@@ -339,18 +344,18 @@ void CUI_Config::draw(Drawable *S) {
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
-        print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
-        print(row(2),col(15),"Autoload File",COLORS.Text,S);
-        print(row(2),col(17),"Default Dir",COLORS.Text,S);
-        print(row(2),col(19),"Record Velocity",COLORS.Text,S);
-        print(row(2),col(20),"Autosave (sec)",COLORS.Text,S);
+        print(row(2),col(13),"Autoload .ZT",COLORS.Text,S);
+        print(row(2),col(14),"Autoload File",COLORS.Text,S);
+        print(row(2),col(16),"Default Dir",COLORS.Text,S);
+        print(row(2),col(18),"Record Velocity",COLORS.Text,S);
+        print(row(2),col(19),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(2),col(21),"Default View",COLORS.Text,S);
+        print(row(2),col(20),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(22),"Default Highlight",COLORS.Text,S);
-        print(row(2),col(23),"Default Lowlight",COLORS.Text,S);
-        print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
-//        print(row(2),col(26)," .ZT directory",COLORS.Text,S);
+        print(row(2),col(21),"Default Highlight",COLORS.Text,S);
+        print(row(2),col(22),"Default Lowlight",COLORS.Text,S);
+        print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
+//        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
 

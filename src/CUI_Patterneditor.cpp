@@ -563,8 +563,9 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   int track_pixels = ((tracks_shown * (field_size+1)) * FONT_SIZE_X) + LEFT_MARGIN  ;
   int extra_pixels = total_pixels - track_pixels ;
   
-  //int poscharx_tracks = LEFT_MARGIN/*(extra_pixels >> 1)*/ / FONT_SIZE_X ;
-  int poscharx_tracks = ((extra_pixels >> 1) + LEFT_MARGIN) / FONT_SIZE_X ;
+  // Left-align the track grid: no centering, just LEFT_MARGIN.
+  int poscharx_tracks = LEFT_MARGIN / FONT_SIZE_X ;
+  (void)extra_pixels;
   g_posx_tracks = poscharx_tracks ;
 
 

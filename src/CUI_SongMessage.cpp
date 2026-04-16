@@ -99,9 +99,10 @@ void CUI_SongMessage::leave(void) {
 }
 
 void CUI_SongMessage::update() {
+    int key=0;
     UI->update();
     if (Keys.size()) {
-        Keys.getkey();
+        key = Keys.getkey();
     }
 }
 

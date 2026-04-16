@@ -99,7 +99,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
 
     vso = new ValueSliderOFF(1); // Bank (ID: 1)
     UI->add_element(vso,tabindex++);
-    vso->x = 36;    vso->y = 16;    vso->xsize = 14;    vso->ysize = 1; vso->min = -1;  vso->max = 0x3fff;    vso->value = -1; 
+    vso->x = 36;    vso->y = 16;    vso->xsize = 16;    vso->ysize = 1; vso->min = -1;  vso->max = 0x3fff;    vso->value = -1; 
     fm = new Frame;
     UI->add_gfx(fm,gfxindex++);
     fm->x=35; fm->y=13; fm->xsize = 22; fm->ysize = 5; fm->type = 0;
@@ -235,7 +235,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     mds->x=35;
     mds->y=38;
     mds->xsize = 44;
-    mds->ysize = 13;
+    mds->ysize = 14;
     
     reset = 0;
 }
@@ -480,7 +480,7 @@ void CUI_InstEditor::draw(Drawable *S)
 
     ie = (InstEditor *)UI->get_element(0);
 
-    ie->ysize = 39 + ((INTERNAL_RESOLUTION_Y-480)/8);
+    ie->ysize = 40 + ((INTERNAL_RESOLUTION_Y-480)/8);
     if(ie->ysize > MAX_INSTS) ie->ysize = MAX_INSTS ;
 
     if (ie->cursor+ie->list_start != cur_inst) {
