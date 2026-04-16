@@ -112,6 +112,7 @@ set(ZT_SOURCES
   src/CUI_Songconfig.cpp
   src/CUI_SongDuration.cpp
   src/CUI_SongMessage.cpp
+  src/CUI_PaletteEditor.cpp
   src/CUI_Sysconfig.cpp
   src/import_export.cpp
   src/it.cpp
@@ -309,12 +310,15 @@ set_target_properties(zt PROPERTIES
 )
 
 if(APPLE)
-  # Copy runtime resources (skins/, doc/, default zt.conf) into the .app
-  # so a double-clicked bundle has everything it needs at runtime.
+  # Copy runtime resources into the .app bundle so a double-clicked app
+  # finds skins/, palettes/, doc/, and zt.conf.
   add_custom_command(TARGET zt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/skins"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/skins"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_SOURCE_DIR}/palettes"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/palettes"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/doc"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/doc"
@@ -324,16 +328,17 @@ if(APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy
       "${CMAKE_SOURCE_DIR}/zt_icon.png"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt_icon.png"
-    COMMENT "Copying skins/, doc/, zt.conf, and zt_icon.png into zt.app/Contents/Resources"
     VERBATIM
   )
 else()
-  # Copy runtime data (zt.conf, skins, doc) next to the binary so it works out of the box.
+  # Copy runtime data next to the binary so it works out of the box on Windows/Linux.
   add_custom_command(TARGET zt POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
           "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/palettes" "$<TARGET_FILE_DIR:zt>/palettes"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
   )

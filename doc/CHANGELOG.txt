@@ -4,6 +4,23 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_13 (PR-L .app bundle work — pending merge)
+-----------------------------------------------------
+
+ Additions/fixes (esaruoho + Claude Opus 4.6)
+
+        + Pattern Editor Options dialog (F2-F2): added DrawMode
+          checkbox row that toggles regular <-> effect-draw mode.
+          Alternative to Shift+~ which is awkward on non-US layouts.
+        + § key on Finnish/EU ISO keyboards (SCANCODE_NONUSBACKSLASH)
+          now maps to SDLK_GRAVE in keyhandler so the existing
+          GRAVE bindings work: plain § -> Note Off (===),
+          Shift+§ -> drawmode toggle.
+        + Ctrl+1..0 now sets the cursor edit step (alongside Alt+1..0).
+          Help text already documented this; binding was missing.
+        * Reverted F2-F2 to reopen the PEParms dialog (was briefly
+          changed to a direct keypress toggle).
+
 zt 0.98 - 15/06/2002
 --------------------
 

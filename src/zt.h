@@ -95,7 +95,7 @@ static inline void zt_text_input_stop(void) {
 #define ZT_BUILD_DATE "2026_02_23"
 #endif
 #define ZTRACKER_VERSION                "zTracker' v" ZT_BUILD_DATE
- 
+
 //#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
 
 #define ZOOM                            (zt_config_globals.zoom)
@@ -158,8 +158,8 @@ extern int PATTERN_EDIT_ROWS;
 
 #include "../resource.h"         // resource includes for win32 icon
 
-#include "lc_sdl_wrapper.h"      // libCON wrapper 
-#include "zlib_wrapper.h"        // zlib wrapper 
+#include "lc_sdl_wrapper.h"      // libCON wrapper
+#include "zlib_wrapper.h"        // zlib wrapper
 #include "CDataBuf.h"            // data buffer for building chunks before writing to disk
 
 
@@ -181,12 +181,12 @@ extern int PATTERN_EDIT_ROWS;
 
 #include "OutputDevices.h"       // in/out plugins
 
-#include "playback.h"            // playing 
-#include "timer.h"               // timer 
-#include "midi-io.h"             // MIDI in/out 
+#include "playback.h"            // playing
+#include "timer.h"               // timer
+#include "midi-io.h"             // MIDI in/out
 
 
-#include "module.h"              // module load/save and memory/events 
+#include "module.h"              // module load/save and memory/events
 
 
 
@@ -223,7 +223,7 @@ public:
     TColor getColor(Uint8 Red, Uint8 Green, Uint8 Blue) {
         return (TColor)(0xFF000000u | Blue | (Green << 8) | (Red << 16));
     }
-    
+
     TColor get_color_from_hex(const char *str, conf *ColorsFile) {
         unsigned char r,g,b;
         r = ColorsFile->getcolor(str,0);
@@ -237,7 +237,7 @@ public:
         if (!ColorsFile.load(file))
             return 0;
         Background =     get_color_from_hex("Background",&ColorsFile);
-        Highlight=       get_color_from_hex("Highlight",&ColorsFile);    
+        Highlight=       get_color_from_hex("Highlight",&ColorsFile);
         Lowlight =       get_color_from_hex("Lowlight",&ColorsFile);
         Text =           get_color_from_hex("Text",&ColorsFile);
         Black =          get_color_from_hex("Black",&ColorsFile);
@@ -259,7 +259,7 @@ public:
 
         return 1;
     }
-    
+
     void setDefaultColors() {
 
         // <Manu> El color del Scream Tracker era ligeramente distinto
@@ -313,7 +313,8 @@ enum state {
   STATE_SONG_MESSAGE,
   STATE_ARPEDIT,
   STATE_MIDIMACEDIT,
-  STATE_LUA_CONSOLE
+  STATE_LUA_CONSOLE,
+  STATE_PALETTE_EDITOR
 } ;
 
 
@@ -327,24 +328,24 @@ enum state {
 //
 // ------------------------------------------------------------------------------------------------
 
-class CScreenUpdateManager 
+class CScreenUpdateManager
 {
-public: 
+public:
 
   SDL_Rect r[MAX_UPDATE_RECTS];
   int updated_rects;
   bool update_all;
 
-  CScreenUpdateManager() 
+  CScreenUpdateManager()
   {
 
     updated_rects = 0;
     update_all = false;
   }
-  
-  ~CScreenUpdateManager() 
+
+  ~CScreenUpdateManager()
   {
-  
+
   }
 
 
@@ -352,12 +353,12 @@ public:
   // ----------------------------------------------------------------------------------------------
   // <Manu 06 de Julio de 2005> He optimizado ligeramente esto y he limpiado el codigo
   //
-  void Update(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2) 
+  void Update(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2)
   {
     if (update_all) return;
     if (updated_rects < MAX_UPDATE_RECTS-1) {
 
-      if (x1 < 0) x1 = 0 ; 
+      if (x1 < 0) x1 = 0 ;
       if (y1 < 0) y1 = 0 ;
       if (x2 > (INTERNAL_RESOLUTION_X - 1)) x2 = INTERNAL_RESOLUTION_X - 1 ;
       if (y2 > (INTERNAL_RESOLUTION_Y - 1)) y2 = INTERNAL_RESOLUTION_Y - 1 ;
@@ -368,7 +369,7 @@ public:
       rect->y = y1 ;
       rect->w = x2 - x1 ;
       rect->h = y2 - y1 ;
-        
+
       updated_rects++ ;
     }
   }
@@ -378,18 +379,18 @@ public:
   // ----------------------------------------------------------------------------------------------
   //
   //
-  void UpdateWH(Sint16 x1, Sint16 y1, Uint16 w, Uint16 h) 
+  void UpdateWH(Sint16 x1, Sint16 y1, Uint16 w, Uint16 h)
   {
     if (update_all) return;
     if (updated_rects < MAX_UPDATE_RECTS-1) {
-      
+
       SDL_Rect *rect=&r[updated_rects] ;
-      
+
       rect->x = x1 ;
       rect->y = y1 ;
       rect->w = w ;
       rect->h = h ;
-      
+
       updated_rects++ ;
     }
   }
@@ -400,7 +401,7 @@ public:
   // ----------------------------------------------------------------------------------------------
   //
   //
-  void UpdateAll(void) 
+  void UpdateAll(void)
   {
     update_all = true;
   }
@@ -411,7 +412,7 @@ public:
   // ----------------------------------------------------------------------------------------------
   //
   //
-  void Reset(void) 
+  void Reset(void)
   {
     updated_rects = 0;
   }
@@ -422,7 +423,7 @@ public:
   // ----------------------------------------------------------------------------------------------
   //
   //
-  bool Refresh(Drawable *S) 
+  bool Refresh(Drawable *S)
   {
     (void)S;
     if (update_all) {
@@ -430,11 +431,11 @@ public:
       updated_rects = 0;
 
       return true ;
-    } 
+    }
     else {
 
       if (updated_rects > 0) {
-        
+
 #ifdef DEBUG_SCREENMANAGER
         for (int i=0;i < updated_rects; i++)
           SDL_FillSurfaceRect(S->surface,&r[i], rand() );
@@ -458,7 +459,7 @@ public:
   // ----------------------------------------------------------------------------------------------
   //
   //
-  bool NeedRefresh(void) 
+  bool NeedRefresh(void)
   {
     return (updated_rects > 0);
   }
@@ -502,7 +503,7 @@ class WStackNode {
     public:
         CUI_Page *page;
         WStackNode *next;
-        
+
         WStackNode(CUI_Page *p);
         ~WStackNode();
 };
@@ -550,7 +551,7 @@ typedef struct {
     unsigned char chan;
 } mbuf;
 
-enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN, 
+enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
                   T_FX, T_FXP};
 
     enum Ecmd {
@@ -566,6 +567,7 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_SWITCH_SAVE,
 
         CMD_SWITCH_CONFIG,
+        CMD_SWITCH_PALETTE,
         CMD_PLAY,
         CMD_PLAY_PAT,
         CMD_PLAY_PAT_LINE,
@@ -631,7 +633,7 @@ extern int zclear_flag, zclear_presscount;
 extern int fast_update, FU_x, FU_y, FU_dx, FU_dy;
 extern zt_module *song;
 extern player *ztPlayer;
-extern int editing; // editing flag/mutex (so it doesnt play a null pointer or something 
+extern int editing; // editing flag/mutex (so it doesnt play a null pointer or something
 extern const char *col_desc[41];
 extern int status_change;
 extern int cur_edit_row,cur_edit_row_disp,cur_edit_pattern;
@@ -728,6 +730,7 @@ extern CUI_Ordereditor *UIP_Ordereditor;
 extern CUI_Playsong *UIP_Playsong;
 extern CUI_Songconfig *UIP_Songconfig;
 extern CUI_Sysconfig *UIP_Sysconfig;
+extern CUI_PaletteEditor *UIP_PaletteEditor;
 extern CUI_Config *UIP_Config;
 extern CUI_Patterneditor *UIP_Patterneditor;
 extern CUI_PEParms *UIP_PEParms;
@@ -763,9 +766,9 @@ extern int file_changed;
 extern std::atomic<int> load_lock;
 extern int save_lock;
 
-extern void do_save(void);  
+extern void do_save(void);
 extern int already_changed_default_directory;
-void draw_status_vars(Drawable *S); 
+void draw_status_vars(Drawable *S);
 void begin_save(void);
 extern char *cur_dir;
 

@@ -2,6 +2,7 @@
 #define _UI_PAGE_H_
 
 #include "platform.h"
+#include "lc_sdl_wrapper.h"
 
 class Button ;
 class CheckBox ;
@@ -22,7 +23,7 @@ typedef void (*VFunc)();
 class CUI_Page {
     public:
         UserInterface *UI;
-       
+
         CUI_Page();
         virtual ~CUI_Page();
         virtual void enter(void)=0;
@@ -75,12 +76,12 @@ class CUI_Playsong : public CUI_Page {
 class CUI_About : public CUI_Page {
     public:
 
-        
+
 //        Bitmap *work, *dest;
 //        TColor color;
 //        int textx,texty,numtexts,curtext;
 //        char *texts[3];
-        
+
         CUI_About();
         ~CUI_About();
 
@@ -122,6 +123,63 @@ class CUI_Sysconfig : public CUI_Page {
         void draw(Drawable *S);
 };
 
+class CUI_PaletteEditor : public CUI_Page {
+    public:
+        int selected_slot;     // index within the focused panel
+        int focus_panel;       // 0 = swatch grid, 1 = preset panel
+        int channel_edit;      // 0 = none, 1 = R, 2 = G, 3 = B
+        int dirty;             // unsaved changes vs. snapshot
+        TColor snapshot[32];   // saved COLORS.* on entry (the "anchor" the
+                               // global brightness/contrast/tint operate on)
+        char status_line[128];
+
+        // Dynamic preset list — built at enter() from palettes/*.conf and
+        // skins/*/colors.conf so users can switch between every shipped look
+        // without leaving the editor.
+        int  num_presets;
+        char preset_label[64][32];
+        char preset_path[64][512];
+        int  preset_is_skin[64];
+
+        // Global adjustments applied on top of the snapshot so they're
+        // composable and reversible. Brightness in [-255..255] is added per
+        // channel, contrast in [-100..+100] scales around mid-grey,
+        // tint_index selects one of g_tints (0 = none), tint_amount in
+        // [0..255] is the blend weight toward the tint color.
+        int brightness;
+        int contrast;
+        int tint_index;
+        int tint_amount;
+
+        // When true, clicking a palette preset (Light Blue, Gold, etc.)
+        // resets the skin to "default" first so the palette renders against
+        // its canonical PNG templates. When false, the palette is applied on
+        // top of whatever skin is currently loaded. Skin presets always
+        // do a full skin switch regardless of this toggle.
+        int reset_skin_on_palette;
+
+        CUI_PaletteEditor();
+        ~CUI_PaletteEditor();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+
+        void load_palette_file(const char *path_or_fname);
+        // Full skin switch — same code path as F12 Sysconfig skin selector.
+        // Used when the user picks a "[skin] xxx" preset so the new skin's
+        // PNG templates are loaded from disk, not just the colors.conf.
+        void load_skin_full(const char *colors_conf_path);
+        void save_palette_file(const char *fname);
+        void apply_channel_delta(int delta);
+        void apply_channel_set(int value);
+
+        // Globals: recomputes COLORS from snapshot + brightness/contrast/tint.
+        void recompute_globals(void);
+        void rebuild_preset_list(void);
+};
+
 class CUI_Config : public CUI_Page {
     public:
 
@@ -154,7 +212,7 @@ class CUI_Help : public CUI_Page {
         TextBox *tb;
 
         int needfree;
-        
+
         CUI_Help();
         ~CUI_Help();
 
@@ -169,7 +227,7 @@ class CUI_SongMessage : public CUI_Page {
 
         int needfree;
         CDataBuf *buffer;
-        
+
         CUI_SongMessage();
         ~CUI_SongMessage();
 
@@ -181,7 +239,7 @@ class CUI_SongMessage : public CUI_Page {
 
 class CUI_Arpeggioeditor : public CUI_Page {
     public:
-        
+
         CUI_Arpeggioeditor();
         ~CUI_Arpeggioeditor();
 
@@ -193,7 +251,7 @@ class CUI_Arpeggioeditor : public CUI_Page {
 
 class CUI_Midimacroeditor : public CUI_Page {
     public:
-        
+
         CUI_Midimacroeditor();
         ~CUI_Midimacroeditor();
 
@@ -236,7 +294,7 @@ class CUI_Savescreen : public CUI_Page {
         Button *b_mid_mc;
         Button *b_mid_pertrack;
         //Button *b_gba;
-        
+
         CUI_Savescreen();
         ~CUI_Savescreen();
 
@@ -249,7 +307,7 @@ class CUI_LoadMsg : public CUI_Page {
     public:
 
         zt_thread_handle hThread;
-        
+
         int OldPriority;
         unsigned long iID;
         int strselect;
@@ -261,7 +319,7 @@ class CUI_LoadMsg : public CUI_Page {
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
 };
 
 class CUI_SaveMsg : public CUI_Page {
@@ -280,7 +338,7 @@ class CUI_SaveMsg : public CUI_Page {
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
 };
 
 class CUI_Logoscreen : public CUI_Page {
@@ -308,11 +366,11 @@ class CUI_Patterneditor : public CUI_Page {
 
         CUI_Patterneditor();
         ~CUI_Patterneditor();
-        
+
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
 };
 
 
@@ -327,6 +385,8 @@ class CUI_PEParms : public CUI_Page {
         CheckBox *cb_centered ;
         CheckBox *cb_stepedit ;
         CheckBox *cb_recveloc ;
+        CheckBox *cb_drawmode ;
+        int      drawmode_val ;
 
         ValueSlider *vs_speedup ;
 
@@ -336,31 +396,31 @@ class CUI_PEParms : public CUI_Page {
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
 };
 
 class CUI_PEVol : public CUI_Page {
 public:
-    
+
     CUI_PEVol();
     ~CUI_PEVol();
-    
+
     void enter(void);
     void leave(void);
     void update(void);
-    void draw(Drawable *S);                 
+    void draw(Drawable *S);
 };
 
 class CUI_PENature : public CUI_Page {
 public:
-    
+
     CUI_PENature();
     ~CUI_PENature();
-    
+
     void enter(void);
     void leave(void);
     void update(void);
-    void draw(Drawable *S);                 
+    void draw(Drawable *S);
 };
 
 class CUI_SliderInput : public CUI_Page {
@@ -371,14 +431,14 @@ class CUI_SliderInput : public CUI_Page {
         int canceled;
         char str[32];
         int checked;
-        
+
         CUI_SliderInput();
         ~CUI_SliderInput();
 
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
         int getresult(void);
 
         void setfirst(int val);
@@ -397,7 +457,7 @@ class CUI_NewSong : public CUI_Page {
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
 };
 
 
@@ -416,7 +476,7 @@ class CUI_RUSure : public CUI_Page {
         void enter(void);
         void leave(void);
         void update(void);
-        void draw(Drawable *S);                 
+        void draw(Drawable *S);
 };
 
 class CUI_SongDuration : public CUI_Page, public CUI_Popup {

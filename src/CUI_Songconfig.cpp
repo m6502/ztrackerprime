@@ -104,7 +104,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         oe = new OrderEditor;
         UI->add_element(oe,5);
         oe->x = 59;
-        oe->y = 15;
+        oe->y = 13;
         oe->xsize = 9;
         oe->ysize = 32 ;
 }
@@ -141,7 +141,8 @@ void CUI_Songconfig::leave(void) {
 
 void CUI_Songconfig::update()
 {
-    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - 22) ;
+    // Bottom margin reduced so more orderlist items (incl. 038/039) are visible.
+    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 7) ;
 
     ValueSlider *vs;
     TextInput *t;
@@ -187,12 +188,16 @@ void CUI_Songconfig::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
-        print(row(11),col(base_y),"Title",COLORS.Text,S);
-        print(row(13),col(base_y+2),   "BPM",COLORS.Text,S);
-        print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
+        print(row(9),col(base_y),"Title",COLORS.Text,S);
+        print(row(10),col(base_y+2),   "BPM",COLORS.Text,S);
+        print(row(10),col(base_y+3),"TPB",COLORS.Text,S);
         print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
         print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
-        print(row(63),col(base_y),"Order List",COLORS.Text,S);
+        // Order List label: row 11 (one blank row below page title at 9),
+        // horizontally clear of the OE data (OE starts at column 59, so
+        // put label at column 60 which is inside the OE x-span so it
+        // visually belongs to the list).
+        print(row(60),col(11),"Order List",COLORS.Text,S);
         printchar(row(17 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
         printchar(row(17 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
 

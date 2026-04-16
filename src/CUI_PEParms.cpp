@@ -91,6 +91,16 @@ CUI_PEParms::CUI_PEParms(void) {
         vs_speedup->max = 32;
         vs_speedup->value = zt_config_globals.control_navigation_amount;
 
+        // Effect-draw mode toggle (alternative to Shift+§ which is awkward
+        // on non-US keyboards). Synced with UIP_Patterneditor->mode in enter().
+        drawmode_val = 0;
+        cb_drawmode = new CheckBox;
+        UI->add_element(cb_drawmode, 8);
+        cb_drawmode->frame = 1;
+        cb_drawmode->x = (start_x / 8) + 14;
+        cb_drawmode->y = (start_y / 8) + 18;
+        cb_drawmode->xsize = 5;
+        cb_drawmode->value = &drawmode_val;
 }
 
 CUI_PEParms::~CUI_PEParms(void) {
@@ -122,6 +132,9 @@ void CUI_PEParms::enter(void) {
 	cb->value = &zt_config_globals.record_velocity;
     vs = (ValueSlider *)UI->get_element(7);
     vs->value = zt_config_globals.control_navigation_amount;
+    drawmode_val = (UIP_Patterneditor->mode == PEM_MOUSEDRAW) ? 1 : 0;
+    cb = (CheckBox *)UI->get_element(8);
+    cb->value = &drawmode_val;
 }
 
 void CUI_PEParms::leave(void) {
@@ -169,6 +182,11 @@ void CUI_PEParms::update() {
     if(vs->changed)
         zt_config_globals.control_navigation_amount = vs->value;
 
+    cb = (CheckBox *)UI->get_element(8);
+    if (cb->changed) {
+        UIP_Patterneditor->mode = (drawmode_val) ? PEM_MOUSEDRAW : PEM_REGULARKEYS;
+        if (UIP_Patterneditor->mode == PEM_REGULARKEYS) midiInQueue.clear();
+    }
 }
 
 void CUI_PEParms::draw(Drawable *S) {
@@ -196,6 +214,8 @@ void CUI_PEParms::draw(Drawable *S) {
     cb_recveloc->y = (start_y / 8) + 14;
     vs_speedup->x = (start_x / 8) + 14;
     vs_speedup->y = (start_y / 8) + 16;
+    cb_drawmode->x = (start_x / 8) + 14;
+    cb_drawmode->y = (start_y / 8) + 18;
 
 
     if (S->lock()==0) {
@@ -215,6 +235,7 @@ void CUI_PEParms::draw(Drawable *S) {
 	print(start_x + col(20),start_y + row(14),"StepEdit:",COLORS.Text,S);
     print(start_x + col(36),start_y + row(14),"RecVeloc:",COLORS.Text,S);
 	print(start_x + col(2),start_y + row(16),"   Speedup:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(18),"  DrawMode:",COLORS.Text,S);
         UI->full_refresh();
         UI->draw(S);
         S->unlock();
