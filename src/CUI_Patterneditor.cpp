@@ -20,7 +20,12 @@ static PatternUndo g_undo;
 #define TRACKS_POS_Y                    row(TRACKS_ROW_Y)
 #define TRACKS_FIRST_NOTE_POS_Y         row(TRACKS_ROW_Y + 1)
 
-#define SPACE_AT_BOTTOM                 4  // rows reserved below pattern for border/padding
+// Rows reserved below the pattern so it can never overlap the lower frame.
+// The toolbar bitmap is 55px tall (TOOLBAR_SIZE_Y in main.cpp) and is drawn at
+// INTERNAL_RESOLUTION_Y - 55. At 8px per character row that's ceil(55/8) = 7
+// rows; we reserve one extra row so the pattern's bottom border never touches
+// the toolbar. Matches the legacy layout (40 rows = 0..039 at 480px height).
+#define SPACE_AT_BOTTOM                 8
 
 
 int PATTERN_EDIT_ROWS = 100;
