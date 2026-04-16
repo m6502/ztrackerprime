@@ -42,6 +42,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 #include <SDL.h>
 
 #include "CDataBuf.h"
