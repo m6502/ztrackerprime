@@ -27,6 +27,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Export compile_commands.json so clangd/IDE tooling can resolve SDL headers
+# and project include paths without guessing.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 option(ZT_ENABLE_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer (GCC/Clang)" OFF)
 
 set(ZT_WINDOWS_LIB_DIR "${CMAKE_SOURCE_DIR}/extlibs" CACHE PATH "Directory containing Windows SDL libraries (.lib/.dll)")
@@ -155,6 +159,12 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   target_compile_options(zt PRIVATE -Wno-pragma-pack)
+  # Apple's SDK marks sprintf and friends as deprecated in favour of the
+  # snprintf family. The codebase uses sprintf extensively with known-safe
+  # buffer sizes; silence the noise project-wide on Clang rather than
+  # touching 200+ call sites. MSVC's _CRT_SECURE_NO_WARNINGS above does
+  # the equivalent on Windows.
+  target_compile_options(zt PRIVATE -Wno-deprecated-declarations)
 endif()
 
 if(ZT_ENABLE_SANITIZERS)
