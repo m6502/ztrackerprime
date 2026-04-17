@@ -136,8 +136,9 @@ void CUI_Songconfig::leave(void) {
 
 void CUI_Songconfig::update()
 {
-    // Bottom margin reduced so more orderlist items (incl. 038/039) are visible.
-    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 7) ;
+    // Reserve 8 rows at the bottom: 7 for the 55px toolbar (ceil(55/8)) plus
+    // one row of safety so the order editor's frame never overlaps.
+    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 8) ;
 
     ValueSlider *vs;
     TextInput *t;
