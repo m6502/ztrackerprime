@@ -29,7 +29,9 @@ CUI_Playsong::CUI_Playsong(void)
     // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
     //p->ysize = 30 ;
 
-    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+    // Reserve 8 rows at the bottom: 7 for the 55px toolbar (ceil(55/8)) plus
+    // one row of safety so the pattern display's frame border never overlaps.
+    pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 8 ;
     //p->ysize = 62;
 
     UI_PatternDisplay->add_element(pattern_display,0);
@@ -194,7 +196,7 @@ void CUI_Playsong::update()
 //
 void CUI_Playsong::draw(Drawable *S) 
 {
-  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 7 ; // 7 es la parte del fondo (meter en algún #define)
+  pattern_display->ysize = (INTERNAL_RESOLUTION_Y / FONT_SIZE_Y) - pattern_display->y - 8 ;
 
   //  char str[256];
   if (S->lock()==0) {

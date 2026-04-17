@@ -123,7 +123,7 @@ void CUI_RUSure::draw(Drawable *S) {
             printchar(start_x + window_width - row(1) + 1,row(i),146,COLORS.Lowlight,S);
         } 
         printline(start_x,start_y,143,window_width / 8,COLORS.Highlight,S);
-        print(col(textcenter(this->str)),start_y + row(1),this->str,COLORS.Text,S);
+        print(col(textcenter(this->str)),start_y + 2 * row(1),this->str,COLORS.Text,S);
 		    UI->full_refresh();
         UI->draw(S);
         S->unlock();

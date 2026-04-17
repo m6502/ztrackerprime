@@ -328,6 +328,7 @@ CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
+CUI_KeyBindings *UIP_KeyBindings = NULL;
 
 
 
@@ -1096,6 +1097,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_Sysconfig = new CUI_Sysconfig;
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_Config = new CUI_Config;
+    UIP_KeyBindings = new CUI_KeyBindings;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1398,6 +1400,13 @@ void global_keys(Drawable *S)
                 }
                 break;
 
+            case SDLK_K: // Keybindings editor (Ctrl+Alt+K)
+                if ((kstate & KS_CTRL) && (kstate & KS_ALT)) {
+                    command = CMD_SWITCH_KEYBINDINGS;
+                    key = Keys.getkey();
+                }
+                break;
+
 #ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
             case SDLK_F10:
 
@@ -1647,6 +1656,11 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_LUA_CONSOLE:
             switch_page(UIP_LuaConsole);
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_KEYBINDINGS:
+            switch_page(UIP_KeyBindings);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
@@ -2263,6 +2277,7 @@ int postAction ()
     delete UIP_Arpeggioeditor;
     delete UIP_Midimacroeditor;
     delete UIP_LuaConsole;
+    delete UIP_KeyBindings;
     g_lua.shutdown();
     delete ztPlayer;
     delete MidiIn;
@@ -2363,11 +2378,11 @@ void keyhandler(SDL_KeyboardEvent *e) {
         actual_ch = 10;
     }
 
-    // EU/Finnish ISO keyboards: the § key. Different layouts map it to
-    // different scancodes — on some it's NONUSBACKSLASH, on others it's
-    // INTERNATIONAL1/2 or even GRAVE itself. Force any of those to SDLK_GRAVE
-    // so the existing GRAVE handlers (plain § -> Note Off, Shift+§ -> drawmode
-    // toggle) work without a US keyboard layout.
+    // EU/Finnish ISO keyboards: the § key. On Linux/Windows SDL reports it
+    // as NONUSBACKSLASH / INTERNATIONAL1..3 / NONUSHASH depending on layout,
+    // so force those to SDLK_GRAVE so the GRAVE handlers (plain § -> Note
+    // Off, Shift+§ -> drawmode toggle) fire without a US keyboard layout.
+#ifndef __APPLE__
     if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH ||
         e->scancode == SDL_SCANCODE_INTERNATIONAL1 ||
         e->scancode == SDL_SCANCODE_INTERNATIONAL2 ||
@@ -2375,6 +2390,65 @@ void keyhandler(SDL_KeyboardEvent *e) {
         e->scancode == SDL_SCANCODE_NONUSHASH) {
       id = SDLK_GRAVE;
     }
+#else
+    // macOS Finnish ISO (verified via ZT_KEYDEBUG):
+    //  * The top-left §-key reports scancode=SDL_SCANCODE_GRAVE with a
+    //    locale-specific keycode (0xA7 §), not SDLK_GRAVE. Normalize so
+    //    the GRAVE handlers (plain § -> Note Off, Shift+§ -> drawmode
+    //    toggle) fire. Also safe on US Mac layouts where the same
+    //    scancode already resolves to SDLK_GRAVE.
+    //  * The <>-key left of Z reports scancode=SDL_SCANCODE_NONUSBACKSLASH
+    //    with keycode=0x3C (<). Map it to the bracket-key octave controls
+    //    so `<` = octave down and Shift+`<` (`>`) = octave up.
+    if (e->scancode == SDL_SCANCODE_GRAVE) {
+      id = SDLK_GRAVE;
+    } else if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH) {
+      id = (e->mod & SDL_KMOD_SHIFT) ? SDLK_RIGHTBRACKET : SDLK_LEFTBRACKET;
+    }
+#endif
+    // Opt-in per-keydown tracing. Set ZT_KEYDEBUG=1 to enable; default is
+    // off so this path adds zero per-key cost (the env check runs once and
+    // is cached in a static). When enabled, every keydown is logged to
+    // stderr and ./zt-keydebug.log for keyboard-layout debugging.
+    if (pressed) {
+      static int init_done = 0;
+      static int enabled = 0;
+      static FILE *dbg_fp = NULL;
+      if (!init_done) {
+        init_done = 1;
+        const char *env = getenv("ZT_KEYDEBUG");
+        enabled = (env && env[0] && env[0] != '0') ? 1 : 0;
+        if (enabled) {
+          dbg_fp = fopen("zt-keydebug.log", "w");
+          if (dbg_fp) {
+            fprintf(dbg_fp, "# ZT_KEYDEBUG active. Columns: scancode (name) | keycode (name) | mod | mod names\n");
+            fflush(dbg_fp);
+          }
+        }
+      }
+      if (enabled) {
+        int sc = (int)e->scancode;
+        const char *sc_name = SDL_GetScancodeName(e->scancode);
+        const char *kc_name = SDL_GetKeyName(e->key);
+        char line[256];
+        snprintf(line, sizeof(line),
+                 "scancode=%d(%s) keycode=0x%X(%s) mod=0x%X%s%s%s%s",
+                 sc, sc_name ? sc_name : "?",
+                 (unsigned)e->key, kc_name ? kc_name : "?",
+                 (unsigned)e->mod,
+                 (e->mod & SDL_KMOD_SHIFT) ? " SHIFT" : "",
+                 (e->mod & SDL_KMOD_CTRL) ? " CTRL" : "",
+                 (e->mod & SDL_KMOD_ALT) ? " ALT" : "",
+                 (e->mod & SDL_KMOD_GUI) ? " GUI/CMD" : "");
+        fprintf(stderr, "[zt-key] %s\n", line);
+        fflush(stderr);
+        if (dbg_fp) {
+          fprintf(dbg_fp, "%s\n", line);
+          fflush(dbg_fp);
+        }
+      }
+    }
+
     if (id != SDLK_LALT && id != SDLK_RALT && id != SDLK_RCTRL && id != SDLK_LCTRL && id != SDLK_LSHIFT && id != SDLK_RSHIFT) {
         if (zt_text_input_is_active && pressed) {
             const bool is_edit_or_nav =
@@ -2439,6 +2513,28 @@ void textinputhandler(const SDL_Event *e) {
     }
 
     const unsigned char ch = (unsigned char)e->text.text[0];
+    // Opt-in text-input logging. Set ZT_KEYDEBUG=1 to enable. Default off
+    // keeps this hot path free of getenv/fopen per event.
+    {
+        static int init_done = 0;
+        static int enabled = 0;
+        if (!init_done) {
+            init_done = 1;
+            const char *env = getenv("ZT_KEYDEBUG");
+            enabled = (env && env[0] && env[0] != '0') ? 1 : 0;
+        }
+        if (enabled) {
+            fprintf(stderr, "[zt-key] TEXT_INPUT='%s' (first byte=0x%02X)\n",
+                    e->text.text, ch);
+            fflush(stderr);
+            FILE *fp = fopen("zt-keydebug.log", "a");
+            if (fp) {
+                fprintf(fp, "TEXT_INPUT='%s' (first byte=0x%02X)\n",
+                        e->text.text, ch);
+                fclose(fp);
+            }
+        }
+    }
     if (ch >= 0x20 || ch == 10 || ch == 9) {
         Keys.insert(SDLK_SPACE, SDL_KMOD_NONE, ch);
     }
@@ -3201,6 +3297,7 @@ int initSDL(void)
     UIP_Help = new CUI_Help;
     UIP_SongDuration = new CUI_SongDuration;
     UIP_LuaConsole = new CUI_LuaConsole;
+    UIP_KeyBindings = new CUI_KeyBindings;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
