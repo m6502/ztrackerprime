@@ -2375,19 +2375,6 @@ void keyhandler(SDL_KeyboardEvent *e) {
         e->scancode == SDL_SCANCODE_NONUSHASH) {
       id = SDLK_GRAVE;
     }
-    // One-time stderr diagnostic so we can identify exactly which scancode
-    // the § key sends on a given keyboard. Prints once per unique scancode.
-    if (pressed) {
-      static int seen[512] = {0};
-      int sc = (int)e->scancode;
-      if (sc >= 0 && sc < 512 && !seen[sc]) {
-        seen[sc] = 1;
-        fprintf(stderr, "[zt-key] scancode=%d keycode=0x%X mod=0x%X\n",
-                sc, (unsigned)e->key, (unsigned)e->mod);
-        fflush(stderr);
-      }
-    }
-
     if (id != SDLK_LALT && id != SDLK_RALT && id != SDLK_RCTRL && id != SDLK_LCTRL && id != SDLK_LSHIFT && id != SDLK_RSHIFT) {
         if (zt_text_input_is_active && pressed) {
             const bool is_edit_or_nav =

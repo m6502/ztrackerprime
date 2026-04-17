@@ -352,8 +352,6 @@ void UserInterface::update()
     key = Keys.checkkey();
     kstate = Keys.getstate();
     
-    if (key == SDLK_TAB) SDL_Delay(1);
-
     if (key) {
 
       ////////////////////////////////////////////////////////////////////////

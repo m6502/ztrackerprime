@@ -166,6 +166,8 @@ struct zt_posix_timer {
     std::atomic<bool> running;
     unsigned int interval_ms;
     zt_timer_callback callback;
+    pthread_mutex_t wake_mutex;
+    pthread_cond_t wake_cond;
 };
 
 struct zt_posix_thread_start {
@@ -193,17 +195,29 @@ static void *zt_posix_timer_main(void *arg)
 {
     zt_posix_timer *timer = (zt_posix_timer *)arg;
     while (timer->running.load()) {
-        struct timespec req;
-        req.tv_sec = timer->interval_ms / 1000U;
-        req.tv_nsec = (long)(timer->interval_ms % 1000U) * 1000000L;
-        nanosleep(&req, NULL);
-        if (!timer->running.load()) {
-            break;
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += timer->interval_ms / 1000U;
+        ts.tv_nsec += (long)(timer->interval_ms % 1000U) * 1000000L;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_sec += 1;
+            ts.tv_nsec -= 1000000000L;
         }
-        if (timer->callback) {
+
+        pthread_mutex_lock(&timer->wake_mutex);
+        int wait_result = 0;
+        while (timer->running.load() && wait_result != ETIMEDOUT) {
+            wait_result = pthread_cond_timedwait(&timer->wake_cond, &timer->wake_mutex, &ts);
+        }
+        const bool should_callback = timer->running.load() && wait_result == ETIMEDOUT;
+        pthread_mutex_unlock(&timer->wake_mutex);
+
+        if (should_callback && timer->callback) {
             timer->callback();
         }
     }
+    pthread_cond_destroy(&timer->wake_cond);
+    pthread_mutex_destroy(&timer->wake_mutex);
     free(timer);
     return NULL;
 }
@@ -372,7 +386,18 @@ zt_timer_handle zt_timer_start(zt_timer_handle timer_id, unsigned int interval_m
     timer->running.store(true);
     timer->interval_ms = interval_ms;
     timer->callback = callback;
+    if (pthread_mutex_init(&timer->wake_mutex, NULL) != 0) {
+        free(timer);
+        return 0;
+    }
+    if (pthread_cond_init(&timer->wake_cond, NULL) != 0) {
+        pthread_mutex_destroy(&timer->wake_mutex);
+        free(timer);
+        return 0;
+    }
     if (pthread_create(&timer->thread, NULL, zt_posix_timer_main, timer) != 0) {
+        pthread_cond_destroy(&timer->wake_cond);
+        pthread_mutex_destroy(&timer->wake_mutex);
         free(timer);
         return 0;
     }
@@ -401,7 +426,10 @@ void zt_timer_stop(zt_timer_handle timer_id)
         g_timers.erase(it);
     }
 
+    pthread_mutex_lock(&timer->wake_mutex);
     timer->running.store(false);
+    pthread_cond_signal(&timer->wake_cond);
+    pthread_mutex_unlock(&timer->wake_mutex);
     if (!pthread_equal(pthread_self(), timer->thread)) {
         pthread_join(timer->thread, NULL);
     } else {
