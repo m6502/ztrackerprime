@@ -94,6 +94,7 @@ CUI_Config::CUI_Config(void) {
     vs->max = VIEW_BIG;
     vs->xsize = 0;
     vs->ysize = 0;
+    vs->no_tab_stop = 1;  // invisible stub; skip it in UP/DOWN cycling
 #endif
 
     vs = new ValueSlider;
@@ -185,6 +186,7 @@ CUI_Config::CUI_Config(void) {
 
     tb = new TextBox;
     UI->add_element(tb, 9);
+    tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
     tb->x = 1;
     tb->y = 25;
     tb->xsize = 78;

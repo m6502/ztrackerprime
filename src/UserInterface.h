@@ -34,16 +34,17 @@ class UserInterfaceElement {
         int ID,mousestate;
         int frame;
         int need_redraw;
+        int no_tab_stop = 0;  // opt-out of TAB/UP/DOWN focus cycling
 
         UserInterfaceElement(void);
         virtual ~UserInterfaceElement(void) = default ;
-        
+
         virtual int mouseupdate(int cur_element);
         virtual void enter(void) {}
         virtual int update()=0;
         virtual void draw(Drawable *S, int active)=0;
         virtual bool is_text_input() const { return false; }
-        virtual bool is_tab_stop() const { return true; }
+        virtual bool is_tab_stop() const { return !no_tab_stop; }
         virtual void on_focus() {}
 
         UserInterfaceElement *next;
