@@ -251,11 +251,20 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
     TextInput *ti;
 
     int tabindex=0;
-    int base_y = TRACKS_ROW_Y;  // Align controls with Pattern Editor content start
+    int base_y = TRACKS_ROW_Y + 3;  // content starts row 14, leaving row 12 for button + gaps on both sides
     UI = new UserInterface;
-    // MIDI Devices
 
-    // MIDI Devices
+        // Tab index 0: page-navigation button. Row 12 gives a clean gap
+        // above (row 11 empty, title at row 9) and below (row 13 empty,
+        // Prebuffer at row 14). UP/DOWN cycle starts here.
+        b = new Button;
+        UI->add_element(b,tabindex++);
+        b->caption = "   Go to page 2   ";
+        b->xsize = 18;
+        b->x = 2;
+        b->y = 12;
+        b->ysize = 1;
+        b->OnClick = (ActFunc)BTNCLK_GotoGlobalConfig;
 
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
@@ -290,9 +299,9 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->xsize = 5;
         cb->value = &zt_config_globals.auto_open_midi;
         cb->frame = 1;
-    
+
         cb = new CheckBox;
-        UI->add_element(cb,tabindex++); // id:4
+        UI->add_element(cb,tabindex++); // Full Screen cb — update() reads via get_element(5)
         cb->frame = 0;
         cb->x = 4+15;
         cb->y = base_y + 8;
@@ -325,32 +334,48 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         sk = new SkinSelector;
         UI->add_element(sk,tabindex++);
         sk->x = 4+35 +10;
-        sk->y = base_y + 2;
+        sk->y = base_y + 1;   // "Skin Selection" label sits on the same row as "Prebuffer"; list top border one row below
         sk->xsize = 19+4;
-        sk->ysize = 10;
+        sk->ysize = 7;   // tight-fit around installed skin count, avoids empty black space
+
+        // MIDI Out column — visual order: Refresh (y=30), list (y=32-44),
+        // Open device (y=47), Latency (y=49), Bank (y=51), Alias (y=53).
+        // tabindex follows the same order so UP/DOWN navigates top-to-bottom.
+        b = new Button;
+        UI->add_element(b,tabindex++);
+        b->caption = " Refresh";
+        b->x = 4+26;
+        b->y = 50 - 16 -2-2;
+        b->xsize = 9;
+        b->ysize = 1;
+        b->OnClick = (ActFunc)BTNCLK_RefreshMidiOutDeviceList;
 
         ml = new MidiOutDeviceOpener;
         UI->add_element(ml,tabindex++);
         midioutdevlist = ml;
-        ml->x = 4; 
-        ml->y = 50 - 16-2; 
+        ml->x = 4;
+        ml->y = 50 - 16-2;
         ml->xsize=35;
         ml->ysize = 13;
 
-		//MidiOutputDevice *m;
+        b = new Button;
+        UI->add_element(b,tabindex++);
+        b->caption = " Open device   ";
+        b->x = 4+21;
+        b->y = 47;
+        b->xsize = 14;
+        b->ysize = 1;
+        b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
+        midiout_action_button = b;
 
-		//m = (MidiOutputDevice*)(MidiOut->outputDevices[MidiOut->devlist_head->key]);
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
         vs->x = 13;
         vs->y = 49;
         vs->xsize = 21;
         vs->ysize = 1;
-		
-        //vs->value = MidiOut->outputDevices[0]->delay_ticks; //m->delay_ticks;
         vs->min = 0;
         vs->max = 255;
-        //ml->update();
 
         cb = new BankSelectCheckBox(ml);
         UI->add_element(cb,tabindex++);
@@ -359,7 +384,6 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->y = 51;
         cb->xsize = 5;
         cb->frame = 1;
-		//cb->value = &(m->reverse_bank_select);
 
         ti = new AliasTextInput(ml);
         UI->add_element(ti,tabindex++);
@@ -373,42 +397,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ml->bscb = cb; // link midi out list to bank select checkbox
         ml->al = ti;
 
-        b = new Button;
-        UI->add_element(b,tabindex++);
-        b->caption = " Refresh";
-        b->x = 4+26;
-        b->y = 50 - 16 -2-2;
-        b->xsize = 9;
-        b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_RefreshMidiOutDeviceList; 
-
-        b = new Button;
-        UI->add_element(b,tabindex++);
-        b->caption = " Open device   ";
-        b->x = 4+21;
-        b->y = 47;
-        b->xsize = 14;
-        b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
-        midiout_action_button = b;
-
-        //Frame *f;
-        //f = new Frame;
-        //UI->add_gfx(f,0);
-        //f->x = 4;
-        //f->y = 50-4;
-        //f->ysize=7;
-        //f->xsize = 35;
-        //f->type = 0;
-        
-        mi = new MidiInDeviceOpener;
-        midiindevlist = mi;
-        UI->add_element(mi,tabindex++);
-        mi->x = 4+37; 
-        mi->y = 50 - 16-2; 
-        mi->xsize=35;
-        mi->ysize = 13;
-
+        // MIDI In column — same visual order: Refresh, list, Open device.
         b = new Button;
         UI->add_element(b,tabindex++);
         b->caption = " Refresh";
@@ -416,7 +405,15 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->y = 50 - 16 -2-2;
         b->xsize = 9;
         b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_RefreshMidiInDeviceList; 
+        b->OnClick = (ActFunc)BTNCLK_RefreshMidiInDeviceList;
+
+        mi = new MidiInDeviceOpener;
+        midiindevlist = mi;
+        UI->add_element(mi,tabindex++);
+        mi->x = 4+37;
+        mi->y = 50 - 16-2;
+        mi->xsize=35;
+        mi->ysize = 13;
 
         b = new Button;
         UI->add_element(b,tabindex++);
@@ -427,15 +424,6 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiInDevice;
         midiin_action_button = b;
-
-        b = new Button;
-        UI->add_element(b,tabindex++);
-        b->caption = "   Go to page 2   ";
-        b->xsize = 18;
-        b->x = 2;
-        b->y = 11;
-        b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_GotoGlobalConfig;
 
 }
 
@@ -459,8 +447,11 @@ void CUI_Sysconfig::update() {
 
     UI->update();
     sync_midi_action_buttons();
-    vs = (ValueSlider *)UI->get_element(0);
-    cb = (CheckBox*)UI->get_element(4);
+    // Indices match the tabindex order set in the constructor: 0=button,
+    // 1=Prebuffer slider, 2=Panic, 3=MIDI-IN Slave, 4=Auto-open MIDI,
+    // 5=Full Screen.
+    vs = (ValueSlider *)UI->get_element(1);
+    cb = (CheckBox*)UI->get_element(5);
     if (vs->changed) {
         zt_config_globals.prebuffer_rows = vs->value;
         ztPlayer->prebuffer = (96/song->tpb) * zt_config_globals.prebuffer_rows; // 96ppqn, so look ahead is 1 beat
@@ -484,18 +475,19 @@ void CUI_Sysconfig::draw(Drawable *S) {
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"System Configuration (F12)",COLORS.Text,COLORS.Background,S);
-        print(row(4),col(TRACKS_ROW_Y),"     Prebuffer",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+2)," Panic on stop",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+4)," MIDI-IN Slave",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+6),"Auto-open MIDI",COLORS.Text,S);
+        // Labels shifted +3 rows from legacy position: row 12 holds the
+        // "Go to page 2" button, rows 11 and 13 are empty gaps.
+        print(row(4),col(TRACKS_ROW_Y+3),"     Prebuffer",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+5)," Panic on stop",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+7)," MIDI-IN Slave",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+9),"Auto-open MIDI",COLORS.Text,S);
 
-        print(row(4),col(TRACKS_ROW_Y+8),"   Full Screen",COLORS.Text,S);
-        //print(row(4),col(24),"  Step Editing",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+11),"   Full Screen",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
-        print(row(4),col(TRACKS_ROW_Y+10),"    Key Repeat",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+12),"      Key Wait",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+13),"    Key Repeat",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+15),"      Key Wait",COLORS.Text,S);
 #endif
-        print(row(4+37+8),col(TRACKS_ROW_Y+2),"Skin Selection",COLORS.Text,S);
+        print(row(4+37+8),col(TRACKS_ROW_Y+3),"Skin Selection",COLORS.Text,S);
 
         print(row(4),col(30),"MIDI Out Device Selection",COLORS.Text,S);
         print(row(4+37),col(30),"MIDI In Device Selection",COLORS.Text,S);
