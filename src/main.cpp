@@ -328,6 +328,7 @@ CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
+CUI_KeyBindings *UIP_KeyBindings = NULL;
 
 
 
@@ -1096,6 +1097,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_Sysconfig = new CUI_Sysconfig;
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_Config = new CUI_Config;
+    UIP_KeyBindings = new CUI_KeyBindings;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1398,6 +1400,13 @@ void global_keys(Drawable *S)
                 }
                 break;
 
+            case SDLK_K: // Keybindings editor (Ctrl+Alt+K)
+                if ((kstate & KS_CTRL) && (kstate & KS_ALT)) {
+                    command = CMD_SWITCH_KEYBINDINGS;
+                    key = Keys.getkey();
+                }
+                break;
+
 #ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
             case SDLK_F10:
 
@@ -1647,6 +1656,11 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_LUA_CONSOLE:
             switch_page(UIP_LuaConsole);
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_KEYBINDINGS:
+            switch_page(UIP_KeyBindings);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
@@ -2263,6 +2277,7 @@ int postAction ()
     delete UIP_Arpeggioeditor;
     delete UIP_Midimacroeditor;
     delete UIP_LuaConsole;
+    delete UIP_KeyBindings;
     g_lua.shutdown();
     delete ztPlayer;
     delete MidiIn;
@@ -2393,7 +2408,6 @@ void keyhandler(SDL_KeyboardEvent *e) {
             fprintf(dbg_fp, "# ZT_KEYDEBUG active. Columns: scancode (name) | keycode (name) | mod | mod names\n");
             fflush(dbg_fp);
           }
-          fprintf(stderr, "[zt-key] debug logging enabled, writing ./zt-keydebug.log\n");
         }
       }
       if (enabled) {
@@ -2483,17 +2497,26 @@ void textinputhandler(const SDL_Event *e) {
     }
 
     const unsigned char ch = (unsigned char)e->text.text[0];
-    // Log text-input chars under ZT_KEYDEBUG so we can see what the OS
-    // translates a physical key to (e.g. "<" vs "§" on Finnish ISO).
-    if (getenv("ZT_KEYDEBUG")) {
-        fprintf(stderr, "[zt-key] TEXT_INPUT='%s' (first byte=0x%02X)\n",
-                e->text.text, ch);
-        fflush(stderr);
-        FILE *fp = fopen("zt-keydebug.log", "a");
-        if (fp) {
-            fprintf(fp, "TEXT_INPUT='%s' (first byte=0x%02X)\n",
+    // Opt-in text-input logging. Set ZT_KEYDEBUG=1 to enable. Default off
+    // keeps this hot path free of getenv/fopen per event.
+    {
+        static int init_done = 0;
+        static int enabled = 0;
+        if (!init_done) {
+            init_done = 1;
+            const char *env = getenv("ZT_KEYDEBUG");
+            enabled = (env && env[0] && env[0] != '0') ? 1 : 0;
+        }
+        if (enabled) {
+            fprintf(stderr, "[zt-key] TEXT_INPUT='%s' (first byte=0x%02X)\n",
                     e->text.text, ch);
-            fclose(fp);
+            fflush(stderr);
+            FILE *fp = fopen("zt-keydebug.log", "a");
+            if (fp) {
+                fprintf(fp, "TEXT_INPUT='%s' (first byte=0x%02X)\n",
+                        e->text.text, ch);
+                fclose(fp);
+            }
         }
     }
     if (ch >= 0x20 || ch == 10 || ch == 9) {
@@ -3258,6 +3281,7 @@ int initSDL(void)
     UIP_Help = new CUI_Help;
     UIP_SongDuration = new CUI_SongDuration;
     UIP_LuaConsole = new CUI_LuaConsole;
+    UIP_KeyBindings = new CUI_KeyBindings;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );

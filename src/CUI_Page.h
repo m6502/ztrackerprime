@@ -477,4 +477,22 @@ class CUI_LuaConsole : public CUI_Page {
         void update(void);
         void draw(Drawable *S);
 };
+
+class CUI_KeyBindings : public CUI_Page {
+    public:
+        int cursor_y;        // currently selected ZtAction (0..ZT_ACTION_COUNT-1)
+        int list_start;      // first visible action
+        int capturing;       // 0 = browsing, 1 = waiting for new key combo
+        int dirty;            // unsaved edits?
+        char status_line[160];
+
+        CUI_KeyBindings();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+
+        int visible_rows(void) const;
+};
 #endif

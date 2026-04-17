@@ -314,7 +314,8 @@ enum state {
   STATE_ARPEDIT,
   STATE_MIDIMACEDIT,
   STATE_LUA_CONSOLE,
-  STATE_PALETTE_EDITOR
+  STATE_PALETTE_EDITOR,
+  STATE_KEYBINDINGS
 } ;
 
 
@@ -591,7 +592,9 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_SWITCH_MIDIMACEDIT,
 #endif
 
-        CMD_SWITCH_LUA_CONSOLE
+        CMD_SWITCH_LUA_CONSOLE,
+
+        CMD_SWITCH_KEYBINDINGS
 
     };
 
@@ -745,6 +748,7 @@ extern CUI_SongMessage *UIP_SongMessage;
 extern CUI_Arpeggioeditor *UIP_Arpeggioeditor;
 extern CUI_Midimacroeditor *UIP_Midimacroeditor;
 extern CUI_LuaConsole *UIP_LuaConsole;
+extern CUI_KeyBindings *UIP_KeyBindings;
 
 extern void switch_page(CUI_Page *page);
 extern int need_update;
