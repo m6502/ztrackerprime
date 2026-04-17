@@ -2378,11 +2378,11 @@ void keyhandler(SDL_KeyboardEvent *e) {
         actual_ch = 10;
     }
 
-    // EU/Finnish ISO keyboards: the § key. Different layouts map it to
-    // different scancodes — on some it's NONUSBACKSLASH, on others it's
-    // INTERNATIONAL1/2 or even GRAVE itself. Force any of those to SDLK_GRAVE
-    // so the existing GRAVE handlers (plain § -> Note Off, Shift+§ -> drawmode
-    // toggle) work without a US keyboard layout.
+    // EU/Finnish ISO keyboards: the § key. On Linux/Windows SDL reports it
+    // as NONUSBACKSLASH / INTERNATIONAL1..3 / NONUSHASH depending on layout,
+    // so force those to SDLK_GRAVE so the GRAVE handlers (plain § -> Note
+    // Off, Shift+§ -> drawmode toggle) fire without a US keyboard layout.
+#ifndef __APPLE__
     if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH ||
         e->scancode == SDL_SCANCODE_INTERNATIONAL1 ||
         e->scancode == SDL_SCANCODE_INTERNATIONAL2 ||
@@ -2390,6 +2390,22 @@ void keyhandler(SDL_KeyboardEvent *e) {
         e->scancode == SDL_SCANCODE_NONUSHASH) {
       id = SDLK_GRAVE;
     }
+#else
+    // macOS Finnish ISO (verified via ZT_KEYDEBUG):
+    //  * The top-left §-key reports scancode=SDL_SCANCODE_GRAVE with a
+    //    locale-specific keycode (0xA7 §), not SDLK_GRAVE. Normalize so
+    //    the GRAVE handlers (plain § -> Note Off, Shift+§ -> drawmode
+    //    toggle) fire. Also safe on US Mac layouts where the same
+    //    scancode already resolves to SDLK_GRAVE.
+    //  * The <>-key left of Z reports scancode=SDL_SCANCODE_NONUSBACKSLASH
+    //    with keycode=0x3C (<). Map it to the bracket-key octave controls
+    //    so `<` = octave down and Shift+`<` (`>`) = octave up.
+    if (e->scancode == SDL_SCANCODE_GRAVE) {
+      id = SDLK_GRAVE;
+    } else if (e->scancode == SDL_SCANCODE_NONUSBACKSLASH) {
+      id = (e->mod & SDL_KMOD_SHIFT) ? SDLK_RIGHTBRACKET : SDLK_LEFTBRACKET;
+    }
+#endif
     // Opt-in per-keydown tracing. Set ZT_KEYDEBUG=1 to enable; default is
     // off so this path adds zero per-key cost (the env check runs once and
     // is cached in a static). When enabled, every keydown is logged to
