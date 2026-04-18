@@ -18,9 +18,9 @@ class InstEditor : public UserInterfaceElement
         ~InstEditor();
 
         void strc(char *dst, char *src);
-        int update();
-        void draw(Drawable *S, int active);
-        int mouseupdate(int cur_element);
+        int update() override;
+        void draw(Drawable *S, int active) override;
+        int mouseupdate(int cur_element) override;
         bool is_text_input() const override { return text_cursor < 24; }
         void on_focus() override { text_cursor = (g_ui_tab_dir < 0) ? 24 : 0; }
 };

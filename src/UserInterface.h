@@ -111,12 +111,12 @@ class TextInput : public UserInterfaceElement {
         unsigned char *str;
         TextInput();
         ~TextInput() = default ;
-        int update();
-        void draw(Drawable *S, int active);
+        int update() override;
+        void draw(Drawable *S, int active) override;
         bool is_text_input() const override { return true; }
 
-        void auto_anchor_at_current_pos(int how) ;
-        void auto_update_anchor() ;
+        void auto_anchor_at_current_pos(int how) override;
+        void auto_update_anchor() override;
 };
 
 
@@ -333,10 +333,10 @@ class MidiOutDeviceSelector : public ListBox {
 //        virtual int update();
 //        virtual void draw(Drawable *S, int active);
 
-        virtual void OnChange();
-        virtual void OnSelect(LBNode *selected);
-        virtual void OnSelectChange() {}
-        virtual void enter(void);
+        void OnChange() override;
+        void OnSelect(LBNode *selected) override;
+        void OnSelectChange() override {}
+        void enter(void) override;
         bool is_tab_stop() const override { return num_elements > 0; }
 
 };
