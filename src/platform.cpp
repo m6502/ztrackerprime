@@ -191,23 +191,62 @@ static void *zt_posix_thread_main(void *arg)
     return NULL;
 }
 
+// Monotonic timespec helpers — a wall-clock jump must never disturb MIDI timing,
+// and callbacks must be scheduled from an absolute deadline (not "now +
+// interval") so runtime doesn't accumulate into the rhythm.
+static void zt_timespec_add_ns(struct timespec *ts, long ns)
+{
+    ts->tv_nsec += ns;
+    while (ts->tv_nsec >= 1000000000L) {
+        ts->tv_sec  += 1;
+        ts->tv_nsec -= 1000000000L;
+    }
+}
+
+static bool zt_timespec_lt(const struct timespec *a, const struct timespec *b)
+{
+    if (a->tv_sec != b->tv_sec) return a->tv_sec < b->tv_sec;
+    return a->tv_nsec < b->tv_nsec;
+}
+
 static void *zt_posix_timer_main(void *arg)
 {
     zt_posix_timer *timer = (zt_posix_timer *)arg;
+    const long interval_ns = (long)timer->interval_ms * 1000000L;
+
+    // Absolute next-tick deadline on CLOCK_MONOTONIC. Each iteration advances
+    // this by exactly interval_ns so callback runtime never leaks into the
+    // tempo. If we fall badly behind (debugger pause, OS stall), the catch-up
+    // loop skips missed ticks rather than firing a burst — preferable for MIDI.
+    struct timespec next_deadline;
+    clock_gettime(CLOCK_MONOTONIC, &next_deadline);
+
     while (timer->running.load()) {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += timer->interval_ms / 1000U;
-        ts.tv_nsec += (long)(timer->interval_ms % 1000U) * 1000000L;
-        if (ts.tv_nsec >= 1000000000L) {
-            ts.tv_sec += 1;
-            ts.tv_nsec -= 1000000000L;
-        }
+        zt_timespec_add_ns(&next_deadline, interval_ns);
 
         pthread_mutex_lock(&timer->wake_mutex);
         int wait_result = 0;
         while (timer->running.load() && wait_result != ETIMEDOUT) {
-            wait_result = pthread_cond_timedwait(&timer->wake_cond, &timer->wake_mutex, &ts);
+#if defined(__APPLE__)
+            // macOS pthread_condattr_setclock doesn't honor CLOCK_MONOTONIC on
+            // older SDKs, so use the relative-wait extension and recompute the
+            // remaining time each loop — immune to wall-clock jumps.
+            struct timespec now, rel;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            if (!zt_timespec_lt(&now, &next_deadline)) {
+                wait_result = ETIMEDOUT;
+                break;
+            }
+            rel.tv_sec  = next_deadline.tv_sec  - now.tv_sec;
+            rel.tv_nsec = next_deadline.tv_nsec - now.tv_nsec;
+            if (rel.tv_nsec < 0) { rel.tv_sec -= 1; rel.tv_nsec += 1000000000L; }
+            wait_result = pthread_cond_timedwait_relative_np(
+                &timer->wake_cond, &timer->wake_mutex, &rel);
+#else
+            // Condvar was initialized with CLOCK_MONOTONIC in zt_timer_start.
+            wait_result = pthread_cond_timedwait(
+                &timer->wake_cond, &timer->wake_mutex, &next_deadline);
+#endif
         }
         const bool should_callback = timer->running.load() && wait_result == ETIMEDOUT;
         pthread_mutex_unlock(&timer->wake_mutex);
@@ -215,10 +254,21 @@ static void *zt_posix_timer_main(void *arg)
         if (should_callback && timer->callback) {
             timer->callback();
         }
+
+        // If a stall pushed 'now' past the deadline by more than one interval,
+        // skip the missed ticks so we resume on cadence rather than firing a
+        // backlog of callbacks all at once.
+        if (should_callback) {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            while (zt_timespec_lt(&next_deadline, &now)) {
+                zt_timespec_add_ns(&next_deadline, interval_ns);
+            }
+        }
     }
-    pthread_cond_destroy(&timer->wake_cond);
-    pthread_mutex_destroy(&timer->wake_mutex);
-    free(timer);
+
+    // Intentionally no destroy/free here — zt_timer_stop does it after
+    // pthread_join returns, so timer->thread stays valid for the join.
     return NULL;
 }
 
@@ -390,11 +440,32 @@ zt_timer_handle zt_timer_start(zt_timer_handle timer_id, unsigned int interval_m
         free(timer);
         return 0;
     }
+#if defined(__APPLE__)
+    // macOS: clock attr is ignored; we use pthread_cond_timedwait_relative_np
+    // in the worker, which reads CLOCK_MONOTONIC directly.
     if (pthread_cond_init(&timer->wake_cond, NULL) != 0) {
         pthread_mutex_destroy(&timer->wake_mutex);
         free(timer);
         return 0;
     }
+#else
+    pthread_condattr_t cond_attr;
+    if (pthread_condattr_init(&cond_attr) != 0) {
+        pthread_mutex_destroy(&timer->wake_mutex);
+        free(timer);
+        return 0;
+    }
+    // Bind the condvar to CLOCK_MONOTONIC so pthread_cond_timedwait deadlines
+    // are immune to wall-clock steps (NTP, DST, user-set time).
+    pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+    if (pthread_cond_init(&timer->wake_cond, &cond_attr) != 0) {
+        pthread_condattr_destroy(&cond_attr);
+        pthread_mutex_destroy(&timer->wake_mutex);
+        free(timer);
+        return 0;
+    }
+    pthread_condattr_destroy(&cond_attr);
+#endif
     if (pthread_create(&timer->thread, NULL, zt_posix_timer_main, timer) != 0) {
         pthread_cond_destroy(&timer->wake_cond);
         pthread_mutex_destroy(&timer->wake_mutex);
@@ -430,8 +501,17 @@ void zt_timer_stop(zt_timer_handle timer_id)
     timer->running.store(false);
     pthread_cond_signal(&timer->wake_cond);
     pthread_mutex_unlock(&timer->wake_mutex);
+
+    // Ownership of teardown lives here (not in the worker) so that the
+    // worker's exit can't race pthread_join's read of timer->thread. On the
+    // self-stop path (stop called from inside the timer callback) we can't
+    // join ourselves — detach instead and accept the struct leak; the process
+    // is almost certainly shutting down in that case.
     if (!pthread_equal(pthread_self(), timer->thread)) {
         pthread_join(timer->thread, NULL);
+        pthread_cond_destroy(&timer->wake_cond);
+        pthread_mutex_destroy(&timer->wake_mutex);
+        free(timer);
     } else {
         pthread_detach(timer->thread);
     }
