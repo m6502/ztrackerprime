@@ -67,9 +67,8 @@ void CUI_LuaConsole::enter()
 
     if (!s_welcomed) {
         g_lua.print_line("zTracker Lua Console — Lua 5.4");
-        g_lua.print_line("Type Lua code, press Enter to execute.");
-        g_lua.print_line("Up/Down = history   PgUp/PgDn = scroll   Esc = exit");
-        g_lua.print_line("Try:  print('hello')   or   for i=1,3 do print(i) end");
+        g_lua.print_line("Enter=run  Up/Down=history  PgUp/PgDn=scroll  Tab=complete  Esc=exit");
+        g_lua.print_api_list();
         g_lua.print_line("");
         s_welcomed = 1;
     }
@@ -180,6 +179,11 @@ void CUI_LuaConsole::update()
 
     case SDLK_END:
         s_cursor = (int)strlen(s_input);
+        break;
+
+    case SDLK_TAB:
+        g_lua.tab_complete(s_input, (int)sizeof(s_input), &s_cursor);
+        g_lua.scroll_off = 0;
         break;
 
     default: {

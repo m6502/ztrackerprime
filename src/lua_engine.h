@@ -41,6 +41,19 @@ public:
     // Append a line of text to the scrollback
     void print_line(const char *text);
 
+    // Print the full API (all zt.* bindings + selected globals) to scrollback.
+    void print_api_list();
+
+    // Tab completion.
+    //
+    // Given `input` of length `len` with the cursor at byte `cursor`, try to
+    // complete the identifier ending at the cursor. If a unique completion is
+    // found, `input` and `*cursor` are rewritten in place (caller guarantees
+    // at least `cap` bytes in `input`). If multiple candidates exist, the
+    // common prefix is applied and the candidate list is printed to the
+    // scrollback. Returns true if `input`/`*cursor` were modified.
+    bool tab_complete(char *input, int cap, int *cursor);
+
 private:
     void registerBindings();
 };

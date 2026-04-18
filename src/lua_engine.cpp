@@ -311,7 +311,7 @@ bool ZtLuaEngine::init()
     registerBindings();
 
     print_line("[Lua] Lua 5.4 ready. Type Lua code and press Enter.");
-    print_line("[Lua] API: zt.get_note/set_note, zt.play/stop, zt.get_bpm/set_bpm, ...");
+    print_line("[Lua] Tab completes; type 'zt.' and press Tab to list the API.");
 
     return true;
 }
@@ -422,4 +422,244 @@ void ZtLuaEngine::registerBindings()
     lua_pushcfunction(L, l_zt_print_fn);       lua_setfield(L, -2, "print");
 
     lua_setglobal(L, "zt");
+}
+
+// ---------------------------------------------------------------------------
+// API listing + tab completion
+// ---------------------------------------------------------------------------
+
+// Lua identifier char? (incl. digits after first pos; we treat '.' specially)
+static bool is_ident_char(char c)
+{
+    return (c >= 'A' && c <= 'Z') ||
+           (c >= 'a' && c <= 'z') ||
+           (c >= '0' && c <= '9') ||
+            c == '_';
+}
+
+// Push the table whose dotted path is `path` (may be empty, meaning _G) onto
+// the Lua stack. Returns true if the path resolved to a table; otherwise the
+// stack is unchanged and false is returned.
+static bool push_table_by_path(lua_State *L, const char *path)
+{
+    if (!path || !path[0]) {
+        lua_pushglobaltable(L);
+        return true;
+    }
+    lua_pushglobaltable(L);
+    const char *p = path;
+    while (*p) {
+        const char *dot = strchr(p, '.');
+        size_t n = dot ? (size_t)(dot - p) : strlen(p);
+        lua_pushlstring(L, p, n);
+        lua_gettable(L, -2);
+        lua_remove(L, -2);
+        if (!lua_istable(L, -1)) {
+            lua_pop(L, 1);
+            return false;
+        }
+        if (!dot) break;
+        p = dot + 1;
+    }
+    return true;
+}
+
+// Collect string keys in the table on top of the stack that start with
+// `prefix`. Table is left on the stack. `out` is a caller-owned buffer of
+// capacity `cap`; returns number of candidates written (may be less than
+// cap if truncated).
+static int collect_keys(lua_State *L, const char *prefix,
+                        char out[][64], int cap)
+{
+    int n = 0;
+    size_t plen = strlen(prefix);
+    lua_pushnil(L);
+    while (lua_next(L, -2) != 0) {
+        if (lua_type(L, -2) == LUA_TSTRING) {
+            const char *k = lua_tostring(L, -2);
+            if (strncmp(k, prefix, plen) == 0) {
+                if (n < cap) {
+                    strncpy(out[n], k, 63);
+                    out[n][63] = '\0';
+                    n++;
+                }
+            }
+        }
+        lua_pop(L, 1); // value
+    }
+    return n;
+}
+
+static int qsort_strcmp(const void *a, const void *b)
+{
+    return strcmp((const char *)a, (const char *)b);
+}
+
+void ZtLuaEngine::print_api_list()
+{
+    if (!L) return;
+
+    // Print the zt.* table contents first.
+    lua_getglobal(L, "zt");
+    if (lua_istable(L, -1)) {
+        static char keys[64][64];
+        int n = collect_keys(L, "", keys, 64);
+        qsort(keys, (size_t)n, 64, qsort_strcmp);
+
+        print_line("[Lua] zt.* API:");
+        char buf[LUA_CONSOLE_LINE_LEN];
+        buf[0] = ' '; buf[1] = ' '; buf[2] = '\0';
+        int col = 2;
+        for (int i = 0; i < n; i++) {
+            int klen = (int)strlen(keys[i]);
+            if (col > 2 && col + klen + 2 > 76) {
+                print_line(buf);
+                buf[0] = ' '; buf[1] = ' '; buf[2] = '\0';
+                col = 2;
+            }
+            strcat(buf, "zt.");
+            strcat(buf, keys[i]);
+            strcat(buf, "  ");
+            col += klen + 5;
+        }
+        if (col > 2) print_line(buf);
+    }
+    lua_pop(L, 1);
+
+    print_line("[Lua] Globals (selected): print, pairs, ipairs, math, string, table");
+    print_line("[Lua] Tab to complete any identifier. Esc/F2 to close.");
+}
+
+bool ZtLuaEngine::tab_complete(char *input, int cap, int *pcursor)
+{
+    if (!L || !input || !pcursor) return false;
+
+    int cursor = *pcursor;
+    int len = (int)strlen(input);
+    if (cursor < 0) cursor = 0;
+    if (cursor > len) cursor = len;
+
+    // Walk backward from cursor over identifier/dot characters.
+    int start = cursor;
+    while (start > 0 && (is_ident_char(input[start - 1]) || input[start - 1] == '.'))
+        start--;
+
+    // Portion to complete is input[start..cursor-1].
+    int span = cursor - start;
+    char word[128];
+    if (span > (int)sizeof(word) - 1) span = (int)sizeof(word) - 1;
+    memcpy(word, input + start, (size_t)span);
+    word[span] = '\0';
+
+    // Split on last dot.
+    char table_path[128] = "";
+    const char *key_prefix = word;
+    char *last_dot = strrchr(word, '.');
+    if (last_dot) {
+        size_t tn = (size_t)(last_dot - word);
+        if (tn >= sizeof(table_path)) tn = sizeof(table_path) - 1;
+        memcpy(table_path, word, tn);
+        table_path[tn] = '\0';
+        key_prefix = last_dot + 1;
+    }
+
+    // If the user typed "zt." alone and hit Tab, show the full API.
+    bool prefix_empty = (key_prefix[0] == '\0');
+
+    if (!push_table_by_path(L, table_path)) {
+        char msg[LUA_CONSOLE_LINE_LEN];
+        snprintf(msg, sizeof(msg), "[tab] '%s' is not a table", table_path);
+        print_line(msg);
+        return false;
+    }
+
+    static char keys[128][64];
+    int n = collect_keys(L, key_prefix, keys, 128);
+
+    // If completion target is an empty prefix and it's the zt.* table, redirect
+    // to full API listing (nicer output).
+    if (prefix_empty && table_path[0] == 'z' && table_path[1] == 't' && table_path[2] == '\0') {
+        lua_pop(L, 1);
+        print_api_list();
+        return false;
+    }
+
+    if (n == 0) {
+        lua_pop(L, 1);
+        char msg[LUA_CONSOLE_LINE_LEN];
+        snprintf(msg, sizeof(msg), "[tab] no match for '%s'", word);
+        print_line(msg);
+        return false;
+    }
+
+    qsort(keys, (size_t)n, 64, qsort_strcmp);
+
+    // Compute longest common prefix among matches.
+    int lcp = (int)strlen(keys[0]);
+    for (int i = 1; i < n; i++) {
+        int j = 0;
+        while (j < lcp && keys[0][j] && keys[i][j] && keys[0][j] == keys[i][j]) j++;
+        lcp = j;
+    }
+
+    // Determine the full replacement — "table.prefix"
+    char replacement[256];
+    if (n == 1) {
+        // Single match: check if it's a function → append "(".
+        lua_getfield(L, -1, keys[0]);
+        bool is_fn = lua_isfunction(L, -1);
+        lua_pop(L, 1);
+
+        if (table_path[0])
+            snprintf(replacement, sizeof(replacement), "%s.%s%s",
+                     table_path, keys[0], is_fn ? "(" : "");
+        else
+            snprintf(replacement, sizeof(replacement), "%s%s",
+                     keys[0], is_fn ? "(" : "");
+    } else {
+        // Multiple — apply the longest common prefix only.
+        char common[64];
+        if (lcp > (int)sizeof(common) - 1) lcp = (int)sizeof(common) - 1;
+        memcpy(common, keys[0], (size_t)lcp);
+        common[lcp] = '\0';
+
+        if (table_path[0])
+            snprintf(replacement, sizeof(replacement), "%s.%s", table_path, common);
+        else
+            snprintf(replacement, sizeof(replacement), "%s", common);
+
+        // Print the candidates so the user sees what's available.
+        char line[LUA_CONSOLE_LINE_LEN];
+        line[0] = ' '; line[1] = ' '; line[2] = '\0';
+        int col = 2;
+        for (int i = 0; i < n; i++) {
+            int klen = (int)strlen(keys[i]);
+            if (col > 2 && col + klen + 2 > 76) {
+                print_line(line);
+                line[0] = ' '; line[1] = ' '; line[2] = '\0';
+                col = 2;
+            }
+            strcat(line, keys[i]);
+            strcat(line, "  ");
+            col += klen + 2;
+        }
+        if (col > 2) print_line(line);
+    }
+    lua_pop(L, 1); // the table we walked
+
+    // Apply replacement in `input`: replace bytes [start..cursor-1] with
+    // `replacement`, preserving everything after the original cursor.
+    int repl_len = (int)strlen(replacement);
+    int tail_len = len - cursor;
+    int new_len  = start + repl_len + tail_len;
+    if (new_len >= cap) return false;
+
+    if (tail_len > 0)
+        memmove(input + start + repl_len, input + cursor, (size_t)tail_len + 1);
+    else
+        input[start + repl_len] = '\0';
+    memcpy(input + start, replacement, (size_t)repl_len);
+
+    *pcursor = start + repl_len;
+    return (repl_len != span);
 }
