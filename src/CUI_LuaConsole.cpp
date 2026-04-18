@@ -1,17 +1,15 @@
 // CUI_LuaConsole.cpp — Lua REPL console page for zTracker
 //
-// Layout:
-//   - Scrollback area fills most of the screen (TRACKS_ROW_Y .. CHARS_Y-3)
-//   - A single-line text input at the bottom row
-//   - Title bar at PAGE_TITLE_ROW_Y
+// Layout (top to bottom):
+//   row PAGE_TITLE_ROW_Y              title bar ("Lua Console")
+//   row TRACKS_ROW_Y .. sep_y-1       scrollback (history of output)
+//   row sep_y                         horizontal separator
+//   row inp_y                         input line with ">" prompt + cursor
+//   (rows below inp_y are covered by the skin's toolbar strip)
 //
-// Keys:
-//   Enter      — execute current input line
-//   Escape/F2  — return to pattern editor
-//   Up/Down    — browse input history / scroll scrollback
-//   PgUp/PgDn  — scroll scrollback by page
-//   Backspace  — delete character to left
-//   Delete     — clear input line
+// Drawable::fillRect takes (x1, y1, x2, y2, color) — two corner points,
+// inclusive on the low side, inclusive on the high side (see
+// lc_sdl_wrapper.cpp:93). NOT (x, y, w, h).
 
 #include "zt.h"
 #include "lua_engine.h"
@@ -20,51 +18,45 @@
 #include "font.h"
 
 // ---------------------------------------------------------------------------
-// Local state (kept outside the class to avoid header pollution)
+// Local state
 // ---------------------------------------------------------------------------
-static char   s_input[256]    = "";  // current input buffer
-static int    s_cursor        = 0;   // cursor position in s_input
+static char s_input[256] = "";
+static int  s_cursor     = 0;
+static int  s_welcomed   = 0;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Layout (all values are character rows/cols; convert with row()/col())
 // ---------------------------------------------------------------------------
+static int frame_x1() { return 1; }
+static int frame_x2() { return CHARS_X - 2; }
 
-// Number of visible rows in the scrollback area
-static int console_rows()
+// Reserve 8 rows at the bottom for the skin toolbar strip (55 px / 8 ≈ 7).
+static int bottom_margin_rows() { return 8; }
+
+static int sep_row()   { return CHARS_Y - bottom_margin_rows() - 1; }
+static int input_row() { return sep_row() + 1; }
+
+static int scrollback_top()    { return TRACKS_ROW_Y; }
+static int scrollback_bottom() { return sep_row() - 1; }
+static int scrollback_rows()
 {
-    return CHARS_Y - TRACKS_ROW_Y - 3; // leave 2 rows for input + border
+    int n = scrollback_bottom() - scrollback_top() + 1;
+    return (n > 0) ? n : 1;
 }
 
-// Draw a single text row at character position (cx, cy) with given colors
-static void draw_text_row(const char *text, int cx, int cy,
-                           TColor fg, TColor bg, Drawable *S)
-{
-    // Clear the row first
-    int px = col(cx);
-    int py = row(cy);
-    int pw = (CHARS_X - 2) * CHARACTER_SIZE_X;
-    S->fillRect(px, py, pw, CHARACTER_SIZE_Y, bg);
-    if (text && text[0])
-        printBG(col(cx), row(cy), text, fg, bg, S);
-}
+// Pixel corners of the console frame (inclusive)
+static int frame_px1() { return col(frame_x1()); }
+static int frame_px2() { return col(frame_x2() + 1) - 1; }
 
 // ---------------------------------------------------------------------------
 // CUI_LuaConsole constructor / destructor
 // ---------------------------------------------------------------------------
-
-CUI_LuaConsole::CUI_LuaConsole()
-{
-    UI = nullptr;  // No widget system needed
-}
-
-CUI_LuaConsole::~CUI_LuaConsole()
-{
-}
+CUI_LuaConsole::CUI_LuaConsole()  { UI = nullptr; }
+CUI_LuaConsole::~CUI_LuaConsole() {}
 
 // ---------------------------------------------------------------------------
 // enter / leave
 // ---------------------------------------------------------------------------
-
 void CUI_LuaConsole::enter()
 {
     s_input[0] = '\0';
@@ -72,44 +64,52 @@ void CUI_LuaConsole::enter()
     g_lua.scroll_off = 0;
     need_refresh++;
     cur_state = STATE_LUA_CONSOLE;
+
+    if (!s_welcomed) {
+        g_lua.print_line("zTracker Lua Console — Lua 5.4");
+        g_lua.print_line("Type Lua code, press Enter to execute.");
+        g_lua.print_line("Up/Down = history   PgUp/PgDn = scroll   Esc = exit");
+        g_lua.print_line("Try:  print('hello')   or   for i=1,3 do print(i) end");
+        g_lua.print_line("");
+        s_welcomed = 1;
+    }
+
+    zt_text_input_start();
 }
 
 void CUI_LuaConsole::leave()
 {
+    zt_text_input_stop();
 }
 
 // ---------------------------------------------------------------------------
-// update — handle keyboard input
+// update — keyboard input
 // ---------------------------------------------------------------------------
-
 void CUI_LuaConsole::update()
 {
     if (!Keys.size()) return;
 
-    KBKey key   = Keys.getkey();
-    KBKey kstate= Keys.getstate();
+    KBKey key    = Keys.getkey();
+    KBKey kstate = Keys.getstate();
     (void)kstate;
 
-    int rows = console_rows();
+    int page = scrollback_rows();
 
     switch (key) {
-    // -- Execute ----------------------------------------------------------------
     case SDLK_RETURN:
         if (s_input[0]) {
             g_lua.execute(s_input);
             s_input[0] = '\0';
             s_cursor   = 0;
-            g_lua.scroll_off = 0;  // snap back to bottom
+            g_lua.scroll_off = 0;
         }
         break;
 
-    // -- Leave page -------------------------------------------------------------
     case SDLK_ESCAPE:
     case SDLK_F2:
         switch_page(UIP_Patterneditor);
         break;
 
-    // -- History navigation (Up/Down) -------------------------------------------
     case SDLK_UP:
         if (g_lua.history_count > 0) {
             if (g_lua.history_pos < 0)
@@ -139,19 +139,17 @@ void CUI_LuaConsole::update()
         }
         break;
 
-    // -- Scroll scrollback ------------------------------------------------------
     case SDLK_PAGEUP:
-        g_lua.scroll_off += rows;
+        g_lua.scroll_off += page;
         if (g_lua.scroll_off > g_lua.line_count - 1)
             g_lua.scroll_off = (g_lua.line_count > 0) ? g_lua.line_count - 1 : 0;
         break;
 
     case SDLK_PAGEDOWN:
-        g_lua.scroll_off -= rows;
+        g_lua.scroll_off -= page;
         if (g_lua.scroll_off < 0) g_lua.scroll_off = 0;
         break;
 
-    // -- Text editing -----------------------------------------------------------
     case SDLK_BACKSPACE:
         if (s_cursor > 0) {
             int len = (int)strlen(s_input);
@@ -185,7 +183,6 @@ void CUI_LuaConsole::update()
         break;
 
     default: {
-        // Use the actual_char field set by the SDL event handler
         unsigned char ch = Keys.getactualchar();
         if (ch >= 0x20 && ch < 0x7F) {
             int len = (int)strlen(s_input);
@@ -207,60 +204,104 @@ void CUI_LuaConsole::update()
 // ---------------------------------------------------------------------------
 // draw
 // ---------------------------------------------------------------------------
-
 void CUI_LuaConsole::draw(Drawable *S)
 {
     if (S->lock() != 0) return;
 
-    TColor fg   = COLORS.EditText;
-    TColor bg   = COLORS.EditBG;
-    TColor hfg  = COLORS.Data;      // highlight (prompt text)
-    TColor ibg  = COLORS.EditBGhigh; // input row bg
+    const TColor page_bg    = COLORS.Background;
+    const TColor console_bg = COLORS.EditBG;
+    const TColor console_fg = COLORS.EditText;
+    const TColor prompt_fg  = COLORS.Data;
+    const TColor input_bg   = COLORS.EditBGhigh;
+    const TColor title_fg   = COLORS.Text;
+    const TColor accent     = COLORS.Highlight;
 
-    // Title
-    printtitle(PAGE_TITLE_ROW_Y, "Lua Console (Esc/F2 to close)", COLORS.Text, COLORS.Background, S);
+    const int fx1 = frame_px1();
+    const int fx2 = frame_px2();
 
-    int rows    = console_rows();
-    int start_y = TRACKS_ROW_Y;
+    // --- Clear the whole console area first ---
+    S->fillRect(fx1, row(PAGE_TITLE_ROW_Y),
+                fx2, row(input_row() + 1) - 1, page_bg);
 
-    // --- Scrollback area ---
-    // We render from (line_count - scroll_off - rows) upward
-    int bottom = g_lua.line_count - g_lua.scroll_off;  // index of first line below view
-    int top    = bottom - rows;
+    // --- Title ---
+    printtitle(PAGE_TITLE_ROW_Y, "Lua Console (Esc/F2 to close)",
+               title_fg, page_bg, S);
 
-    for (int i = 0; i < rows; i++) {
-        int line_idx = top + i;
-        const char *text = "";
+    // --- Scrollback background (distinct shade, so the console area is
+    //     visually separate from the empty page background) ---
+    const int sb_top = scrollback_top();
+    const int sb_rows = scrollback_rows();
+    S->fillRect(fx1, row(sb_top),
+                fx2, row(sb_top + sb_rows) - 1, console_bg);
+
+    // --- Scrollback lines (newest at bottom) ---
+    const int bottom_idx = g_lua.line_count - g_lua.scroll_off;
+    const int top_idx    = bottom_idx - sb_rows;
+    for (int i = 0; i < sb_rows; i++) {
+        int line_idx = top_idx + i;
         if (line_idx >= 0 && line_idx < g_lua.line_count) {
             int ring = line_idx % LUA_CONSOLE_MAX_LINES;
-            text = g_lua.lines[ring];
+            const char *text = g_lua.lines[ring];
+            if (text && text[0]) {
+                printBG(col(frame_x1() + 1), row(sb_top + i),
+                        text, console_fg, console_bg, S);
+            }
         }
-        int cy = start_y + i;
-        draw_text_row(text, 1, cy, fg, bg, S);
     }
 
-    // --- Separator line ---
-    int sep_y = start_y + rows;
-    S->fillRect(col(1), row(sep_y), (CHARS_X - 2) * CHARACTER_SIZE_X, CHARACTER_SIZE_Y, COLORS.Lowlight);
+    // --- Scroll indicator ---
+    if (g_lua.scroll_off > 0) {
+        char ind[32];
+        snprintf(ind, sizeof(ind), " [-%d] ", g_lua.scroll_off);
+        int ind_len = (int)strlen(ind);
+        printBG(col(frame_x2() - ind_len), row(sb_top),
+                ind, prompt_fg, console_bg, S);
+    }
+
+    // --- Separator (just above input line) ---
+    printlineBG(col(frame_x1()), row(sep_row()), 0x81,
+                frame_x2() - frame_x1() + 1, accent, page_bg, S);
 
     // --- Input line ---
-    int inp_y = sep_y + 1;
-    S->fillRect(col(1), row(inp_y), (CHARS_X - 2) * CHARACTER_SIZE_X, CHARACTER_SIZE_Y, ibg);
+    const int iy = input_row();
+    S->fillRect(fx1, row(iy), fx2, row(iy + 1) - 1, input_bg);
 
-    // Draw prompt ">"
-    printcharBG(col(1), row(inp_y), '>', hfg, ibg, S);
-    // Draw input text
-    printBG(col(2), row(inp_y), s_input, fg, ibg, S);
+    printcharBG(col(frame_x1()    ), row(iy), '>', prompt_fg, input_bg, S);
+    printcharBG(col(frame_x1() + 1), row(iy), ' ', prompt_fg, input_bg, S);
 
-    // Draw cursor block
-    int cur_x = 2 + s_cursor;
-    unsigned char cur_ch = s_input[s_cursor] ? (unsigned char)s_input[s_cursor] : ' ';
-    printcharBG(col(cur_x), row(inp_y), cur_ch, ibg, hfg, S);
+    const int text_x1   = frame_x1() + 2;
+    const int max_chars = frame_x2() - text_x1;
+    const int len       = (int)strlen(s_input);
+    int view_off = 0;
+    if (s_cursor >= max_chars) view_off = s_cursor - max_chars + 1;
+    if (view_off < 0)   view_off = 0;
+    if (view_off > len) view_off = len;
+    char view[512];
+    {
+        int n = len - view_off;
+        if (n > max_chars) n = max_chars;
+        if (n > (int)sizeof(view) - 1) n = (int)sizeof(view) - 1;
+        memcpy(view, s_input + view_off, (size_t)n);
+        view[n] = '\0';
+    }
+    printBG(col(text_x1), row(iy), view, console_fg, input_bg, S);
 
+    // Cursor block (inverse)
+    int cur_col = text_x1 + (s_cursor - view_off);
+    if (cur_col < text_x1)      cur_col = text_x1;
+    if (cur_col > frame_x2())   cur_col = frame_x2();
+    unsigned char cur_ch = (s_cursor < len) ? (unsigned char)s_input[s_cursor] : ' ';
+    printcharBG(col(cur_col), row(iy), cur_ch, input_bg, prompt_fg, S);
+
+    // Top-of-screen info (Song Name etc.) last so it wins.
     draw_status(S);
 
     need_refresh = 0;
     updated = 2;
 
     S->unlock();
+
+    // Tell screenmanager the frame is dirty so the backbuffer actually
+    // gets blitted to the SDL texture.
+    screenmanager.UpdateAll();
 }
