@@ -82,6 +82,7 @@ KBKey KeyBuffer::checkkey(void) {
         ret = buffer[a].key;
         this->cur_state = buffer[a].state;
         this->actual_char = buffer[a].actual_char;
+        this->actual_code = buffer[a].code;
     }
     return ret;
 }
@@ -94,6 +95,7 @@ KBKey KeyBuffer::getkey(void) {
         ret = buffer[tail].key;
         this->cur_state = buffer[tail].state;
         this->actual_char = buffer[tail].actual_char;
+        this->actual_code = buffer[tail].code;
     }
     return ret;
 }
@@ -103,6 +105,11 @@ KBMod KeyBuffer::getstate(void) {
 unsigned char KeyBuffer::getactualchar(void) {
     return this->actual_char;
 }
+
+unsigned int KeyBuffer::getcode() {
+    return this->actual_code;
+}
+
 unsigned char KeyBuffer::size(void) {
     return cursize;
 /*  if (head<tail)
@@ -111,7 +118,7 @@ unsigned char KeyBuffer::size(void) {
         return head-tail;
 */
 }
-void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char) {
+void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char, unsigned int code) {
     unsigned char ls;
     switch(key) {
         case SDLK_KP_0: key=SDLK_0; break;
@@ -138,6 +145,7 @@ void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char) {
 #endif
 
     buffer[head].key = key;
+    buffer[head].code = code;
     KBMod c = 0;
     if (state & SDL_KMOD_ALT)
         c |= KS_ALT;

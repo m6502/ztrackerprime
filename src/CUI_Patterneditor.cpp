@@ -929,6 +929,7 @@ void CUI_Patterneditor::update()
   int i,j,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
   int key;
+  unsigned int scancode;
   int temp,oktogo=0/*,dontc=0*/;
   short int p1,p2,p3;
   //  char str[256];
@@ -1012,6 +1013,7 @@ void CUI_Patterneditor::update()
       
       clear++;
       key=Keys.getkey();
+      scancode=Keys.getcode();
       kstate = Keys.getstate();
     }
   }
@@ -1153,6 +1155,7 @@ void CUI_Patterneditor::update()
   if (Keys.size() || midiInQueue.size() > 0) {
     
     key=Keys.getkey();
+    scancode=Keys.getcode();
     kstate = Keys.getstate();
     
     set_note = 0xff;
@@ -2792,25 +2795,25 @@ case SDLK_DELETE:
                     }
                     break;
                     case T_NOTE: 
-                      switch(key) {
+                      switch(scancode) {
                         /* TOP ROW */
-                      case SDLK_Q: set_note = 12*base_octave;         break;
-                      case SDLK_2: set_note = (12*base_octave)+1;     break;
-                      case SDLK_W: set_note = (12*base_octave)+2;     break;
-                      case SDLK_3: set_note = (12*base_octave)+3;     break;
-                      case SDLK_E: set_note = (12*base_octave)+4;     break;
-                      case SDLK_R: set_note = (12*base_octave)+5;     break;
-                      case SDLK_5: set_note = (12*base_octave)+6;     break;
-                      case SDLK_T: set_note = (12*base_octave)+7;     break;
-                      case SDLK_6: set_note = (12*base_octave)+8;     break;
-                      case SDLK_Y: set_note = (12*base_octave)+9;     break;
-                      case SDLK_7: set_note = (12*base_octave)+10;    break;
-                      case SDLK_U: set_note = (12*base_octave)+11;    break;
-                      case SDLK_I: set_note = (12*base_octave)+12;    break;
-                      case SDLK_9: set_note = (12*base_octave)+1+12;  break;
-                      case SDLK_O: set_note = (12*base_octave)+2+12;  break;
-                      case SDLK_0: set_note = (12*base_octave)+3+12;  break;
-                      case SDLK_P: set_note = (12*base_octave)+4+12;  break;
+                      case SDL_SCANCODE_Q: set_note = 12*base_octave;         break;
+                      case SDL_SCANCODE_2: set_note = (12*base_octave)+1;     break;
+                      case SDL_SCANCODE_W: set_note = (12*base_octave)+2;     break;
+                      case SDL_SCANCODE_3: set_note = (12*base_octave)+3;     break;
+                      case SDL_SCANCODE_E: set_note = (12*base_octave)+4;     break;
+                      case SDL_SCANCODE_R: set_note = (12*base_octave)+5;     break;
+                      case SDL_SCANCODE_5: set_note = (12*base_octave)+6;     break;
+                      case SDL_SCANCODE_T: set_note = (12*base_octave)+7;     break;
+                      case SDL_SCANCODE_6: set_note = (12*base_octave)+8;     break;
+                      case SDL_SCANCODE_Y: set_note = (12*base_octave)+9;     break;
+                      case SDL_SCANCODE_7: set_note = (12*base_octave)+10;    break;
+                      case SDL_SCANCODE_U: set_note = (12*base_octave)+11;    break;
+                      case SDL_SCANCODE_I: set_note = (12*base_octave)+12;    break;
+                      case SDL_SCANCODE_9: set_note = (12*base_octave)+1+12;  break;
+                      case SDL_SCANCODE_O: set_note = (12*base_octave)+2+12;  break;
+                      case SDL_SCANCODE_0: set_note = (12*base_octave)+3+12;  break;
+                      case SDL_SCANCODE_P: set_note = (12*base_octave)+4+12;  break;
                       
                       
                       // <Manu> Repurpose these keys
@@ -2819,18 +2822,18 @@ case SDLK_DELETE:
 
 
                         /* BOTTOM ROW */
-                      case SDLK_Z: set_note = 12*(base_octave-1);     break;
-                      case SDLK_S: set_note = (12*(base_octave-1))+1; break;
-                      case SDLK_X: set_note = (12*(base_octave-1))+2; break;
-                      case SDLK_D: set_note =(12*(base_octave-1))+3;  break;
-                      case SDLK_C: set_note =(12*(base_octave-1))+4;  break;
-                      case SDLK_V: set_note = (12*(base_octave-1))+5; break;
-                      case SDLK_G: set_note = (12*(base_octave-1))+6; break;
-                      case SDLK_B: set_note = (12*(base_octave-1))+7; break;
-                      case SDLK_H: set_note = (12*(base_octave-1))+8; break;
-                      case SDLK_N: set_note = (12*(base_octave-1))+9; break;
-                      case SDLK_J: set_note = (12*(base_octave-1))+10;break; 
-                      case SDLK_M: set_note = (12*(base_octave-1))+11;break;
+                      case SDL_SCANCODE_Z: set_note = 12*(base_octave-1);     break;
+                      case SDL_SCANCODE_S: set_note = (12*(base_octave-1))+1; break;
+                      case SDL_SCANCODE_X: set_note = (12*(base_octave-1))+2; break;
+                      case SDL_SCANCODE_D: set_note =(12*(base_octave-1))+3;  break;
+                      case SDL_SCANCODE_C: set_note =(12*(base_octave-1))+4;  break;
+                      case SDL_SCANCODE_V: set_note = (12*(base_octave-1))+5; break;
+                      case SDL_SCANCODE_G: set_note = (12*(base_octave-1))+6; break;
+                      case SDL_SCANCODE_B: set_note = (12*(base_octave-1))+7; break;
+                      case SDL_SCANCODE_H: set_note = (12*(base_octave-1))+8; break;
+                      case SDL_SCANCODE_N: set_note = (12*(base_octave-1))+9; break;
+                      case SDL_SCANCODE_J: set_note = (12*(base_octave-1))+10;break;
+                      case SDL_SCANCODE_M: set_note = (12*(base_octave-1))+11;break;
                         /* EDITING KEYS */
                       case SDLK_1: set_note = 0x81; break;      
                       case SDLK_GRAVE: set_note = 0x82; break;  
