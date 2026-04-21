@@ -1998,6 +1998,9 @@ ListBox::ListBox()
   check_off = 250;
   color_itemsel = &COLORS.EditBG;
   color_itemnosel = &COLORS.EditText;
+  typeahead_buf[0] = 0;
+  typeahead_len = 0;
+  typeahead_last_ms = 0;
 }
 
 
@@ -2387,6 +2390,25 @@ void ListBox::setCursor(int index) {
 // ------------------------------------------------------------------------------------------------
 //
 //
+LBNode *ListBox::findNodeWithPrefix(const char *prefix) {
+    if (!prefix || !*prefix) return NULL;
+    int plen = (int)strlen(prefix);
+    LBNode *w = items;
+    while (w) {
+        if (w->caption) {
+            int i;
+            for (i = 0; i < plen && w->caption[i]; i++) {
+                if (tolower((unsigned char)w->caption[i]) !=
+                    tolower((unsigned char)prefix[i]))
+                    break;
+            }
+            if (i == plen) return w;
+        }
+        w = w->next;
+    }
+    return NULL;
+}
+
 LBNode *ListBox::findNodeWithChar(char c, LBNode *start) {
     LBNode *work = start;
     if (start) {
@@ -2424,12 +2446,43 @@ int ListBox::update() {
         if (num_elements && use_key_select) {
             signed int retchar = key;//getKeyChar(key);
             LBNode *p = getNode(cur_sel + y_start);
-            if (retchar >= 0 && retchar <= 0xFF && isalpha((unsigned char)retchar) && p) {
-                char c = (char)toupper((unsigned char)retchar);
-                LBNode *n = findNodeWithChar(c,p);
+            if (retchar >= 0 && retchar <= 0xFF &&
+                (isalnum((unsigned char)retchar) || retchar == ' ' ||
+                 retchar == '.' || retchar == '-' || retchar == '_') && p) {
+                // Multi-char prefix typeahead: accumulate typed chars; reset
+                // buffer after ~800ms of idle or on first no-match. Lets the
+                // user type "music" to jump to a folder called "Music".
+                Uint64 now = SDL_GetTicks();
+                if (typeahead_len == 0 ||
+                    (now - typeahead_last_ms) > 800) {
+                    typeahead_len = 0;
+                }
+                typeahead_last_ms = now;
+                if (typeahead_len < (int)sizeof(typeahead_buf) - 1) {
+                    typeahead_buf[typeahead_len++] =
+                        (char)tolower((unsigned char)retchar);
+                    typeahead_buf[typeahead_len] = 0;
+                }
+
+                LBNode *n = findNodeWithPrefix(typeahead_buf);
                 if (n) {
                     this->setCursor(findItem(n->caption));
                     act++;
+                } else {
+                    // No prefix match — restart buffer with just this char
+                    // and fall back to the single-char cycling search.
+                    typeahead_buf[0] =
+                        (char)tolower((unsigned char)retchar);
+                    typeahead_buf[1] = 0;
+                    typeahead_len = 1;
+                    if (isalpha((unsigned char)retchar)) {
+                        char c = (char)toupper((unsigned char)retchar);
+                        LBNode *m = findNodeWithChar(c, p);
+                        if (m) {
+                            this->setCursor(findItem(m->caption));
+                            act++;
+                        }
+                    }
                 }
             }
         }

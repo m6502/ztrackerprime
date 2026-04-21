@@ -89,7 +89,7 @@ CUI_InstEditor::CUI_InstEditor(void) {
     ie = new InstEditor;
     UI->add_element(ie,tabindex++);
     ie->x = 5;
-    ie->y = TRACKS_ROW_Y;
+    ie->y = TRACKS_ROW_Y + 1;
     ie->xsize = 29;
 
     ie->ysize = MAX_INSTS ;

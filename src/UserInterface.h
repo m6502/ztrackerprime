@@ -303,6 +303,13 @@ class ListBox : public UserInterfaceElement {
         int sortstr(const char *s1, const char *s2);
         int mouseupdate(int cur_element);
         LBNode *findNodeWithChar(char c, LBNode *start);
+        LBNode *findNodeWithPrefix(const char *prefix);
+
+        // Typeahead state: accumulate typed chars and match against item
+        // prefixes (case-insensitive). Resets after ~800ms of idle.
+        char   typeahead_buf[64];
+        int    typeahead_len;
+        Uint64 typeahead_last_ms;
 
         virtual void OnChange()=0;
         virtual void OnSelect(LBNode *selected);

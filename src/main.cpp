@@ -1651,7 +1651,10 @@ void global_keys(Drawable *S)
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_HELP:
-            switch_page(UIP_Help);
+            if (ActivePage == UIP_Help && LastPage && LastPage != UIP_Help)
+                switch_page(LastPage);
+            else
+                switch_page(UIP_Help);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------

@@ -338,14 +338,14 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         sk->xsize = 19+4;
         sk->ysize = 7;   // tight-fit around installed skin count, avoids empty black space
 
-        // MIDI Out column — visual order: Refresh (y=30), list (y=32-44),
-        // Open device (y=47), Latency (y=49), Bank (y=51), Alias (y=53).
+        // MIDI Out column — visual order: Refresh (y=28), list (y=30-42),
+        // Open device (y=45), Latency (y=47), Bank (y=49), Alias (y=51).
         // tabindex follows the same order so UP/DOWN navigates top-to-bottom.
         b = new Button;
         UI->add_element(b,tabindex++);
         b->caption = " Refresh";
         b->x = 4+26;
-        b->y = 50 - 16 -2-2;
+        b->y = 48 - 16 -2-2;
         b->xsize = 9;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_RefreshMidiOutDeviceList;
@@ -354,7 +354,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(ml,tabindex++);
         midioutdevlist = ml;
         ml->x = 4;
-        ml->y = 50 - 16-2;
+        ml->y = 48 - 16-2;
         ml->xsize=35;
         ml->ysize = 13;
 
@@ -362,7 +362,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(b,tabindex++);
         b->caption = " Open device   ";
         b->x = 4+21;
-        b->y = 47;
+        b->y = 45;
         b->xsize = 14;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
@@ -371,7 +371,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
         vs->x = 13;
-        vs->y = 49;
+        vs->y = 47;
         vs->xsize = 21;
         vs->ysize = 1;
         vs->min = 0;
@@ -381,7 +381,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(cb,tabindex++);
         cb->frame = 0;
         cb->x = 25;
-        cb->y = 51;
+        cb->y = 49;
         cb->xsize = 5;
         cb->frame = 1;
 
@@ -389,7 +389,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(ti,tabindex++);
         ti->frame = 1;
         ti->x = 18;
-        ti->y = 53;
+        ti->y = 51;
         ti->xsize=43;
         ti->length=42;
 
@@ -402,7 +402,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(b,tabindex++);
         b->caption = " Refresh";
         b->x = 4+26+37;
-        b->y = 50 - 16 -2-2;
+        b->y = 48 - 16 -2-2;
         b->xsize = 9;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_RefreshMidiInDeviceList;
@@ -411,7 +411,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         midiindevlist = mi;
         UI->add_element(mi,tabindex++);
         mi->x = 4+37;
-        mi->y = 50 - 16-2;
+        mi->y = 48 - 16-2;
         mi->xsize=35;
         mi->ysize = 13;
 
@@ -419,7 +419,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(b,tabindex++);
         b->caption = " Open device   ";
         b->x = 4+21+37;
-        b->y = 47;
+        b->y = 45;
         b->xsize = 14;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiInDevice;
@@ -489,12 +489,12 @@ void CUI_Sysconfig::draw(Drawable *S) {
 #endif
         print(row(4+37+8),col(TRACKS_ROW_Y+3),"Skin Selection",COLORS.Text,S);
 
-        print(row(4),col(30),"MIDI Out Device Selection",COLORS.Text,S);
-        print(row(4+37),col(30),"MIDI In Device Selection",COLORS.Text,S);
+        print(row(4),col(28),"MIDI Out Device Selection",COLORS.Text,S);
+        print(row(4+37),col(28),"MIDI In Device Selection",COLORS.Text,S);
 
-        print(row(5),col(49),"Latency ",COLORS.Text,S);
-        print(row(5),col(51),"Reverse Bank Select ",COLORS.Text,S);
-        print(row(5),col(53),"Device Alias",COLORS.Text,S);
+        print(row(5),col(47),"Latency ",COLORS.Text,S);
+        print(row(5),col(49),"Reverse Bank Select ",COLORS.Text,S);
+        print(row(5),col(51),"Device Alias",COLORS.Text,S);
         
         need_refresh = 0; 
         updated=2;

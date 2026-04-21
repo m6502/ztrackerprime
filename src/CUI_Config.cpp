@@ -277,36 +277,36 @@ void CUI_Config::draw(Drawable *S) {
         }
 #endif
         sprintf(buf,"\n|U|Current Settings in memory:\n");
-        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autoload .ZT  |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autoload File |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile_filename);
-        sprintf(buf+strlen(buf),"\n|U| Default Dir   |L|[|H|%s|L|]",zt_config_globals.default_directory);
-        sprintf(buf+strlen(buf),"\n|U| Record Veloc  |L|[|H|%s|L|]",zt_config_globals.record_velocity?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autosave (s)  |L|[|H|%d|L|]",zt_config_globals.autosave_interval_seconds);
+        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI  |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Autoload .ZT    |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Autoload File   |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile_filename);
+        sprintf(buf+strlen(buf),"\n|U| Default Dir     |L|[|H|%s|L|]",zt_config_globals.default_directory);
+        sprintf(buf+strlen(buf),"\n|U| Record Velocity |L|[|H|%s|L|]",zt_config_globals.record_velocity?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Autosave (s)    |L|[|H|%d|L|]",zt_config_globals.autosave_interval_seconds);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        sprintf(buf+strlen(buf),"\n|U| View Mode     |L|[|H|%s|L|]",view_mode_name);
+        sprintf(buf+strlen(buf),"\n|U| View Mode       |L|[|H|%s|L|]",view_mode_name);
 #endif
-        sprintf(buf+strlen(buf),"\n|U| Highlight Inc |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Lowlight Inc  |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Pattern Len   |L|[|H|%d|L|]",zt_config_globals.pattern_length);
-        sprintf(buf+strlen(buf),"\n|U| Full Screen   |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Send Panic    |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| MIDI In Sync  |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Step Editing  |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Centered Edit |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Screen Size   |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
-        sprintf(buf+strlen(buf),"\n|U| Zoom          |L|[|H|%.2f|L|]",zt_config_globals.zoom);
-        sprintf(buf+strlen(buf),"\n|U| Scale Filter  |L|[|H|%s|L|]",zt_config_globals.scale_filter);
-        sprintf(buf+strlen(buf),"\n|U| Ctrl Nav Amt  |L|[|H|%d|L|]",zt_config_globals.control_navigation_amount);
-        sprintf(buf+strlen(buf),"\n|U| Inst Glob Vol |L|[|H|%d|L|]",zt_config_globals.instrument_global_volume);
-        sprintf(buf+strlen(buf),"\n|U| Default TPB   |L|[|H|%d|L|]",zt_config_globals.default_tpb);
-        sprintf(buf+strlen(buf),"\n|U| Default BPM   |L|[|H|%d|L|]",zt_config_globals.default_bpm);
+        sprintf(buf+strlen(buf),"\n|U| Highlight Inc   |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Lowlight Inc    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Pattern Len     |L|[|H|%d|L|]",zt_config_globals.pattern_length);
+        sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Centered Edit   |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Screen Size     |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
+        sprintf(buf+strlen(buf),"\n|U| Zoom            |L|[|H|%.2f|L|]",zt_config_globals.zoom);
+        sprintf(buf+strlen(buf),"\n|U| Scale Filter    |L|[|H|%s|L|]",zt_config_globals.scale_filter);
+        sprintf(buf+strlen(buf),"\n|U| Ctrl Nav Amt    |L|[|H|%d|L|]",zt_config_globals.control_navigation_amount);
+        sprintf(buf+strlen(buf),"\n|U| Inst Glob Vol   |L|[|H|%d|L|]",zt_config_globals.instrument_global_volume);
+        sprintf(buf+strlen(buf),"\n|U| Default TPB     |L|[|H|%d|L|]",zt_config_globals.default_tpb);
+        sprintf(buf+strlen(buf),"\n|U| Default BPM     |L|[|H|%d|L|]",zt_config_globals.default_bpm);
 #ifdef DISABLED_CONFIGURATION_VALUES
-        sprintf(buf+strlen(buf),"\n|U| Key Repeat    |L|[|H|%d|L|] (disabled)",zt_config_globals.key_repeat_time);
-        sprintf(buf+strlen(buf),"\n|U| Key Wait      |L|[|H|%d|L|] (disabled)",zt_config_globals.key_wait_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Repeat      |L|[|H|%d|L|] (disabled)",zt_config_globals.key_repeat_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Wait        |L|[|H|%d|L|] (disabled)",zt_config_globals.key_wait_time);
 #else
-        sprintf(buf+strlen(buf),"\n|U| Key Repeat    |L|[|H|%d|L|]",zt_config_globals.key_repeat_time);
-        sprintf(buf+strlen(buf),"\n|U| Key Wait      |L|[|H|%d|L|]",zt_config_globals.key_wait_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Repeat      |L|[|H|%d|L|]",zt_config_globals.key_repeat_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Wait        |L|[|H|%d|L|]",zt_config_globals.key_wait_time);
 #endif
 
         if(tb->text != NULL)
