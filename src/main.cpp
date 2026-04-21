@@ -2456,7 +2456,14 @@ void keyhandler(SDL_KeyboardEvent *e) {
                  id == SDLK_BACKSPACE || id == SDLK_DELETE || id == SDLK_RETURN ||
                  id == SDLK_TAB || id == SDLK_HOME || id == SDLK_END ||
                  id == SDLK_PAGEUP || id == SDLK_PAGEDOWN);
-            if (!is_edit_or_nav) {
+            // Modifier combos (Ctrl/Alt/Cmd+X) are shortcuts, not text input
+            // — they must flow through to global_keys / page update, not be
+            // swallowed in favor of SDL_TEXTINPUT. Without this, Ctrl+Alt+Q
+            // (quit), Ctrl+L (load), etc. stop working on any text-input
+            // page (Lua Console, Song Message).
+            const bool has_cmd_mod =
+                (mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT | SDL_KMOD_GUI)) != 0;
+            if (!is_edit_or_nav && !has_cmd_mod) {
                 if (id >= 0x20 && id < 0x7f) {
                     return;
                 }
@@ -3479,7 +3486,13 @@ int main(int argc, char *argv[])
       } else {
         focus_page = ActivePage;
       }
-      if (focus_page && focus_page->UI && focus_page->UI->has_text_focus()) {
+      bool want_text_input =
+          (focus_page && focus_page->UI && focus_page->UI->has_text_focus());
+      // Lua console has no UI widget system but still needs text input
+      // (SDL_TEXTINPUT events are the only path that delivers typed
+      // characters with a valid actual_char; plain key-downs give 0).
+      if (cur_state == STATE_LUA_CONSOLE) want_text_input = true;
+      if (want_text_input) {
         if (!zt_text_input_is_active) {
           zt_text_input_start();
         }
