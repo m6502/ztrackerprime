@@ -26,18 +26,19 @@ class KeyBuffer {
         ~KeyBuffer(void) = default ;
 
         KBKey getkey(void);
+        unsigned int getcode();
         KBMod getstate(void);
         unsigned char getactualchar(void);
         unsigned char size(void);
-        void insert(KBKey key, KBMod state = SDL_KMOD_NONE, unsigned char actual_char=0x0 );
+        void insert(KBKey key, KBMod state = SDL_KMOD_NONE, unsigned char actual_char = 0, unsigned int code = 0);
 //        void insert(unsigned char key, Keyboard &K);
         void flush(void);
 
         KBKey checkkey(void);
 
-        //unsigned char buffer[256];
         struct c {
             KBKey key;
+            unsigned int code;
             unsigned char  state;
             unsigned char actual_char;
         } buffer[256];
@@ -47,8 +48,7 @@ class KeyBuffer {
         unsigned char tail;
         unsigned char maxsize,cursize;
         unsigned char last_actual_char,actual_char;
-
-        
+        unsigned int actual_code;
 };
 
 #endif

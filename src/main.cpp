@@ -197,6 +197,7 @@ int keypress=0;
 int keywait = 0;
 zt_timer_handle keytimer = 0;
 unsigned int keyID = 0;
+static unsigned int keyCode = 0;
 
 int status_change = 0;
 
@@ -2336,7 +2337,7 @@ void TP_Keyboard_Repeat(void) {
         if ((!key_jazz) || !active_jazz_note)
             if (!(active_jazz_note && cur_state==STATE_IEDIT))
                 if (!bDontKeyRepeat && keyID != SDLK_8 && keyID != SDLK_4)
-                    Keys.insert(keyID,KS_LAST_STATE);
+                    Keys.insert(keyID,KS_LAST_STATE,0,keyCode);
         if (active_jazz_note && !key_jazz) {
             if (cur_state!=STATE_IEDIT) {
                 const mbuf st = jazz_get_state(keyID);
@@ -2361,6 +2362,7 @@ void TP_Keyboard_Repeat(void) {
 
 void keyhandler(SDL_KeyboardEvent *e) {
     KBKey id = (KBKey)e->key;
+    unsigned int scancode = e->scancode;
     KBMod mod = (KBMod)e->mod;
     unsigned char actual_ch = 0;
     int pressed = e->down ? 1 : 0;
@@ -2481,6 +2483,7 @@ void keyhandler(SDL_KeyboardEvent *e) {
             }
             if (id == keyID) {
                 keyID = 0;
+                keyCode = 0;
                 zt_timer_stop(keytimer);
             }
             if (jazz_note_is_active((int)id)) {
@@ -2492,7 +2495,7 @@ void keyhandler(SDL_KeyboardEvent *e) {
                 jazz_clear_state((int)id);
             }
         } else  {
-            Keys.insert(id, mod, actual_ch);
+            Keys.insert(id, mod, actual_ch, scancode);
             const bool allow_repeat = (!zt_text_input_is_active) ||
                 (id == SDLK_BACKSPACE || id == SDLK_DELETE ||
                  id == SDLK_LEFT || id == SDLK_RIGHT ||
@@ -2502,10 +2505,12 @@ void keyhandler(SDL_KeyboardEvent *e) {
                 keytimer = zt_timer_start(keytimer, zt_config_globals.key_wait_time, TP_Keyboard_Repeat);
                 keywait = 1;
                 keyID = id;
+                keyCode = scancode;
             } else if (!allow_repeat) {
                 zt_timer_stop(keytimer);
                 keywait = 0;
                 keyID = 0;
+                keyCode = 0;
             }
         }
     }
@@ -2543,7 +2548,7 @@ void textinputhandler(const SDL_Event *e) {
         }
     }
     if (ch >= 0x20 || ch == 10 || ch == 9) {
-        Keys.insert(SDLK_SPACE, SDL_KMOD_NONE, ch);
+        Keys.insert(SDLK_SPACE, SDL_KMOD_NONE, ch, SDL_SCANCODE_SPACE);
     }
 }
 
