@@ -370,9 +370,9 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
-        vs->x = 13;
+        vs->x = 19;                    // align with Prebuffer slider
         vs->y = 47;
-        vs->xsize = 21;
+        vs->xsize = 15;
         vs->ysize = 1;
         vs->min = 0;
         vs->max = 255;
@@ -388,10 +388,10 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti = new AliasTextInput(ml);
         UI->add_element(ti,tabindex++);
         ti->frame = 1;
-        ti->x = 18;
+        ti->x = 19;                    // align with Prebuffer slider
         ti->y = 51;
-        ti->xsize=43;
-        ti->length=42;
+        ti->xsize=42;
+        ti->length=41;
 
         ml->lvs = vs;  // link midi out list to latency value slider
         ml->bscb = cb; // link midi out list to bank select checkbox

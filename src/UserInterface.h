@@ -132,6 +132,9 @@ class GfxButton : public UserInterfaceElement {
         int state;
         int updown;
         int StuffKey,StuffKeyState;
+        // Optional second binding used when Ctrl is held at click time
+        // (e.g. Ctrl-click on the Conf toolbar button goes to System Config).
+        int CtrlStuffKey,CtrlStuffKeyState;
         ActFunc OnClick;
 
         Bitmap *bmDefault;

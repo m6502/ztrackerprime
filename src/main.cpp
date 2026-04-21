@@ -1907,6 +1907,9 @@ void make_toolbar(void)
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,0);
     gb->StuffKey = SDLK_F11;
+    // Ctrl-click jumps to System Configuration (F12) instead of Song Config.
+    gb->CtrlStuffKey = SDLK_F12;
+    gb->CtrlStuffKeyState = KS_NO_SHIFT_KEYS;
     UI_Toolbar->add_element(gb,id++);
 
     /* Stop */

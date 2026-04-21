@@ -1111,6 +1111,8 @@ GfxButton::GfxButton(void) {
     bmOnClick = NULL;
     StuffKey = -1;
     StuffKeyState = KS_NO_SHIFT_KEYS;
+    CtrlStuffKey = -1;
+    CtrlStuffKeyState = KS_NO_SHIFT_KEYS;
 }
 
 
@@ -1231,8 +1233,13 @@ int GfxButton::mouseupdate(int cur_element) {
     }
     if (act) {
         key = Keys.getkey();
-        if (StuffKey != -1 && bustit)
-            Keys.insert(StuffKey,StuffKeyState);
+        if (bustit) {
+            bool ctrl_held = (SDL_GetModState() & SDL_KMOD_CTRL) != 0;
+            if (ctrl_held && CtrlStuffKey != -1)
+                Keys.insert(CtrlStuffKey, CtrlStuffKeyState);
+            else if (StuffKey != -1)
+                Keys.insert(StuffKey, StuffKeyState);
+        }
     }
     if (cur_element != this->ID && mousestate && act) {
             need_refresh++;
