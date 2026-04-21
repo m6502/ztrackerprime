@@ -4,6 +4,24 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_18 (MIDI timer robustness — POSIX path)
+--------------------------------------------------
+
+        * POSIX timer now uses CLOCK_MONOTONIC, not CLOCK_REALTIME.
+          Wall-clock steps (NTP, DST, user-set time) no longer disturb
+          MIDI playback timing.
+        * Eliminated cumulative drift. Each tick is scheduled against an
+          absolute monotonic deadline, not "now + interval", so callback
+          runtime never bleeds into the tempo.
+        * Added catch-up that skips missed ticks on stall recovery
+          instead of firing a burst of backlogged callbacks.
+        * Fixed a use-after-free race in zt_timer_stop: teardown/free
+          moved out of the worker thread so pthread_join can safely read
+          timer->thread after the worker returns.
+        ! macOS uses pthread_cond_timedwait_relative_np (monotonic by
+          construction); Linux uses pthread_cond_timedwait with a
+          CLOCK_MONOTONIC-bound condvar.
+
 zt 2026_04_13 (PR-L .app bundle work — pending merge)
 -----------------------------------------------------
 
