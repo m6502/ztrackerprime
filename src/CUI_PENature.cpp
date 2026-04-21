@@ -9,9 +9,11 @@ CUI_PENature::CUI_PENature(void) {
     int window_width = 40 * col(1);
     int window_height = 12 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
-    for(;start_x % 8;start_x--);
+    for(;start_x % 8;start_x--)
+        ;
     int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
-    for(;start_y % 8;start_y--);
+    for(;start_y % 8;start_y--)
+        ;
     
     /* Initialize Naturalization percent Slider */
         vs = new ValueSlider;

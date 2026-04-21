@@ -625,19 +625,17 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
     {
-      unsigned long Background, Highlight, Lowlight ;
+      unsigned long Background, Highlight ;
 
       if(song->patterns[cur_edit_pattern]->custom_colors) {
 
           Background = song->patterns[cur_edit_pattern]->Background ;
           Highlight = song->patterns[cur_edit_pattern]->Highlight ;
-          Lowlight = song->patterns[cur_edit_pattern]->Lowlight ;
       }
       else {
 
           Background = COLORS.Background ;
           Highlight = COLORS.Highlight ;
-          Lowlight = COLORS.Lowlight ;
       }
 
 
@@ -655,7 +653,6 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
                 Background = song->patterns[cur_edit_pattern]->Background ;
                 Highlight = song->patterns[cur_edit_pattern]->Highlight ;
-                Lowlight = song->patterns[cur_edit_pattern]->Lowlight ;
               }
               else {
 

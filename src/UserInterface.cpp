@@ -2825,7 +2825,7 @@ void MidiOutDeviceOpener::OnChange() {
         const std::string &name = *it;
         int found_dev = -1;
         for (unsigned int i=0; i<MidiOut->numOuputDevices; i++) {
-            if (MidiOut->outputDevices[i] && MidiOut->outputDevices[i]->szName && zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
+            if (MidiOut->outputDevices[i] && zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
                 found_dev = (int)i;
                 break;
             }
@@ -3090,10 +3090,10 @@ AliasTextInput::AliasTextInput(MidiOutDeviceOpener *m) {
 
 	for(int i = 0; i < 1024; i++)
 		alias[i] = '\0';
-    this->str = (alias != NULL)?(unsigned char*)alias:(unsigned char*)"";
+    this->str = (unsigned char*)alias;
     listbox = m;
     cursor = 0;
-    length = 1023 ;//(alias != NULL)?strlen(alias):0;
+    length = 1023 ;
     sel = -1;
     sync();
 }

@@ -988,9 +988,8 @@ void zt_module::load_ZT_pattern_lengths(CDataBuf *buf) {
 //
 //
 void zt_module::load_ZT_pattern_properties(CDataBuf *buf) {
-    unsigned short int size;
     for (int i=0;i<256;i++) {
-        size = buf->getusi();
+        (void)buf->getusi();
         //this->patterns[i]->resize(size);
     }
 }
