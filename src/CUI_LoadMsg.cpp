@@ -134,6 +134,9 @@ void CUI_LoadMsg::update() {
         fixmouse++;
         need_refresh++;
         load_finished = 0;
+        // After a successful load, jump to the Instrument Editor (F3) so
+        // the user can immediately see and edit the imported instruments.
+        switch_page(UIP_InstEditor);
     }
 }
 void CUI_LoadMsg::draw(Drawable *S)
