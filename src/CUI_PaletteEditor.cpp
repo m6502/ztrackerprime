@@ -525,16 +525,6 @@ static void global_slider_rect(int which, int *x0, int *y0, int *x1, int *y1) {
     *x1 = *x0 + col(PE_GLOBAL_BAR_W);
 }
 
-static int preset_row_rect(int idx, int top_y, int *x0, int *y0, int *x1, int *y1) {
-    int ppx = col(PE_PRESET_X);
-    int ppw = col(PE_PRESET_W);
-    *x0 = ppx;
-    *x1 = ppx + ppw;
-    *y0 = top_y + row(2 + idx);                  // 1-row pitch (denser list)
-    *y1 = *y0 + row(1);
-    return 1;
-}
-
 void CUI_PaletteEditor::update(void) {
     static int digit_accum = -1;
     static int digit_channel = 0;

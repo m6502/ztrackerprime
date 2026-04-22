@@ -158,4 +158,5 @@
             *screen = c;
     };
     void Drawable::drawVLine(int x, int y, int y2, TColor c) {
+        (void)x; (void)y; (void)y2; (void)c;
     };

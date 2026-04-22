@@ -95,7 +95,9 @@ class player {
     private:
         MMRESULT wTimerID;
         zt_timer_handle ztTimerID;
+#ifdef _WIN32
         TIMECAPS tc;
+#endif
         UINT SetTimerCallback(UINT msInterval);
 
         struct s_note_off {

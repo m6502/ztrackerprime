@@ -47,11 +47,10 @@ std::atomic<int> is_loading(0);
 
 unsigned long ZT_THREAD_CALL load_thread(void *) {
     char *sstr;
-    int ret;
 
     is_loading = 1;
     load_finished = 0;
-    ret=song->load(load_filename);
+    song->load(load_filename);
 
     /* if there was a status message, display it */
     if ((sstr=song->getstatusstr())) {

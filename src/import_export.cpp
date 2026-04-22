@@ -173,12 +173,13 @@ void find_insts(unsigned char iflag[MAX_INSTS], zt_module *song)
 //
 int ZTImportExport::ExportMID(const char *fn, int format)
 {
+  (void)format;
   CDataBuf buffer, mtrk[MAX_INSTS+1], *mp;
   midi_buf *buf;
   int bpm, i, rstatus[MAX_INSTS+1], stat;
   FILE *fp;
   midi_event *e;
-  int dtime[MAX_INSTS+1], total_mtrks=1, trk, chn;
+  int dtime[MAX_INSTS+1], total_mtrks=1, trk;
   int mtrk_imap[MAX_INSTS];
   unsigned char iflag[MAX_INSTS];
   char* midiOutName;
@@ -335,9 +336,8 @@ int ZTImportExport::ExportMID(const char *fn, int format)
         
         trk = mtrk_imap[e->inst+1];
         mp = &mtrk[trk];
-        chn = e->device;
-        
-        switch(e->type) 
+
+        switch(e->type)
         {
           // ------------------------------------------------------------------
           // ------------------------------------------------------------------
@@ -1148,8 +1148,7 @@ int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
       if (zt->instruments[i]->patch <-1 || zt->instruments[i]->patch >0x7F) zt->instruments[i]->patch = -1;
       
       //strcpy((char *)&zt->instruments[i]->title[0], mod.Instruments(i).name);
-      if (mod.Instruments(i).name) memcpy(&zt->instruments[i]->title[0], mod.Instruments(i).name,24);
-      else memset(&zt->instruments[i]->title[0], 0, 24);
+      memcpy(&zt->instruments[i]->title[0], mod.Instruments(i).name, 24);
       
       for (int z=0;z<23;z++) {
         
@@ -1173,8 +1172,7 @@ int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
     
     for (int i = 0; i < mod.header.numSamples; i++) {
       
-      if (mod.Samples(i).name) memcpy(&zt->instruments[i]->title[0], mod.Samples(i).name,24);
-      else memset(&zt->instruments[i]->title[0], 0, 24);
+      memcpy(&zt->instruments[i]->title[0], mod.Samples(i).name, 24);
       
       zt->instruments[i]->default_volume = mod.Samples(i).defaultVolume*2;
       

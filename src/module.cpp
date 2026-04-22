@@ -466,8 +466,13 @@ pattern::pattern(void) {
 }
 pattern::pattern(int len) {
     int i;
+    length = len;
     for(i=0;i<ZTM_MAX_TRACKS;i++)
         tracks[i] = new track(length);
+
+    Background = COLORS.Background ;
+    Highlight = COLORS.Highlight ;
+    Lowlight = COLORS.Lowlight ;
 }
 pattern::~pattern(void) {
     int i;

@@ -976,6 +976,9 @@ void player::callback(void) {
         while(e) {
             if (e->tick == playing_tick) {
                 switch(e->type) {
+                    case ET_LOOP:
+                        // loop markers are consumed by the pattern loop logic elsewhere
+                        break;
                     case ET_MSTART:
                         if (song->flag_SendMidiStopStart)
                             MidiOut->sendGlobal(0xFA);

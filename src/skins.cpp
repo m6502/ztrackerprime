@@ -284,15 +284,6 @@ static inline void unpack_color(TColor c, int *r, int *g, int *b) {
     *b = (c      ) & 0xFF;
 }
 
-static inline void lerp_rgb(int t, int *r0, int *g0, int *b0,
-                            int r1, int g1, int b1) {
-    // t in [0..255]
-    int inv = 255 - t;
-    *r0 = (*r0 * inv + r1 * t) / 255;
-    *g0 = (*g0 * inv + g1 * t) / 255;
-    *b0 = (*b0 * inv + b1 * t) / 255;
-}
-
 static inline int clamp_byte(int v) {
     if (v < 0)   return 0;
     if (v > 255) return 255;

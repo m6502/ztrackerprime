@@ -20,19 +20,6 @@
 ZtLuaEngine g_lua;
 
 // ---------------------------------------------------------------------------
-// Internal helper: append a printf-formatted line to the scrollback
-// ---------------------------------------------------------------------------
-static void lua_engine_printf(const char *fmt, ...)
-{
-    char buf[LUA_CONSOLE_LINE_LEN];
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    g_lua.print_line(buf);
-}
-
-// ---------------------------------------------------------------------------
 // Lua print() replacement — redirects to our scrollback
 // ---------------------------------------------------------------------------
 static int l_zt_print(lua_State *L)

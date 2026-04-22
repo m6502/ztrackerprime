@@ -3574,13 +3574,10 @@ int main(int argc, char *argv[])
 
 	      zt_autosave_tick();
 
-	      static int debug_contador = 0;
 	      if(screenmanager.Refresh(screen_buffer)) {
-	        debug_contador = 0;
         zt_backend_present_frame();
       }
       else {
-        debug_contador++;
         SDL_Delay(1);
       }
     }
