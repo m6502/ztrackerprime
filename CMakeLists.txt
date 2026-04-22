@@ -142,6 +142,9 @@ if(APPLE)
   list(APPEND ZT_SOURCES ${ZT_MACOSX_ICON})
   set_source_files_properties(${ZT_MACOSX_ICON} PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources")
+  # Objective-C++ shim that captures media/brightness aux-key events
+  # and feeds them to keyhandler() as synthesized SDL F-key events.
+  list(APPEND ZT_SOURCES src/macos_fkeys.mm)
 endif()
 
 if(WIN32)
@@ -301,7 +304,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if(APPLE)
-  target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation")
+  target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation" "-framework AppKit" "-framework IOKit")
   # Turn the macOS build into a proper .app bundle with icon + Info.plist.
   set_target_properties(zt PROPERTIES
     MACOSX_BUNDLE TRUE

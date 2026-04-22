@@ -4,6 +4,25 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_22 (macOS F-key capture)
+-----------------------------------
+
+        + macOS: F1..F12 now fire zTracker bindings regardless of the
+          System Settings toggle "Use F1, F2 etc. keys as standard
+          function keys". A local NSEvent monitor watches aux-control
+          events (NSSystemDefined subtype 8) from the frontmost app and
+          feeds them to keyhandler() as synthesized SDL F-key events.
+          Covers F1/F2 (brightness), F5/F6 (keyboard illumination), and
+          F7..F12 (media). F3 (Mission Control) and F4 (Launchpad) are
+          symbolic hotkeys handled by WindowServer and cannot be
+          captured without Accessibility permission — disable them in
+          System Settings > Keyboard > Keyboard Shortcuts if you need
+          them in zt.
+        ! No Accessibility permission required. The OS default action
+          (volume/brightness change) still fires alongside the
+          zTracker binding — that is the tradeoff for avoiding a
+          CGEventTap.
+
 zt 2026_04_18 (MIDI timer robustness — POSIX path)
 --------------------------------------------------
 

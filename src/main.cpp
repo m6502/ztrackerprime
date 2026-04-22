@@ -3161,6 +3161,11 @@ int set_video_mode(int w, int h, char *errstr)
   return 1;
 }
 
+#ifdef __APPLE__
+void zt_macos_install_fkey_monitor(void);
+void zt_macos_remove_fkey_monitor(void);
+#endif
+
 static int zt_backend_init_runtime(char *errstr)
 {
   if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
@@ -3168,6 +3173,12 @@ static int zt_backend_init_runtime(char *errstr)
     zt_show_error("Error", errstr);
     return 0;
   }
+#ifdef __APPLE__
+  // Translate media/brightness aux-key events into SDL F-key events so
+  // F1..F12 bindings fire regardless of the "Use F1, F2 etc. as standard
+  // function keys" toggle in System Settings.
+  zt_macos_install_fkey_monitor();
+#endif
   return 1;
 }
 
@@ -3382,6 +3393,9 @@ static void zt_backend_release_frame_resources(void)
 
 static void zt_backend_shutdown_runtime(void)
 {
+#ifdef __APPLE__
+  zt_macos_remove_fkey_monitor();
+#endif
   if (zt_renderer) {
     SDL_DestroyRenderer(zt_renderer);
     zt_renderer = NULL;
