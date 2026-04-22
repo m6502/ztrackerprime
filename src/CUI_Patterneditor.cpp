@@ -37,10 +37,60 @@ int g_posx_tracks = 0 ;
 
 int last_unused_key = 0 ;
 
+static int clamp_int(int value, int min_value, int max_value)
+{
+  if (value < min_value) return min_value;
+  if (value > max_value) return max_value;
+  return value;
+}
+
+static void adjust_pattern_scroll_after_row_count_change(int old_edit_rows, int new_edit_rows)
+{
+  if (old_edit_rows == new_edit_rows) return;
+  if (new_edit_rows < 1) return;
+  if (!song || !song->patterns[cur_edit_pattern]) return;
+
+  int pattern_len = song->patterns[cur_edit_pattern]->length;
+  if (pattern_len < 1) return;
+
+  int old_visible_rows = old_edit_rows;
+  if (old_visible_rows > pattern_len) old_visible_rows = pattern_len;
+  if (old_visible_rows < 1) old_visible_rows = 1;
+
+  int new_visible_rows = new_edit_rows;
+  if (new_visible_rows > pattern_len) new_visible_rows = pattern_len;
+  if (new_visible_rows < 1) new_visible_rows = 1;
+
+  int old_max_scroll = pattern_len - old_visible_rows;
+  if (old_max_scroll < 0) old_max_scroll = 0;
+
+  int old_top = clamp_int(cur_edit_row_disp, 0, old_max_scroll);
+  int cursor_row = clamp_int(cur_edit_row, 0, pattern_len - 1);
+  int cursor_offset = cursor_row - old_top;
+
+  if (cursor_offset < 0) cursor_offset = 0;
+  if (cursor_offset > old_visible_rows - 1) cursor_offset = old_visible_rows - 1;
+
+  int new_top;
+
+  if (cursor_offset >= old_visible_rows / 2) {
+    int rows_below_cursor = old_visible_rows - 1 - cursor_offset;
+    new_top = cursor_row - (new_visible_rows - 1 - rows_below_cursor);
+  }
+  else {
+    new_top = cursor_row - cursor_offset;
+  }
+
+  int new_max_scroll = pattern_len - new_visible_rows;
+  if (new_max_scroll < 0) new_max_scroll = 0;
+
+  cur_edit_row_disp = clamp_int(new_top, 0, new_max_scroll);
+}
+
 // ------------------------------------------------------------------------------------------------
 //
 //
-void set_effect_data_msg(char *str, unsigned char effect, unsigned short int effect_data) 
+void set_effect_data_msg(char *str, unsigned char effect, unsigned short int effect_data)
 {
   int temp = effect_data;
 
@@ -921,7 +971,10 @@ void CUI_Patterneditor::leave(void)
 //
 void CUI_Patterneditor::update()
 {
+  int old_pattern_edit_rows = PATTERN_EDIT_ROWS;
   PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
+  if (PATTERN_EDIT_ROWS < 1) PATTERN_EDIT_ROWS = 1;
+  int pattern_edit_rows_changed = (old_pattern_edit_rows != PATTERN_EDIT_ROWS);
 
   int i,j,p=0,step=0,noplay=0,bump=0;
   unsigned char set_note=0xff,kstate;
@@ -940,6 +993,11 @@ void CUI_Patterneditor::update()
   
   clear = 0;
   keypress = 0;
+  if (pattern_edit_rows_changed) {
+    adjust_pattern_scroll_after_row_count_change(old_pattern_edit_rows, PATTERN_EDIT_ROWS);
+    need_refresh++;
+    clear++;
+  }
   //memset(note,0,4);
 
 //  int pattern_visible ;
