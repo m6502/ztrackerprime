@@ -14,7 +14,9 @@ zt 2026_04_23 (MIDI Clock tempo chase)
           preserved on save.
         + New zt.conf flag `midi_in_sync_chase_tempo` (default no).
           Requires `midi_in_sync = yes` and a MIDI input device open.
-          Config-only in this release; UI checkbox to follow.
+          Toggleable from Global Config (F12) — two new checkboxes
+          "MIDI In Sync" and "Chase MIDI Tempo" on page 2 alongside
+          the existing Record Velocity / Autoload toggles.
         ! Transport sync (Start/Continue/Stop/Song Position Pointer)
           was already handled — this adds the missing tempo-chase leg
           so Logic/Cubase/Ableton can drive zTracker's speed live.
