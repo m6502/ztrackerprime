@@ -1651,7 +1651,10 @@ void global_keys(Drawable *S)
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_HELP:
-            switch_page(UIP_Help);
+            if (ActivePage == UIP_Help && LastPage && LastPage != UIP_Help)
+                switch_page(LastPage);
+            else
+                switch_page(UIP_Help);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
@@ -1904,6 +1907,9 @@ void make_toolbar(void)
     gb->ysize = NORMAL_BUTTONS_SIZE_Y ;
     grab_buttons(gb,57,0);
     gb->StuffKey = SDLK_F11;
+    // Ctrl-click jumps to System Configuration (F12) instead of Song Config.
+    gb->CtrlStuffKey = SDLK_F12;
+    gb->CtrlStuffKeyState = KS_NO_SHIFT_KEYS;
     UI_Toolbar->add_element(gb,id++);
 
     /* Stop */

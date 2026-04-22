@@ -37,7 +37,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,0);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 13;
+    cb->y = 14;
     cb->xsize = 5;
     cb->value = &zt_config_globals.autoload_ztfile;
     cb->frame = 1;
@@ -46,7 +46,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,1);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 14;
+    ti->y = 15;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.autoload_ztfile_filename;
@@ -55,7 +55,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,2);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 16;
+    ti->y = 17;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
@@ -64,7 +64,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,3);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 18;
+    cb->y = 19;
     cb->xsize = 5;
     cb->value = &zt_config_globals.record_velocity;
     cb->frame = 1;
@@ -72,7 +72,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,4);
     vs->x = 20;
-    vs->y = 19;
+    vs->y = 20;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.autosave_interval_seconds;
@@ -82,7 +82,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 20;
+    vs->y = 21;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.cur_edit_mode;
@@ -100,7 +100,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,6);
     vs->x = 20;
-    vs->y = 21;
+    vs->y = 22;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.highlight_increment;
@@ -110,7 +110,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,7);
     vs->x = 20;
-    vs->y = 22;
+    vs->y = 23;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
@@ -120,7 +120,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,8);
     vs->x = 20;
-    vs->y = 23;
+    vs->y = 24;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -188,7 +188,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(tb, 9);
     tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
     tb->x = 1;
-    tb->y = 25;
+    tb->y = 26;
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
@@ -205,6 +205,9 @@ void CUI_Config::enter(void) {
     need_refresh = 1;
     cur_state = STATE_CONFIG;
     Keys.flush();
+    // Start with focus on "Go to page 1" so the user can bounce straight
+    // back to System Config without tabbing past every field first.
+    UI->set_focus(10);
 }
 
 void CUI_Config::leave(void) {
@@ -276,37 +279,37 @@ void CUI_Config::draw(Drawable *S) {
             case VIEW_BIG:     view_mode_name = "Big"; break;
         }
 #endif
-        sprintf(buf,"\n|U|Current Settings in memory:\n");
-        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autoload .ZT  |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autoload File |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile_filename);
-        sprintf(buf+strlen(buf),"\n|U| Default Dir   |L|[|H|%s|L|]",zt_config_globals.default_directory);
-        sprintf(buf+strlen(buf),"\n|U| Record Veloc  |L|[|H|%s|L|]",zt_config_globals.record_velocity?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autosave (s)  |L|[|H|%d|L|]",zt_config_globals.autosave_interval_seconds);
+        sprintf(buf,"|U|Current Settings in memory:");
+        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI  |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Autoload .ZT    |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Autoload File   |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile_filename);
+        sprintf(buf+strlen(buf),"\n|U| Default Dir     |L|[|H|%s|L|]",zt_config_globals.default_directory);
+        sprintf(buf+strlen(buf),"\n|U| Record Velocity |L|[|H|%s|L|]",zt_config_globals.record_velocity?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Autosave (s)    |L|[|H|%d|L|]",zt_config_globals.autosave_interval_seconds);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        sprintf(buf+strlen(buf),"\n|U| View Mode     |L|[|H|%s|L|]",view_mode_name);
+        sprintf(buf+strlen(buf),"\n|U| View Mode       |L|[|H|%s|L|]",view_mode_name);
 #endif
-        sprintf(buf+strlen(buf),"\n|U| Highlight Inc |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Lowlight Inc  |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Pattern Len   |L|[|H|%d|L|]",zt_config_globals.pattern_length);
-        sprintf(buf+strlen(buf),"\n|U| Full Screen   |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Send Panic    |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| MIDI In Sync  |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Step Editing  |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Centered Edit |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Screen Size   |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
-        sprintf(buf+strlen(buf),"\n|U| Zoom          |L|[|H|%.2f|L|]",zt_config_globals.zoom);
-        sprintf(buf+strlen(buf),"\n|U| Scale Filter  |L|[|H|%s|L|]",zt_config_globals.scale_filter);
-        sprintf(buf+strlen(buf),"\n|U| Ctrl Nav Amt  |L|[|H|%d|L|]",zt_config_globals.control_navigation_amount);
-        sprintf(buf+strlen(buf),"\n|U| Inst Glob Vol |L|[|H|%d|L|]",zt_config_globals.instrument_global_volume);
-        sprintf(buf+strlen(buf),"\n|U| Default TPB   |L|[|H|%d|L|]",zt_config_globals.default_tpb);
-        sprintf(buf+strlen(buf),"\n|U| Default BPM   |L|[|H|%d|L|]",zt_config_globals.default_bpm);
+        sprintf(buf+strlen(buf),"\n|U| Highlight Inc   |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Lowlight Inc    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Pattern Len     |L|[|H|%d|L|]",zt_config_globals.pattern_length);
+        sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Centered Edit   |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Screen Size     |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
+        sprintf(buf+strlen(buf),"\n|U| Zoom            |L|[|H|%.2f|L|]",zt_config_globals.zoom);
+        sprintf(buf+strlen(buf),"\n|U| Scale Filter    |L|[|H|%s|L|]",zt_config_globals.scale_filter);
+        sprintf(buf+strlen(buf),"\n|U| Ctrl Nav Amt    |L|[|H|%d|L|]",zt_config_globals.control_navigation_amount);
+        sprintf(buf+strlen(buf),"\n|U| Inst Glob Vol   |L|[|H|%d|L|]",zt_config_globals.instrument_global_volume);
+        sprintf(buf+strlen(buf),"\n|U| Default TPB     |L|[|H|%d|L|]",zt_config_globals.default_tpb);
+        sprintf(buf+strlen(buf),"\n|U| Default BPM     |L|[|H|%d|L|]",zt_config_globals.default_bpm);
 #ifdef DISABLED_CONFIGURATION_VALUES
-        sprintf(buf+strlen(buf),"\n|U| Key Repeat    |L|[|H|%d|L|] (disabled)",zt_config_globals.key_repeat_time);
-        sprintf(buf+strlen(buf),"\n|U| Key Wait      |L|[|H|%d|L|] (disabled)",zt_config_globals.key_wait_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Repeat      |L|[|H|%d|L|] (disabled)",zt_config_globals.key_repeat_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Wait        |L|[|H|%d|L|] (disabled)",zt_config_globals.key_wait_time);
 #else
-        sprintf(buf+strlen(buf),"\n|U| Key Repeat    |L|[|H|%d|L|]",zt_config_globals.key_repeat_time);
-        sprintf(buf+strlen(buf),"\n|U| Key Wait      |L|[|H|%d|L|]",zt_config_globals.key_wait_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Repeat      |L|[|H|%d|L|]",zt_config_globals.key_repeat_time);
+        sprintf(buf+strlen(buf),"\n|U| Key Wait        |L|[|H|%d|L|]",zt_config_globals.key_wait_time);
 #endif
 
         if(tb->text != NULL)
@@ -314,11 +317,13 @@ void CUI_Config::draw(Drawable *S) {
             free((void*)tb->text);
         }
         tb->text = strdup(buf);
-        // Auto-fit textbox height to actual content (count newlines + small pad).
+        // Auto-fit textbox height to actual content (count newlines).
+        // No trailing pad row — avoids wasted black space at the bottom.
         {
             int nlines = 1;
             for (const char *p = buf; *p; p++) if (*p == '\n') nlines++;
-            tb->ysize = nlines + 1;
+            tb->ysize = nlines - 1;
+            if (tb->ysize < 1) tb->ysize = 1;
         }
         UI->draw(S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
@@ -342,17 +347,17 @@ void CUI_Config::draw(Drawable *S) {
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
-        print(row(2),col(13),"Autoload .ZT",COLORS.Text,S);
-        print(row(2),col(14),"Autoload File",COLORS.Text,S);
-        print(row(2),col(16),"Default Dir",COLORS.Text,S);
-        print(row(2),col(18),"Record Velocity",COLORS.Text,S);
-        print(row(2),col(19),"Autosave (sec)",COLORS.Text,S);
+        print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
+        print(row(2),col(15),"Autoload File",COLORS.Text,S);
+        print(row(2),col(17),"Default Dir",COLORS.Text,S);
+        print(row(2),col(19),"Record Velocity",COLORS.Text,S);
+        print(row(2),col(20),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(2),col(20),"Default View",COLORS.Text,S);
+        print(row(2),col(21),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(21),"Default Highlight",COLORS.Text,S);
-        print(row(2),col(22),"Default Lowlight",COLORS.Text,S);
-        print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
+        print(row(2),col(22),"Default Highlight",COLORS.Text,S);
+        print(row(2),col(23),"Default Lowlight",COLORS.Text,S);
+        print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
