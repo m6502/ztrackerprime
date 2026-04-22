@@ -37,6 +37,7 @@ name: Build
 on:
   push:
     branches: ['**']
+    tags: ['v*']
   pull_request:
     branches: [master]
 
@@ -148,6 +149,23 @@ jobs:
           path: dist/ztrackerprime-linux-x86_64
           if-no-files-found: error
 
+      - name: Package release tarball
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          TAG="${GITHUB_REF_NAME}"
+          tar -czf "ztrackerprime-${TAG}-linux-x86_64.tar.gz" ztrackerprime-linux-x86_64
+
+      - name: Upload release asset (linux)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-x86_64
+          path: dist/ztrackerprime-*-linux-x86_64.tar.gz
+          if-no-files-found: error
+
   # ---------------------------------------------------------------------------
   # macOS arm64 (Apple Silicon)
   # ---------------------------------------------------------------------------
@@ -191,6 +209,38 @@ jobs:
         with:
           name: ztrackerprime-macos-arm64
           path: dist/ztrackerprime-macos-arm64
+          if-no-files-found: error
+
+      - name: Package release (zip + unsigned DMG)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          TAG="${GITHUB_REF_NAME}"
+          ARCH="arm64"
+          # Zip of the full staged dir (zt.app + zt.conf + skins + doc).
+          # ditto preserves .app bundle structure and resource forks.
+          ditto -c -k --sequesterRsrc --keepParent \
+            "ztrackerprime-macos-${ARCH}" \
+            "ztrackerprime-${TAG}-macos-${ARCH}.zip"
+          # Unsigned DMG containing just zt.app (self-contained — the bundle
+          # already has skins/doc/zt.conf copied into Contents/Resources/
+          # by the CMake POST_BUILD step).
+          hdiutil create \
+            -volname "zTracker ${TAG} (${ARCH})" \
+            -srcfolder "ztrackerprime-macos-${ARCH}/zt.app" \
+            -fs HFS+ -format UDZO -ov \
+            "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
+
+      - name: Upload release asset (macos-arm64)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-arm64
+          path: |
+            dist/ztrackerprime-*-macos-arm64.zip
+            dist/ztrackerprime-*-macos-arm64.dmg
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
@@ -238,6 +288,33 @@ jobs:
         with:
           name: ztrackerprime-macos-x86_64
           path: dist/ztrackerprime-macos-x86_64
+          if-no-files-found: error
+
+      - name: Package release (zip + unsigned DMG)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          TAG="${GITHUB_REF_NAME}"
+          ARCH="x86_64"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "ztrackerprime-macos-${ARCH}" \
+            "ztrackerprime-${TAG}-macos-${ARCH}.zip"
+          hdiutil create \
+            -volname "zTracker ${TAG} (${ARCH})" \
+            -srcfolder "ztrackerprime-macos-${ARCH}/zt.app" \
+            -fs HFS+ -format UDZO -ov \
+            "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
+
+      - name: Upload release asset (macos-x86_64)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-x86_64
+          path: |
+            dist/ztrackerprime-*-macos-x86_64.zip
+            dist/ztrackerprime-*-macos-x86_64.dmg
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
@@ -345,6 +422,23 @@ jobs:
           path: dist/ztrackerprime-windows-x86-xp
           if-no-files-found: error
 
+      - name: Package release zip
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          TAG="${GITHUB_REF_NAME}"
+          zip -r "ztrackerprime-${TAG}-windows-x86-xp.zip" ztrackerprime-windows-x86-xp
+
+      - name: Upload release asset (windows-x86-xp)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x86-xp
+          path: dist/ztrackerprime-*-windows-x86-xp.zip
+          if-no-files-found: error
+
   # ---------------------------------------------------------------------------
   # Windows x64 -- MSVC, modern Windows 10/11 target
   # ---------------------------------------------------------------------------
@@ -427,3 +521,64 @@ jobs:
           name: ztrackerprime-windows-x64
           path: dist/ztrackerprime-windows-x64
           if-no-files-found: error
+
+      - name: Package release zip
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          Set-Location dist
+          Compress-Archive -Path ztrackerprime-windows-x64 `
+            -DestinationPath "ztrackerprime-$tag-windows-x64.zip" -Force
+
+      - name: Upload release asset (windows-x64)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-x64
+          path: dist/ztrackerprime-*-windows-x64.zip
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Release — runs only on tag pushes (v*). Gathers the release-* artifacts
+  # from each platform job and publishes a draft GitHub Release. Draft, not
+  # published, so the maintainer reviews the asset list before announcing.
+  #
+  # Codesigning / notarization are intentionally skipped for this first pass
+  # (explicitly approved). macOS DMGs are ad-hoc signed only — users will see
+  # the Gatekeeper warning and can right-click > Open on first launch.
+  # Adding a Developer ID Application cert + notarytool + signing secrets
+  # is a follow-up PR once the basic tag-to-release flow is validated.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release (draft)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - linux-x86_64
+      - macos-arm64
+      - macos-x86_64
+      - windows-x86-xp
+      - windows-x64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-*
+          merge-multiple: true
+
+      - name: List collected assets
+        run: |
+          set -euo pipefail
+          ls -la release-assets/
+
+      - name: Publish draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          draft: true
+          generate_release_notes: true
