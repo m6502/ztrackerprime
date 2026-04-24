@@ -385,11 +385,57 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
               switch(msg) {
                 case 0xF8: // MIDI CLOCK
                     g_midi_in_clocks_received++;
-/*                  sprintf(szStatmsg, "Midi CLOCK");
-                    statusmsg = szStatmsg;
-                    status_change = 1;
-                    need_refresh++; 
-*/                  break;
+                    // Tempo chase: derive BPM from the rolling average of
+                    // 24 clock intervals (= one quarter note) and push the
+                    // result into the live player without mutating
+                    // song->bpm. Gated on midi_in_sync_chase_tempo so users
+                    // who want only transport sync (Start/Stop/SPP) are
+                    // unaffected. Only active while playing — Logic sends
+                    // clocks even when stopped.
+                    if (zt_config_globals.midi_in_sync_chase_tempo
+                        && ztPlayer && ztPlayer->playing) {
+                        // File-local state — only written from this MIDI-in
+                        // callback thread, so no cross-thread locking needed
+                        // for the ring itself.
+                        static Uint64 s_last_clock_ms = 0;
+                        static int    s_ring[24] = {0};
+                        static int    s_ring_idx = 0;
+                        static int    s_ring_count = 0;
+                        static int    s_last_pushed_bpm = 0;
+
+                        Uint64 now = SDL_GetTicks();
+                        if (s_last_clock_ms != 0) {
+                            int interval = (int)(now - s_last_clock_ms);
+                            // Sanity window: 24..2500 BPM range expressed
+                            // as per-clock ms (60000/(24*bpm)).
+                            if (interval > 0 && interval < 1000) {
+                                s_ring[s_ring_idx] = interval;
+                                s_ring_idx = (s_ring_idx + 1) % 24;
+                                if (s_ring_count < 24) s_ring_count++;
+                                if (s_ring_count == 24) {
+                                    int sum = 0;
+                                    for (int i = 0; i < 24; ++i) sum += s_ring[i];
+                                    // 24 intervals == one beat, so BPM =
+                                    // 60_000 ms / sum_ms.
+                                    int bpm = (sum > 0) ? (60000 / sum) : 0;
+                                    if (bpm >= 20 && bpm <= 500
+                                        && bpm != s_last_pushed_bpm) {
+                                        ztPlayer->chase_external_tempo(bpm);
+                                        s_last_pushed_bpm = bpm;
+                                    }
+                                }
+                            } else {
+                                // Out-of-range interval — treat as dropout,
+                                // reset the ring so we rebuild a clean
+                                // average once clocks resume.
+                                s_ring_count = 0;
+                                s_ring_idx = 0;
+                                s_last_pushed_bpm = 0;
+                            }
+                        }
+                        s_last_clock_ms = now;
+                    }
+                    break;
 
                 case 0xF2: // MIDI SONG POSITION POINTER
                     song_pos_ptr = (dwParam1&0x7F0000)>>9 |
