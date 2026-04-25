@@ -230,8 +230,9 @@ void CUI_Help::update() {
             Keys.getkey(); // consume
             if (kstate & KS_SHIFT) {
                 // Previous section: largest section_lines[i] strictly
-                // less than current startline.
-                int target = 0;
+                // less than current startline. If we're already at or
+                // before the first section, wrap to the last.
+                int target = section_lines[section_count - 1];
                 for (int i = section_count - 1; i >= 0; i--) {
                     if (section_lines[i] < tb->startline) {
                         target = section_lines[i];
