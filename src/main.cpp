@@ -923,9 +923,11 @@ void update_status(Drawable *S)
   int i,o=0;
   char str[10];
 
-  // Only refresh the playing/looping status line when viewing the Pattern
-  // Editor; otherwise it bleeds over Help/Sample/Song/Sys Config pages.
-  if (ztPlayer->playing && cur_state == STATE_PEDIT) {
+  // Refresh the playing/looping status line on the pages where it makes
+  // sense (Pattern Editor + Play Song). Other pages (Help, Instrument
+  // Editor, Sys Config…) keep the status bar quiet so the playback line
+  // doesn't bleed over their own UI.
+  if (ztPlayer->playing && (cur_state == STATE_PEDIT || cur_state == STATE_PLAY)) {
 
     if (ztPlayer->playmode) {
 
@@ -952,8 +954,8 @@ void update_status(Drawable *S)
       need_refresh++;
     }
   }
-  else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
-    // Keep statusmsg quiet on non-Pattern pages while playing.
+  else if (ztPlayer->playing && cur_state != STATE_PEDIT && cur_state != STATE_PLAY) {
+    // Keep statusmsg quiet on Help/InstEdit/SysConfig/etc while playing.
     statusmsg = (char*)" ";
   }
 
