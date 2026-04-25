@@ -159,7 +159,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package release tarball
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         shell: bash
         run: |
           set -euo pipefail
@@ -168,7 +168,7 @@ jobs:
           tar -czf "ztrackerprime-${TAG}-linux-x86_64.tar.gz" ztrackerprime-linux-x86_64
 
       - name: Upload release asset (linux)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         uses: actions/upload-artifact@v4
         with:
           name: release-linux-x86_64
@@ -224,7 +224,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package release (zip + unsigned DMG)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         shell: bash
         run: |
           set -euo pipefail
@@ -248,7 +248,7 @@ jobs:
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
       - name: Upload release asset (macos-arm64)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         uses: actions/upload-artifact@v4
         with:
           name: release-macos-arm64
@@ -306,7 +306,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package release (zip + unsigned DMG)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         shell: bash
         run: |
           set -euo pipefail
@@ -326,7 +326,7 @@ jobs:
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
       - name: Upload release asset (macos-x86_64)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         uses: actions/upload-artifact@v4
         with:
           name: release-macos-x86_64
@@ -441,7 +441,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package release zip
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         shell: bash
         run: |
           set -euo pipefail
@@ -450,7 +450,7 @@ jobs:
           zip -r "ztrackerprime-${TAG}-windows-x86-xp.zip" ztrackerprime-windows-x86-xp
 
       - name: Upload release asset (windows-x86-xp)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         uses: actions/upload-artifact@v4
         with:
           name: release-windows-x86-xp
@@ -541,7 +541,7 @@ jobs:
           if-no-files-found: error
 
       - name: Package release zip
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         shell: pwsh
         run: |
           $tag = $env:RELEASE_TAG
@@ -550,7 +550,7 @@ jobs:
             -DestinationPath "ztrackerprime-$tag-windows-x64.zip" -Force
 
       - name: Upload release asset (windows-x64)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         uses: actions/upload-artifact@v4
         with:
           name: release-windows-x64
