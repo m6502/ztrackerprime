@@ -114,7 +114,16 @@ CUI_Help::CUI_Help(void) {
                             if (n == 1 && (*p == 'W' || *p == 'H')) return true;
                             return false;
                         };
-                        if (is_reserved(src + key_start, key_len)) {
+                        // Compound combos like "SHIFT-X" expand to
+                        // "CMD-SHIFT-X/ALT-SHIFT-X" which doubles the
+                        // length and pushes the colon way past the
+                        // source's column. That destroys row-to-row
+                        // colon alignment and looks bad. Keep the
+                        // source modifier verbatim for these.
+                        bool key_starts_with_shift =
+                            key_len >= 6 && strncmp(src + key_start, "SHIFT-", 6) == 0;
+                        if (is_reserved(src + key_start, key_len)
+                            || key_starts_with_shift) {
                             memcpy(dst + di, src + i, kw_len + key_len);
                             di += kw_len + key_len;
                             i = key_end;

@@ -88,8 +88,8 @@
 
 |L|%==|H|Instrument Editor|L|==%|U|
 
- ALT-1 => 1 : Quick selects midi device
- CTRL-1=> 9 : Quick selects midi channel
+ ALT-1 => 1: Quick selects midi device
+ CTRL-1 => 9: Quick selects midi channel
  ALT-T      : Toggle tracker mode on/off
  Mouse-2    : Focus a slider
 
@@ -154,37 +154,23 @@
 |L|%==|H|Effects|L|==%|U|
 
  A..xx      : Set TPB (ticks per beat)
-
  B  00      : Set "[" in the midi file.
-
  B  01      : Set "]" in the midi file.
-
  Cxxxx      : Pattern break - setting the C marker denotes the end of a
               pattern.  ex: C0000 will skip to the next pattern, row 0
-
  D..xx      : Delay note/volume/cut - by xxxx sub-ticks.
-
  Exxxx      : Pitch slide down, E0000 will repeat the last portamento command.
-
  Fxxxx      : Pitch slide up, F0000 will repeat the last portamento down command.
-
  P....      : Send program change message for the current instrument.
-
  Q..xx      : Retrig note every xx subticks
-
  R..xx      : Start arpeggio xx.  R0000 will continue the last arpeggio
-
  Sxxyy      : xx is the CC (Continuous Controller) number, yy is the value (0-80).
               ex. S0142 will set CC #01 (Mod Wheel) to a value of 42.
               >=80 sends last value
-
  T..xx      : Set tempo to xx bpm
-
  Wxxxx      : Absolute pitch set, between 0 and 3FFF, 2000 is no pitch change,
               0 is max down, 3FFF is max up
-
  X..xx      : Set panning, 00=left, 40=center, 7F=right
-
  Zxxyy      : Send midimacro xx with parameter yy.  00 repeats the last used
               value
 

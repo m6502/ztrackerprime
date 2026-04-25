@@ -70,11 +70,9 @@ void CUI_SongMessage::enter(void) {
     need_refresh++;
     cur_state = STATE_SONG_MESSAGE;
     CommentEditor *cb = (CommentEditor*)UI->get_element(0);
-//    buffer = new CDataBuf;
-//    buffer->pushstr(song->songmessage->songmessage);
     buffer = song->songmessage->songmessage;
     cb->target = buffer;
-    cb->text = buffer->getbuffer();
+    cb->refresh_display();
     zt_text_input_start();
 }
 
@@ -112,11 +110,10 @@ void CUI_SongMessage::draw(Drawable *S) {
     CommentEditor *cb = (CommentEditor*)UI->get_element(0);
     cb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
     cb->ysize = (INTERNAL_RESOLUTION_Y/8) - cb->y - 8;
-    // Refresh the text pointer in case CDataBuf::pushc realloc'd the
-    // backing buffer (every DATABUF_CHUNK_SIZE chars). Without this
-    // typed text would be invisible because the cached pointer is
-    // either stale or NULL (NULL when entering an empty message).
-    if (buffer) cb->text = buffer->getbuffer();
+    // Refresh the null-terminated display mirror so TextBox::draw has
+    // a clean string to walk (CDataBuf is not null-terminated; reading
+    // past the live byte count walks heap garbage).
+    cb->refresh_display();
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);

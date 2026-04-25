@@ -2578,7 +2578,13 @@ void textinputhandler(const SDL_Event *e) {
             }
         }
     }
-    if (ch >= 0x20 || ch == 10 || ch == 9) {
+    // Newline (\n, 0x0A) is delivered via the dedicated SDLK_RETURN
+    // keydown path (keyhandler sets actual_ch=10 for SDLK_RETURN).
+    // If we ALSO let it through here, every Enter press pushes two
+    // newlines in widgets that handle both paths. Same logic for Tab —
+    // SDLK_TAB has its own meaning (widget focus cycling) and shouldn't
+    // be appended as text.
+    if (ch >= 0x20) {
         Keys.insert(SDLK_SPACE, SDL_KMOD_NONE, ch, SDL_SCANCODE_SPACE);
     }
 }
