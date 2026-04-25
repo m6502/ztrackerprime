@@ -48,10 +48,12 @@ CUI_SongMessage::CUI_SongMessage(void) {
     tb = new CommentEditor;
     UI->add_element(tb, 0);
     tb->x = 1;
-    tb->y = 14;
+    tb->y = 12;
     tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
-    tb->ysize = 36+ ((INTERNAL_RESOLUTION_Y-480)/8);
-    tb->text = NULL;//"\n\n  This is the song comment.  Edit me!";
+    // Bottom-anchor: same formula as CUI_Help so the textbox never
+    // bleeds into the toolbar strip at INTERNAL_RESOLUTION_Y - 55.
+    tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
+    tb->text = NULL;
     needfree = 0;
     buffer = NULL;
 }
@@ -105,6 +107,16 @@ void CUI_SongMessage::update() {
 }
 
 void CUI_SongMessage::draw(Drawable *S) {
+    // Re-run the bottom-anchored sizing in case the window has been
+    // resized since the page was constructed.
+    CommentEditor *cb = (CommentEditor*)UI->get_element(0);
+    cb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    cb->ysize = (INTERNAL_RESOLUTION_Y/8) - cb->y - 8;
+    // Refresh the text pointer in case CDataBuf::pushc realloc'd the
+    // backing buffer (every DATABUF_CHUNK_SIZE chars). Without this
+    // typed text would be invisible because the cached pointer is
+    // either stale or NULL (NULL when entering an empty message).
+    if (buffer) cb->text = buffer->getbuffer();
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);

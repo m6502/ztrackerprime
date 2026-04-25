@@ -3237,17 +3237,35 @@ int CommentEditor::update() {
         case SDLK_LEFT: act++; soff--; break;
         case SDLK_RIGHT:act++; soff++; break;
         case SDLK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
-
+        case SDLK_BACKSPACE:
+            if (target) {
+                target->popc();
+                // Refresh text pointer; popc may have shrunk the
+                // alloc and realloc'd to a new address.
+                this->text = target->getbuffer();
+                act++;
+            }
+            break;
+        case SDLK_RETURN:
+            if (target) {
+                target->pushc('\n');
+                this->text = target->getbuffer();
+                act++;
+            }
+            break;
         default:
             if (ch != 0x0) {
                 if (target) {
                     target->pushc(ch);
+                    // CDataBuf::pushc grows in DATABUF_CHUNK_SIZE
+                    // increments via realloc — refresh our cached
+                    // text pointer so TextBox::draw renders the
+                    // current contents (and so an initially-NULL
+                    // empty buffer becomes visible after first char).
+                    this->text = target->getbuffer();
                     act++;
                 }
             }
-            //        case SDLK_SPACE:  //  / Same thing
-//        case SDLK_RETURN: //  \ Same thingg
-//            break;
         }
         if (act) {
             Keys.getkey();
