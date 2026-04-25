@@ -75,10 +75,16 @@ static inline void zt_text_input_stop(void) {
 //#include "sdl_mixer.h"  // this is for audio testing
 
 
-#define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
+// Song Message editor: editor mutates song->songmessage->songmessage
+// (a CDataBuf) in place, and ztfile-io::build_song_message() already
+// serializes that CDataBuf into the .zt file. So unblocking F10 is
+// safe — typed text persists across save/reload.
+//#define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
 #define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
 // Midimacro editor is reachable now (Ctrl-M / Shift-F4). Leave the
 // "unfinished" macro undefined so the dispatch and case blocks compile.
+// NOTE: the editor itself is still a 10–15% stub (single "name" text
+// field not wired to song data) — finishing it is a separate PR.
 //#define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
 
 
