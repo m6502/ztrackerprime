@@ -212,6 +212,9 @@ jobs:
           cp zt.conf                 dist/ztrackerprime-macos-arm64/
           cp -R skins                dist/ztrackerprime-macos-arm64/
           cp -R doc                  dist/ztrackerprime-macos-arm64/
+          # macOS users hit "zt.app is damaged" because the build is unsigned
+          # (no Apple Developer Program). README explains the xattr fix.
+          cp .github/release-notes/README-MAC.txt dist/ztrackerprime-macos-arm64/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -228,17 +231,19 @@ jobs:
           cd dist
           TAG="${RELEASE_TAG}"
           ARCH="arm64"
-          # Zip of the full staged dir (zt.app + zt.conf + skins + doc).
+          # Zip of the full staged dir (zt.app + zt.conf + skins + doc + README-MAC.txt).
           # ditto preserves .app bundle structure and resource forks.
           ditto -c -k --sequesterRsrc --keepParent \
             "ztrackerprime-macos-${ARCH}" \
             "ztrackerprime-${TAG}-macos-${ARCH}.zip"
-          # Unsigned DMG containing just zt.app (self-contained — the bundle
-          # already has skins/doc/zt.conf copied into Contents/Resources/
-          # by the CMake POST_BUILD step).
+          # Unsigned DMG: zt.app + README-MAC.txt side by side, so the user sees
+          # the quarantine-fix instructions immediately on mounting the DMG.
+          mkdir -p "dmg-staging-${ARCH}"
+          cp -R "ztrackerprime-macos-${ARCH}/zt.app"         "dmg-staging-${ARCH}/"
+          cp    "ztrackerprime-macos-${ARCH}/README-MAC.txt" "dmg-staging-${ARCH}/"
           hdiutil create \
             -volname "zTracker ${TAG} (${ARCH})" \
-            -srcfolder "ztrackerprime-macos-${ARCH}/zt.app" \
+            -srcfolder "dmg-staging-${ARCH}" \
             -fs HFS+ -format UDZO -ov \
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
@@ -291,6 +296,7 @@ jobs:
           cp zt.conf                 dist/ztrackerprime-macos-x86_64/
           cp -R skins                dist/ztrackerprime-macos-x86_64/
           cp -R doc                  dist/ztrackerprime-macos-x86_64/
+          cp .github/release-notes/README-MAC.txt dist/ztrackerprime-macos-x86_64/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -310,9 +316,12 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             "ztrackerprime-macos-${ARCH}" \
             "ztrackerprime-${TAG}-macos-${ARCH}.zip"
+          mkdir -p "dmg-staging-${ARCH}"
+          cp -R "ztrackerprime-macos-${ARCH}/zt.app"         "dmg-staging-${ARCH}/"
+          cp    "ztrackerprime-macos-${ARCH}/README-MAC.txt" "dmg-staging-${ARCH}/"
           hdiutil create \
             -volname "zTracker ${TAG} (${ARCH})" \
-            -srcfolder "ztrackerprime-macos-${ARCH}/zt.app" \
+            -srcfolder "dmg-staging-${ARCH}" \
             -fs HFS+ -format UDZO -ov \
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
