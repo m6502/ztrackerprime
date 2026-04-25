@@ -217,6 +217,7 @@ ZTConf::ZTConf() {
 //    skin[0] = '\0';
     work_directory[0] = '\0';
     midi_in_sync = 0; // flag_midiinsync
+    midi_in_sync_chase_tempo = 0; // off by default; requires midi_in_sync
     auto_send_panic = 1; // flag_autosendpanic
     highlight_increment = 8;
     lowlight_increment = 8;
@@ -311,6 +312,7 @@ int ZTConf::load()
   
   if (Config->get("send_panic_on_stop"))              auto_send_panic = getFlag("send_panic_on_stop");
   if (Config->get("midi_in_sync"))                    midi_in_sync = getFlag("midi_in_sync");
+  if (Config->get("midi_in_sync_chase_tempo"))        midi_in_sync_chase_tempo = getFlag("midi_in_sync_chase_tempo");
   
   full_screen = getFlag("fullscreen");                
   step_editing = getFlag("step_editing");
@@ -403,6 +405,11 @@ int ZTConf::save() {
         Config->set("midi_in_sync","yes");
     else
         Config->set("midi_in_sync","no");
+
+    if (midi_in_sync_chase_tempo)
+        Config->set("midi_in_sync_chase_tempo","yes");
+    else
+        Config->set("midi_in_sync_chase_tempo","no");
 
     if (full_screen)
         Config->set("fullscreen","yes");

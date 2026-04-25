@@ -391,6 +391,27 @@ void player::set_speed() {
 }
 
 
+// ------------------------------------------------------------------------------------------------
+//
+// Slave playback tempo to an externally-computed BPM (from incoming
+// MIDI Clock). Mirrors the subtick-length math in set_speed() but
+// deliberately does NOT touch song->bpm, so saving the song preserves
+// the original authored tempo. New BPM is clamped to a sane range;
+// out-of-range values are ignored.
+void player::chase_external_tempo(int new_bpm) {
+    if (new_bpm < 20 || new_bpm > 500) return;
+    if (new_bpm == this->bpm) return;
+    this->bpm = new_bpm;
+    int64_t a = 1000000 / wTimerRes;
+    subtick_len_ms = (int)(60 * a / (96 * this->bpm));
+    subtick_len_mms = subtick_len_ms % 1000;
+    subtick_len_ms -= subtick_len_mms;
+    subtick_error = subtick_len_mms;
+    if (subtick_error > 500) subtick_add = 1000;
+    else                     subtick_add = 0;
+}
+
+
 
 
 // ------------------------------------------------------------------------------------------------

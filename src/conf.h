@@ -56,6 +56,7 @@ class ZTConf {
         char autoload_ztfile_filename[MAX_PATH + 1];
         int autoload_ztfile;
         int midi_in_sync; // flag_midiinsync
+        int midi_in_sync_chase_tempo; // slave bpm to incoming 0xF8 MIDI Clock
         int auto_send_panic; // flag_autosendpanic
         int highlight_increment;
         int lowlight_increment;

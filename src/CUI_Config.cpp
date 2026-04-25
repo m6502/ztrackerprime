@@ -127,6 +127,25 @@ CUI_Config::CUI_Config(void) {
     vs->min = 1;
     vs->max = 256;
 
+    // MIDI realtime sync toggles. The underlying flags already exist in
+    // zt.conf but were previously only reachable via the Sysconfig page;
+    // expose them here so Global Config (F12) covers the full config set.
+    cb = new CheckBox;
+    UI->add_element(cb, 11);
+    cb->frame = 1;
+    cb->x = 20;
+    cb->y = 25;
+    cb->xsize = 5;
+    cb->value = &zt_config_globals.midi_in_sync;
+
+    cb = new CheckBox;
+    UI->add_element(cb, 12);
+    cb->frame = 1;
+    cb->x = 20;
+    cb->y = 26;
+    cb->xsize = 5;
+    cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
+
     b = new Button;
     UI->add_element(b,10);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
@@ -188,7 +207,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(tb, 9);
     tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
     tb->x = 1;
-    tb->y = 26;
+    tb->y = 28;
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
@@ -295,6 +314,7 @@ void CUI_Config::draw(Drawable *S) {
         sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
+        sprintf(buf+strlen(buf),"\n|U| Chase MIDI Tempo|L|[|H|%s|L|]",zt_config_globals.midi_in_sync_chase_tempo?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Centered Edit   |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Screen Size     |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
@@ -358,6 +378,8 @@ void CUI_Config::draw(Drawable *S) {
         print(row(2),col(22),"Default Highlight",COLORS.Text,S);
         print(row(2),col(23),"Default Lowlight",COLORS.Text,S);
         print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
+        print(row(2),col(25),"MIDI In Sync",COLORS.Text,S);
+        print(row(2),col(26),"Chase MIDI Tempo",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);

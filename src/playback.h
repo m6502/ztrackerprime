@@ -182,6 +182,12 @@ class player {
 
         void set_speed();
 
+        // Slave the live playback tempo to an externally supplied BPM
+        // (derived from incoming MIDI Clock). Does NOT mutate song->bpm,
+        // so the song file's stored tempo is preserved. Called from the
+        // MIDI-input callback thread at most once per 24 received clocks.
+        void chase_external_tempo(int new_bpm);
+
         int next_order(void);
         void num_orders(void);
         int seek_order(int pattern);
