@@ -308,6 +308,7 @@ midiIn *MidiIn = NULL;
 CUI_Page *ActivePage = NULL, *LastPage = NULL, *PopupWindow = NULL;
 
 CUI_About *UIP_About = NULL;
+CUI_MainMenu *UIP_MainMenu = NULL;
 CUI_InstEditor *UIP_InstEditor = NULL;
 CUI_Logoscreen *UIP_Logoscreen = NULL;
 CUI_Loadscreen *UIP_Loadscreen = NULL;
@@ -1300,6 +1301,26 @@ void global_keys(Drawable *S)
     if (!key) return;
 
     if (!modal) {
+        // ESC opens the main menu (Schism-style overlay) when no
+        // popup is already up. Pages that want to consume ESC for
+        // their own purposes (Help / About return-to-pattern, etc.)
+        // are reached AFTER global_keys, so they still get to see
+        // ESC if the menu doesn't open it (we only fire if the user
+        // is not on a page where ESC has dedicated meaning).
+        if (key == SDLK_ESCAPE
+            && kstate == KS_NO_SHIFT_KEYS
+            && window_stack.isempty()
+            && cur_state != STATE_HELP
+            && cur_state != STATE_ABOUT
+            && cur_state != STATE_LOAD
+            && cur_state != STATE_LUA_CONSOLE
+            && cur_state != STATE_SONG_MESSAGE
+            && UIP_MainMenu) {
+            (void)Keys.getkey();
+            popup_window(UIP_MainMenu);
+            need_refresh++;
+            return;
+        }
         switch(key) {
             case SDLK_RIGHT:
                 if (key==SDLK_RIGHT && kstate == KS_CTRL)
@@ -2285,6 +2306,7 @@ int postAction ()
     delete InstEditorUI;
     delete UI; UI=NULL;
     delete UIP_About;
+    delete UIP_MainMenu;
     delete UIP_LoadMsg;
     delete UIP_SaveMsg;
     delete UIP_InstEditor;
@@ -3355,6 +3377,7 @@ int initSDL(void)
     UIP_KeyBindings = new CUI_KeyBindings;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
+    UIP_MainMenu = new CUI_MainMenu;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
     return 1;

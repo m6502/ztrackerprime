@@ -757,8 +757,12 @@ extern CUI_Arpeggioeditor *UIP_Arpeggioeditor;
 extern CUI_Midimacroeditor *UIP_Midimacroeditor;
 extern CUI_LuaConsole *UIP_LuaConsole;
 extern CUI_KeyBindings *UIP_KeyBindings;
+extern CUI_Help *UIP_Help;
+extern CUI_MainMenu *UIP_MainMenu;
 
 extern void switch_page(CUI_Page *page);
+extern void popup_window(CUI_Page *page);
+extern void close_popup_window(void);
 extern int need_update;
 
 void popup_window(CUI_Page *page);
