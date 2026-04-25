@@ -12,7 +12,7 @@
  SHIFT-TAB  : Previous track
  CTRL-TAB   : Change pattern edit viewmode
 
- ALT-1 => 0 : Mute/unmute track 1-10
+ ALT-1 => 0: Mute/unmute track 1-10
  ALT-F9     : Mute current track
  ALT-F10    : Solo current track
 
@@ -73,15 +73,15 @@
  CTRL-T     : Set all effect and effect data fields of block to same
               value as first row in block
  CTRL-K     : Interpolate volume (block)
-  ALT-Q     : Transpose block up
-  ALT-A     : Transpose block down
+ ALT-Q      : Transpose block up
+ ALT-A      : Transpose block down
  CTRL-J     : Popup scale volume window (10-200%)
  CTRL-A     : Popup Naturalizing window (1-100%)
  CTRL-[     : Decrease all volumes in block by 8
  CTRL-]     : Increase all volumes in block by 8
  CTRL-`     : Set all note's lengths in selection to distance
               between note and next note
-  ALT-S     : Set instruments in block to current instrument
+ ALT-S      : Set instruments in block to current instrument
  SHIFT-move : Block selection (movements are arrows and PgUp/PgDn)
 
 
@@ -106,7 +106,7 @@
               editing screen brings up the pattern settings.
  F3         : Instrument editor
  F4         : Arpeggio editor
- CTRL-F4    : Midimacro editor
+ CTRL-SHIFT-F4 : Midimacro editor
  F10        : Song message editor
  F5         : Song play (F5 PatternDisplay widget,
               left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)
@@ -136,7 +136,9 @@
 
  Up/Down    : Cycles through widgets
  TAB        : Cycles forwards through widgets
+              (in Help: jumps to next section)
  SHIFT-TAB  : Cycles backwards through widgets
+              (in Help: jumps to previous section)
  ENTER      : Confirms choice
  SPACE      : Toggles an option or clicks a button
 
@@ -189,7 +191,6 @@
  Timing issues:
 
    Q: The midi timing is very poor.
-
    A: If you have any other applications open, try closing them.  If this
  	   doesn't work, perhaps you're drunk.  If drunk, fall down.  end if.
 
@@ -198,14 +199,12 @@
 
    Q: The screen is beige/gray and is displaying  "This unit is in accordance
       with FCC standards for radio-interference emitting devices".
-
    A: You are looking at the back of the monitor.  For best results, look at
       the front, or "screen" of your monitor.
 
 
    Q: The screen is black and zTracker is not responding to any key/mouse
       commands.
-
    A: Your computer is not turned on.  Press the "power" switch on the front
       of the housing and follow the resulting prompts.  You may also want to
       gently pat the front of your pants using two outstretched fingers, to
@@ -216,7 +215,6 @@
       to be an airfield surrounded by buildings.  Occasionally, a small red
       and cyan airplane flies by and shoots at the cyan and red airplane
       and/or surrounding buildings.
-
    A: You are playing the DOS classic "Sopwith".   Depressing the "X" key
       will cause your plane to accelerate, and you can control the direction
       of your plane by pressing the "," and "/" keys.  The "." key will cause

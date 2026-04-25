@@ -4,6 +4,33 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_25 (Minor tweaks: status messages, help nav, F4 binding)
+-------------------------------------------------------------------
+
+        * Pattern Editor: Alt-§ (set previous note's length to distance
+          to cursor) now posts a status message
+          "Changed Note (<note>, <inst>) length to <ticks>". Previously
+          if Alt-1..0 was pressed first to set the step value, the
+          "Step set to N" message stayed on screen and Alt-§ silently
+          changed the length with no visible feedback.
+        * Pattern Editor: Shift-§ (toggle drawmode) now posts the
+          correct status message in both directions — "Editing: Volume"
+          (or current md_mode) when entering drawmode, "Editing: Pattern"
+          when leaving. Previously the status bar lagged or stayed
+          stuck on the prior mode label.
+        * Global: Midimacro editor binding moved from Ctrl-F4 to
+          Shift-Ctrl-F4 (Shift-Cmd-F4 / Shift-Alt-F4 on macOS). Plain
+          Cmd-F4 collides with the macOS window-zoom shortcut and plain
+          Alt-F4 closes windows on Linux/Windows; the Shift gate avoids
+          all three OS-level handlers.
+        + Help (F1): Tab jumps to the next section header, Shift-Tab to
+          the previous. Section anchors are built once at load time by
+          scanning for the |L|%==|H|...|U| markers in help.txt.
+        * help.txt: aligned colon column for ALT-Q / ALT-A / ALT-S in
+          Block Functions and ALT-1 in Pattern Editing. Removed the
+          blank line between Q: and A: in Troubleshooting for tighter
+          readability.
+
 zt 2026_04_23 (MIDI Clock tempo chase)
 --------------------------------------
 

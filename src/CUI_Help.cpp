@@ -4,6 +4,9 @@ CUI_Help::CUI_Help(void) {
 
 //  Help *oe;
 
+    section_lines = NULL;
+    section_count = 0;
+
     UI = new UserInterface;
 
     tb = new TextBox;
@@ -130,6 +133,49 @@ CUI_Help::CUI_Help(void) {
         tb->text = "\n\n  I couldn't find doc/help.txt.  no help for you :[";
     }
     free(help_file);
+
+    // Build section anchor list. Section headers look like
+    //   |L|%==|H|Section Title|L|==%|U|
+    // and always sit at the start of a line. Walk tb->text once,
+    // recording the line index (number of \n encountered before the
+    // line) for each match. Two-pass: count, then fill.
+    {
+        const char *t = tb->text;
+        int line_idx = 0;
+        int count = 0;
+        for (int i = 0; t[i]; ) {
+            int line_start = i;
+            int line_end = line_start;
+            while (t[line_end] && t[line_end] != '\n') line_end++;
+            // Match the marker at the very start of the line, allowing
+            // for one optional leading space (defensive — the file's
+            // headers all start at column 0 today).
+            int p = line_start;
+            if (t[p] == ' ') p++;
+            if (line_end - p >= 8 && strncmp(t + p, "|L|%==|H|", 9) == 0) {
+                count++;
+            }
+            line_idx++;
+            i = (t[line_end] == '\n') ? line_end + 1 : line_end;
+        }
+        if (count > 0) {
+            section_lines = new int[count];
+            section_count = 0;
+            line_idx = 0;
+            for (int i = 0; t[i]; ) {
+                int line_start = i;
+                int line_end = line_start;
+                while (t[line_end] && t[line_end] != '\n') line_end++;
+                int p = line_start;
+                if (t[p] == ' ') p++;
+                if (line_end - p >= 8 && strncmp(t + p, "|L|%==|H|", 9) == 0) {
+                    section_lines[section_count++] = line_idx;
+                }
+                line_idx++;
+                i = (t[line_end] == '\n') ? line_end + 1 : line_end;
+            }
+        }
+    }
 }
 
 CUI_Help::~CUI_Help() {
@@ -137,6 +183,10 @@ CUI_Help::~CUI_Help() {
     if (needfree) {
         tb = (TextBox *)UI->get_element(0);
         delete[] tb->text;
+    }
+    if (section_lines) {
+        delete[] section_lines;
+        section_lines = NULL;
     }
 }
 
@@ -151,6 +201,47 @@ void CUI_Help::leave(void) {
 
 void CUI_Help::update() {
     int key=0;
+    KBMod kstate = 0;
+    // Peek the buffered key BEFORE TextBox::update() consumes it, so
+    // Tab/Shift-Tab can be intercepted for section navigation rather
+    // than scrolling line-by-line.
+    if (Keys.size()) {
+        key = Keys.checkkey();
+        kstate = Keys.cur_state;
+        if (key == SDLK_TAB && section_count > 0) {
+            Keys.getkey(); // consume
+            if (kstate & KS_SHIFT) {
+                // Previous section: largest section_lines[i] strictly
+                // less than current startline.
+                int target = 0;
+                for (int i = section_count - 1; i >= 0; i--) {
+                    if (section_lines[i] < tb->startline) {
+                        target = section_lines[i];
+                        break;
+                    }
+                }
+                tb->startline = target;
+            } else {
+                // Next section: smallest section_lines[i] strictly
+                // greater than current startline. If already at/past
+                // the last, wrap to the first.
+                int target = section_lines[0];
+                int found = 0;
+                for (int i = 0; i < section_count; i++) {
+                    if (section_lines[i] > tb->startline) {
+                        target = section_lines[i];
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) target = section_lines[0];
+                tb->startline = target;
+            }
+            tb->bEof = false;
+            need_refresh++;
+            return;
+        }
+    }
     UI->update();
     if (Keys.size()) {
         key = Keys.getkey();
