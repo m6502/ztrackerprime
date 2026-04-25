@@ -40,6 +40,12 @@ on:
     tags: ['v*']
   pull_request:
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      simulate_tag:
+        description: 'Synthetic tag for packaging filenames (e.g. v0.0.0-test). Triggers full packaging path; does NOT publish a GitHub Release.'
+        required: false
+        default: 'v0.0.0-test'
 
 # Allow only one concurrent run per branch / PR; cancel older runs.
 concurrency:
@@ -50,6 +56,9 @@ env:
   SDL3_VERSION: "3.4.4"
   LIBPNG_VERSION: "1.6.44"
   ZLIB_VERSION: "1.3.1"
+  # On tag push: the real tag (e.g. v1.2.3). On manual dispatch: the simulated
+  # tag input. On regular branch/PR pushes: empty (packaging steps skipped).
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || '') }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -150,16 +159,16 @@ jobs:
           if-no-files-found: error
 
       - name: Package release tarball
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
           cd dist
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           tar -czf "ztrackerprime-${TAG}-linux-x86_64.tar.gz" ztrackerprime-linux-x86_64
 
       - name: Upload release asset (linux)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: release-linux-x86_64
@@ -212,12 +221,12 @@ jobs:
           if-no-files-found: error
 
       - name: Package release (zip + unsigned DMG)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
           cd dist
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           ARCH="arm64"
           # Zip of the full staged dir (zt.app + zt.conf + skins + doc).
           # ditto preserves .app bundle structure and resource forks.
@@ -234,7 +243,7 @@ jobs:
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
       - name: Upload release asset (macos-arm64)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: release-macos-arm64
@@ -291,12 +300,12 @@ jobs:
           if-no-files-found: error
 
       - name: Package release (zip + unsigned DMG)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
           cd dist
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           ARCH="x86_64"
           ditto -c -k --sequesterRsrc --keepParent \
             "ztrackerprime-macos-${ARCH}" \
@@ -308,7 +317,7 @@ jobs:
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
       - name: Upload release asset (macos-x86_64)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: release-macos-x86_64
@@ -423,16 +432,16 @@ jobs:
           if-no-files-found: error
 
       - name: Package release zip
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
           set -euo pipefail
           cd dist
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${RELEASE_TAG}"
           zip -r "ztrackerprime-${TAG}-windows-x86-xp.zip" ztrackerprime-windows-x86-xp
 
       - name: Upload release asset (windows-x86-xp)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: release-windows-x86-xp
@@ -523,16 +532,16 @@ jobs:
           if-no-files-found: error
 
       - name: Package release zip
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
-          $tag = $env:GITHUB_REF_NAME
+          $tag = $env:RELEASE_TAG
           Set-Location dist
           Compress-Archive -Path ztrackerprime-windows-x64 `
             -DestinationPath "ztrackerprime-$tag-windows-x64.zip" -Force
 
       - name: Upload release asset (windows-x64)
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: release-windows-x64
@@ -552,6 +561,8 @@ jobs:
   # ---------------------------------------------------------------------------
   release:
     name: Publish GitHub Release (draft)
+    # Real-tag-only — manual dispatch exercises the packaging path but does NOT
+    # publish a Release (you can still download the release-* artifacts to inspect).
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - linux-x86_64
