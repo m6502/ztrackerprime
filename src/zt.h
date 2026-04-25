@@ -77,7 +77,9 @@ static inline void zt_text_input_stop(void) {
 
 #define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
 #define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
-#define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+// Midimacro editor is reachable now (Ctrl-M / Shift-F4). Leave the
+// "unfinished" macro undefined so the dispatch and case blocks compile.
+//#define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
 
 
 // ------------------------------------------------------------------------------------------------

@@ -103,6 +103,24 @@ CUI_Help::CUI_Help(void) {
                                && src[key_end] != '\t'
                                && src[key_end] != ':') key_end++;
                         int key_len = key_end - key_start;
+                        // Don't rewrite chords whose Cmd-form is OS-reserved
+                        // on macOS (Cmd-TAB = app switcher, Cmd-Q = quit
+                        // — handled separately, Cmd-W = close window,
+                        // Cmd-H = hide, Cmd-` = window-cycle).
+                        // Copy the modifier verbatim so users see e.g.
+                        // "CTRL-TAB" not "CMD-TAB/ALT-TAB".
+                        auto is_reserved = [](const char *p, int n) {
+                            if (n == 3 && strncmp(p, "TAB", 3) == 0) return true;
+                            if (n == 1 && (*p == 'W' || *p == 'H')) return true;
+                            return false;
+                        };
+                        if (is_reserved(src + key_start, key_len)) {
+                            memcpy(dst + di, src + i, kw_len + key_len);
+                            di += kw_len + key_len;
+                            i = key_end;
+                            rewritten = true;
+                            continue;
+                        }
                         // Emit "CMD-<key>/ALT-<key>".
                         memcpy(dst + di, "CMD-", 4); di += 4;
                         memcpy(dst + di, src + key_start, key_len); di += key_len;

@@ -21,6 +21,8 @@
  SHIFT-kp - : Moves back one order
  / keypad   : Octave down.
  * keypad   : Octave up.
+ [          : Octave down (also < on Finnish/EU ISO keyboards)
+ ]          : Octave up   (also > on Finnish/EU ISO keyboards)
 
  SHIFT-,    : Select previous instrument.
  SHIFT-.    : Select next instrument.
