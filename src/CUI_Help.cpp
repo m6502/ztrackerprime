@@ -238,6 +238,10 @@ void CUI_Help::update() {
                 tb->startline = target;
             }
             tb->bEof = false;
+            // The TextBox only repaints when its element-level need_redraw
+            // flag is set; bumping the global need_refresh alone leaves the
+            // visible scroll position stale until the page is left+re-entered.
+            UI->full_refresh();
             need_refresh++;
             return;
         }

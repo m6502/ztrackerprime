@@ -142,6 +142,11 @@ if(APPLE)
   list(APPEND ZT_SOURCES ${ZT_MACOSX_ICON})
   set_source_files_properties(${ZT_MACOSX_ICON} PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources")
+  # Objective-C++ helper that strips Cmd-Q from the auto-created NSApp menu
+  # so the Pattern Editor can use Cmd-Q as Transpose-Up.
+  list(APPEND ZT_SOURCES src/macos_menu.mm)
+  set_source_files_properties(src/macos_menu.mm PROPERTIES
+    COMPILE_FLAGS "-fobjc-arc")
 endif()
 
 if(WIN32)
@@ -301,7 +306,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if(APPLE)
-  target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation")
+  target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation" "-framework Cocoa")
   # Turn the macOS build into a proper .app bundle with icon + Info.plist.
   set_target_properties(zt PROPERTIES
     MACOSX_BUNDLE TRUE

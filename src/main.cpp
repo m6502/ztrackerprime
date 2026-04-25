@@ -75,6 +75,10 @@
 #include "lua_engine.h"
 #include "keybindings.h"
 
+#ifdef __APPLE__
+extern "C" void zt_macos_disable_cmd_q(void);
+#endif
+
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <unistd.h>
@@ -3084,6 +3088,12 @@ static int zt_backend_set_video_mode(char *errstr)
       zt_show_error("Error", errstr);
       return 0;
     }
+#ifdef __APPLE__
+    // Free Cmd-Q from the auto-created NSApp menu so the Pattern Editor can
+    // use it as Transpose-Up (KS_HAS_ALT treats Cmd as Alt). Quit reachable
+    // via Ctrl-Q / Ctrl-Alt-Q.
+    zt_macos_disable_cmd_q();
+#endif
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {
       snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
