@@ -106,7 +106,7 @@
               editing screen brings up the pattern settings.
  F3         : Instrument editor
  F4         : Arpeggio editor
- CTRL-SHIFT-F4 : Midimacro editor
+ SHIFT-F4   : Midimacro editor
  F10        : Song message editor
  F5         : Song play (F5 PatternDisplay widget,
               left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)

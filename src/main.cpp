@@ -1393,11 +1393,12 @@ void global_keys(Drawable *S)
 
 #ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
             case SDLK_F4:
-                // Shift+(Ctrl|Cmd|Alt)+F4. Plain Cmd-F4 collides with the
-                // macOS window-zoom shortcut and Alt-F4 closes windows on
-                // Linux/Windows, so the modifier set is gated on Shift to
-                // avoid all three OS-level handlers.
-                if ((kstate & KS_SHIFT) && (kstate & (KS_CTRL | KS_META | KS_ALT))) {
+                // Any combination involving Shift+F4 opens the Midimacro
+                // editor. Plain Shift-F4 (no other modifier) is the
+                // simplest path and avoids every OS-level F-key shortcut
+                // (macOS Cmd-F4 zoom, Linux/Win Alt-F4 close-window).
+                // Shift+Ctrl+F4, Shift+Cmd+F4, Shift+Alt+F4 also work.
+                if (kstate & KS_SHIFT) {
                     command=CMD_SWITCH_MIDIMACEDIT;
                 }
                 break;
