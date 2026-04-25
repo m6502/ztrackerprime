@@ -39,9 +39,29 @@ mkdir -p "$workdir"
 echo "=== Fetching libpng $LIBPNG_VERSION ==="
 libpng_tarball="$workdir/libpng-$LIBPNG_VERSION.tar.gz"
 if [ ! -f "$libpng_tarball" ]; then
-  # SourceForge mirror for libpng tarballs. Follow redirects (-L).
-  curl -fL -o "$libpng_tarball" \
+  # SourceForge mirrors return transient 502s. Try multiple sources with
+  # retry/backoff — same pattern as zlib below.
+  urls=(
     "https://download.sourceforge.net/libpng/libpng-${LIBPNG_VERSION}.tar.gz"
+    "https://prdownloads.sourceforge.net/libpng/libpng-${LIBPNG_VERSION}.tar.gz"
+    "https://github.com/pnggroup/libpng/archive/refs/tags/v${LIBPNG_VERSION}.tar.gz"
+    "https://download.savannah.nongnu.org/releases/libpng/libpng-${LIBPNG_VERSION}.tar.gz"
+  )
+  ok=0
+  for u in "${urls[@]}"; do
+    echo "  trying: $u"
+    if curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 30 --max-time 300 \
+            -o "$libpng_tarball" "$u"; then
+      ok=1
+      break
+    fi
+    rm -f "$libpng_tarball"
+  done
+  if [ "$ok" -ne 1 ]; then
+    echo "ERROR: could not fetch libpng $LIBPNG_VERSION from any known mirror" >&2
+    exit 1
+  fi
 fi
 
 rm -rf "$root/extlibs/libpng"
@@ -73,7 +93,9 @@ if [ ! -f "$zlib_tarball" ]; then
   ok=0
   for u in "${urls[@]}"; do
     echo "  trying: $u"
-    if curl -fL -o "$zlib_tarball" "$u"; then
+    if curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
+            --connect-timeout 30 --max-time 300 \
+            -o "$zlib_tarball" "$u"; then
       ok=1
       break
     fi
