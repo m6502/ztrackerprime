@@ -1331,7 +1331,11 @@ void global_keys(Drawable *S)
                 status_change = 1; need_refresh++;
                 break;
             case SDLK_Q:
-                if (kstate & KS_ALT && kstate & KS_CTRL) {
+                // Plain Ctrl-Q quits, same as the long-form Ctrl-Alt-Q.
+                // (Cmd-Q on macOS is reserved for the pattern-editor
+                // Transpose-up shortcut via KS_HAS_ALT, so we don't bind
+                // Cmd-Q here.)
+                if (kstate & KS_CTRL) {
                     command=CMD_QUIT;
                     key = Keys.getkey();
                 }

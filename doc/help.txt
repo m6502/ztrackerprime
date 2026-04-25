@@ -129,7 +129,7 @@
  CTRL-S     : Save Song
  CTRL-ALT-N : New Song
  ALT-P      : Song Duration
- CTRL-ALT-Q : Quit
+ CTRL-Q     : Quit (CTRL-ALT-Q also works)
 
 
 |L|%==|H|User Interface Keys|L|==%|U|
