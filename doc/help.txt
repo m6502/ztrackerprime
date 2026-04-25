@@ -1,4 +1,3 @@
-
 |L|%==|H|Pattern Editing|L|==%|U|
 
  Spacebar   : Turns Edit (or "Keyjazz") mode on or off
@@ -106,8 +105,9 @@
               editing screen brings up the pattern settings.
  F3         : Instrument editor
  F4         : Arpeggio editor
- CTRL-ALT-M : Midimacro editor (works everywhere; SHIFT-F4 also works
+ CTRL-M     : Midimacro editor (works everywhere; SHIFT-F4 also works
               on systems where F-keys are not eaten by the OS)
+ CTRL-SHIFT-M : Quick MIDI export of current song
  F10        : Song message editor
  F5         : Song play (F5 PatternDisplay widget,
               left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)
