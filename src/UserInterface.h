@@ -239,14 +239,20 @@ class TextBox : public UserInterfaceElement {
 
 class CommentEditor : public TextBox {
     public:
-        
+
         CDataBuf *target;
 
         CommentEditor();
         ~CommentEditor() = default ;
 
-        int update();
-        
+        int update() override;
+        // CommentEditor accepts typed characters (Song Message editor),
+        // so the main loop must keep SDL text input enabled while it
+        // is the focused element. Without this override the parent
+        // TextBox's default is_text_input()=false makes the main
+        // event loop call zt_text_input_stop() every frame, and no
+        // SDL_EVENT_TEXT_INPUT events ever reach textinputhandler().
+        bool is_text_input() const override { return true; }
 };
 class LBNode {
     public:
