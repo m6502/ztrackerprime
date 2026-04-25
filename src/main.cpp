@@ -1344,7 +1344,19 @@ void global_keys(Drawable *S)
                     key = Keys.getkey();
                 }
                 break;
-            case SDLK_M: // Quick MIDI export
+            case SDLK_M:
+                // Ctrl-Alt-M = open Midimacro editor. Reliable
+                // alternative to Shift-F4 (macOS often eats F4 for
+                // Launchpad unless "Use F-keys as standard function
+                // keys" is enabled in System Settings).
+                if ((kstate & KS_CTRL) && (kstate & KS_ALT)) {
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+                    command = CMD_SWITCH_MIDIMACEDIT;
+                    key = Keys.getkey();
+#endif
+                    break;
+                }
+                // Plain Ctrl-M = quick MIDI export.
                 if (kstate & KS_CTRL) {
                     // Export current song as .mid file
                     char midfn[512];
