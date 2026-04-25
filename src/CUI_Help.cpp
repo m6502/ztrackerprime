@@ -136,11 +136,16 @@ CUI_Help::CUI_Help(void) {
                         memcpy(dst + di, "/ALT-", 5); di += 5;
                         memcpy(dst + di, src + key_start, key_len); di += key_len;
                         i = key_end;
-                        // Width expansion: source "CTRL-<key>" is 5+key_len
-                        // chars; output is 4+key_len+5+4+key_len = 13+2*key_len.
-                        // Consume trailing spaces up to the source surplus so
-                        // the colon stays as aligned as possible.
-                        int grown = (13 + 2 * key_len) - (kw_len + key_len);
+                        // Width expansion: source "CTRL-<key>" is kw_len +
+                        // key_len chars; output is "CMD-" (4) + key_len +
+                        // "/ALT-" (5) + key_len = 9 + 2*key_len. Consume
+                        // exactly that many trailing spaces from the source
+                        // so the colon ends up at the same column it had
+                        // pre-rewrite. (Previous formula used 13 instead of
+                        // 9, eating four spaces too many — rewritten lines
+                        // ended up with colons four columns left of
+                        // unrewritten neighbours.)
+                        int grown = (9 + 2 * key_len) - (kw_len + key_len);
                         while (grown > 0 && i < line_end && src[i] == ' ') {
                             i++; grown--;
                         }

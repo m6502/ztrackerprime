@@ -1,38 +1,38 @@
 |L|%==|H|Pattern Editing|L|==%|U|
 
- Spacebar   : Turns Edit (or "Keyjazz") mode on or off
- 4/8        : peek play the current note/row
- Home/End   : Just try them
- PgUp/PgDn  : Up/down 16 rows
- Ins/Del    : Insert/delete row on current track
+ Spacebar    : Turns Edit (or "Keyjazz") mode on or off
+ 4/8         : peek play the current note/row
+ Home/End    : Just try them
+ PgUp/PgDn   : Up/down 16 rows
+ Ins/Del     : Insert/delete row on current track
               Hold CTRL for ALL tracks
 
- Tab        : Next track
- SHIFT-TAB  : Previous track
- CTRL-TAB   : Change pattern edit viewmode
+ Tab         : Next track
+ SHIFT-TAB   : Previous track
+ CTRL-TAB    : Change pattern edit viewmode
 
- ALT-1 => 0: Mute/unmute track 1-10
- ALT-F9     : Mute current track
- ALT-F10    : Solo current track
+ ALT-1 => 0  : Mute/unmute track 1-10
+ ALT-F9      : Mute current track
+ ALT-F10     : Solo current track
 
- + keypad   : Moves ahead one pattern.
- - keypad   : Moves back one pattern.
- SHIFT-kp + : Moves ahead one order
- SHIFT-kp - : Moves back one order
- / keypad   : Octave down.
- * keypad   : Octave up.
- [          : Octave down (also < on Finnish/EU ISO keyboards)
- ]          : Octave up   (also > on Finnish/EU ISO keyboards)
+ + keypad    : Moves ahead one pattern.
+ - keypad    : Moves back one pattern.
+ SHIFT-kp +  : Moves ahead one order
+ SHIFT-kp -  : Moves back one order
+ / keypad    : Octave down.
+ * keypad    : Octave up.
+ [           : Octave down (also < on Finnish/EU ISO keyboards)
+ ]           : Octave up   (also > on Finnish/EU ISO keyboards)
 
- SHIFT-,    : Select previous instrument.
- SHIFT-.    : Select next instrument.
- SHIFT-~    : Switch between regular and effect-draw mode
+ SHIFT-,     : Select previous instrument.
+ SHIFT-.     : Select next instrument.
+ SHIFT-~     : Switch between regular and effect-draw mode
               Use TAB here to switch edit mode
 
- CTRL-1 => 0: Change the step-value in the pattern editor
- ALT-`      : Set previous note's length to distance between
+ CTRL-1 => 0 : Change the step-value in the pattern editor
+ ALT-`       : Set previous note's length to distance between
               note and current cursor position
- ScrollLock : Follow playback toggle (cursor follows playback position)
+ ScrollLock  : Follow playback toggle (cursor follows playback position)
 
 |L|%==|H|Pattern Operations|L|==%|U|
 
@@ -49,49 +49,49 @@
 
 |L|%==|H|Block Functions|L|==%|U|
 
- CTRL-B     : Marks the beginning of a select block.
- CTRL-E     : Marks the end of a select block.
- CTRL-L     : Select whole track, pressing it again will select the entire
+ CTRL-B : Marks the beginning of a select block.
+ CTRL-E : Marks the end of a select block.
+ CTRL-L : Select whole track, pressing it again will select the entire
               pattern.
- CTRL-U     : Unselect block
- ALT-D      : Select one beat (press multiple times to select next beats)
+ CTRL-U : Unselect block
+ ALT-D  : Select one beat (press multiple times to select next beats)
 
- CTRL-C     : Copy the selected block to the clipboard.
- CTRL-P     : Copy pattern, paste to next empty pattern,
+ CTRL-C : Copy the selected block to the clipboard.
+ CTRL-P : Copy pattern, paste to next empty pattern,
               and jump to new pattern
- CTRL-V     : Paste the contents of the clipboard to the cursor location.
- CTRL-O     : Overwrite paste
- CTRL-M     : Merge paste the contents of the clipboard with the contents
+ CTRL-V : Paste the contents of the clipboard to the cursor location.
+ CTRL-O : Overwrite paste
+ CTRL-M : Merge paste the contents of the clipboard with the contents
               of the location you're pasting to.
- CTRL-X     : Cut the selected block. (remove and copy to clipboard)
- CTRL-Z     : Clear block (hold this one)
+ CTRL-X : Cut the selected block. (remove and copy to clipboard)
+ CTRL-Z : Clear block (hold this one)
 
- CTRL-N     : Set length of first row of block to length of block
- CTRL-W     : Clear unused volumes
- CTRL-I     : Interpolate values through selection (note, vol, or fx param,
+ CTRL-N : Set length of first row of block to length of block
+ CTRL-W : Clear unused volumes
+ CTRL-I : Interpolate values through selection (note, vol, or fx param,
               depending on which column the cursor is on; falls back to
               effect-data interpolation when no selection column applies)
- CTRL-T     : Set all effect and effect data fields of block to same
+ CTRL-T : Set all effect and effect data fields of block to same
               value as first row in block
- CTRL-K     : Interpolate volume (block)
- ALT-Q      : Transpose block up
- ALT-A      : Transpose block down
- CTRL-J     : Popup scale volume window (10-200%)
- CTRL-A     : Popup Naturalizing window (1-100%)
- CTRL-[     : Decrease all volumes in block by 8
- CTRL-]     : Increase all volumes in block by 8
- CTRL-`     : Set all note's lengths in selection to distance
+ CTRL-K : Interpolate volume (block)
+ ALT-Q  : Transpose block up
+ ALT-A  : Transpose block down
+ CTRL-J : Popup scale volume window (10-200%)
+ CTRL-A : Popup Naturalizing window (1-100%)
+ CTRL-[ : Decrease all volumes in block by 8
+ CTRL-] : Increase all volumes in block by 8
+ CTRL-` : Set all note's lengths in selection to distance
               between note and next note
- ALT-S      : Set instruments in block to current instrument
+ ALT-S  : Set instruments in block to current instrument
  SHIFT-move : Block selection (movements are arrows and PgUp/PgDn)
 
 
 |L|%==|H|Instrument Editor|L|==%|U|
 
- ALT-1 => 1: Quick selects midi device
- CTRL-1 => 9: Quick selects midi channel
- ALT-T      : Toggle tracker mode on/off
- Mouse-2    : Focus a slider
+ ALT-1 => 1  : Quick selects midi device
+ CTRL-1 => 9 : Quick selects midi channel
+ ALT-T       : Toggle tracker mode on/off
+ Mouse-2     : Focus a slider
 
 
 |L|%==|H|Order Editor|L|==%|U|
@@ -102,76 +102,76 @@
 
 |L|%==|H|Global Keys|L|==%|U|
 
- F1         : Help (That is this text)
- F2         : Pattern editor - Pressing F2 again while in the pattern
+ F1             : Help (That is this text)
+ F2             : Pattern editor - Pressing F2 again while in the pattern
               editing screen brings up the pattern settings.
- F3         : Instrument editor
- F4         : Arpeggio editor
- CTRL-M     : Midimacro editor (works everywhere; SHIFT-F4 also works
+ F3             : Instrument editor
+ F4             : Arpeggio editor
+ CTRL-M         : Midimacro editor (works everywhere; SHIFT-F4 also works
               on systems where F-keys are not eaten by the OS)
- CTRL-SHIFT-M : Quick MIDI export of current song
- F10        : Song message editor
- F5         : Song play (F5 PatternDisplay widget,
+ CTRL-SHIFT-M   : Quick MIDI export of current song
+ F10            : Song message editor
+ F5             : Song play (F5 PatternDisplay widget,
               left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)
- F6         : Pattern Play - will play the current pattern being edited.
- F7         : Start the song at the current row -
+ F6             : Pattern Play - will play the current pattern being edited.
+ F7             : Start the song at the current row -
               If in the pattern edit mode, F7 will start at the current
               row, at the first instance of the pattern in the pattern
               order.  If in the pattern order screen, F7 will start the
               song at the cursor position (by pattern).
- SHIFT-F11  : Set current order
- SHIFT-F7   : Play song from the current order
- F8         : Stop playback
- F9         : Panic (all midi-off/SHIFT-F9 performs a hard driver panic)
- CTRL-F9    : Track Solo (pattern editor)
- CTRL-F10   : Save Song As...
- F11        : Song Configuration and Order editor
- F12        : System Configuration (midi dev select)
+ SHIFT-F11      : Set current order
+ SHIFT-F7       : Play song from the current order
+ F8             : Stop playback
+ F9             : Panic (all midi-off/SHIFT-F9 performs a hard driver panic)
+ CTRL-F9        : Track Solo (pattern editor)
+ CTRL-F10       : Save Song As...
+ F11            : Song Configuration and Order editor
+ F12            : System Configuration (midi dev select)
  SHIFT-CTRL-F12 : Open Palette Editor (live color editing + presets)
- ALT-F12    : About
- CTRL-S     : Save Song
- CTRL-ALT-N : New Song
- ALT-P      : Song Duration
- CTRL-Q     : Quit (CTRL-ALT-Q also works)
+ ALT-F12        : About
+ CTRL-S         : Save Song
+ CTRL-ALT-N     : New Song
+ ALT-P          : Song Duration
+ CTRL-Q         : Quit (CTRL-ALT-Q also works)
 
 
 |L|%==|H|User Interface Keys|L|==%|U|
 
- Up/Down    : Cycles through widgets
- TAB        : Cycles forwards through widgets
+ Up/Down   : Cycles through widgets
+ TAB       : Cycles forwards through widgets
               (in Help: jumps to next section)
- SHIFT-TAB  : Cycles backwards through widgets
+ SHIFT-TAB : Cycles backwards through widgets
               (in Help: jumps to previous section)
- ENTER      : Confirms choice
- SPACE      : Toggles an option or clicks a button
+ ENTER     : Confirms choice
+ SPACE     : Toggles an option or clicks a button
 
- Sliders    : If you hold CTRL while using LEFT/RIGHT the slider will move in
+ Sliders   : If you hold CTRL while using LEFT/RIGHT the slider will move in
               bigger steps
- Listboxes  : Up/Down scroll, Space toggles select-items in a list box
- Popups     : ESC closes, all other UI keys apply
+ Listboxes : Up/Down scroll, Space toggles select-items in a list box
+ Popups    : ESC closes, all other UI keys apply
 
 
 |L|%==|H|Effects|L|==%|U|
 
- A..xx      : Set TPB (ticks per beat)
- B  00      : Set "[" in the midi file.
- B  01      : Set "]" in the midi file.
- Cxxxx      : Pattern break - setting the C marker denotes the end of a
+ A..xx : Set TPB (ticks per beat)
+ B  00 : Set "[" in the midi file.
+ B  01 : Set "]" in the midi file.
+ Cxxxx : Pattern break - setting the C marker denotes the end of a
               pattern.  ex: C0000 will skip to the next pattern, row 0
- D..xx      : Delay note/volume/cut - by xxxx sub-ticks.
- Exxxx      : Pitch slide down, E0000 will repeat the last portamento command.
- Fxxxx      : Pitch slide up, F0000 will repeat the last portamento down command.
- P....      : Send program change message for the current instrument.
- Q..xx      : Retrig note every xx subticks
- R..xx      : Start arpeggio xx.  R0000 will continue the last arpeggio
- Sxxyy      : xx is the CC (Continuous Controller) number, yy is the value (0-80).
+ D..xx : Delay note/volume/cut - by xxxx sub-ticks.
+ Exxxx : Pitch slide down, E0000 will repeat the last portamento command.
+ Fxxxx : Pitch slide up, F0000 will repeat the last portamento down command.
+ P.... : Send program change message for the current instrument.
+ Q..xx : Retrig note every xx subticks
+ R..xx : Start arpeggio xx.  R0000 will continue the last arpeggio
+ Sxxyy : xx is the CC (Continuous Controller) number, yy is the value (0-80).
               ex. S0142 will set CC #01 (Mod Wheel) to a value of 42.
               >=80 sends last value
- T..xx      : Set tempo to xx bpm
- Wxxxx      : Absolute pitch set, between 0 and 3FFF, 2000 is no pitch change,
+ T..xx : Set tempo to xx bpm
+ Wxxxx : Absolute pitch set, between 0 and 3FFF, 2000 is no pitch change,
               0 is max down, 3FFF is max up
- X..xx      : Set panning, 00=left, 40=center, 7F=right
- Zxxyy      : Send midimacro xx with parameter yy.  00 repeats the last used
+ X..xx : Set panning, 00=left, 40=center, 7F=right
+ Zxxyy : Send midimacro xx with parameter yy.  00 repeats the last used
               value
 
 
@@ -250,7 +250,7 @@
  musicianship awaits you!  Are you ready to meet the challenge?  Then join
  in the cry:
 
- 	zTracker: it is a midi tracker for writing music!
+ 	zTracker : it is a midi tracker for writing music!
 
 
 |L|%==|H|Documentation Credits|L|==%|U|
