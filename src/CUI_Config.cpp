@@ -146,6 +146,19 @@ CUI_Config::CUI_Config(void) {
     cb->xsize = 5;
     cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
+    // Post-Load Page: where to land after a successful song load.
+    // Slider with an inline label name (Inst/Pattern/Songconf) drawn
+    // by draw() — same idiom as View Mode above.
+    vs = new ValueSlider;
+    UI->add_element(vs, 13);
+    vs->x = 20;
+    vs->y = 27;
+    vs->xsize = 15;
+    vs->ysize = 1;
+    vs->value = zt_config_globals.post_load_page;
+    vs->min = 0;
+    vs->max = POST_LOAD_PAGE_COUNT - 1;
+
     b = new Button;
     UI->add_element(b,10);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
@@ -265,6 +278,11 @@ void CUI_Config::update() {
         zt_config_globals.pattern_length = vs->value;
     }
 
+    vs = (ValueSlider *)UI->get_element(13);
+    if (vs && vs->value != zt_config_globals.post_load_page) {
+        zt_config_globals.post_load_page = vs->value;
+    }
+
     ti = (TextInput *)UI->get_element(1);
     if (ti && ti->changed) {
         strncpy(zt_config_globals.autoload_ztfile_filename, (char *)ti->str, sizeof(zt_config_globals.autoload_ztfile_filename) - 1);
@@ -315,6 +333,14 @@ void CUI_Config::draw(Drawable *S) {
         sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Chase MIDI Tempo|L|[|H|%s|L|]",zt_config_globals.midi_in_sync_chase_tempo?"On":"Off");
+        const char *post_load_name = "Inst Editor";
+        switch (zt_config_globals.post_load_page) {
+            case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Edit"; break;
+            case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Config";  break;
+            case POST_LOAD_INST_EDIT:
+            default:                     post_load_name = "Inst Editor";  break;
+        }
+        sprintf(buf+strlen(buf),"\n|U| Post-Load Page  |L|[|H|%s|L|]",post_load_name);
         sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Centered Edit   |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Screen Size     |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
@@ -364,6 +390,25 @@ void CUI_Config::draw(Drawable *S) {
             }
         }
 #endif
+        // Inline label for the Post-Load Page slider (mirrors the View
+        // Mode pattern above — slider value alone reads as 0/1/2 which
+        // is meaningless to the user without the page name beside it).
+        {
+            ValueSlider *vs = (ValueSlider *)UI->get_element(13);
+            if (vs) {
+                const char *post_load_name = "Inst Editor";
+                switch (zt_config_globals.post_load_page) {
+                    case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Edit"; break;
+                    case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Config";  break;
+                    case POST_LOAD_INST_EDIT:
+                    default:                     post_load_name = "Inst Editor";  break;
+                }
+                char label[20];
+                snprintf(label, sizeof(label), " %-12s", post_load_name);
+                printBG(col(vs->x + vs->xsize), row(vs->y), "             ", COLORS.Text, COLORS.Background, S);
+                printBG(col(vs->x + vs->xsize), row(vs->y), label, COLORS.Text, COLORS.Background, S);
+            }
+        }
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
@@ -380,6 +425,7 @@ void CUI_Config::draw(Drawable *S) {
         print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
         print(row(2),col(25),"MIDI In Sync",COLORS.Text,S);
         print(row(2),col(26),"Chase MIDI Tempo",COLORS.Text,S);
+        print(row(2),col(27),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
