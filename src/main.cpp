@@ -939,11 +939,14 @@ void update_status(Drawable *S)
   if (ztPlayer->playing) {
 
     char time[128],time2[64];
-    int sec;
-    sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
-    sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
-    sec = calcSongSeconds();
-    sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
+    int ms = calcSongMs(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
+    int sec = ms / 1000;
+    int tenth = (ms % 1000) / 100;
+    sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|.|H|%d|U|", sec/60, sec%60, tenth);
+    ms = calcSongMs();
+    sec = ms / 1000;
+    tenth = (ms % 1000) / 100;
+    sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|.|H|%d|U|", time2, sec/60, sec%60, tenth);
 
     if (ztPlayer->playmode) {
       sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
