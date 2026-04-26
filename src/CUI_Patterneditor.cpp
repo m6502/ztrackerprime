@@ -1079,8 +1079,15 @@ void CUI_Patterneditor::update()
 
   
   static char view_mode_status[64];
+  // Only post the "View mode: …" status message when the mode or zoom
+  // actually changes. Previously it was rewritten on every refresh,
+  // overwriting any other status message and feeling spammy on entry.
+  static int  prev_view_mode = -1;
+  static float prev_zoom     = -1.0f;
+  bool view_mode_changed = (zt_config_globals.cur_edit_mode != prev_view_mode)
+                       || (ZOOM != prev_zoom);
 
-  switch(zt_config_globals.cur_edit_mode) 
+  switch(zt_config_globals.cur_edit_mode)
   {
 
   // --------------------------------------------------------------------------
@@ -1088,9 +1095,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_SQUISH:
 
-    if (need_refresh) {
+    if (view_mode_changed) {
       sprintf(view_mode_status, "View mode: Squish (%.1fx)", ZOOM);
       statusmsg = view_mode_status;
+      status_change = 1;
     }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 6) ;
@@ -1105,9 +1113,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_REGULAR:
 
-    if (need_refresh) {
+    if (view_mode_changed) {
       sprintf(view_mode_status, "View mode: Regular (%.1fx)", ZOOM);
       statusmsg = view_mode_status;
+      status_change = 1;
     }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 14) ;
@@ -1122,9 +1131,10 @@ void CUI_Patterneditor::update()
 
   case VIEW_BIG:
 
-    if (need_refresh) {
+    if (view_mode_changed) {
       sprintf(view_mode_status, "View mode: Big (%.1fx)", ZOOM);
       statusmsg = view_mode_status;
+      status_change = 1;
     }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / 160 ;    // 160 es lo que mide cada columna; dejamos 80 pixels extras de margen
@@ -1139,13 +1149,14 @@ void CUI_Patterneditor::update()
 
   case VIEW_FX:
 
-    if (need_refresh) {
+    if (view_mode_changed) {
       sprintf(view_mode_status, "View mode: FX (%.1fx)", ZOOM);
       statusmsg = view_mode_status;
+      status_change = 1;
     }
 
     tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 13) ;
-    
+
 //    if((((INTERNAL_RESOLUTION_X-640)/8) % 13) > .5) tracks_shown++;
 
     field_size = 12;
@@ -1154,6 +1165,8 @@ void CUI_Patterneditor::update()
 
     break;
   }
+  prev_view_mode = zt_config_globals.cur_edit_mode;
+  prev_zoom = ZOOM;
 
   
   if (cur_edit_track_disp+tracks_shown >= MAX_TRACKS) {    // Fix for bug #454764 -cm
@@ -1223,15 +1236,25 @@ void CUI_Patterneditor::update()
 
       case SDLK_GRAVE:
         if (mode==PEM_MOUSEDRAW) {
-          
+
         /* Here we flush the MIDIin queue so as to
           not  plug them  in the  pattern  editor */
           midiInQueue.clear();
           key = 0;
-          
+
           mode = PEM_REGULARKEYS;
+          statusmsg = "Editing: Pattern";
         }
-        else mode = PEM_MOUSEDRAW;
+        else {
+          mode = PEM_MOUSEDRAW;
+          switch(md_mode) {
+          case MD_VOL:       statusmsg = "Editing: Volume"; break;
+          case MD_FX:        statusmsg = "Editing: Effect low-byte (0-0x7F)"; break;
+          case MD_FX_SIGNED: statusmsg = "Editing: Effect low-byte signed (0-0x7F)"; break;
+          default:           statusmsg = "Editing: Volume"; break;
+          }
+        }
+        status_change = 1;
         need_refresh++;
         break;
 
@@ -2342,7 +2365,7 @@ void CUI_Patterneditor::update()
         if (KS_HAS_ALT(kstate)) {
           switch(key) {
             
-          case SDLK_GRAVE: 
+          case SDLK_GRAVE:
             // find row of previous note in current edit track
             prev_row = -1;
             x = cur_edit_row;
@@ -2353,10 +2376,17 @@ void CUI_Patterneditor::update()
               }
               x--;
             }
-            
+
             if (prev_row >= 0) {
               j = (cur_edit_row+1 - prev_row)*(96/song->tpb);
               song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(prev_row,-1,-1,-1,j,-1,-1);
+              {
+                char szNote[4] = {'.','.','.',0};
+                hex2note(szNote, e->note);
+                sprintf(szStatmsg, "Changed Note (%s, %02X) length to %d", szNote, e->inst, j);
+                statusmsg = szStatmsg;
+                status_change = 1;
+              }
               need_refresh++;
             }
             break;

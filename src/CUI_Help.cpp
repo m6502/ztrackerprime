@@ -4,6 +4,9 @@ CUI_Help::CUI_Help(void) {
 
 //  Help *oe;
 
+    section_lines = NULL;
+    section_count = 0;
+
     UI = new UserInterface;
 
     tb = new TextBox;
@@ -100,17 +103,49 @@ CUI_Help::CUI_Help(void) {
                                && src[key_end] != '\t'
                                && src[key_end] != ':') key_end++;
                         int key_len = key_end - key_start;
+                        // Don't rewrite chords whose Cmd-form is OS-reserved
+                        // on macOS (Cmd-TAB = app switcher, Cmd-Q = quit
+                        // — handled separately, Cmd-W = close window,
+                        // Cmd-H = hide, Cmd-` = window-cycle).
+                        // Copy the modifier verbatim so users see e.g.
+                        // "CTRL-TAB" not "CMD-TAB/ALT-TAB".
+                        auto is_reserved = [](const char *p, int n) {
+                            if (n == 3 && strncmp(p, "TAB", 3) == 0) return true;
+                            if (n == 1 && (*p == 'W' || *p == 'H')) return true;
+                            return false;
+                        };
+                        // Compound combos like "SHIFT-X" expand to
+                        // "CMD-SHIFT-X/ALT-SHIFT-X" which doubles the
+                        // length and pushes the colon way past the
+                        // source's column. That destroys row-to-row
+                        // colon alignment and looks bad. Keep the
+                        // source modifier verbatim for these.
+                        bool key_starts_with_shift =
+                            key_len >= 6 && strncmp(src + key_start, "SHIFT-", 6) == 0;
+                        if (is_reserved(src + key_start, key_len)
+                            || key_starts_with_shift) {
+                            memcpy(dst + di, src + i, kw_len + key_len);
+                            di += kw_len + key_len;
+                            i = key_end;
+                            rewritten = true;
+                            continue;
+                        }
                         // Emit "CMD-<key>/ALT-<key>".
                         memcpy(dst + di, "CMD-", 4); di += 4;
                         memcpy(dst + di, src + key_start, key_len); di += key_len;
                         memcpy(dst + di, "/ALT-", 5); di += 5;
                         memcpy(dst + di, src + key_start, key_len); di += key_len;
                         i = key_end;
-                        // Width expansion: source "CTRL-<key>" is 5+key_len
-                        // chars; output is 4+key_len+5+4+key_len = 13+2*key_len.
-                        // Consume trailing spaces up to the source surplus so
-                        // the colon stays as aligned as possible.
-                        int grown = (13 + 2 * key_len) - (kw_len + key_len);
+                        // Width expansion: source "CTRL-<key>" is kw_len +
+                        // key_len chars; output is "CMD-" (4) + key_len +
+                        // "/ALT-" (5) + key_len = 9 + 2*key_len. Consume
+                        // exactly that many trailing spaces from the source
+                        // so the colon ends up at the same column it had
+                        // pre-rewrite. (Previous formula used 13 instead of
+                        // 9, eating four spaces too many — rewritten lines
+                        // ended up with colons four columns left of
+                        // unrewritten neighbours.)
+                        int grown = (9 + 2 * key_len) - (kw_len + key_len);
                         while (grown > 0 && i < line_end && src[i] == ' ') {
                             i++; grown--;
                         }
@@ -130,6 +165,49 @@ CUI_Help::CUI_Help(void) {
         tb->text = "\n\n  I couldn't find doc/help.txt.  no help for you :[";
     }
     free(help_file);
+
+    // Build section anchor list. Section headers look like
+    //   |L|%==|H|Section Title|L|==%|U|
+    // and always sit at the start of a line. Walk tb->text once,
+    // recording the line index (number of \n encountered before the
+    // line) for each match. Two-pass: count, then fill.
+    {
+        const char *t = tb->text;
+        int line_idx = 0;
+        int count = 0;
+        for (int i = 0; t[i]; ) {
+            int line_start = i;
+            int line_end = line_start;
+            while (t[line_end] && t[line_end] != '\n') line_end++;
+            // Match the marker at the very start of the line, allowing
+            // for one optional leading space (defensive — the file's
+            // headers all start at column 0 today).
+            int p = line_start;
+            if (t[p] == ' ') p++;
+            if (line_end - p >= 8 && strncmp(t + p, "|L|%==|H|", 9) == 0) {
+                count++;
+            }
+            line_idx++;
+            i = (t[line_end] == '\n') ? line_end + 1 : line_end;
+        }
+        if (count > 0) {
+            section_lines = new int[count];
+            section_count = 0;
+            line_idx = 0;
+            for (int i = 0; t[i]; ) {
+                int line_start = i;
+                int line_end = line_start;
+                while (t[line_end] && t[line_end] != '\n') line_end++;
+                int p = line_start;
+                if (t[p] == ' ') p++;
+                if (line_end - p >= 8 && strncmp(t + p, "|L|%==|H|", 9) == 0) {
+                    section_lines[section_count++] = line_idx;
+                }
+                line_idx++;
+                i = (t[line_end] == '\n') ? line_end + 1 : line_end;
+            }
+        }
+    }
 }
 
 CUI_Help::~CUI_Help() {
@@ -137,6 +215,10 @@ CUI_Help::~CUI_Help() {
     if (needfree) {
         tb = (TextBox *)UI->get_element(0);
         delete[] tb->text;
+    }
+    if (section_lines) {
+        delete[] section_lines;
+        section_lines = NULL;
     }
 }
 
@@ -151,6 +233,52 @@ void CUI_Help::leave(void) {
 
 void CUI_Help::update() {
     int key=0;
+    KBMod kstate = 0;
+    // Peek the buffered key BEFORE TextBox::update() consumes it, so
+    // Tab/Shift-Tab can be intercepted for section navigation rather
+    // than scrolling line-by-line.
+    if (Keys.size()) {
+        key = Keys.checkkey();
+        kstate = Keys.cur_state;
+        if (key == SDLK_TAB && section_count > 0) {
+            Keys.getkey(); // consume
+            if (kstate & KS_SHIFT) {
+                // Previous section: largest section_lines[i] strictly
+                // less than current startline. If we're already at or
+                // before the first section, wrap to the last.
+                int target = section_lines[section_count - 1];
+                for (int i = section_count - 1; i >= 0; i--) {
+                    if (section_lines[i] < tb->startline) {
+                        target = section_lines[i];
+                        break;
+                    }
+                }
+                tb->startline = target;
+            } else {
+                // Next section: smallest section_lines[i] strictly
+                // greater than current startline. If already at/past
+                // the last, wrap to the first.
+                int target = section_lines[0];
+                int found = 0;
+                for (int i = 0; i < section_count; i++) {
+                    if (section_lines[i] > tb->startline) {
+                        target = section_lines[i];
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) target = section_lines[0];
+                tb->startline = target;
+            }
+            tb->bEof = false;
+            // The TextBox only repaints when its element-level need_redraw
+            // flag is set; bumping the global need_refresh alone leaves the
+            // visible scroll position stale until the page is left+re-entered.
+            UI->full_refresh();
+            need_refresh++;
+            return;
+        }
+    }
     UI->update();
     if (Keys.size()) {
         key = Keys.getkey();

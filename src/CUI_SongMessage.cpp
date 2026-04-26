@@ -48,10 +48,12 @@ CUI_SongMessage::CUI_SongMessage(void) {
     tb = new CommentEditor;
     UI->add_element(tb, 0);
     tb->x = 1;
-    tb->y = 14;
+    tb->y = 12;
     tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
-    tb->ysize = 36+ ((INTERNAL_RESOLUTION_Y-480)/8);
-    tb->text = NULL;//"\n\n  This is the song comment.  Edit me!";
+    // Bottom-anchor: same formula as CUI_Help so the textbox never
+    // bleeds into the toolbar strip at INTERNAL_RESOLUTION_Y - 55.
+    tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
+    tb->text = NULL;
     needfree = 0;
     buffer = NULL;
 }
@@ -68,11 +70,9 @@ void CUI_SongMessage::enter(void) {
     need_refresh++;
     cur_state = STATE_SONG_MESSAGE;
     CommentEditor *cb = (CommentEditor*)UI->get_element(0);
-//    buffer = new CDataBuf;
-//    buffer->pushstr(song->songmessage->songmessage);
     buffer = song->songmessage->songmessage;
     cb->target = buffer;
-    cb->text = buffer->getbuffer();
+    cb->refresh_display();
     zt_text_input_start();
 }
 
@@ -105,6 +105,15 @@ void CUI_SongMessage::update() {
 }
 
 void CUI_SongMessage::draw(Drawable *S) {
+    // Re-run the bottom-anchored sizing in case the window has been
+    // resized since the page was constructed.
+    CommentEditor *cb = (CommentEditor*)UI->get_element(0);
+    cb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    cb->ysize = (INTERNAL_RESOLUTION_Y/8) - cb->y - 8;
+    // Refresh the null-terminated display mirror so TextBox::draw has
+    // a clean string to walk (CDataBuf is not null-terminated; reading
+    // past the live byte count walks heap garbage).
+    cb->refresh_display();
     if (S->lock()==0) {
         UI->draw(S);
         draw_status(S);

@@ -75,6 +75,10 @@
 #include "lua_engine.h"
 #include "keybindings.h"
 
+#ifdef __APPLE__
+extern "C" void zt_macos_disable_cmd_q(void);
+#endif
+
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <unistd.h>
@@ -923,9 +927,11 @@ void update_status(Drawable *S)
   int i,o=0;
   char str[10];
 
-  // Only refresh the playing/looping status line when viewing the Pattern
-  // Editor; otherwise it bleeds over Help/Sample/Song/Sys Config pages.
-  if (ztPlayer->playing && cur_state == STATE_PEDIT) {
+  // Refresh the playing/looping status line on the pages where it makes
+  // sense (Pattern Editor + Play Song). Other pages (Help, Instrument
+  // Editor, Sys Config…) keep the status bar quiet so the playback line
+  // doesn't bleed over their own UI.
+  if (ztPlayer->playing && (cur_state == STATE_PEDIT || cur_state == STATE_PLAY)) {
 
     if (ztPlayer->playmode) {
 
@@ -952,8 +958,8 @@ void update_status(Drawable *S)
       need_refresh++;
     }
   }
-  else if (ztPlayer->playing && cur_state != STATE_PEDIT) {
-    // Keep statusmsg quiet on non-Pattern pages while playing.
+  else if (ztPlayer->playing && cur_state != STATE_PEDIT && cur_state != STATE_PLAY) {
+    // Keep statusmsg quiet on Help/InstEdit/SysConfig/etc while playing.
     statusmsg = (char*)" ";
   }
 
@@ -1329,13 +1335,27 @@ void global_keys(Drawable *S)
                 status_change = 1; need_refresh++;
                 break;
             case SDLK_Q:
-                if (kstate & KS_ALT && kstate & KS_CTRL) {
+                // Plain Ctrl-Q quits, same as the long-form Ctrl-Alt-Q.
+                // (Cmd-Q on macOS is reserved for the pattern-editor
+                // Transpose-up shortcut via KS_HAS_ALT, so we don't bind
+                // Cmd-Q here.)
+                if (kstate & KS_CTRL) {
                     command=CMD_QUIT;
                     key = Keys.getkey();
                 }
                 break;
-            case SDLK_M: // Quick MIDI export
-                if (kstate & KS_CTRL) {
+            case SDLK_M:
+                // Ctrl-M = open Midimacro editor (the obvious-name
+                // shortcut; works regardless of macOS F-key mode).
+                if ((kstate & KS_CTRL) && !(kstate & KS_SHIFT)) {
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+                    command = CMD_SWITCH_MIDIMACEDIT;
+                    key = Keys.getkey();
+#endif
+                    break;
+                }
+                // Ctrl-Shift-M = quick MIDI export to .mid file.
+                if ((kstate & KS_CTRL) && (kstate & KS_SHIFT)) {
                     // Export current song as .mid file
                     char midfn[512];
                     if (song->filename[0]) {
@@ -1383,7 +1403,12 @@ void global_keys(Drawable *S)
 
 #ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
             case SDLK_F4:
-                if (kstate & KS_CTRL) {
+                // Any combination involving Shift+F4 opens the Midimacro
+                // editor. Plain Shift-F4 (no other modifier) is the
+                // simplest path and avoids every OS-level F-key shortcut
+                // (macOS Cmd-F4 zoom, Linux/Win Alt-F4 close-window).
+                // Shift+Ctrl+F4, Shift+Cmd+F4, Shift+Alt+F4 also work.
+                if (kstate & KS_SHIFT) {
                     command=CMD_SWITCH_MIDIMACEDIT;
                 }
                 break;
@@ -2553,7 +2578,13 @@ void textinputhandler(const SDL_Event *e) {
             }
         }
     }
-    if (ch >= 0x20 || ch == 10 || ch == 9) {
+    // Newline (\n, 0x0A) is delivered via the dedicated SDLK_RETURN
+    // keydown path (keyhandler sets actual_ch=10 for SDLK_RETURN).
+    // If we ALSO let it through here, every Enter press pushes two
+    // newlines in widgets that handle both paths. Same logic for Tab —
+    // SDLK_TAB has its own meaning (widget focus cycling) and shouldn't
+    // be appended as text.
+    if (ch >= 0x20) {
         Keys.insert(SDLK_SPACE, SDL_KMOD_NONE, ch, SDL_SCANCODE_SPACE);
     }
 }
@@ -3074,6 +3105,12 @@ static int zt_backend_set_video_mode(char *errstr)
       zt_show_error("Error", errstr);
       return 0;
     }
+#ifdef __APPLE__
+    // Free Cmd-Q from the auto-created NSApp menu so the Pattern Editor can
+    // use it as Transpose-Up (KS_HAS_ALT treats Cmd as Alt). Quit reachable
+    // via Ctrl-Q / Ctrl-Alt-Q.
+    zt_macos_disable_cmd_q();
+#endif
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {
       snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());

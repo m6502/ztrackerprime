@@ -201,6 +201,12 @@ class CUI_Help : public CUI_Page {
 
         int needfree;
 
+        // Section anchor lines (line numbers in tb->text where section
+        // headers start). Built once at load time; used by Tab/Shift-Tab
+        // to jump tb->startline forward/back to the next/prev section.
+        int *section_lines;
+        int section_count;
+
         CUI_Help();
         ~CUI_Help();
 

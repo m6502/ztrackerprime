@@ -3215,6 +3215,36 @@ int AliasTextInput::update() {
 CommentEditor::CommentEditor() {
     bUseColors = FALSE;
     bWordWrap = true;
+    target = NULL;
+    _display = NULL;
+    _display_alloc = 0;
+    text = NULL;
+}
+
+CommentEditor::~CommentEditor() {
+    if (_display) free(_display);
+    _display = NULL;
+}
+
+void CommentEditor::refresh_display() {
+    if (!target) {
+        text = NULL;
+        return;
+    }
+    int n = target->getsize();
+    int need = n + 1;
+    if (need > _display_alloc) {
+        int newalloc = _display_alloc ? _display_alloc : 64;
+        while (newalloc < need) newalloc *= 2;
+        _display = (char*)realloc(_display, (size_t)newalloc);
+        _display_alloc = newalloc;
+    }
+    if (n > 0) {
+        const char *src = target->getbuffer();
+        if (src) memcpy(_display, src, (size_t)n);
+    }
+    _display[n] = '\0';
+    text = _display;
 }
 
 
@@ -3237,17 +3267,35 @@ int CommentEditor::update() {
         case SDLK_LEFT: act++; soff--; break;
         case SDLK_RIGHT:act++; soff++; break;
         case SDLK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
-
+        case SDLK_BACKSPACE:
+            if (target) {
+                target->popc();
+                refresh_display();
+                act++;
+            }
+            break;
+        case SDLK_RETURN:
+            if (target) {
+                target->pushc('\n');
+                refresh_display();
+                act++;
+            }
+            break;
         default:
-            if (ch != 0x0) {
+            // Only the SDLK_SPACE proxy carries a real typed-text
+            // actual_char (textinputhandler() routes every printable
+            // SDL_TEXTINPUT byte through SDLK_SPACE). Real keydowns
+            // for non-printable keys (function keys etc.) reach this
+            // default path with ch=0, so a SDLK_SPACE gate is enough
+            // to avoid double-pushing keys that have explicit cases
+            // above (Backspace, Return).
+            if (key == SDLK_SPACE && ch != 0x0) {
                 if (target) {
                     target->pushc(ch);
+                    refresh_display();
                     act++;
                 }
             }
-            //        case SDLK_SPACE:  //  / Same thing
-//        case SDLK_RETURN: //  \ Same thingg
-//            break;
         }
         if (act) {
             Keys.getkey();
