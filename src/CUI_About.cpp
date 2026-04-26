@@ -12,7 +12,7 @@ CUI_About::CUI_About(void) {
     // xsize is in characters. The longest line we want to fully contain
     // is "This fork is currently maintained by Manuel Montoto (Debvgger)"
     // (62 chars from column 2). Right edge aligns with end of "(Debvgger)".
-    l->xsize = 62;
+    l->xsize = 66;
     // Layout policy (CUI_About::draw will scale the bmAbout bitmap to
     // fit between the page title row and the textbox top, so this is
     // the single source of truth for both):
@@ -29,11 +29,14 @@ CUI_About::CUI_About(void) {
     const int TOOLBAR_RESERVE_ROWS = 8;
     int total_rows  = (INTERNAL_RESOLUTION_Y / 8);
     int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
-    // Top: 25 rows higher than the (row(9)+300px)/8 anchor (i.e. 15
-    // rows lower than the previous -40 setting).
-    int box_top = ((row(9) + 300) / 8) - 25;
+    // Top: 27 rows higher than the (row(9)+300px)/8 anchor (2 rows
+    // higher than the previous -25 setting).
+    int box_top = ((row(9) + 300) / 8) - 27;
     if (box_top < 0) box_top = 0;
-    int box_size = max_end_row - box_top;
+    // Height: 75% of the available room down to max_end_row, i.e. the
+    // bottom no longer rides max_end_row — it's pulled up so the box
+    // is ~3/4 of its previous height.
+    int box_size = ((max_end_row - box_top) * 75) / 100;
     if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
