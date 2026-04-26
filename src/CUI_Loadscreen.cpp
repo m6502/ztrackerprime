@@ -58,7 +58,7 @@ extern std::atomic<int> is_loading;
 //
 void do_load(void) 
 {
-//  <Manu> Si la cancion está sonando la paramos --
+//  <Manu> Si la cancion está sonando la paramos -- [EN: if the song is playing, stop it]
   if(ztPlayer->playing) {
     
     ztPlayer->stop() ;
@@ -76,7 +76,7 @@ void do_load(void)
 //
 void filelist_onEnter(UserInterfaceElement *b)
 {
-//  <Manu> Desactivamos el requester de si estas loco; al cargar 
+//  <Manu> Desactivamos el requester de si estas loco; al cargar  [EN: disable the are-you-sure requester when loading]
 //         la cancion se comprueba si se esta playeando y la parara
   
 /*  if(ztPlayer->playing) {

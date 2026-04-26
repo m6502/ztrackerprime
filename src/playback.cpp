@@ -462,7 +462,7 @@ int player::calc_pos(int midi_songpos, int *rowptr, int *orderptr) {
 
     int i,rowspassed,lastrowspassed,pat,row,order,found;
     
-    // <Manu> Por si acaso
+    // <Manu> Por si acaso [EN: just in case]
     row = 0 ;
     order = 0 ;
 
@@ -521,7 +521,7 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
     patt_memory.tracks[t]->reset();
   }
 
-  // <Manu> A veces no entraba abajo?
+  // <Manu> A veces no entraba abajo? [EN: sometimes it didn't fall through to the block below?]
   while (!lock_mutex(song->hEditMutex)) {
   
     SDL_Delay(1) ;
@@ -606,7 +606,7 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
 //
 void player::play(int row, int pattern,int pm, int loopmode)
 {
-// <Manu> esta comprobacion no es necesaria ?
+// <Manu> esta comprobacion no es necesaria ? [EN: is this check unnecessary?]
 
 /*    if (song->orderlist[pattern] == 0x100) 
         return;
@@ -680,7 +680,7 @@ void player::play_current_row()
         set_note = pEvent->note;
         set_note += song->instruments[pEvent->inst]->transpose; 
 
-        // <Manu> Transposición
+        // <Manu> Transposición [EN: transposition]
 
 
         if (set_note>0x7f) set_note = 0x7f;
@@ -1306,7 +1306,7 @@ void player::playback(midi_buf *buffer, int ticks)
                     break;
 
 
-                  case 'B': // <Manu> No se si hace falta poner aqui el evento de loop
+                  case 'B': // <Manu> No se si hace falta poner aqui el evento de loop [EN: not sure whether the loop event needs to be placed here]
 
                     {
                       //                                  buffer->insert(p_tick,ET_LOOP,0,0,evento->effect_data,0,t);

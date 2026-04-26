@@ -130,7 +130,7 @@ public:
 
 public:
 
-  // <Manu> Flag que indica si el instrumento se ha utilizado en la última reproducción
+  // <Manu> Flag que indica si el instrumento se ha utilizado en la última reproducción [EN: flag indicating whether the instrument was used in the last playback]
   bool bHasBeenUsed ;
 
   signed char patch;

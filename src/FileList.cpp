@@ -390,7 +390,7 @@ void FileList::OnChange()
     AddFiles(".zt", COLORS.Data);
     AddFiles(".it", COLORS.Highlight);
     
-    // <Manu> Quiero que muestre tambien los .mid, asi que añado esta linea
+    // <Manu> Quiero que muestre tambien los .mid, asi que añado esta linea [EN: I want it to show .mid files too, so I'm adding this line]
     AddFiles(".mid", COLORS.Highlight);
     
     need_redraw++;

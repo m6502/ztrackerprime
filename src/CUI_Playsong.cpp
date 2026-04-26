@@ -22,11 +22,11 @@ CUI_Playsong::CUI_Playsong(void)
 
     clear = 0 ;
 
-    // <Manu> ¿Por qué 20?
+    // <Manu> ¿Por qué 20? [EN: why 20?]
     //p->y = 20 ;
     pattern_display->y = 14 ;
     
-    // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
+    // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto) [EN: controls how many lines are shown while a song is playing (default 30)]
     //p->ysize = 30 ;
 
     // Reserve 8 rows at the bottom: 7 for the 55px toolbar (ceil(55/8)) plus
@@ -203,9 +203,9 @@ void CUI_Playsong::draw(Drawable *S)
     
     if (clear > 0) {
       
-      // <Manu> cambio res
+      // <Manu> cambio res [EN: resolution change]
       //S->fillRect(0,row(15),INTERNAL_RESOLUTION_X,row(50)/*410*/,COLORS.Background);
-      S->fillRect(0, row(15), INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y - (640 - row(50))/*410*/,COLORS.Background); // <Manu> Necesario?
+      S->fillRect(0, row(15), INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y - (640 - row(50))/*410*/,COLORS.Background); // <Manu> Necesario? [EN: needed?]
 
       clear = 0 ;
     }
