@@ -1017,28 +1017,33 @@ void CheckBox::draw(Drawable *S, int active) {
     int cx,cy=y;
     TColor f,b;
     const char *str;
-    for(cx=x;cx<x+xsize;cx++) {
-        printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
-    }
     if (*value)
-        str = "On";
+        str = "On ";
     else
         str = "Off";
+    // Visible chip width derives from the string length so the dark
+    // background is exactly as wide as the text (no trailing padding).
+    // Both "Off" and "On " are 3 chars, so it's a single source of
+    // truth: change the strings and every checkbox in the app follows.
+    const int chip_w = (int)strlen(str);
+    for(cx=x;cx<x+chip_w;cx++) {
+        printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
+    }
     if (active) {
         f = COLORS.EditBG;
-        b = COLORS.Highlight; 
+        b = COLORS.Highlight;
     } else {
         f = COLORS.EditText;
         b = COLORS.EditBG;
     }
     printBG(col(x),col(y),str,f,b,S);
     if (frame) {
-        printline(col(x),row(y-1),0x86,xsize,COLORS.Lowlight,S);
-        printline(col(x),row(y+1),0x81,xsize,COLORS.Highlight,S);
+        printline(col(x),row(y-1),0x86,chip_w,COLORS.Lowlight,S);
+        printline(col(x),row(y+1),0x81,chip_w,COLORS.Highlight,S);
         printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
-        printchar(col(x+xsize),row(y),0x83,COLORS.Highlight,S);
+        printchar(col(x+chip_w),row(y),0x83,COLORS.Highlight,S);
     }
-    screenmanager.Update(col(x-1),row(y-1),col(x+xsize+1),row(y+1));
+    screenmanager.Update(col(x-1),row(y-1),col(x+chip_w+1),row(y+1));
     changed = 0;
 }
 
