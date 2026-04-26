@@ -12,8 +12,15 @@ CUI_About::CUI_About(void) {
     UI->add_element(l,0);
     l->x = 2;
     l->xsize = (int)((double)(38+3)*xscale);
-    l->ysize = (int)((double)26*yscale);
-    l->y = 25 + ((INTERNAL_RESOLUTION_Y-480)/8) - (l->ysize-26);
+    // Anchor below the bmAbout logo and clamp height so the box never
+    // overlaps the bottom toolbar (~7 rows of 55 px).
+    const int ROW_BELOW_LOGO = 20;
+    const int TOOLBAR_ROWS = 7;
+    int max_end_row = (INTERNAL_RESOLUTION_Y / 8) - TOOLBAR_ROWS - 1;
+    int avail = max_end_row - ROW_BELOW_LOGO;
+    if (avail < 6) avail = 6;
+    l->y = ROW_BELOW_LOGO;
+    l->ysize = avail;
     l->bWordWrap = true ;
     l->text =R"about_text(
 |H|About|U|
