@@ -85,8 +85,12 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Pattern Editor",           "F2",                   CMD_SWITCH_PEDIT,           NULL},
     {MM_CMD,        "Instrument Editor",        "F3",                   CMD_SWITCH_IEDIT,           NULL},
     {MM_CMD,        "Song Configuration",       "F11",                  CMD_SWITCH_SONGCONF,        NULL},
+#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
     {MM_CMD,        "Song Message",             "F10",                  CMD_SWITCH_SONGMSG,         NULL},
+#endif
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
     {MM_CMD,        "Midimacro Editor",         "Ctrl-M",               CMD_SWITCH_MIDIMACEDIT,     NULL},
+#endif
     {MM_CMD,        "Help",                     "F1",                   CMD_SWITCH_HELP,            NULL},
     {MM_CMD,        "About",                    "Alt-F12",              CMD_SWITCH_ABOUT,           NULL},
 
@@ -331,6 +335,10 @@ void CUI_MainMenu::draw(Drawable *S) {
     }
 
     S->unlock();
+    // Mark the popup region dirty so screenmanager flushes the
+    // updated cursor highlight to SDL on the next Refresh — without
+    // this, cur_sel changes from Up/Down don't make it to the screen.
+    screenmanager.UpdateWH(col(x0), row(y0), col(box_w), row(box_h));
     need_refresh = 0;
     updated++;
 }
