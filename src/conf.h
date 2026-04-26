@@ -11,6 +11,13 @@
 
 enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_EXTEND };
 
+// Where to land after a successful song load. Default is Instrument
+// Editor (F3) — matches the long-standing behaviour. Pattern Editor
+// (F2) suits arrangers who go straight to writing notes; Song Config
+// (F11) suits people who want to verify BPM/TPB/order list first.
+enum E_post_load_page { POST_LOAD_INST_EDIT = 0, POST_LOAD_PATTERN_EDIT, POST_LOAD_SONG_CONFIG };
+#define POST_LOAD_PAGE_COUNT 3
+
 
 //  New class ZTConf puts all global variables in one place
 //  with convenient high level functions to handle I/O
@@ -80,6 +87,7 @@ class ZTConf {
         int control_navigation_amount;
         char default_directory[MAX_PATH + 1];
         int record_velocity;
+        int post_load_page;        // E_post_load_page — page to switch to after a successful load
         char window_icon[MAX_PATH + 1];
 };
 

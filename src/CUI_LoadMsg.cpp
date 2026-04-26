@@ -133,9 +133,17 @@ void CUI_LoadMsg::update() {
         fixmouse++;
         need_refresh++;
         load_finished = 0;
-        // After a successful load, jump to the Instrument Editor (F3) so
-        // the user can immediately see and edit the imported instruments.
-        switch_page(UIP_InstEditor);
+        // Jump to the user-configured post-load destination (Global Config
+        // > Post-Load Page). Default is Instrument Editor (F3), matching
+        // the long-standing behaviour. Pattern Editor (F2) suits arrangers
+        // who want to start writing notes; Song Configuration (F11) suits
+        // people who want to verify BPM/TPB/order list before anything else.
+        switch (zt_config_globals.post_load_page) {
+            case POST_LOAD_PATTERN_EDIT: switch_page(UIP_Patterneditor); break;
+            case POST_LOAD_SONG_CONFIG:  switch_page(UIP_Songconfig);    break;
+            case POST_LOAD_INST_EDIT:
+            default:                     switch_page(UIP_InstEditor);   break;
+        }
     }
 }
 void CUI_LoadMsg::draw(Drawable *S)
