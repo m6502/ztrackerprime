@@ -139,24 +139,22 @@ CUI_Config::CUI_Config(void) {
     // MIDI realtime sync toggles. The underlying flags already exist in
     // zt.conf but were previously only reachable via the Sysconfig page;
     // expose them here so Global Config (F12) covers the full config set.
+    // MIDI In Sync + Chase MIDI Tempo moved to F11 (Songconfig). Keep
+    // the elements here as off-screen no-tab-stops so the existing
+    // get_element(N) index numbering in update()/draw() doesn't break.
     cb = new CheckBox;
     UI->add_element(cb, 9);
-    cb->frame = 1;
-    cb->x = 20;
-    cb->y = 24;
-    cb->xsize = 5;
+    cb->frame = 0;
+    cb->x = 0; cb->y = 0; cb->xsize = 0;
     cb->value = &zt_config_globals.midi_in_sync;
+    cb->no_tab_stop = 1;
 
-    // Pair Chase MIDI Tempo on the same row as MIDI In Sync. "MIDI In
-    // Sync" label = 12 cols, slider at x=20 ends at col 25 (chip 3).
-    // Place "Chase MIDI Tempo" label at col 28, checkbox at x=46.
     cb = new CheckBox;
     UI->add_element(cb, 10);
-    cb->frame = 1;
-    cb->x = 46;
-    cb->y = 24;
-    cb->xsize = 5;
+    cb->frame = 0;
+    cb->x = 0; cb->y = 0; cb->xsize = 0;
     cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
+    cb->no_tab_stop = 1;
 
     // Post-Load Page: where to land after a successful song load.
     // Slider with an inline label name (Inst/Pattern/Songconf) drawn
@@ -164,7 +162,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs, 11);
     vs->x = 20;
-    vs->y = 25;
+    vs->y = 24;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.post_load_page;
@@ -438,9 +436,8 @@ void CUI_Config::draw(Drawable *S) {
         print(row(2),col(21),"Row highlight minor",COLORS.Text,S);
         print(row(40),col(21),"Row highlight major",COLORS.Text,S);
         print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
-        print(row(2),col(24),"MIDI In Sync",COLORS.Text,S);
-        print(row(28),col(24),"Chase MIDI Tempo",COLORS.Text,S);
-        print(row(2),col(25),"Post-Load Page",COLORS.Text,S);
+        // MIDI In Sync + Chase MIDI Tempo labels moved to F11 (Songconfig).
+        print(row(2),col(24),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);

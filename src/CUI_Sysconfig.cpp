@@ -284,13 +284,18 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->value = &zt_config_globals.auto_send_panic;
         cb->frame = 1;
 
+        // MIDI In Sync (a.k.a. "MIDI-IN Slave"). The user-facing label
+        // lives in F11 (Songconfig) now, but we keep the element here
+        // off-screen so the tabindex/get_element(N) numbering elsewhere
+        // doesn't shift. xsize=0 / no_tab_stop hide it from cycling.
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
-        cb->x = 4 + 15;
-        cb->y = base_y + 4;
-        cb->xsize = 5;
+        cb->x = 0;
+        cb->y = 0;
+        cb->xsize = 0;
         cb->value = &zt_config_globals.midi_in_sync;
-        cb->frame = 1;
+        cb->frame = 0;
+        cb->no_tab_stop = 1;
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
@@ -479,7 +484,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
         // "Go to page 2" button, rows 11 and 13 are empty gaps.
         print(row(4),col(TRACKS_ROW_Y+3),"     Prebuffer",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+5)," Panic on stop",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+7)," MIDI-IN Slave",COLORS.Text,S);
+        // "MIDI-IN Slave" label intentionally omitted — see F11 (Songconfig).
         print(row(4),col(TRACKS_ROW_Y+9),"Auto-open MIDI",COLORS.Text,S);
 
         print(row(4),col(TRACKS_ROW_Y+11),"   Full Screen",COLORS.Text,S);

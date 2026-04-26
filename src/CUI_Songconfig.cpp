@@ -131,8 +131,26 @@ CUI_Songconfig::CUI_Songconfig(void) {
         fm->xsize = 28;
         fm->ysize = 2;
 
+        // MIDI In Sync (slave to incoming MIDI clock).
+        cb = new CheckBox;
+        UI->add_element(cb, 8);
+        cb->frame = 1;
+        cb->x = 17;
+        cb->y = base_y + 11;
+        cb->xsize = 5;
+        cb->value = &zt_config_globals.midi_in_sync;
+
+        // Chase MIDI Tempo.
+        cb = new CheckBox;
+        UI->add_element(cb, 9);
+        cb->frame = 1;
+        cb->x = 17;
+        cb->y = base_y + 12;
+        cb->xsize = 5;
+        cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
+
         oe = new OrderEditor;
-        UI->add_element(oe,8);
+        UI->add_element(oe,10);
         oe->x = 59;
         oe->y = 13;
         oe->xsize = 9;
@@ -216,6 +234,14 @@ void CUI_Songconfig::update()
     } else if (vs) {
         vs->value = zt_config_globals.lowlight_increment;
     }
+    {
+        CheckBox *cb = (CheckBox *)UI->get_element(8);
+        if (cb && cb->changed)
+            zt_config_globals.midi_in_sync = *(cb->value);
+        cb = (CheckBox *)UI->get_element(9);
+        if (cb && cb->changed)
+            zt_config_globals.midi_in_sync_chase_tempo = *(cb->value);
+    }
     if (Keys.size()) {
         Keys.getkey();
     }
@@ -241,6 +267,9 @@ void CUI_Songconfig::draw(Drawable *S) {
         print(row(1),col(base_y+9),"Row hl major   ",COLORS.Text,S);
         printchar(row(17 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
         printchar(row(17 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
+        // MIDI sync settings (moved from F12 Sysconfig + Ctrl+F12 Global Config).
+        print(row(1),col(base_y+11),"  MIDI In Sync",COLORS.Text,S);
+        print(row(1),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
         // Order List label aligned to the OE x-origin (col 59) so the
         // header sits flush over the "000" index column.
         print(row(59),col(11),"Order List",COLORS.Text,S);
