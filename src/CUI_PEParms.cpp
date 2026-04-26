@@ -182,6 +182,33 @@ void CUI_PEParms::update() {
         UIP_Patterneditor->mode = (drawmode_val) ? PEM_MOUSEDRAW : PEM_REGULARKEYS;
         if (UIP_Patterneditor->mode == PEM_REGULARKEYS) midiInQueue.clear();
     }
+
+    // Live drawing while the popup is open. With DrawMode on, forward
+    // mouse activity to the pattern editor when the cursor is outside
+    // the popup window. Only forward if the queue is empty (so the PE
+    // can refresh its drag from LastX/LastY) or the next pending key
+    // is a mouse-button event — never a keyboard key, which would
+    // hijack the popup's own input.
+    if (UIP_Patterneditor->mode == PEM_MOUSEDRAW) {
+        int win_w = 54 * col(1);
+        int win_h = 20 * row(1);
+        int wx = (INTERNAL_RESOLUTION_X / 2) - (win_w / 2);
+        int wy = (INTERNAL_RESOLUTION_Y / 2) - (win_h / 2);
+        int outside_popup = (LastX < wx) || (LastX >= wx + win_w) ||
+                            (LastY < wy) || (LastY >= wy + win_h);
+        if (outside_popup) {
+            int peeked = Keys.checkkey();
+            int forwardable_key =
+                peeked == 0 ||
+                peeked == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP   << 8) | SDL_BUTTON_LEFT)) ||
+                peeked == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT));
+            if (forwardable_key) {
+                UIP_Patterneditor->update();
+                need_refresh++;
+                need_popup_refresh++;
+            }
+        }
+    }
 }
 
 void CUI_PEParms::draw(Drawable *S) {

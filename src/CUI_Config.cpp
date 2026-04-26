@@ -260,6 +260,39 @@ void CUI_Config::leave(void) {
 }
 
 void CUI_Config::update() {
+    // Enter on Default Dir (tabindex 2) opens a native macOS folder
+    // picker via osascript. Peek the key first so UI->update() doesn't
+    // consume it. The result replaces the TextInput's buffer (which
+    // points at zt_config_globals.default_directory).
+    if (UI->cur_element == 2 && Keys.checkkey() == SDLK_RETURN) {
+        Keys.getkey();
+        FILE *p = popen(
+            "osascript -e 'try' "
+            "-e 'POSIX path of (choose folder with prompt \"Default Dir\")' "
+            "-e 'on error' -e 'return \"\"' -e 'end try'", "r");
+        if (p) {
+            char picked[MAX_PATH + 1] = {0};
+            if (fgets(picked, sizeof(picked), p)) {
+                size_t n = strlen(picked);
+                while (n > 0 && (picked[n-1] == '\n' || picked[n-1] == '\r' || picked[n-1] == '/')) {
+                    picked[--n] = '\0';
+                }
+                if (n > 0) {
+                    strncpy(zt_config_globals.default_directory, picked,
+                            sizeof(zt_config_globals.default_directory) - 1);
+                    zt_config_globals.default_directory[sizeof(zt_config_globals.default_directory) - 1] = '\0';
+                    TextInput *ti2 = (TextInput *)UI->get_element(2);
+                    if (ti2) {
+                        ti2->cursor = 0;
+                        ti2->changed = 1;
+                        ti2->need_redraw++;
+                    }
+                    need_refresh++;
+                }
+            }
+            pclose(p);
+        }
+    }
     UI->update();
     ValueSlider *vs;
     TextInput *ti;
