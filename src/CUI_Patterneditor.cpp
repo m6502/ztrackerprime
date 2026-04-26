@@ -25,7 +25,7 @@ static PatternUndo g_undo;
 // INTERNAL_RESOLUTION_Y - 55. At 8px per character row that's ceil(55/8) = 7
 // rows; we reserve one extra row so the pattern's bottom border never touches
 // the toolbar. Matches the legacy layout (40 rows = 0..039 at 480px height).
-#define SPACE_AT_BOTTOM                 8
+#define SPACE_AT_BOTTOM                 7
 
 
 int PATTERN_EDIT_ROWS = 100;
