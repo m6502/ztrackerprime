@@ -101,14 +101,11 @@ Write me to |U|mail@manuelmontoto.com|U|
 
 Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
 
-Copyright (c) 2000-2001,
-                    Christopher Micali
-Copyright (c) 2000-2001,
-                    Austin Luminais
+Copyright (c) 2000-2001, Christopher Micali
+Copyright (c) 2000-2001, Austin Luminais
 Copyright (c) 2001, Nicolas Soudee
 Copyright (c) 2001, Daniel Kahlin
-Copyright (c) 2003-2026,
-                    Manuel Montoto
+Copyright (c) 2003-2026, Manuel Montoto
 
 All rights reserved.
 )about_text";
