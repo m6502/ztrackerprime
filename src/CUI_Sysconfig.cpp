@@ -496,7 +496,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(5),col(49),"Reverse Bank Select ",COLORS.Text,S);
         print(row(5),col(51),"Device Alias",COLORS.Text,S);
         
-        need_refresh = 0; 
+        need_refresh = 0;
         updated=2;
         S->unlock();
     }
