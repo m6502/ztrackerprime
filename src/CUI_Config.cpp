@@ -260,6 +260,7 @@ void CUI_Config::leave(void) {
 }
 
 void CUI_Config::update() {
+#ifdef __APPLE__
     // Enter on Default Dir (tabindex 2) opens a native macOS folder
     // picker via osascript. Peek the key first so UI->update() doesn't
     // consume it. The result replaces the TextInput's buffer (which
@@ -293,6 +294,7 @@ void CUI_Config::update() {
             pclose(p);
         }
     }
+#endif
     UI->update();
     ValueSlider *vs;
     TextInput *ti;
