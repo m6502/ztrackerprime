@@ -1312,7 +1312,6 @@ void global_keys(Drawable *S)
             && window_stack.isempty()
             && cur_state != STATE_HELP
             && cur_state != STATE_ABOUT
-            && cur_state != STATE_LOAD
             && cur_state != STATE_LUA_CONSOLE
             && cur_state != STATE_SONG_MESSAGE
             && UIP_MainMenu) {
@@ -1356,6 +1355,10 @@ void global_keys(Drawable *S)
                 status_change = 1; need_refresh++;
                 break;
             case SDLK_Q:
+                // Keybindings editor: let the page receive the keypress
+                // so the user can bind it (Ctrl-Q, Shift-Ctrl-Alt-Q,
+                // etc.) instead of triggering the global quit.
+                if (cur_state == STATE_KEYBINDINGS) break;
                 // Plain Ctrl-Q quits, same as the long-form Ctrl-Alt-Q.
                 // (Cmd-Q on macOS is reserved for the pattern-editor
                 // Transpose-up shortcut via KS_HAS_ALT, so we don't bind
