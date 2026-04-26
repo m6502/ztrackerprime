@@ -446,8 +446,13 @@ void switch_page(CUI_Page *page)
     if (ActivePage->UI)
         ActivePage->UI->full_refresh();
     // Clear any stale status message from the previous page so it
-    // doesn't bleed onto the newly activated page.
-    statusmsg = (char*)" ";
+    // doesn't bleed onto the newly activated page — but only when
+    // we're stopped. While playing, the playhead status line should
+    // carry through page changes; otherwise it briefly blanks and
+    // flashes back in on every F1/F2/F3/etc switch.
+    if (!ztPlayer || !ztPlayer->playing) {
+        statusmsg = (char*)" ";
+    }
 
 
   // <Manu> TO-DO Check if still needed, but not problematic if not
