@@ -46,7 +46,7 @@ CUI_About::CUI_About(void) {
 
 zTracker Prime is a fork of the original zTracker project from 2001, which was a clone of Impulse Tracker, itself a clone of Scream Tracker. The original zTracker was developed by Christopher Micali until 2002.
 
-It had become my go-to software for composing music, so I forked it in 2003. Over 20 years later, it remains my primary sequencer, and as of 2024 I continue to work on it.
+It had become my go-to software for composing music, so I forked it in 2003. Over 20 years later, it remains my primary sequencer, and as of 2026 I continue to work on it.
 
 Check for new releases at the Github project page:
 
@@ -69,6 +69,7 @@ Write me to |U|mail@manuelmontoto.com|U|
     Austin Luminais
     Christopher Micali
     Daniel Kahlin
+    Esa Juhani Ruoho
     Manuel Montoto
     Nic Soudee
 
@@ -96,7 +97,9 @@ Write me to |U|mail@manuelmontoto.com|U|
 
 |H|License|U|
 
-   ztracker  is released under the BSD license.   Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
+   ztracker  is released under the BSD license.
+
+Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
 
 Copyright (c) 2000-2001,
                     Christopher Micali
@@ -104,7 +107,7 @@ Copyright (c) 2000-2001,
                     Austin Luminais
 Copyright (c) 2001, Nicolas Soudee
 Copyright (c) 2001, Daniel Kahlin
-Copyright (c) 2003-2025,
+Copyright (c) 2003-2026,
                     Manuel Montoto
 
 All rights reserved.
