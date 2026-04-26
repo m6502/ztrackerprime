@@ -24,7 +24,7 @@ CUI_Playsong::CUI_Playsong(void)
 
     // <Manu> ¿Por qué 20?
     //p->y = 20 ;
-    pattern_display->y = 14 ;
+    pattern_display->y = 12 ;
     
     // <Manu> Control del número de líneas que se muestran mientras se reproduce una canción (30 por defecto)
     //p->ysize = 30 ;
