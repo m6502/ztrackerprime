@@ -101,9 +101,11 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,6);
-    vs->x = 20;
+    // "Row highlight minor" label is 19 chars at col 2, so the slider
+    // starts at col 22.
+    vs->x = 22;
     vs->y = 22;
-    vs->xsize = 15;
+    vs->xsize = 13;
     vs->ysize = 1;
     vs->value = zt_config_globals.highlight_increment;
     vs->min = 1;
@@ -111,11 +113,14 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,7);
-    // Pair with the highlight slider on the same row; "Default Lowlight"
-    // label draws at col 38 (16 chars), slider sits to its right.
-    vs->x = 56;
+    // Pair with the minor-row slider on row 22. Layout:
+    //   col 2..20  "Row highlight minor" label
+    //   col 22..34 minor slider, col 35..38 readout
+    //   col 40..58 "Row highlight major" label
+    //   col 60..72 major slider, col 73..76 readout
+    vs->x = 60;
     vs->y = 22;
-    vs->xsize = 15;
+    vs->xsize = 13;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
     vs->min = 1;
@@ -330,8 +335,8 @@ void CUI_Config::draw(Drawable *S) {
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         sprintf(buf+strlen(buf),"\n|U| View Mode       |L|[|H|%s|L|]",view_mode_name);
 #endif
-        sprintf(buf+strlen(buf),"\n|U| Highlight Inc   |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Lowlight Inc    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Row hl minor    |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Row hl major    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
         sprintf(buf+strlen(buf),"\n|U| Pattern Len     |L|[|H|%d|L|]",zt_config_globals.pattern_length);
         sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
@@ -424,8 +429,8 @@ void CUI_Config::draw(Drawable *S) {
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         print(row(2),col(21),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(22),"Default Highlight",COLORS.Text,S);
-        print(row(38),col(22),"Default Lowlight",COLORS.Text,S);
+        print(row(2),col(22),"Row highlight minor",COLORS.Text,S);
+        print(row(40),col(22),"Row highlight major",COLORS.Text,S);
         print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
         print(row(2),col(25),"MIDI In Sync",COLORS.Text,S);
         print(row(2),col(26),"Chase MIDI Tempo",COLORS.Text,S);
