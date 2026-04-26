@@ -31,12 +31,12 @@ CUI_About::CUI_About(void) {
     int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
     // Top: 26 rows higher than the (row(9)+300px)/8 anchor (1 row
     // lower than the previous -27 setting).
-    int box_top = ((row(9) + 300) / 8) - 26;
+    int box_top = ((row(9) + 300) / 8) - 27;
     if (box_top < 0) box_top = 0;
     // Height: 75% of the available room, plus 1 extra row so the bottom
     // sits 2 rows lower than the previous setting (top moved down 1,
     // bottom moved down 2 → size grows by 1).
-    int box_size = ((max_end_row - box_top) * 75) / 100 + 6;
+    int box_size = ((max_end_row - box_top) * 75) / 100 + 9;
     if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
