@@ -57,7 +57,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,2);
     ti->frame = 1;
     ti->x = 20;
-    ti->y = 17;
+    ti->y = 16;
     ti->xsize = 50;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
@@ -66,7 +66,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb,3);
     cb->frame = 0;
     cb->x = 20;
-    cb->y = 19;
+    cb->y = 18;
     cb->xsize = 5;
     cb->value = &zt_config_globals.record_velocity;
     cb->frame = 1;
@@ -74,7 +74,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,4);
     vs->x = 20;
-    vs->y = 20;
+    vs->y = 19;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.autosave_interval_seconds;
@@ -84,7 +84,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 21;
+    vs->y = 20;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.cur_edit_mode;
@@ -104,7 +104,7 @@ CUI_Config::CUI_Config(void) {
     // "Row highlight minor" label is 19 chars at col 2, so the slider
     // starts at col 22.
     vs->x = 22;
-    vs->y = 22;
+    vs->y = 21;
     vs->xsize = 13;
     vs->ysize = 1;
     vs->value = zt_config_globals.highlight_increment;
@@ -119,7 +119,7 @@ CUI_Config::CUI_Config(void) {
     //   col 40..58 "Row highlight major" label
     //   col 60..72 major slider, col 73..76 readout
     vs->x = 60;
-    vs->y = 22;
+    vs->y = 21;
     vs->xsize = 13;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
@@ -129,7 +129,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,8);
     vs->x = 20;
-    vs->y = 24;
+    vs->y = 23;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -143,7 +143,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb, 11);
     cb->frame = 1;
     cb->x = 20;
-    cb->y = 25;
+    cb->y = 24;
     cb->xsize = 5;
     cb->value = &zt_config_globals.midi_in_sync;
 
@@ -151,7 +151,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(cb, 12);
     cb->frame = 1;
     cb->x = 20;
-    cb->y = 26;
+    cb->y = 25;
     cb->xsize = 5;
     cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
@@ -161,7 +161,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs, 13);
     vs->x = 20;
-    vs->y = 27;
+    vs->y = 26;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.post_load_page;
@@ -423,18 +423,18 @@ void CUI_Config::draw(Drawable *S) {
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
         print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
         print(row(28),col(14),"Autoload File",COLORS.Text,S);
-        print(row(2),col(17),"Default Dir",COLORS.Text,S);
-        print(row(2),col(19),"Record Velocity",COLORS.Text,S);
-        print(row(2),col(20),"Autosave (sec)",COLORS.Text,S);
+        print(row(2),col(16),"Default Dir",COLORS.Text,S);
+        print(row(2),col(18),"Record Velocity",COLORS.Text,S);
+        print(row(2),col(19),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(2),col(21),"Default View",COLORS.Text,S);
+        print(row(2),col(20),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(22),"Row highlight minor",COLORS.Text,S);
-        print(row(40),col(22),"Row highlight major",COLORS.Text,S);
-        print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
-        print(row(2),col(25),"MIDI In Sync",COLORS.Text,S);
-        print(row(2),col(26),"Chase MIDI Tempo",COLORS.Text,S);
-        print(row(2),col(27),"Post-Load Page",COLORS.Text,S);
+        print(row(2),col(21),"Row highlight minor",COLORS.Text,S);
+        print(row(40),col(21),"Row highlight major",COLORS.Text,S);
+        print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
+        print(row(2),col(24),"MIDI In Sync",COLORS.Text,S);
+        print(row(2),col(25),"Chase MIDI Tempo",COLORS.Text,S);
+        print(row(2),col(26),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
