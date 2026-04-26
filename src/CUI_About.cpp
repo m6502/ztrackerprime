@@ -5,41 +5,36 @@
 CUI_About::CUI_About(void) {
     UI = new UserInterface();
 
-    double xscale = (double)INTERNAL_RESOLUTION_X / 640;
-
     TextBox *l = new TextBox();
     UI->add_element(l,0);
-    l->x = 2;
-    // 20% wider again so long sentences wrap further to the right
-    // and don't break mid-word. (Was 49*xscale; now 59*xscale.)
-    l->xsize = (int)(59.0 * xscale);
-    // bmAbout is a 620x319 px logo drawn at y = row(9). It extends to
-    // ~y = 391 px, i.e. row ~50. Place the textbox right below it with
-    // a one-row breathing gap, and clamp the bottom edge so we never
-    // paint into the toolbar's 55px (~7 rows + 2 rows safety).
+    l->x = 1;
+    // Font cells are a fixed 8x8 regardless of INTERNAL_RESOLUTION, so
+    // xsize is in characters. The longest line we want to fully contain
+    // is "This fork is currently maintained by Manuel Montoto (Debvgger)"
+    // (62 chars from column 2). Right edge aligns with end of "(Debvgger)".
+    l->xsize = 62;
+    // Layout policy (CUI_About::draw will scale the bmAbout bitmap to
+    // fit between the page title row and the textbox top, so this is
+    // the single source of truth for both):
     //
-    // Layout (large screens):
-    //   row 9       page title bar
-    //   row 9-49    bmAbout logo
-    //   row 51..    textbox
-    //   row N-9..N  toolbar reserve
+    //   row 9               page title bar
+    //   row 10..box_top-1   bmAbout logo (scaled to fit)
+    //   row box_top..end    textbox
+    //   row total_rows-9    start of toolbar reserve (7 rows + 2 safety)
     //
-    // On small screens (default INTERNAL_RESOLUTION_Y = 350, ~43 rows)
-    // there isn't enough room for the textbox below the logo, so we
-    // fall back to placing it in the lower part of the page where it
-    // unavoidably overlaps the logo.
-    const int TOOLBAR_RESERVE_ROWS = 9;
-    const int LOGO_BOTTOM_ROW      = 51;
+    // We give the textbox 13 rows when there's room, and place it so
+    // its bottom sits 9 rows above the screen bottom. The logo gets
+    // whatever rows remain above it.
+    // Bottom: 1 row lower than the prior 9-row toolbar reserve (so 8).
+    const int TOOLBAR_RESERVE_ROWS = 8;
     int total_rows  = (INTERNAL_RESOLUTION_Y / 8);
     int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
-    int box_top   = LOGO_BOTTOM_ROW;
-    int box_size  = max_end_row - box_top;
-    if (box_size < 8) {
-        // Tight screen — fall back to lower-half placement.
-        box_size = (max_end_row - 11) > 8 ? (max_end_row - 11) : 8;
-        box_top  = max_end_row - box_size;
-        if (box_top < 12) box_top = 12;
-    }
+    // Top: 25 rows higher than the (row(9)+300px)/8 anchor (i.e. 15
+    // rows lower than the previous -40 setting).
+    int box_top = ((row(9) + 300) / 8) - 25;
+    if (box_top < 0) box_top = 0;
+    int box_size = max_end_row - box_top;
+    if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
     l->bWordWrap = true ;
