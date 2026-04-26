@@ -140,18 +140,21 @@ CUI_Config::CUI_Config(void) {
     // zt.conf but were previously only reachable via the Sysconfig page;
     // expose them here so Global Config (F12) covers the full config set.
     cb = new CheckBox;
-    UI->add_element(cb, 11);
+    UI->add_element(cb, 9);
     cb->frame = 1;
     cb->x = 20;
     cb->y = 24;
     cb->xsize = 5;
     cb->value = &zt_config_globals.midi_in_sync;
 
+    // Pair Chase MIDI Tempo on the same row as MIDI In Sync. "MIDI In
+    // Sync" label = 12 cols, slider at x=20 ends at col 25 (chip 3).
+    // Place "Chase MIDI Tempo" label at col 28, checkbox at x=46.
     cb = new CheckBox;
-    UI->add_element(cb, 12);
+    UI->add_element(cb, 10);
     cb->frame = 1;
-    cb->x = 20;
-    cb->y = 25;
+    cb->x = 46;
+    cb->y = 24;
     cb->xsize = 5;
     cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
@@ -159,9 +162,9 @@ CUI_Config::CUI_Config(void) {
     // Slider with an inline label name (Inst/Pattern/Songconf) drawn
     // by draw() — same idiom as View Mode above.
     vs = new ValueSlider;
-    UI->add_element(vs, 13);
+    UI->add_element(vs, 11);
     vs->x = 20;
-    vs->y = 26;
+    vs->y = 25;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.post_load_page;
@@ -169,7 +172,10 @@ CUI_Config::CUI_Config(void) {
     vs->max = POST_LOAD_PAGE_COUNT - 1;
 
     b = new Button;
-    UI->add_element(b,10);
+    // Tab order: Page-switch button is the LAST element so DOWN-arrow
+    // from the bottom of the config list wraps cleanly back to Autoload
+    // .ZT (tabindex 0) instead of jumping past the MIDI rows.
+    UI->add_element(b,12);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
     b->xsize = 18;
     b->x = 2;
@@ -287,7 +293,7 @@ void CUI_Config::update() {
         zt_config_globals.pattern_length = vs->value;
     }
 
-    vs = (ValueSlider *)UI->get_element(13);
+    vs = (ValueSlider *)UI->get_element(11);
     if (vs && vs->value != zt_config_globals.post_load_page) {
         zt_config_globals.post_load_page = vs->value;
     }
@@ -403,7 +409,7 @@ void CUI_Config::draw(Drawable *S) {
         // Mode pattern above — slider value alone reads as 0/1/2 which
         // is meaningless to the user without the page name beside it).
         {
-            ValueSlider *vs = (ValueSlider *)UI->get_element(13);
+            ValueSlider *vs = (ValueSlider *)UI->get_element(11);
             if (vs) {
                 const char *post_load_name = "Inst Editor";
                 switch (zt_config_globals.post_load_page) {
@@ -433,8 +439,8 @@ void CUI_Config::draw(Drawable *S) {
         print(row(40),col(21),"Row highlight major",COLORS.Text,S);
         print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
         print(row(2),col(24),"MIDI In Sync",COLORS.Text,S);
-        print(row(2),col(25),"Chase MIDI Tempo",COLORS.Text,S);
-        print(row(2),col(26),"Post-Load Page",COLORS.Text,S);
+        print(row(28),col(24),"Chase MIDI Tempo",COLORS.Text,S);
+        print(row(2),col(25),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
