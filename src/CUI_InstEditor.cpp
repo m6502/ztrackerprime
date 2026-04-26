@@ -276,7 +276,7 @@ void CUI_InstEditor::update() {
 
     
     
-    // <Manu> Refrescamos la pantalla cuando cambia la línea -----------
+    // <Manu> Refrescamos la pantalla cuando cambia la línea ----------- [EN: refresh the screen when the line changes]
 
     if(!ztPlayer->playing) ie->last_cur_row = -1 ;
     else {

@@ -222,7 +222,7 @@ ZTConf::ZTConf() {
     highlight_increment = 8;
     lowlight_increment = 8;
 
-    // <Manu> Por  defecto siempre tamaño 64!! ----------------
+    // <Manu> Por  defecto siempre tamaño 64!! ---------------- [EN: default is always size 64!]
 
     //    pattern_length = 128;
     pattern_length = 64;

@@ -101,7 +101,7 @@ void push_varlen(CDataBuf *buf, unsigned int value)
 
 
 // ------------------------------------------------------------------------------------------------
-// <Manu> Creo esta funcion
+// <Manu> Creo esta funcion [EN: I'm creating this function]
 //
 void push_marker(CDataBuf *buf, unsigned char type, char *str, int len=-1) 
 {
@@ -255,7 +255,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
 
   // Put good stuff into the first MTrk
 
-//  <Manu> Elimino estos eventos que no sirven para nada
+//  <Manu> Elimino estos eventos que no sirven para nada [EN: removing these events that serve no purpose]
   
 //  mtrk[0].pushuc(0);  
 //  mtrk[0].pushuc(0xFF);
@@ -297,7 +297,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
     while((e = buf->get_next_event())) {
       
 
-      if(0 && e->type == ET_LOOP) {     // <Manu> Por ahora lo dejo asi para evitar problemas
+      if(0 && e->type == ET_LOOP) {     // <Manu> Por ahora lo dejo asi para evitar problemas [EN: leaving it like this for now to avoid issues]
       
         // ¿Esto no puede estar abajo porque no tiene nota?
       
@@ -305,7 +305,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
           // ------------------------------------------------------------------
           // ------------------------------------------------------------------
           
-//        case ET_LOOP: // <Manu> Exportamos el evento de loop ------------------
+//        case ET_LOOP: // <Manu> Exportamos el evento de loop [EN: export the loop event] ------------------ [EN: export the loop event]
           
           push_varlen(&mtrk[0], dtime[0]) ;     // Delta time
           dtime[0] = 0 ;
@@ -414,7 +414,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
           
         case ET_PITCH:
           
-          // <Manu> Añado llaves para que compile al poner el case de abajo ¿?
+          // <Manu> Añado llaves para que compile al poner el case de abajo ¿? [EN: adding braces so it compiles when the case below is added]
           
           { 
             unsigned short int usi ; 
@@ -823,7 +823,7 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
 
 /*
 
-// <Manu> BACKUP DE LA FUNCION DE ARRIBA
+// <Manu> BACKUP DE LA FUNCION DE ARRIBA [EN: backup of the function above]
 
 
 
@@ -981,7 +981,7 @@ int ZTImportExport::ExportMID(char *fn, int format) {
                         mp->pushuc((unsigned char)e->data1);
                         break;
                     case ET_PITCH:
-                      { // <Manu> Añado llaves para que compile al poner el case de abajo ¿?
+                      { // <Manu> Añado llaves para que compile al poner el case de abajo ¿? [EN: adding braces so it compiles when the case below is added]
                         unsigned short int usi = (unsigned short int)e->data1<<8; usi+=e->data2;
                         unsigned char d1,d2;
                         usi &= 0x3FFF;
@@ -992,7 +992,7 @@ int ZTImportExport::ExportMID(char *fn, int format) {
                         mp->pushuc(0xe0 + e->command);
                         mp->pushuc(d1);
                         mp->pushuc(d2);
-                      } // <Manu> Cierro la llave de arriba
+                      } // <Manu> Cierro la llave de arriba [EN: closing the brace from above]
                         break;
 
                     case ET_LOOP: // <Manu> Exportamos el evento de loop

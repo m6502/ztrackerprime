@@ -10,7 +10,7 @@ PatternDisplay::PatternDisplay(void)
 {
     frame = new Frame;
     
-    // <Manu> Por defecto estaba a 0, pero yo quiero cur_pat_view a 1
+    // <Manu> Por defecto estaba a 0, pero yo quiero cur_pat_view a 1 [EN: default was 0, but I want cur_pat_view = 1]
     
     cur_pat_view = 1;
 
@@ -312,7 +312,7 @@ void PatternDisplay::update_frame(void)
 
     tracksize = 7;
     
-    // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto)
+    // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto) [EN: controls how many tracks are shown while a song is playing (default 10)]
     //tracks = 10;
     tracks = ((INTERNAL_RESOLUTION_X /*- LEFT_LINE_NUMBER_MARGIN*/) / (tracksize * FONT_SIZE_X)) - 1 ;
 
@@ -347,7 +347,7 @@ void PatternDisplay::disp_track_headers(Drawable *S)
 //    if (this->cur_pat_view >1) sprintf(str," Track %.2d ",num_track+1);
 //    else sprintf(str,"%.2d",num_track+1);
     
-    // <Manu> Cambio el codigo comentado por este switch
+    // <Manu> Cambio el codigo comentado por este switch [EN: replacing the commented-out code with this switch]
 
     switch(this->cur_pat_view)
     {

@@ -334,7 +334,7 @@ void printBG(int x, int y, const char *str,TColor col, TColor bg, Drawable *S)
 
       for(j=0;j<8;j++) {
 
-        if (byte & 1) *buf = col;              // <Manu> Este if se puede sacar del for(;;) y hacer dos bucles en su lugar
+        if (byte & 1) *buf = col;              // <Manu> Este if se puede sacar del for(;;) y hacer dos bucles en su lugar [EN: this if could be hoisted out of the for(;;) and replaced with two loops]
         else *buf = bg;
         
         buf--;

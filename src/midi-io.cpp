@@ -305,7 +305,7 @@ int g_midi_in_clocks_received = 0;
 
 
 
-// <Manu> Variables para saber si se van produciendo eventos de estos tipos
+// <Manu> Variables para saber si se van produciendo eventos de estos tipos [EN: variables that track whether these kinds of events are occurring]
 int mim_moredata = 0 ;
 int mim_error = 0 ;
 int mim_longerror = 0 ;

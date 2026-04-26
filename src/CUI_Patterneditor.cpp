@@ -121,7 +121,7 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
 
   case 'B':
 
-    // <Manu> Nuevo comando B para hacer loops en la GBA; pintamos la informacion
+    // <Manu> Nuevo comando B para hacer loops en la GBA; pintamos la informacion [EN: new B command for GBA loops; we draw the info]
     sprintf(str,"Command: Write GBA loop marker to pattern %d when exporting MIDI", effect_data);
 
     break ;
@@ -279,7 +279,7 @@ char *printNote(char *str, event *r, int cur_edit_mode)
 #ifdef __AAAA5251785AAAA55AAA
 
 // ------------------------------------------------------------------------------------------------
-// <Manu> Debería mirar si puedo hacer esto de una manera un poco más limpia
+// <Manu> Debería mirar si puedo hacer esto de una manera un poco más limpia [EN: should look into doing this in a slightly cleaner way]
 //
 char *printBlankNote(char *str, int cur_edit_mode) 
 {
@@ -570,7 +570,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 {
   int num_displayed_rows, num_displayed_tracks, special ;
   TColor bg,fg;
-  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resolución muy grande. 512 debería servir para w=4096 pero...
+  static char str[2048] ;    // <Manu> Aumento esto de 512 a 2048 por si se utiliza una resolución muy grande. 512 debería servir para w=4096 pero... [EN: bumping this from 512 to 2048 in case a very high resolution is used. 512 should be enough for w=4096 but...]
   
   int posx_current_track ;
   int posy_current_row ;
@@ -610,7 +610,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
-  // <Manu> Cumple alguna función dibujar este carácter?
+  // <Manu> Cumple alguna función dibujar este carácter? [EN: does drawing this character serve any purpose?]
   //printchar(col(4), row(TRACKS_ROW_Y), 139, COLORS.Lowlight,S);
 
   
@@ -624,7 +624,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   g_posx_tracks = poscharx_tracks ;
 
 
-  num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1
+  num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1 [EN: this goes from 0 to (max rows to draw) - 1]
   
   
   for(int var_row = first_row; var_row < (last_row + blank_rows); var_row++) {
@@ -645,7 +645,7 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
     }
     else {
 
-      if(var_row >= 0) { // <Manu> ¿Necesario?
+      if(var_row >= 0) { // <Manu> ¿Necesario? [EN: needed?]
         
         sprintf(str,"%.3d",var_row);
       
@@ -724,11 +724,11 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
               posx_current_track = col(poscharx_tracks) + col(num_displayed_tracks * (field_size + 1)) ;
 
-              // <Manu> Si esta línea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo
+              // <Manu> Si esta línea hay que dibujarla en blanco dibujamos las columnas de los tracks con el color del fondo [EN: if this line should be drawn blank, draw the track columns with the background color]
 
               if(var_row >= first_blank_row) {
 
-                //fg = COLORS.EditText; // <Manu> Innecesario ?
+                //fg = COLORS.EditText; // <Manu> Innecesario ? [EN: unnecessary?]
                 //bg = COLORS.EditBG;
 
                 //printBlankNote(str, zt_config_globals.cur_edit_mode) ;
@@ -1009,7 +1009,7 @@ void CUI_Patterneditor::update()
 
 
 
-  // <Manu> Esto arregla el bug del último número de línea destacado cuando el play pasa por el pattern actual y sigue por otro.
+  // <Manu> Esto arregla el bug del último número de línea destacado cuando el play pasa por el pattern actual y sigue por otro. [EN: this fixes the highlighted last-line-number bug when playback passes through the current pattern and continues in another one]
   //        No es 100% perfecto por culpa del prebuffer, pero bueno...
 
   if(!ztPlayer->playing) last_cur_pattern = -1 ;
@@ -1026,7 +1026,7 @@ void CUI_Patterneditor::update()
   }
 
 
-  // <Manu> Esto arreglaba el bug de que no se refresque la pantalla al cambiar
+  // <Manu> Esto arreglaba el bug de que no se refresque la pantalla al cambiar [EN: this used to fix the bug where the screen wasn't refreshed on change]
   //        el número de filas del pattern actual, pero ya no es necesario :-)
   //
   //if(ztPlayer->song->patterns[cur_edit_pattern]->length != last_pattern_size) {
@@ -1411,7 +1411,7 @@ void CUI_Patterneditor::update()
           break;
 
         case SDLK_PAGEUP:
-          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> ¿Esto no debería ser un múltiplo del step?
+          cur_edit_row_disp-= zt_config_globals.highlight_increment * 4 ;    // <Manu> ¿Esto no debería ser un múltiplo del step? [EN: shouldn't this be a multiple of step?]
           need_refresh++;
           break;
 
@@ -1537,7 +1537,7 @@ void CUI_Patterneditor::update()
                   break;
                   
                  
-                // <Manu> Clarifico esto un poco
+                // <Manu> Clarifico esto un poco [EN: clarifying this a bit]
                   
                 case SDLK_PAGEDOWN:
                   
@@ -1580,7 +1580,7 @@ void CUI_Patterneditor::update()
                         }
                         else{
                             
-                          // <Manu> if y else eran iguales ¿?
+                          // <Manu> if y else eran iguales ¿? [EN: if and else were identical?]
                           select_row_start = song->patterns[cur_edit_pattern]->length-1;
                         }
                       }
@@ -2932,7 +2932,7 @@ case SDLK_DELETE:
                         
                         ztPlayer->play_current_row();
                         
-                        // <Manu> Hacemos avanzar el cursor
+                        // <Manu> Hacemos avanzar el cursor [EN: advance the cursor]
                         
                         cur_edit_row+=cur_step;
             
@@ -3609,7 +3609,7 @@ void CUI_Patterneditor::draw(Drawable *S)
       
       // Update buffer if necessary
 
-      // <Manu> Esto nunca puede funcionar porque pe_buf es NULL
+      // <Manu> Esto nunca puede funcionar porque pe_buf es NULL [EN: this can never work because pe_buf is NULL]
 
       
       if(pe_modification) // pe_modification is a very very global var which is set to
@@ -3642,7 +3642,7 @@ void CUI_Patterneditor::draw(Drawable *S)
     
     if (m_Fullupd) {
 
-      // <Manu> Clarificar un poco esta fórmula, porque con row(52 se comía la última línea 
+      // <Manu> Clarificar un poco esta fórmula, porque con row(52 se comía la última línea  [EN: clarify this formula a bit — with row(52) it was eating the last line]
 
       screenmanager.Update(0, row(11), INTERNAL_RESOLUTION_X, row(53+((INTERNAL_RESOLUTION_Y-480)/8))) ;
     }

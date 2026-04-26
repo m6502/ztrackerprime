@@ -122,7 +122,7 @@
         dstrect.x = x;
         dstrect.y = y;
 
-        // <Manu> ?
+        // <Manu> ? [EN: ?]
         //dstrect.w = ? ;
         //dstrect.h = ? ;
 
