@@ -5,29 +5,48 @@
 CUI_About::CUI_About(void) {
     UI = new UserInterface();
 
-    double xscale = (double)INTERNAL_RESOLUTION_X / 640;
-    double yscale = (double)INTERNAL_RESOLUTION_Y / 480;
-    
     TextBox *l = new TextBox();
     UI->add_element(l,0);
-    l->x = 2;
-    l->xsize = (int)((double)(38+3)*xscale);
-    // Anchor below the bmAbout logo and clamp height so the box never
-    // overlaps the bottom toolbar (~7 rows of 55 px).
-    const int ROW_BELOW_LOGO = 20;
-    const int TOOLBAR_ROWS = 7;
-    int max_end_row = (INTERNAL_RESOLUTION_Y / 8) - TOOLBAR_ROWS - 1;
-    int avail = max_end_row - ROW_BELOW_LOGO;
-    if (avail < 6) avail = 6;
-    l->y = ROW_BELOW_LOGO;
-    l->ysize = avail;
+    l->x = 1;
+    // Font cells are a fixed 8x8 regardless of INTERNAL_RESOLUTION, so
+    // xsize is in characters. The longest line we want to fully contain
+    // is "This fork is currently maintained by Manuel Montoto (Debvgger)"
+    // (62 chars from column 2). Right edge aligns with end of "(Debvgger)".
+    l->xsize = 66;
+    // Layout policy (CUI_About::draw will scale the bmAbout bitmap to
+    // fit between the page title row and the textbox top, so this is
+    // the single source of truth for both):
+    //
+    //   row 9               page title bar
+    //   row 10..box_top-1   bmAbout logo (scaled to fit)
+    //   row box_top..end    textbox
+    //   row total_rows-9    start of toolbar reserve (7 rows + 2 safety)
+    //
+    // We give the textbox 13 rows when there's room, and place it so
+    // its bottom sits 9 rows above the screen bottom. The logo gets
+    // whatever rows remain above it.
+    // Bottom: 1 row lower than the prior 9-row toolbar reserve (so 8).
+    const int TOOLBAR_RESERVE_ROWS = 8;
+    int total_rows  = (INTERNAL_RESOLUTION_Y / 8);
+    int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
+    // Top: 26 rows higher than the (row(9)+300px)/8 anchor (1 row
+    // lower than the previous -27 setting).
+    int box_top = ((row(9) + 300) / 8) - 27;
+    if (box_top < 0) box_top = 0;
+    // Height: 75% of the available room, plus 1 extra row so the bottom
+    // sits 2 rows lower than the previous setting (top moved down 1,
+    // bottom moved down 2 → size grows by 1).
+    int box_size = ((max_end_row - box_top) * 75) / 100 + 9;
+    if (box_size < 6) box_size = 6;
+    l->y     = box_top;
+    l->ysize = box_size;
     l->bWordWrap = true ;
     l->text =R"about_text(
 |H|About|U|
 
 zTracker Prime is a fork of the original zTracker project from 2001, which was a clone of Impulse Tracker, itself a clone of Scream Tracker. The original zTracker was developed by Christopher Micali until 2002.
 
-It had become my go-to software for composing music, so I forked it in 2003. Over 20 years later, it remains my primary sequencer, and as of 2024 I continue to work on it.
+It had become my go-to software for composing music, so I forked it in 2003. Over 20 years later, it remains my primary sequencer, and as of 2026 I continue to work on it.
 
 Check for new releases at the Github project page:
 
@@ -52,6 +71,7 @@ Write me to |U|mail@manuelmontoto.com|U|
     Daniel Kahlin
     Manuel Montoto
     Nic Soudee
+    Esa Juhani Ruoho
 
   |H|Support|U|
 
@@ -77,16 +97,15 @@ Write me to |U|mail@manuelmontoto.com|U|
 
 |H|License|U|
 
-   ztracker  is released under the BSD license.   Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
+   zTracker is released under the BSD license.
 
-Copyright (c) 2000-2001,
-                    Christopher Micali
-Copyright (c) 2000-2001,
-                    Austin Luminais
+Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
+
+Copyright (c) 2000-2001, Christopher Micali
+Copyright (c) 2000-2001, Austin Luminais
 Copyright (c) 2001, Nicolas Soudee
 Copyright (c) 2001, Daniel Kahlin
-Copyright (c) 2003-2025,
-                    Manuel Montoto
+Copyright (c) 2003-2026, Manuel Montoto
 
 All rights reserved.
 )about_text";
@@ -109,7 +128,11 @@ void CUI_About::update() {
 }
 
 void CUI_About::draw(Drawable *S) {
-        S->copy(CurrentSkin->bmAbout,5,row(12));
+        // Logo at row 9, sitting under the page title bar. The textbox
+        // (in CUI_About::CUI_About) is positioned at row 51 — right
+        // below where this 319px-tall bitmap ends — so the two never
+        // overlap on screens tall enough to fit both.
+        S->copy(CurrentSkin->bmAbout,5,row(9));
     /*
     if (640 == INTERNAL_RESOLUTION_X && 480 == INTERNAL_RESOLUTION_Y) {
         S->copy(CurrentSkin->bmAbout,5,row(12));
