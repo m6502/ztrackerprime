@@ -224,17 +224,18 @@ void CUI_PEParms::draw(Drawable *S) {
         }
         printline(start_x,start_y,143,window_width / 8,COLORS.Highlight,S);
         print(col(textcenter("Pattern Editor Options")),start_y + row(2),"Pattern Editor Options",COLORS.Text,S);
-        // Right-align labels at col 16 (slider/checkbox x-origin sits
-        // at col 17 inside the popup, leaving one space gap).
-        print(start_x + col(2),start_y + row(6),     "      EditStep:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(8),     "    Pat length:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(10),    " Row Highlight:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(12),    "  Row Lowlight:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(14),    "      Centered:",COLORS.Text,S);
+        // Labels right-align so the colon lands at col 15. The slider/
+        // checkbox x-origin is col 17, so the frame border at col 16
+        // sits between the colon and the chip without stomping either.
+        print(start_x + col(2),start_y + row(6),     "     EditStep:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(8),     "   Pat length:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(10),    "Row Highlight:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(12),    " Row Lowlight:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(14),    "     Centered:",COLORS.Text,S);
         print(start_x + col(23),start_y + row(14),"StepEdit:",COLORS.Text,S);
         print(start_x + col(39),start_y + row(14),"RecVeloc:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(16),    "       Speedup:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(18),    "      DrawMode:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(16),    "      Speedup:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(18),    "     DrawMode:",COLORS.Text,S);
         UI->full_refresh();
         UI->draw(S);
         S->unlock();

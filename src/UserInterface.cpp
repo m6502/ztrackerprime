@@ -1014,6 +1014,12 @@ int CheckBox::update() {
 //
 //
 void CheckBox::draw(Drawable *S, int active) {
+    // Hidden placeholder: callers can hide a checkbox (without renumbering
+    // get_element() indices elsewhere) by setting xsize=0. Honour that.
+    if (xsize <= 0) {
+        changed = 0;
+        return;
+    }
     int cx,cy=y;
     TColor f,b;
     const char *str;
@@ -1026,15 +1032,14 @@ void CheckBox::draw(Drawable *S, int active) {
     // Both "Off" and "On " are 3 chars, so it's a single source of
     // truth: change the strings and every checkbox in the app follows.
     const int chip_w = (int)strlen(str);
-    // Clear the wider area first (xsize is the bookkeeping width that
-    // callers reserve for hit-testing / older layouts) so we wipe any
-    // stale pixels from a previous chip that was rendered wider, then
-    // paint the visible chip exactly chip_w cells wide.
-    int wipe_w = (xsize > chip_w) ? xsize : chip_w;
-    for (cx = x - 1; cx <= x + wipe_w; cx++) {
-        printBG(col(cx),row(cy-1)," ",COLORS.Text,COLORS.Background,S);
-        printBG(col(cx),row(cy)  ," ",COLORS.Text,COLORS.Background,S);
-        printBG(col(cx),row(cy+1)," ",COLORS.Text,COLORS.Background,S);
+    // If the caller's reserved xsize is wider than the visible chip,
+    // wipe the trailing cells back to page background so old "On  "
+    // pixels don't linger after a redraw. Only the cy row — wiping the
+    // rows above and below clobbers neighbouring UI elements.
+    if (xsize > chip_w) {
+        for (cx = x + chip_w; cx < x + xsize; cx++) {
+            printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.Background,S);
+        }
     }
     for(cx=x;cx<x+chip_w;cx++) {
         printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
@@ -1053,7 +1058,8 @@ void CheckBox::draw(Drawable *S, int active) {
         printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
         printchar(col(x+chip_w),row(y),0x83,COLORS.Highlight,S);
     }
-    screenmanager.Update(col(x-1),row(y-1),col(x+wipe_w+1),row(y+1));
+    int dirty_w = (xsize > chip_w) ? xsize : chip_w;
+    screenmanager.Update(col(x-1),row(y-1),col(x+dirty_w+1),row(y+1));
     changed = 0;
 }
 

@@ -293,7 +293,10 @@ void ValueSliderOFF::draw(Drawable *S, int active) {
             sprintf(str,"%.2d",value);
         v = value;
     }
-    printBG(col(x+xsize+1),row(cy),str,COLORS.Text,COLORS.Background,S);
+    // One char of gap between the slider's right border and the
+    // numeric readout, matching ValueSlider::draw above (which gets
+    // the same effect by prefixing its sprintf format with a space).
+    printBG(col(x+xsize+2),row(cy),str,COLORS.Text,COLORS.Background,S);
     if (active)
         col = COLORS.Highlight;
     else
@@ -305,7 +308,7 @@ void ValueSliderOFF::draw(Drawable *S, int active) {
         printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
         printchar(col(x+xsize),row(y),0x83,COLORS.Highlight,S);
     }
-    screenmanager.Update(col(x-1),row(y-1),col(x+xsize+7),row(y+1));
+    screenmanager.Update(col(x-1),row(y-1),col(x+xsize+8),row(y+1));
     changed = 0;
 }
 

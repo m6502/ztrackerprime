@@ -108,6 +108,11 @@ void CUI_PENature::draw(Drawable *S) {
         print(col(textcenter("Naturalization Amount")),start_y + row(2),"Naturalization Amount",COLORS.Text,S);
         print(start_x + col(1), start_y + window_height / 2,"  Percent:",COLORS.Text,S);
         UI->draw(S);
+        // Show "%" suffix after the slider's numeric readout. ValueSlider
+        // prints " NNN" (4 chars) starting at col(x+xsize); "%" lands
+        // immediately after.
+        ValueSlider *vs = (ValueSlider *)UI->get_element(0);
+        print(col(vs->x + vs->xsize + 4), row(vs->y), "%", COLORS.Text, S);
         S->unlock();
         need_refresh = need_popup_refresh = 0;
         updated++;

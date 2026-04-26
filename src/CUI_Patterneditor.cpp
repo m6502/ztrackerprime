@@ -1680,6 +1680,23 @@ void CUI_Patterneditor::update()
           status_change = 1; need_refresh++; key = 0;
         }
 
+        // Cmd+N (macOS): set length of first note of selection to length of
+        // the selection. Mirrors the Ctrl+N binding documented in help.txt;
+        // on Mac the global Alt+N → New Song would otherwise win because
+        // SDL maps Cmd to KS_META|KS_ALT.
+        if ((kstate & KS_META) && !(kstate & KS_CTRL) && !(kstate & KS_SHIFT) && key == SDLK_N) {
+          if (selected &&
+            (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
+            ) {
+            j = (select_row_end+1 - select_row_start)*(96/song->tpb);
+            for(i=select_track_start;i<=select_track_end;i++)
+              song->patterns[cur_edit_pattern]->tracks[i]->update_event(select_row_start,-1,-1,-1,j,-1,-1);
+            file_changed++;
+            need_refresh++;
+          }
+          key = 0;
+        }
+
         // Double Pattern: Ctrl+Shift+G
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
           UNDO_SAVE();
