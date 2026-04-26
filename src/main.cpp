@@ -308,6 +308,7 @@ midiIn *MidiIn = NULL;
 CUI_Page *ActivePage = NULL, *LastPage = NULL, *PopupWindow = NULL;
 
 CUI_About *UIP_About = NULL;
+CUI_MainMenu *UIP_MainMenu = NULL;
 CUI_InstEditor *UIP_InstEditor = NULL;
 CUI_Logoscreen *UIP_Logoscreen = NULL;
 CUI_Loadscreen *UIP_Loadscreen = NULL;
@@ -1300,6 +1301,25 @@ void global_keys(Drawable *S)
     if (!key) return;
 
     if (!modal) {
+        // ESC opens the main menu (Schism-style overlay) when no
+        // popup is already up. Pages that want to consume ESC for
+        // their own purposes (Help / About return-to-pattern, etc.)
+        // are reached AFTER global_keys, so they still get to see
+        // ESC if the menu doesn't open it (we only fire if the user
+        // is not on a page where ESC has dedicated meaning).
+        if (key == SDLK_ESCAPE
+            && kstate == KS_NO_SHIFT_KEYS
+            && window_stack.isempty()
+            && cur_state != STATE_HELP
+            && cur_state != STATE_ABOUT
+            && cur_state != STATE_LUA_CONSOLE
+            && cur_state != STATE_SONG_MESSAGE
+            && UIP_MainMenu) {
+            (void)Keys.getkey();
+            popup_window(UIP_MainMenu);
+            need_refresh++;
+            return;
+        }
         switch(key) {
             case SDLK_RIGHT:
                 if (key==SDLK_RIGHT && kstate == KS_CTRL)
@@ -1335,6 +1355,10 @@ void global_keys(Drawable *S)
                 status_change = 1; need_refresh++;
                 break;
             case SDLK_Q:
+                // Keybindings editor: let the page receive the keypress
+                // so the user can bind it (Ctrl-Q, Shift-Ctrl-Alt-Q,
+                // etc.) instead of triggering the global quit.
+                if (cur_state == STATE_KEYBINDINGS) break;
                 // Plain Ctrl-Q quits, same as the long-form Ctrl-Alt-Q.
                 // (Cmd-Q on macOS is reserved for the pattern-editor
                 // Transpose-up shortcut via KS_HAS_ALT, so we don't bind
@@ -1445,6 +1469,9 @@ void global_keys(Drawable *S)
               break ;
 
             case SDLK_S: // save
+                // Keybindings editor uses Ctrl-S to save bindings to
+                // zt.conf, not the song. Let the page handle it.
+                if (cur_state == STATE_KEYBINDINGS) break;
                 if (kstate & KS_CTRL) {
 
                     bool saveas = true ;
@@ -2285,6 +2312,7 @@ int postAction ()
     delete InstEditorUI;
     delete UI; UI=NULL;
     delete UIP_About;
+    delete UIP_MainMenu;
     delete UIP_LoadMsg;
     delete UIP_SaveMsg;
     delete UIP_InstEditor;
@@ -3355,6 +3383,7 @@ int initSDL(void)
     UIP_KeyBindings = new CUI_KeyBindings;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
+    UIP_MainMenu = new CUI_MainMenu;
     //SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL );
 
     return 1;

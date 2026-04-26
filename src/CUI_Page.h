@@ -459,6 +459,23 @@ class CUI_RUSure : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// ESC main menu — Schism-style modal popup that lists every page /
+// action so users don't have to memorise the F-key map. ESC opens it
+// from any page; ESC again closes; cursor up/down navigates;
+// Enter dispatches.
+class CUI_MainMenu : public CUI_Page {
+    public:
+        int cur_sel;
+
+        CUI_MainMenu();
+        ~CUI_MainMenu();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+};
+
 class CUI_SongDuration : public CUI_Page {
     public:
         int x,y;

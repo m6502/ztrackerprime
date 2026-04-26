@@ -70,10 +70,40 @@ CUI_Help::CUI_Help(void) {
             char *dst = new char[src_len * 3 + 32];
             int di = 0;
             int i = 0;
+            // Carries over from the previous shortcut line. If a rewrite
+            // pushed the colon `pending_pad` columns to the right (e.g.
+            // when there weren't enough trailing spaces in the source to
+            // absorb a long key name like F10/F11/F12), the next
+            // continuation line(s) (lines starting with leading whitespace
+            // and no early colon) get the same number of extra leading
+            // spaces so the wrapped description text re-aligns under the
+            // rewritten line's description column.
+            int pending_pad = 0;
             while (i < src_len) {
                 int line_end = i;
                 while (line_end < src_len && src[line_end] != '\n') line_end++;
                 bool rewritten = false;
+                int line_growth = 0;
+
+                bool is_blank_line = (i >= line_end);
+                bool starts_with_space = (!is_blank_line && src[i] == ' ');
+                bool has_early_colon = false;
+                {
+                    int scan_end = line_end;
+                    if (scan_end - i > 24) scan_end = i + 24;
+                    for (int k = i; k < scan_end; k++) {
+                        if (src[k] == ':') { has_early_colon = true; break; }
+                    }
+                }
+                bool is_continuation = !is_blank_line && starts_with_space && !has_early_colon;
+
+                if (is_blank_line) pending_pad = 0;
+                if (pending_pad > 0 && is_continuation) {
+                    for (int p = 0; p < pending_pad && di < src_len * 3 + 30; p++) {
+                        dst[di++] = ' ';
+                    }
+                }
+
                 while (i <= line_end) {
                     if (i == line_end) { if (i < src_len) dst[di++] = src[i++]; break; }
                     bool boundary = (i == 0)
@@ -146,13 +176,20 @@ CUI_Help::CUI_Help(void) {
                         // ended up with colons four columns left of
                         // unrewritten neighbours.)
                         int grown = (9 + 2 * key_len) - (kw_len + key_len);
-                        while (grown > 0 && i < line_end && src[i] == ' ') {
-                            i++; grown--;
+                        int absorbed = 0;
+                        while (absorbed < grown && i < line_end && src[i] == ' ') {
+                            i++; absorbed++;
                         }
+                        line_growth += (grown - absorbed);
                         rewritten = true;
                         continue;
                     }
                     dst[di++] = src[i++];
+                }
+                if (rewritten) {
+                    pending_pad = line_growth;
+                } else if (!is_continuation && !is_blank_line) {
+                    pending_pad = 0;
                 }
             }
             dst[di] = '\0';
