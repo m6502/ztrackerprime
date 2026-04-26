@@ -97,7 +97,7 @@ Write me to |U|mail@manuelmontoto.com|U|
 
 |H|License|U|
 
-   ztracker  is released under the BSD license.
+   zTracker is released under the BSD license.
 
 Refer to the included |H|LICENSE.TXT|U| for details on the licensing terms.
 
