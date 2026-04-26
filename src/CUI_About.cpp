@@ -36,7 +36,7 @@ CUI_About::CUI_About(void) {
     // Height: 75% of the available room, plus 1 extra row so the bottom
     // sits 2 rows lower than the previous setting (top moved down 1,
     // bottom moved down 2 → size grows by 1).
-    int box_size = ((max_end_row - box_top) * 75) / 100 + 9;
+    int box_size = ((max_end_row - box_top) * 75) / 100 + 5;
     if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
@@ -122,7 +122,10 @@ void CUI_About::leave(void) {
 void CUI_About::update() {
     UI->update();
     if (Keys.size()) {
-        Keys.getkey();
+        int key = Keys.getkey();
+        if (key == SDLK_ESCAPE) {
+            switch_page(UIP_Patterneditor);
+        }
     }
     //need_refresh++;
 }

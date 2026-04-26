@@ -98,6 +98,16 @@ void CUI_SongMessage::leave(void) {
 }
 
 void CUI_SongMessage::update() {
+    // Peek for ESC before UI->update() so the CommentEditor doesn't
+    // get a chance to swallow it.
+    if (Keys.size()) {
+        int key = Keys.checkkey();
+        if (key == SDLK_ESCAPE) {
+            Keys.getkey(); // consume
+            switch_page(UIP_Patterneditor);
+            return;
+        }
+    }
     UI->update();
     if (Keys.size()) {
         Keys.getkey();
