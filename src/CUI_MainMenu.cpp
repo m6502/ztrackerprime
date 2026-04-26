@@ -85,9 +85,8 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Pattern Editor",           "F2",                   CMD_SWITCH_PEDIT,           NULL},
     {MM_CMD,        "Instrument Editor",        "F3",                   CMD_SWITCH_IEDIT,           NULL},
     {MM_CMD,        "Song Configuration",       "F11",                  CMD_SWITCH_SONGCONF,        NULL},
-#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
     {MM_CMD,        "Song Message",             "F10",                  CMD_SWITCH_SONGMSG,         NULL},
-#endif
+    {MM_CMD,        "Midimacro Editor",         "Ctrl-M",               CMD_SWITCH_MIDIMACEDIT,     NULL},
     {MM_CMD,        "Help",                     "F1",                   CMD_SWITCH_HELP,            NULL},
     {MM_CMD,        "About",                    "Alt-F12",              CMD_SWITCH_ABOUT,           NULL},
 
@@ -120,15 +119,6 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Keybindings Editor",       "Ctrl-Alt-K",           CMD_SWITCH_KEYBINDINGS,     NULL},
     {MM_CMD,        "Lua Console",              "Ctrl-Alt-L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt-Enter",            0,                          mm_toggle_fullscreen},
-
-    {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
-    {MM_SUBHEADING, "Effects (WIP)",            NULL,                   0,                          NULL},
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
-    {MM_CMD,        "Midimacro Editor (WIP)",   "Ctrl-M",               CMD_SWITCH_MIDIMACEDIT,     NULL},
-#endif
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
-    {MM_CMD,        "Arpeggio Editor (WIP)",    "F4",                   CMD_SWITCH_ARPEDIT,         NULL},
-#endif
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_FUNC,       "Quit",                     "Ctrl-Q",               0,                          mm_quit},

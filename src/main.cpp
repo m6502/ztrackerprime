@@ -1466,6 +1466,9 @@ void global_keys(Drawable *S)
               break ;
 
             case SDLK_S: // save
+                // Keybindings editor uses Ctrl-S to save bindings to
+                // zt.conf, not the song. Let the page handle it.
+                if (cur_state == STATE_KEYBINDINGS) break;
                 if (kstate & KS_CTRL) {
 
                     bool saveas = true ;
