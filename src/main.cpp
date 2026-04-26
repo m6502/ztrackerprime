@@ -938,19 +938,19 @@ void update_status(Drawable *S)
   // currently editing in.
   if (ztPlayer->playing) {
 
-    if (ztPlayer->playmode) {
+    char time[128],time2[64];
+    int sec;
+    sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
+    sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
+    sec = calcSongSeconds();
+    sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
 
-      char time[128],time2[64];
-      int sec;
-      sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
-      sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
-      sec = calcSongSeconds();
-      sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
+    if (ztPlayer->playmode) {
       sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
     }
     else {
 
-      sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,song->bpm,song->tpb,cur_step);
+      sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
     }
 
     statusmsg = szStatmsg;
