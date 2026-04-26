@@ -1388,7 +1388,7 @@ void VUPlay::draw(Drawable *S, int)
 //        for(i = 0; i < 17; str[i++] = '\0') ;
 //        for(i = 0; i < vol_len; str[i++] = '=');
         
-        // <Manu> Cambio estas dos lineas guarrisimas comentadas por estos dos fors()
+        // <Manu> Cambio estas dos lineas guarrisimas comentadas por estos dos fors() [EN: replacing those two filthy commented-out lines with these two for() loops]
        
         for(i = 0; i < 17; i++) {
         
@@ -1475,7 +1475,7 @@ latency[track].e.effect_data, latency[track].longevity);
         strcat(str," ");
         if(!measure) {
           
-          // <Manu> Sin cast daba un warning
+          // <Manu> Sin cast daba un warning [EN: without the cast it gave a warning]
           //measure = ((float)latency[track].init_vol - (float)((float)(1 - (float)((float)latency[track].init_vol * (float)((float)latency[track].longevity / (float)latency[track].init_longevity )))* (float)latency[track].init_vol) / 10);
             measure = (int) ((float)latency[track].init_vol - (float)((float)(1 - (float)((float)latency[track].init_vol * (float)((float)latency[track].longevity / (float)latency[track].init_longevity )))* (float)latency[track].init_vol) / 10);
             measure /= 100;

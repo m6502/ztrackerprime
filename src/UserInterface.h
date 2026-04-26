@@ -395,7 +395,7 @@ class MidiOutDeviceOpener : public ListBox {
 
 
 
-#include "Sliders.h"  // <Manu> Un poco feo poner esto aqui, pero asi puedo ir separando en modulos esto
+#include "Sliders.h"  // <Manu> Un poco feo poner esto aqui, pero asi puedo ir separando en modulos esto [EN: a bit ugly to put this here, but it lets me start splitting this into modules]
 
 
 

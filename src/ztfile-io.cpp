@@ -1028,7 +1028,7 @@ void instrument::load(CDataBuf *buf)
     
     this->midi_device = buf->getuch();
 
-    // <Manu> Aqui es donde se puede hacer un parche que ponga el primer dispositivo
+    // <Manu> Aqui es donde se puede hacer un parche que ponga el primer dispositivo [EN: this is where a patch could pick the first device]
     //        MIDI que este abierto en los instrumentos que quieran usar uno que
     //        no este disponible
     

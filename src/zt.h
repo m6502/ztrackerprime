@@ -37,7 +37,7 @@
 #include <atomic>
 
 
-// <Manu> Pequeño parche mientras miro qué hago con el main
+// <Manu> Pequeño parche mientras miro qué hago con el main [EN: small patch while I figure out what to do with main]
 // Define SDL_MAIN_HANDLED across every translation unit that includes zt.h
 // so <SDL_main.h> (pulled in only from main.cpp) is the single place that
 // emits the platform entry point (WinMain on Windows, main() elsewhere).
@@ -86,7 +86,7 @@ static inline void zt_text_input_stop(void) {
 
 //#define VER_MAJ 0
 
-// <Manu> antes era 98
+// <Manu> antes era 98 [EN: was 98 before]
 //#define VER_MIN 986
 
 // Version string is the build date (YYYY_MM_DD) injected by CMake at configure time.
@@ -262,7 +262,7 @@ public:
 
     void setDefaultColors() {
 
-        // <Manu> El color del Scream Tracker era ligeramente distinto
+        // <Manu> El color del Scream Tracker era ligeramente distinto [EN: Scream Tracker's color was slightly different]
         //Background =     getColor(0xA4,0x90,0x54);
         Background =     getColor(0xA1,0x91,0x55);
         //Background =     getColor(0x7F,0x00,0x00);

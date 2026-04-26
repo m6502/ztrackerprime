@@ -965,7 +965,7 @@ void update_status(Drawable *S)
 
       if (cur_edit_pattern == ztPlayer->playing_cur_pattern) {
 
-        //<Manu> Hecho as este bucle pintaba nmeros de lnea sin comprobar cuntas tena el pattern actual
+        //<Manu> Hecho as este bucle pintaba nmeros de lnea sin comprobar cuntas tena el pattern actual [EN: as written, this loop was drawing line numbers without checking how many the current pattern actually has]
 //        for(i = cur_edit_row_disp; i < (cur_edit_row_disp + PATTERN_EDIT_ROWS); i++) {
 
         //int max_row = song->patterns[cur_edit_pattern]->length ;
@@ -1733,7 +1733,7 @@ void global_keys(Drawable *S)
 
 
 
-// <Manu> Variables para saber si se van produciendo eventos de estos tipos
+// <Manu> Variables para saber si se van produciendo eventos de estos tipos [EN: variables that track whether these kinds of events are occurring]
 extern int mim_moredata ;
 extern int mim_error ;
 extern int mim_longerror ;
@@ -1747,7 +1747,7 @@ void redrawscreen(Drawable *S)
 {
   if(load_lock) return ;
 
-  // <Manu> header era 80 y he cambiado el texto del sprintf
+  // <Manu> header era 80 y he cambiado el texto del sprintf [EN: header was 80 and I changed the sprintf text]
 
   static char header[256];
   //  sprintf(header,"%s ||||| DEBUG: moredata = %d || error = %d || longerror = %d", ZTRACKER_VERSION, mim_moredata, mim_error, mim_longerror) ;
@@ -2052,7 +2052,7 @@ void setup_midi()
         sprintf(szKey,"alias_%s",tt);
         temp = Config->get(&szKey[0]);
 
-        // <Manu> Cuidado con esto....
+        // <Manu> Cuidado con esto... [EN: be careful with this]. [EN: be careful with this]
         if (MidiOut->outputDevices[j]->alias) {
             free(MidiOut->outputDevices[j]->alias);
             MidiOut->outputDevices[j]->alias = NULL;
@@ -3018,7 +3018,7 @@ int action(Screen *S)
             if (S->lock()==0) {
 
                 // Clean UI page background
-                // <Manu> Creo que este clean es mejorable y segn cmo redundante
+                // <Manu> Creo que este clean es mejorable y segn cmo redundante [EN: I think this clean can be improved and is somewhat redundant]
                 S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X-CHARACTER_SIZE_X,INTERNAL_RESOLUTION_Y - (480-424),/*0x00FF00*/COLORS.Background);
                 S->unlock();
 
@@ -3120,7 +3120,7 @@ int set_video_mode(int w, int h, char *errstr)
 
   if (!zt_backend_set_video_mode(errstr)) {
 
-    // <Manu> El mensaje de error estaba mal
+    // <Manu> El mensaje de error estaba mal [EN: the error message was wrong]
 
     //sprintf(errstr, "Couldn't set 640x480x32 video mode: %s\n", SDL_GetError());
     sprintf(errstr, "Couldn't set %dx%dx32 video mode: %s\n", INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y, SDL_GetError());
