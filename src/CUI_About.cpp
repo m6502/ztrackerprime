@@ -6,21 +6,34 @@ CUI_About::CUI_About(void) {
     UI = new UserInterface();
 
     double xscale = (double)INTERNAL_RESOLUTION_X / 640;
-    double yscale = (double)INTERNAL_RESOLUTION_Y / 480;
-    
+
     TextBox *l = new TextBox();
     UI->add_element(l,0);
     l->x = 2;
-    l->xsize = (int)((double)(38+3)*xscale);
-    // Anchor below the bmAbout logo and clamp height so the box never
-    // overlaps the bottom toolbar (~7 rows of 55 px).
-    const int ROW_BELOW_LOGO = 20;
-    const int TOOLBAR_ROWS = 7;
-    int max_end_row = (INTERNAL_RESOLUTION_Y / 8) - TOOLBAR_ROWS - 1;
-    int avail = max_end_row - ROW_BELOW_LOGO;
-    if (avail < 6) avail = 6;
-    l->y = ROW_BELOW_LOGO;
-    l->ysize = avail;
+    // 20% wider than before so long lines wrap less awkwardly.
+    // (Was (38+3)*xscale; now 49*xscale.)
+    l->xsize = (int)(49.0 * xscale);
+    // bmAbout is a 620x319 px logo drawn at y = row(9) (the row right
+    // below the page title). The title sits at PAGE_TITLE_ROW_Y = 9,
+    // logo immediately below it. Textbox lives in the bottom slice of
+    // the page with a clean two-row margin above the toolbar so it
+    // never paints into the toolbar pixels.
+    //
+    // Layout:
+    //   row 9     page title
+    //   row 9+    bmAbout logo (drawn in CUI_About::draw)
+    //   ...       textbox (lower 55% of usable area)
+    //   row N-9   start of toolbar reserve (55px = 7 rows + 2 rows safety)
+    const int TOOLBAR_RESERVE_ROWS = 9;     // 7 rows toolbar + 2 rows safety
+    int total_rows  = (INTERNAL_RESOLUTION_Y / 8);
+    int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
+    int usable = max_end_row - 10;          // rows 10..max_end_row
+    if (usable < 8) usable = 8;
+    int text_rows = (usable * 55 + 50) / 100;
+    if (text_rows < 6)  text_rows = 6;
+    if (text_rows > 30) text_rows = 30;
+    l->y     = max_end_row - text_rows;
+    l->ysize = text_rows;
     l->bWordWrap = true ;
     l->text =R"about_text(
 |H|About|U|
@@ -109,7 +122,9 @@ void CUI_About::update() {
 }
 
 void CUI_About::draw(Drawable *S) {
-        S->copy(CurrentSkin->bmAbout,5,row(12));
+        // Logo at row 9 (was row 12) so it sits just under the page
+        // title bar instead of leaving a 3-row gap.
+        S->copy(CurrentSkin->bmAbout,5,row(9));
     /*
     if (640 == INTERNAL_RESOLUTION_X && 480 == INTERNAL_RESOLUTION_Y) {
         S->copy(CurrentSkin->bmAbout,5,row(12));
