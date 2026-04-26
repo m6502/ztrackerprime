@@ -36,7 +36,7 @@ CUI_About::CUI_About(void) {
     // Height: 75% of the available room, plus 1 extra row so the bottom
     // sits 2 rows lower than the previous setting (top moved down 1,
     // bottom moved down 2 → size grows by 1).
-    int box_size = ((max_end_row - box_top) * 75) / 100 + 1;
+    int box_size = ((max_end_row - box_top) * 75) / 100 + 6;
     if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
@@ -69,9 +69,9 @@ Write me to |U|mail@manuelmontoto.com|U|
     Austin Luminais
     Christopher Micali
     Daniel Kahlin
-    Esa Juhani Ruoho
     Manuel Montoto
     Nic Soudee
+    Esa Juhani Ruoho
 
   |H|Support|U|
 
