@@ -16,18 +16,32 @@ Everyone does have his own tastes, routines and circumstances. zTracker' behaves
 There's also the possibility that I misunderstood how something worked and "fixing" it I broke it, or that I have changed the way something works that could have been activated by just pressing a key. Who knows?
 
 
+Builds and downloads
+--------------------
+
+CMake-based, cross-platform CI runs on every push and PR for Linux x86_64, Windows x64 (MSVC), Windows x86 (MinGW, XP-compatible), macOS arm64 and macOS x86_64. Pushing a `v*` tag also packages the binaries into a draft GitHub Release with `.tar.gz` / `.zip` / `.dmg` artifacts ready for download.
+
+External libraries (zlib, libpng, SDL3, Lua) are vendored and statically linked — there are no DLLs to ship next to the executable. SDL3 on macOS comes from Homebrew (`brew install sdl3`); on Windows and Linux it is built/linked through the CI matrix.
+
+
 So, what's new / different from the original zTracker? Here's a somewhat complete (but not really complete) list of the most important changes:
 
 
 Program behavior changes:
 
 - Support for laptop keyboards: The two right most keyboard keys after 'i', 'o', 'p' have been remapped to duplicate the octave up and down keys functionality. The two keys below now also go to the previous or next pattern (These have been tested only on Spanish keyboards for now)
-  
+
+- Note keys use layout-independent SDL scancodes, so the QWERTY/AZERTY/QWERTZ row positions trigger the right notes regardless of the host keyboard layout.
+
+- Finnish / EU ISO keyboard support: the `§` key (top-left, scancode `NONUSBACKSLASH` / `INTERNATIONAL1..3`) is mapped to Note Off, and Shift+`§` toggles drawmode. The `<` / `>` key (left of Z on ISO Macs) is mapped to the bracket-key octave controls.
+
 - Support for 1bpp PNG files in the skin fonts.
 
 - Zoom mode enables the program to work in 2x, 3x, 4x... So it's useable again on high resolution screens.
 
-- Resizeable window allows for a much more convenient experience.
+- Resizeable window allows for a much more convenient experience. Mouse-wheel zoom preserves the window size — no more accidental resizes.
+
+- Full-screen toggle (Alt+Enter) works again, including on macOS.
 
 - Many shortcuts have been modified to use ALT key instead of Control (selections, etc).
 
@@ -52,21 +66,90 @@ Program behavior changes:
 - Default pattern size is 64 instead of 128.
 
 - Program doesn't allow the user to set a resolution lower than 1024x700 and will increase the X, Y or both of them if necessary.
-  
+
 - Play view draws as many channels as it can fit within the horizontal resolution, instead of a fixed number of them.
-  
-- Load and Save screens now use all the available space to display their list entries, and have an improved X size.
+
+- Load and Save screens now use all the available space to display their list entries, and have an improved X size. The file list shows `.mid` files alongside `.zt`.
+
+- After a successful load you land on the Instrument Editor (F3) by default. The destination is configurable in Global Config (Ctrl+F12 → Post-Load Page) — pick Pattern Editor (F2) or Song Configuration (F11) instead if you prefer.
+
+- Auto-save: songs are auto-saved every N seconds (configurable in Global Config; default 60 s). Set to 0 to disable.
+
+- Status messages no longer bleed across pages — switching pages clears the previous page's status line.
 
 - Many more.
+
+
+New pages and editors:
+
+- **Main menu (ESC)** — pressing ESC anywhere overlays a Schism Tracker-style menu listing every page and common action with its keyboard shortcut. Cursor up/down to navigate, Enter to fire, ESC to close. You don't have to memorise the F-key map.
+
+- **Keybindings Editor (Ctrl+Alt+K)** — view and rebind every keyboard shortcut in the app. Bindings are saved to `zt.conf` with Ctrl+S.
+
+- **Lua Console (Ctrl+Alt+L)** — interactive Lua REPL with tab completion and a full API listing on open. Lets you script zTracker's internals.
+
+- **Palette Editor (Shift+Ctrl+F12)** — live color editing of the current skin with seven presets. Changes apply immediately and save with the skin.
+
+- **Song Message editor (F10)** — re-enabled and supports text input and Backspace / Enter / arrows.
+
+- **Midimacro Editor (Ctrl+M)** — bound to plain Ctrl+M; MIDI export now lives at Ctrl+Shift+M.
+
+- **About page (Alt+F12)** — credits, version, project links.
+
+
+Pattern editing additions:
+
+- **Replicate at Cursor / Clone Pattern** — quality-of-life pattern operations ported from Paketti.
+
+- **Humanize Velocities** — randomise note velocities by ±N to take the rigid edge off programmed parts.
+
+- **Interpolate (Ctrl+I)** — interpolate values across a selection (note, vol, or fx param), with a sensible fallback when no selection column applies.
+
+- **Multichannel MIDI export** — exporting `.mid` writes one track per channel instead of flattening everything onto one track.
+
+- **Centered editing mode** — keep the current row pinned at the centre of the pattern view as the cursor moves.
+
+- **Step editing** — toggleable.
+
+- **Highlight / Lowlight rows** — independent increments, both configurable in Global Config.
+
+
+MIDI realtime and clock:
+
+- **Send MIDI Clock** and **Send MIDI Stop/Start** — toggleable per song (Songconfig F11) and project-wide default (Sysconfig F12 / Global Config Ctrl+F12).
+
+- **MIDI In Sync** — slave zTracker's transport to incoming MIDI Start/Stop/Continue.
+
+- **Chase MIDI Tempo** — when MIDI In Sync is on, slave the BPM to incoming `0xF8` MIDI Clock so external sequencers / DAWs drive the tempo.
+
+- **Send Panic on Stop** — toggle whether stopping playback also sends an All Notes Off panic.
+
+- **Auto-Open MIDI** — open the configured MIDI ports at startup.
+
+
+Configuration:
+
+- **Most settings now have a UI**. The Sysconfig page (F12) handles the MIDI device list, and Global Configuration (Ctrl+F12, two pages) covers Auto-Open MIDI, Autoload, Default Directory, Record Velocity, Autosave interval, View Mode, Highlight / Lowlight increment, Default Pattern Length, MIDI In Sync, Chase MIDI Tempo, and Post-Load Page. Hand-editing `zt.conf` is no longer required for day-to-day use.
+
+- The values still persist in `zt.conf` — the new GUI just gives you a way to change them without leaving the program.
+
+
+Help text:
+
+- **F1 toggle** — pressing F1 from Help returns you to the previous page.
+
+- **macOS modifiers** — on macOS, every `CTRL-X` shortcut in `doc/help.txt` is rewritten on the fly to the uniform `CMD-X/ALT-X` form so users see both the macOS-natural and the cross-platform-portable modifiers in the same line. Continuation lines are re-indented to stay aligned with the rewritten description.
+
+- **Section-aware nav** — Tab / Shift+Tab in the Help screen jump between section headers; Shift+Tab from the first section wraps to the last.
 
 
 Fixed bugs:
 
 - Many crashes have been fixed - Works rock solid now.
-  
+
 - Many memory bugs have been fixed (reading from uninitialized variables et al).
 
-- File requester didn't show .mid files; now it does.
+- File requester didn't show `.mid` files; now it does.
 
 - Control + L to load and Control + S to save work again.
 
@@ -75,10 +158,22 @@ Fixed bugs:
 - Scroll didn't move when playing individual notes and rows.
 
 - Current pattern being edited didn't display correctly the row numbers if it had a different count than the default.
-  
+
 - Last line remained highlighted when play entered the current pattern then exited to another.
 
 - You could use the numeric keypad '+' to advance the song position, but couldn't use the '-' to rewind it.
+
+- F5 / Play Song view track-header rows now align with the Pattern Editor (F2) — switching between F2 and F5 no longer shifts the pattern body.
+
+- About page text box height is clamped so it can never overlap the bottom toolbar at non-default resolutions.
+
+- Order List: pressing Up while at row 0 cycles focus back to the previous control (e.g. MIDI Stop/Start), matching the Down-into-the-list path.
+
+- Songconfig: Title / BPM / TPB labels right-align with the field/slider start, and the Title field is the same width as the BPM/TPB sliders.
+
+- Cursor no longer ends up outside the visible area when resizing the window.
+
+- Compiler-warning sweep across macOS / Linux / Windows: most pre-existing warnings (unused variables, missing override, sign mismatches, narrowing) are gone.
 
 - Many, many more.
 
@@ -88,39 +183,43 @@ Removed things:
 - Initial information screen has been removed.
 
 - VUMeters can't be enabled. It's been broken forever, and I don't use it - Will reenable if / when it's fixed.
-  
+
 - 8 bit .png files are not supported anymore.
 
 - Comments when exporting .mid files have been removed (I needed them to be as small as possible).
 
 - The weird "Are you crazy" requester has been removed, substituted by just stopping the current song and loading the new one.
-  
+
 - Column size can't be changed.
 
-- Full screen mode is disabled for now, because trying to set the weird resolutions possible with a window to full screen just doesn't work. Still, I like to work on full screen, so it's going to be fixed soon.
-
 - There was a (too frequent) crash when loading a song from disk. It's now fixed.
-  
 
-Broken things:
 
-- zt.conf configuration file needs to be edited by hand.
+Broken / known limitations:
 
-- Full screen mode doesn't work with the weird resolutions you can set on the windowed mode :-)
+- VUMeters are still disabled (see above).
+
+- Column-size view modes are stubbed out — only "Big" view is currently active.
 
 
 Other changes:
 
 - The source code has been updated where needed to compile with modern C++.
 
-- External libraries (zlib, libpng, SDL3) are again up to date.
+- External libraries (zlib, libpng, SDL3) are again up to date. Lua is also vendored for the Lua Console.
 
 - zlib and libpng are now statically linked instead of using external .dll files.
 
 - The old project and solutions have been replaced by CMAKE.
-  
+
+- A macOS `.app` bundle is produced as part of the standard build, with native menubar integration (`macos_menu.mm`) and Gatekeeper-friendly packaging.
+
+- Cross-platform CI publishes per-platform artifacts on every push and a draft GitHub Release on tag pushes.
+
+- Spanish source comments by Manu (`<Manu>`) are retained verbatim with an inline English gloss in `[EN: ...]` so non-Spanish readers can follow along.
+
 - Parts of the code may have been cleaned, re-indented, commented, altered to suit my tastes.or just screwed for any reason.
-  
+
 - Directory tree has been changed.
 
 - Version number scheme and program name have been changed, too.
