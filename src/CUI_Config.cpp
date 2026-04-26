@@ -45,9 +45,11 @@ CUI_Config::CUI_Config(void) {
     ti = new TextInput;
     UI->add_element(ti,1);
     ti->frame = 1;
-    ti->x = 20;
-    ti->y = 15;
-    ti->xsize = 50;
+    // Sit on the same row as the Autoload .ZT checkbox, to the right of
+    // the "Autoload File" label that draws at col 28 (label is 13 cols).
+    ti->x = 42;
+    ti->y = 14;
+    ti->xsize = 30;
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.autoload_ztfile_filename;
 
@@ -109,8 +111,10 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,7);
-    vs->x = 20;
-    vs->y = 23;
+    // Pair with the highlight slider on the same row; "Default Lowlight"
+    // label draws at col 38 (16 chars), slider sits to its right.
+    vs->x = 56;
+    vs->y = 22;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.lowlight_increment;
@@ -413,7 +417,7 @@ void CUI_Config::draw(Drawable *S) {
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
         print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
-        print(row(2),col(15),"Autoload File",COLORS.Text,S);
+        print(row(28),col(14),"Autoload File",COLORS.Text,S);
         print(row(2),col(17),"Default Dir",COLORS.Text,S);
         print(row(2),col(19),"Record Velocity",COLORS.Text,S);
         print(row(2),col(20),"Autosave (sec)",COLORS.Text,S);
@@ -421,7 +425,7 @@ void CUI_Config::draw(Drawable *S) {
         print(row(2),col(21),"Default View",COLORS.Text,S);
 #endif
         print(row(2),col(22),"Default Highlight",COLORS.Text,S);
-        print(row(2),col(23),"Default Lowlight",COLORS.Text,S);
+        print(row(38),col(22),"Default Lowlight",COLORS.Text,S);
         print(row(2),col(24),"Default Pat Len",COLORS.Text,S);
         print(row(2),col(25),"MIDI In Sync",COLORS.Text,S);
         print(row(2),col(26),"Chase MIDI Tempo",COLORS.Text,S);
