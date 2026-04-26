@@ -29,14 +29,14 @@ CUI_About::CUI_About(void) {
     const int TOOLBAR_RESERVE_ROWS = 8;
     int total_rows  = (INTERNAL_RESOLUTION_Y / 8);
     int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
-    // Top: 27 rows higher than the (row(9)+300px)/8 anchor (2 rows
-    // higher than the previous -25 setting).
-    int box_top = ((row(9) + 300) / 8) - 27;
+    // Top: 26 rows higher than the (row(9)+300px)/8 anchor (1 row
+    // lower than the previous -27 setting).
+    int box_top = ((row(9) + 300) / 8) - 26;
     if (box_top < 0) box_top = 0;
-    // Height: 75% of the available room down to max_end_row, i.e. the
-    // bottom no longer rides max_end_row — it's pulled up so the box
-    // is ~3/4 of its previous height.
-    int box_size = ((max_end_row - box_top) * 75) / 100;
+    // Height: 75% of the available room, plus 1 extra row so the bottom
+    // sits 2 rows lower than the previous setting (top moved down 1,
+    // bottom moved down 2 → size grows by 1).
+    int box_size = ((max_end_row - box_top) * 75) / 100 + 1;
     if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
