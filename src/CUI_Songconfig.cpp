@@ -101,8 +101,38 @@ CUI_Songconfig::CUI_Songconfig(void) {
         fm->ysize = 2;
     // END Frame
 
+        // Row highlight minor / major (the global zt_config_globals
+        // values, surfaced here so song-edit tasks can tweak them
+        // without leaving F11).
+        vs = new ValueSlider;
+        UI->add_element(vs, 6);
+        vs->frame = 0;
+        vs->x = 17;
+        vs->y = base_y + 8;
+        vs->xsize = 28;
+        vs->min = 1;
+        vs->max = 64;
+        vs->value = zt_config_globals.highlight_increment;
+
+        vs = new ValueSlider;
+        UI->add_element(vs, 7);
+        vs->frame = 0;
+        vs->x = 17;
+        vs->y = base_y + 9;
+        vs->xsize = 28;
+        vs->min = 1;
+        vs->max = 64;
+        vs->value = zt_config_globals.lowlight_increment;
+
+        fm = new Frame;
+        UI->add_gfx(fm, 2);
+        fm->x = 17;
+        fm->y = base_y + 8;
+        fm->xsize = 28;
+        fm->ysize = 2;
+
         oe = new OrderEditor;
-        UI->add_element(oe,5);
+        UI->add_element(oe,8);
         oe->x = 59;
         oe->y = 13;
         oe->xsize = 9;
@@ -136,9 +166,10 @@ void CUI_Songconfig::leave(void) {
 
 void CUI_Songconfig::update()
 {
-    // Reserve 8 rows at the bottom: 7 for the 55px toolbar (ceil(55/8)) plus
-    // one row of safety so the order editor's frame never overlaps.
-    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 8) ;
+    // Reserve 7 rows at the bottom for the 55 px toolbar (ceil(55/8));
+    // one extra row of safety was previously added but it left the order
+    // list one row short of the F1 Help bottom edge.
+    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 7) ;
 
     ValueSlider *vs;
     TextInput *t;
@@ -161,8 +192,8 @@ void CUI_Songconfig::update()
         file_changed++;
     }
     vs = (ValueSlider *)UI->get_element(2);
-    if (vs->value != rev_tpb_tab[song->tpb]) { 
-        song->tpb = tpb_tab[vs->value]; 
+    if (vs->value != rev_tpb_tab[song->tpb]) {
+        song->tpb = tpb_tab[vs->value];
         ztPlayer->set_speed();
         vs->force_f=1; vs->force_v = song->tpb;
 
@@ -170,8 +201,20 @@ void CUI_Songconfig::update()
             zt_config_globals.highlight_increment = song->tpb;
         if(!zt_config_globals.lowlight_increment)
             zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
-        
+
         file_changed++;
+    }
+    vs = (ValueSlider *)UI->get_element(6);
+    if (vs && vs->value != zt_config_globals.highlight_increment) {
+        zt_config_globals.highlight_increment = vs->value;
+    } else if (vs) {
+        vs->value = zt_config_globals.highlight_increment;
+    }
+    vs = (ValueSlider *)UI->get_element(7);
+    if (vs && vs->value != zt_config_globals.lowlight_increment) {
+        zt_config_globals.lowlight_increment = vs->value;
+    } else if (vs) {
+        vs->value = zt_config_globals.lowlight_increment;
     }
     if (Keys.size()) {
         Keys.getkey();
@@ -193,11 +236,14 @@ void CUI_Songconfig::draw(Drawable *S) {
         print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
         print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
         print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
-        // Order List label: row 11 (one blank row below page title at 9),
-        // horizontally clear of the OE data (OE starts at column 59, so
-        // put label at column 60 which is inside the OE x-span so it
-        // visually belongs to the list).
-        print(row(60),col(11),"Order List",COLORS.Text,S);
+        // Row highlight minor / major sliders share the BPM/TPB column.
+        print(row(1),col(base_y+8),"Row hl minor   ",COLORS.Text,S);
+        print(row(1),col(base_y+9),"Row hl major   ",COLORS.Text,S);
+        printchar(row(17 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
+        printchar(row(17 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
+        // Order List label aligned to the OE x-origin (col 59) so the
+        // header sits flush over the "000" index column.
+        print(row(59),col(11),"Order List",COLORS.Text,S);
         printchar(row(17 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
         printchar(row(17 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
 
