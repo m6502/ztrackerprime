@@ -13,27 +13,35 @@ CUI_About::CUI_About(void) {
     // 20% wider again so long sentences wrap further to the right
     // and don't break mid-word. (Was 49*xscale; now 59*xscale.)
     l->xsize = (int)(59.0 * xscale);
-    // bmAbout is a 620x319 px logo drawn at y = row(9) (the row right
-    // below the page title). The title sits at PAGE_TITLE_ROW_Y = 9,
-    // logo immediately below it. Textbox lives in the bottom slice of
-    // the page with a clean two-row margin above the toolbar so it
-    // never paints into the toolbar pixels.
+    // bmAbout is a 620x319 px logo drawn at y = row(9). It extends to
+    // ~y = 391 px, i.e. row ~50. Place the textbox right below it with
+    // a one-row breathing gap, and clamp the bottom edge so we never
+    // paint into the toolbar's 55px (~7 rows + 2 rows safety).
     //
-    // Layout:
-    //   row 9     page title
-    //   row 9+    bmAbout logo (drawn in CUI_About::draw)
-    //   ...       textbox (lower 55% of usable area)
-    //   row N-9   start of toolbar reserve (55px = 7 rows + 2 rows safety)
-    const int TOOLBAR_RESERVE_ROWS = 9;     // 7 rows toolbar + 2 rows safety
+    // Layout (large screens):
+    //   row 9       page title bar
+    //   row 9-49    bmAbout logo
+    //   row 51..    textbox
+    //   row N-9..N  toolbar reserve
+    //
+    // On small screens (default INTERNAL_RESOLUTION_Y = 350, ~43 rows)
+    // there isn't enough room for the textbox below the logo, so we
+    // fall back to placing it in the lower part of the page where it
+    // unavoidably overlaps the logo.
+    const int TOOLBAR_RESERVE_ROWS = 9;
+    const int LOGO_BOTTOM_ROW      = 51;
     int total_rows  = (INTERNAL_RESOLUTION_Y / 8);
     int max_end_row = total_rows - TOOLBAR_RESERVE_ROWS;
-    int usable = max_end_row - 10;          // rows 10..max_end_row
-    if (usable < 8) usable = 8;
-    int text_rows = (usable * 55 + 50) / 100;
-    if (text_rows < 6)  text_rows = 6;
-    if (text_rows > 30) text_rows = 30;
-    l->y     = max_end_row - text_rows;
-    l->ysize = text_rows;
+    int box_top   = LOGO_BOTTOM_ROW;
+    int box_size  = max_end_row - box_top;
+    if (box_size < 8) {
+        // Tight screen — fall back to lower-half placement.
+        box_size = (max_end_row - 11) > 8 ? (max_end_row - 11) : 8;
+        box_top  = max_end_row - box_size;
+        if (box_top < 12) box_top = 12;
+    }
+    l->y     = box_top;
+    l->ysize = box_size;
     l->bWordWrap = true ;
     l->text =R"about_text(
 |H|About|U|
@@ -122,13 +130,11 @@ void CUI_About::update() {
 }
 
 void CUI_About::draw(Drawable *S) {
-        // The bmAbout PNG has ~3 rows of transparent/whitespace padding
-        // at the top of the bitmap, so even drawing at row(9) leaves a
-        // visible gap below the page title. Anchor at row(7), which is
-        // 2 rows above the title row — the bitmap's own top padding
-        // absorbs that offset and the visible logo lands flush with
-        // the title bar.
-        S->copy(CurrentSkin->bmAbout,5,row(7));
+        // Logo at row 9, sitting under the page title bar. The textbox
+        // (in CUI_About::CUI_About) is positioned at row 51 — right
+        // below where this 319px-tall bitmap ends — so the two never
+        // overlap on screens tall enough to fit both.
+        S->copy(CurrentSkin->bmAbout,5,row(9));
     /*
     if (640 == INTERNAL_RESOLUTION_X && 480 == INTERNAL_RESOLUTION_Y) {
         S->copy(CurrentSkin->bmAbout,5,row(12));
