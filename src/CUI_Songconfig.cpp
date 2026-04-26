@@ -37,10 +37,10 @@ CUI_Songconfig::CUI_Songconfig(void) {
         ti = new TextInput;
         UI->add_element(ti,0);
         ti->frame = 1;
-        ti->x = 17; 
-        ti->y = base_y; 
-        ti->xsize=24;
-        ti->length=24;
+        ti->x = 17;
+        ti->y = base_y;
+        ti->xsize=28;
+        ti->length=28;
         ti->str = &song->title[0];
     // END Test Slider
     /* Initialize BPM Slider */
@@ -184,9 +184,13 @@ void CUI_Songconfig::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
-        print(row(9),col(base_y),"Title",COLORS.Text,S);
-        print(row(10),col(base_y+2),   "BPM",COLORS.Text,S);
-        print(row(10),col(base_y+3),"TPB",COLORS.Text,S);
+        // Right-align Title/BPM/TPB labels so their right edge sits one
+        // char before the textfield/slider start (col 17), matching the
+        // tight "Send MIDI Clock" / "MIDI Stop/Start" pattern below.
+        // "Title" = 5 chars → col 11; "BPM"/"TPB" = 3 chars → col 13.
+        print(row(11),col(base_y),"Title",COLORS.Text,S);
+        print(row(13),col(base_y+2),"BPM",COLORS.Text,S);
+        print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
         print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
         print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
         // Order List label: row 11 (one blank row below page title at 9),
