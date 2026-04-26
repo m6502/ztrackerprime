@@ -85,11 +85,16 @@ int OrderEditor::update() {
                     list_start+=16;
                 act++;
                 break;
-            case SDLK_UP: 
-                cursor_y--; 
+            case SDLK_UP:
+                // At top of list: cycle focus to the previous element
+                // (so Up out of Order List reaches MIDI Stop/Start, etc.)
+                if (cursor_y == 0 && list_start == 0) {
+                    ret = -1; act++; break;
+                }
+                cursor_y--;
                 if (cursor_y<0)
                     list_start--;
-                act++; 
+                act++;
                 break;
             case SDLK_DOWN: 
                 cursor_y++; 
