@@ -97,7 +97,7 @@ CUI_Config::CUI_Config(void) {
     vs = new ValueSlider;
     UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 22;
+    vs->y = 21;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -183,7 +183,7 @@ CUI_Config::CUI_Config(void) {
     // count, just shifted right by 3.
     tb->x = 4;
     tb->y = 26;
-    tb->xsize = 75;
+    tb->xsize = 72;   // ends col 76 — matches F12 MIDI list right edge
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
         int remain = max_rows - tb->y - 1 - 9;
@@ -344,14 +344,14 @@ void CUI_Config::draw(Drawable *S) {
         sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Chase MIDI Tempo|L|[|H|%s|L|]",zt_config_globals.midi_in_sync_chase_tempo?"On":"Off");
-        const char *post_load_name = "Pattern Edit";
+        const char *post_load_name = "Pattern Editor (F2)";
         switch (zt_config_globals.post_load_page) {
-            case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Edit"; break;
-            case POST_LOAD_INST_EDIT:    post_load_name = "Inst Editor";  break;
-            case POST_LOAD_PLAYSONG:     post_load_name = "Play Song";    break;
-            case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Config";  break;
-            case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message"; break;
-            default:                     post_load_name = "Pattern Edit"; break;
+            case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Editor (F2)";    break;
+            case POST_LOAD_INST_EDIT:    post_load_name = "Instrument Editor (F3)"; break;
+            case POST_LOAD_PLAYSONG:     post_load_name = "Play Song (F5)";         break;
+            case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Configuration (F11)"; break;
+            case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message (F10)";     break;
+            default:                     post_load_name = "Pattern Editor (F2)";    break;
         }
         sprintf(buf+strlen(buf),"\n|U| Post-Load Page  |L|[|H|%s|L|]",post_load_name);
         sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
@@ -409,18 +409,18 @@ void CUI_Config::draw(Drawable *S) {
         {
             ValueSlider *vs = (ValueSlider *)UI->get_element(6);   // Post-Load Page (was 9)
             if (vs) {
-                const char *post_load_name = "Pattern Edit";
+                const char *post_load_name = "Pattern Editor (F2)";
                 switch (zt_config_globals.post_load_page) {
-                    case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Edit"; break;
-                    case POST_LOAD_INST_EDIT:    post_load_name = "Inst Editor";  break;
-                    case POST_LOAD_PLAYSONG:     post_load_name = "Play Song";    break;
-                    case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Config";  break;
-                    case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message"; break;
-                    default:                     post_load_name = "Pattern Edit"; break;
+                    case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Editor (F2)";    break;
+                    case POST_LOAD_INST_EDIT:    post_load_name = "Instrument Editor (F3)"; break;
+                    case POST_LOAD_PLAYSONG:     post_load_name = "Play Song (F5)";         break;
+                    case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Configuration (F11)"; break;
+                    case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message (F10)";     break;
+                    default:                     post_load_name = "Pattern Editor (F2)";    break;
                 }
-                char label[20];
-                snprintf(label, sizeof(label), " %-12s", post_load_name);
-                printBG(col(vs->x + vs->xsize), row(vs->y), "             ", COLORS.Text, COLORS.Background, S);
+                char label[32];
+                snprintf(label, sizeof(label), " %-25s", post_load_name);
+                printBG(col(vs->x + vs->xsize), row(vs->y), "                          ", COLORS.Text, COLORS.Background, S);
                 printBG(col(vs->x + vs->xsize), row(vs->y), label, COLORS.Text, COLORS.Background, S);
             }
         }
@@ -438,7 +438,7 @@ void CUI_Config::draw(Drawable *S) {
         print(row(7),col(20),"Default View",COLORS.Text,S);
 #endif
         // Row Highlight / Row Lowlight live in F11 (Songconfig) only.
-        print(row(4),col(22),"Default Pat Len",COLORS.Text,S);
+        print(row(4),col(21),"Default Pat Len",COLORS.Text,S);
         print(row(5),col(23),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
