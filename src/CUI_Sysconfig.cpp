@@ -283,7 +283,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->y = base_y + 2;
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_send_panic;
-        cb->frame = 1;
+        cb->frame = 0;
 
         // MIDI In Sync (a.k.a. "MIDI-IN Slave"). The user-facing label
         // lives in F11 (Songconfig) now, but we keep the element here
@@ -304,7 +304,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->y = base_y + 6;
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_open_midi;
-        cb->frame = 1;
+        cb->frame = 0;
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++); // Full Screen cb — update() reads via get_element(5)
@@ -312,7 +312,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->y = base_y + 8;
         cb->xsize = 3;
         cb->value = &zt_config_globals.full_screen;
-        cb->frame = 1;
+        cb->frame = 0;
 
 #ifndef DISABLED_CONFIGURATION_VALUES
         vs = new ValueSlider;
@@ -387,7 +387,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->x = 26;
         cb->y = 49;
         cb->xsize = 3;
-        cb->frame = 1;
+        cb->frame = 0;
 
         ti = new AliasTextInput(ml);
         UI->add_element(ti,tabindex++);

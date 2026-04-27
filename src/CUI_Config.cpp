@@ -39,7 +39,7 @@ CUI_Config::CUI_Config(void) {
     cb->y = 14;
     cb->xsize = 3;
     cb->value = &zt_config_globals.autoload_ztfile;
-    cb->frame = 1;
+    cb->frame = 0;
 
     ti = new TextInput;
     UI->add_element(ti,1);
@@ -67,12 +67,14 @@ CUI_Config::CUI_Config(void) {
     cb->y = 18;
     cb->xsize = 3;
     cb->value = &zt_config_globals.record_velocity;
-    cb->frame = 1;
+    cb->frame = 0;
 
+    // Autosave (sec) shares row 18 with Record Velocity to the right of
+    // its checkbox.
     vs = new ValueSlider;
     UI->add_element(vs,4);
-    vs->x = 20;
-    vs->y = 19;
+    vs->x = 40;
+    vs->y = 18;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.autosave_interval_seconds;
@@ -266,6 +268,14 @@ void CUI_Config::update() {
             }
             pclose(p);
         }
+        // Pump SDL events + flush queued keys so the Enter the user
+        // pressed inside the Finder dialog (and any keystrokes that
+        // landed in zTracker's window while it was unfocused) don't
+        // leak through and re-open the picker on the next update().
+        SDL_PumpEvents();
+        SDL_FlushEvent(SDL_EVENT_KEY_DOWN);
+        SDL_FlushEvent(SDL_EVENT_KEY_UP);
+        Keys.flush();
     }
 #endif
     UI->update();
@@ -439,7 +449,9 @@ void CUI_Config::draw(Drawable *S) {
         print(row(28),col(14),"Autoload File",COLORS.Text,S);
         print(row(8),col(16),"Default Dir",COLORS.Text,S);
         print(row(4),col(18),"Record Velocity",COLORS.Text,S);
-        print(row(5),col(19),"Autosave (sec)",COLORS.Text,S);
+        // Autosave (sec) shares row 18 with Record Velocity. Label
+        // right-aligned to end col 38, slider starts col 40.
+        print(row(25),col(18),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         print(row(7),col(20),"Default View",COLORS.Text,S);
 #endif
