@@ -134,19 +134,19 @@ CUI_Songconfig::CUI_Songconfig(void) {
         // MIDI In Sync (slave to incoming MIDI clock).
         cb = new CheckBox;
         UI->add_element(cb, 8);
-        cb->frame = 1;
+        cb->frame = 0;
         cb->x = 17;
         cb->y = base_y + 11;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &zt_config_globals.midi_in_sync;
 
         // Chase MIDI Tempo.
         cb = new CheckBox;
         UI->add_element(cb, 9);
-        cb->frame = 1;
+        cb->frame = 0;
         cb->x = 17;
         cb->y = base_y + 12;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
         oe = new OrderEditor;
