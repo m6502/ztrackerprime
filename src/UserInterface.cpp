@@ -1058,12 +1058,10 @@ void CheckBox::draw(Drawable *S, int active) {
         b = COLORS.EditBG;
     }
     printBG(col(x),col(y),str,f,b,S);
-    if (frame) {
-        printline(col(x),row(y-1),0x86,chip_w,COLORS.Lowlight,S);
-        printline(col(x),row(y+1),0x81,chip_w,COLORS.Highlight,S);
-        printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
-        printchar(col(x+chip_w),row(y),0x83,COLORS.Highlight,S);
-    }
+    // Frame border is intentionally never drawn around checkboxes — the
+    // border chars rendered as a yellow stripe next to the chip and added
+    // no information on top of the dark chip background. Callers may still
+    // set frame=1, but the flag is a no-op here.
     int dirty_w = (xsize > chip_w) ? xsize : chip_w;
     screenmanager.Update(col(x-1),row(y-1),col(x+dirty_w+1),row(y+1));
     changed = 0;
