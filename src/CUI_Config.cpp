@@ -151,7 +151,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(b,10);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
     b->xsize = 18;
-    b->x = 2;
+    b->x = 4;   // matches Sysconfig F12 button x so the button doesn't jump on page switch
     b->y = 12;
     b->ysize = 1;
     b->OnClick = (ActFunc)BTNCLK_GotoSystemConfig;
