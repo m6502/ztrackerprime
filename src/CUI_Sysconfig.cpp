@@ -280,7 +280,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 16;
-        cb->y = base_y + 2;
+        cb->y = base_y + 2;   // Panic on stop
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_send_panic;
         cb->frame = 0;
@@ -301,7 +301,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 16;
-        cb->y = base_y + 4;   // moved 2 rows up
+        cb->y = base_y + 3;   // Auto-open MIDI — adjacent to Panic on stop
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_open_midi;
         cb->frame = 0;
@@ -309,7 +309,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++); // Full Screen cb — update() reads via get_element(5)
         cb->x = 4+16;
-        cb->y = base_y + 8;
+        cb->y = base_y + 4;   // adjacent to Auto-open MIDI; matches F11 tight checkbox stack
         cb->xsize = 3;
         cb->value = &zt_config_globals.full_screen;
         cb->frame = 0;
@@ -485,9 +485,9 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(TRACKS_ROW_Y+3),"      Prebuffer",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+5),"  Panic on stop",COLORS.Text,S);
         // "MIDI-IN Slave" label intentionally omitted — see F11 (Songconfig).
-        print(row(4),col(TRACKS_ROW_Y+7)," Auto-open MIDI",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+6)," Auto-open MIDI",COLORS.Text,S);
 
-        print(row(4),col(TRACKS_ROW_Y+11),"    Full Screen",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+7),"    Full Screen",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
         print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);
