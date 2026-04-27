@@ -1024,7 +1024,7 @@ void CheckBox::draw(Drawable *S, int active) {
     TColor f,b;
     const char *str;
     if (*value)
-        str = "On ";
+        str = "On";
     else
         str = "Off";
     // Visible chip width derives from the string length so the dark
@@ -1032,12 +1032,13 @@ void CheckBox::draw(Drawable *S, int active) {
     // Both "Off" and "On " are 3 chars, so it's a single source of
     // truth: change the strings and every checkbox in the app follows.
     const int chip_w = (int)strlen(str);
-    // If the caller's reserved xsize is wider than the visible chip,
-    // wipe the trailing cells back to page background so old "On  "
-    // pixels don't linger after a redraw. Only the cy row — wiping the
-    // rows above and below clobbers neighbouring UI elements.
-    if (xsize > chip_w) {
-        for (cx = x + chip_w; cx < x + xsize; cx++) {
+    // Wipe trailing cells back to page background. Covers both the
+    // caller-reserved xsize beyond the chip AND the Off->On transition
+    // where the chip shrinks 3->2 and the old "f" cell would otherwise
+    // linger. Min wipe extent is 3 (Off width).
+    const int wipe_end = (xsize > 3) ? xsize : 3;
+    if (wipe_end > chip_w) {
+        for (cx = x + chip_w; cx < x + wipe_end; cx++) {
             printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.Background,S);
         }
     }
