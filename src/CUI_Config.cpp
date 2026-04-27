@@ -101,9 +101,9 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,6);
-    // "Row highlight minor" label is 19 chars at col 2, so the slider
-    // starts at col 22.
-    vs->x = 22;
+    // Row highlight + Row lowlight share row 21. Labels right-align to
+    // end col 18 / col 59 (1-char gap before each slider at x=20 / x=60).
+    vs->x = 20;
     vs->y = 21;
     vs->xsize = 13;
     vs->ysize = 1;
@@ -113,11 +113,6 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,7);
-    // Pair with the minor-row slider on row 22. Layout:
-    //   col 2..20  "Row highlight minor" label
-    //   col 22..34 minor slider, col 35..38 readout
-    //   col 40..58 "Row highlight major" label
-    //   col 60..72 major slider, col 73..76 readout
     vs->x = 60;
     vs->y = 21;
     vs->xsize = 13;
@@ -136,31 +131,11 @@ CUI_Config::CUI_Config(void) {
     vs->min = 1;
     vs->max = 256;
 
-    // MIDI realtime sync toggles. The underlying flags already exist in
-    // zt.conf but were previously only reachable via the Sysconfig page;
-    // expose them here so Global Config (F12) covers the full config set.
-    // MIDI In Sync + Chase MIDI Tempo moved to F11 (Songconfig). Keep
-    // the elements here as off-screen no-tab-stops so the existing
-    // get_element(N) index numbering in update()/draw() doesn't break.
-    cb = new CheckBox;
-    UI->add_element(cb, 9);
-    cb->frame = 0;
-    cb->x = 0; cb->y = 0; cb->xsize = 0;
-    cb->value = &zt_config_globals.midi_in_sync;
-    cb->no_tab_stop = 1;
-
-    cb = new CheckBox;
-    UI->add_element(cb, 10);
-    cb->frame = 0;
-    cb->x = 0; cb->y = 0; cb->xsize = 0;
-    cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
-    cb->no_tab_stop = 1;
-
     // Post-Load Page: where to land after a successful song load.
     // Slider with an inline label name (Inst/Pattern/Songconf) drawn
     // by draw() — same idiom as View Mode above.
     vs = new ValueSlider;
-    UI->add_element(vs, 11);
+    UI->add_element(vs, 9);
     vs->x = 20;
     vs->y = 24;
     vs->xsize = 15;
@@ -170,10 +145,10 @@ CUI_Config::CUI_Config(void) {
     vs->max = POST_LOAD_PAGE_COUNT - 1;
 
     b = new Button;
-    // Tab order: Page-switch button is the LAST element so DOWN-arrow
-    // from the bottom of the config list wraps cleanly back to Autoload
-    // .ZT (tabindex 0) instead of jumping past the MIDI rows.
-    UI->add_element(b,12);
+    // Tab order: Page-switch button is the LAST tab-stop element so
+    // DOWN-arrow from the bottom of the config list wraps cleanly back
+    // to Autoload .ZT (tabindex 0).
+    UI->add_element(b,10);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
     b->xsize = 18;
     b->x = 2;
@@ -230,10 +205,10 @@ CUI_Config::CUI_Config(void) {
 */
 
     tb = new TextBox;
-    UI->add_element(tb, 9);
+    UI->add_element(tb, 11);
     tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
     tb->x = 1;
-    tb->y = 28;
+    tb->y = 26;
     tb->xsize = 78;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
@@ -326,7 +301,7 @@ void CUI_Config::update() {
         zt_config_globals.pattern_length = vs->value;
     }
 
-    vs = (ValueSlider *)UI->get_element(11);
+    vs = (ValueSlider *)UI->get_element(9);
     if (vs && vs->value != zt_config_globals.post_load_page) {
         zt_config_globals.post_load_page = vs->value;
     }
@@ -374,8 +349,8 @@ void CUI_Config::draw(Drawable *S) {
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         sprintf(buf+strlen(buf),"\n|U| View Mode       |L|[|H|%s|L|]",view_mode_name);
 #endif
-        sprintf(buf+strlen(buf),"\n|U| Row hl minor    |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Row hl major    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Row highlight   |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
+        sprintf(buf+strlen(buf),"\n|U| Row lowlight    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
         sprintf(buf+strlen(buf),"\n|U| Pattern Len     |L|[|H|%d|L|]",zt_config_globals.pattern_length);
         sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
@@ -442,7 +417,7 @@ void CUI_Config::draw(Drawable *S) {
         // Mode pattern above — slider value alone reads as 0/1/2 which
         // is meaningless to the user without the page name beside it).
         {
-            ValueSlider *vs = (ValueSlider *)UI->get_element(11);
+            ValueSlider *vs = (ValueSlider *)UI->get_element(9);
             if (vs) {
                 const char *post_load_name = "Inst Editor";
                 switch (zt_config_globals.post_load_page) {
@@ -460,19 +435,20 @@ void CUI_Config::draw(Drawable *S) {
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
-        print(row(2),col(14),"Autoload .ZT",COLORS.Text,S);
+        // Labels right-align so text ends at col 18 (1-char gap before
+        // the col-20 controls).
+        print(row(7),col(14),"Autoload .ZT",COLORS.Text,S);
         print(row(28),col(14),"Autoload File",COLORS.Text,S);
-        print(row(2),col(16),"Default Dir",COLORS.Text,S);
-        print(row(2),col(18),"Record Velocity",COLORS.Text,S);
-        print(row(2),col(19),"Autosave (sec)",COLORS.Text,S);
+        print(row(8),col(16),"Default Dir",COLORS.Text,S);
+        print(row(4),col(18),"Record Velocity",COLORS.Text,S);
+        print(row(5),col(19),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(2),col(20),"Default View",COLORS.Text,S);
+        print(row(7),col(20),"Default View",COLORS.Text,S);
 #endif
-        print(row(2),col(21),"Row highlight minor",COLORS.Text,S);
-        print(row(40),col(21),"Row highlight major",COLORS.Text,S);
-        print(row(2),col(23),"Default Pat Len",COLORS.Text,S);
-        // MIDI In Sync + Chase MIDI Tempo labels moved to F11 (Songconfig).
-        print(row(2),col(24),"Post-Load Page",COLORS.Text,S);
+        print(row(6),col(21),"Row highlight",COLORS.Text,S);
+        print(row(48),col(21),"Row lowlight",COLORS.Text,S);
+        print(row(4),col(23),"Default Pat Len",COLORS.Text,S);
+        print(row(5),col(24),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
