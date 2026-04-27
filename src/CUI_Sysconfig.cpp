@@ -40,11 +40,16 @@ void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
     
 }
 
+// All captions are exactly 15 chars (= button xsize) and centred so the
+// visible text sits in the same column for every device state.
+//   "Open device"   (11) -> "  Open device  " (2 + 11 + 2)
+//   "Forget device" (13) -> " Forget device " (1 + 13 + 1)
+//   "Close device"  (12) -> " Close device  " (1 + 12 + 2)
 static const char *get_midi_out_action_caption()
 {
     LBNode *selected = midioutdevlist ? midioutdevlist->getNode(midioutdevlist->getCurrentItemIndex()) : NULL;
     if (!selected) {
-        return " Open device   ";
+        return "  Open device  ";
     }
     if (selected->int_data < 0) {
         return " Forget device ";
@@ -52,14 +57,14 @@ static const char *get_midi_out_action_caption()
     if (MidiOut->QueryDevice(selected->int_data)) {
         return " Close device  ";
     }
-    return " Open device   ";
+    return "  Open device  ";
 }
 
 static const char *get_midi_in_action_caption()
 {
     LBNode *selected = midiindevlist ? midiindevlist->getNode(midiindevlist->getCurrentItemIndex()) : NULL;
     if (!selected) {
-        return " Open device   ";
+        return "  Open device  ";
     }
     if (selected->int_data < 0) {
         return " Forget device ";
@@ -67,7 +72,7 @@ static const char *get_midi_in_action_caption()
     if (MidiIn->QueryDevice(selected->int_data)) {
         return " Close device  ";
     }
-    return " Open device   ";
+    return "  Open device  ";
 }
 
 static void sync_midi_action_buttons()
@@ -375,10 +380,10 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         b = new Button;
         UI->add_element(b,tabindex++);
-        b->caption = " Open device   ";
-        b->x = 4+21;
+        b->caption = "  Open device  ";
+        b->x = 4+20;       // right edge ends at col 39 (= MIDI In list end)
         b->y = 45;
-        b->xsize = 14;
+        b->xsize = 15;     // matches caption length so text never gets truncated
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiInDevice;
         midiin_action_button = b;
@@ -403,26 +408,30 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         b = new Button;
         UI->add_element(b,tabindex++);
-        b->caption = " Open device   ";
-        b->x = 4+21+37;
+        b->caption = "  Open device  ";
+        b->x = 4+20+37;   // align left edge with MIDI Out list (4+37=41) shifted by +20 chars to space the button
         b->y = 45;
-        b->xsize = 14;
+        b->xsize = 15;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
         midiout_action_button = b;
 
+        // Latency / Bank / Alias share the right half (col 41..76, matching
+        // the MIDI Out list / Open device button width). Labels start at
+        // col 41 (left-aligned with list); values follow each label and
+        // extend to col 76.
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
-        vs->x = 20+37;
+        vs->x = 49;        // after "Latency " label (cols 41..48)
         vs->y = 47;
-        vs->xsize = 15;
+        vs->xsize = 27;    // ends col 76 — matches list right edge
         vs->ysize = 1;
         vs->min = 0;
         vs->max = 255;
 
         cb = new BankSelectCheckBox(ml);
         UI->add_element(cb,tabindex++);
-        cb->x = 26+37;
+        cb->x = 61;        // after "Reverse Bank Select " label (cols 41..60)
         cb->y = 49;
         cb->xsize = 3;
         cb->frame = 0;
@@ -430,17 +439,10 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti = new AliasTextInput(ml);
         UI->add_element(ti,tabindex++);
         ti->frame = 1;
-        ti->x = 20+37;
+        ti->x = 54;        // after "Device Alias " label (cols 41..53)
         ti->y = 51;
-        // Alias visible width must fit between x=57 and the right edge.
-        // Default 640px screen = 80 cols, so available = 80-57-1 = 22.
-        // Wider screens get more room. The buffer (length) holds up to
-        // 41 chars regardless — TextInput scrolls horizontally.
-        {
-            const int avail = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 57 - 1;
-            ti->xsize  = (avail > 42) ? 42 : (avail > 1 ? avail : 1);
-            ti->length = 41;
-        }
+        ti->xsize = 22;    // ends col 76 — matches list right edge
+        ti->length = 41;   // buffer still fits a long alias; field scrolls horizontally
 
         ml->lvs = vs;  // link midi out list to latency value slider
         ml->bscb = cb; // link midi out list to bank select checkbox
@@ -516,9 +518,10 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(28),"MIDI In Device Selection",COLORS.Text,S);
         print(row(4+37),col(28),"MIDI Out Device Selection",COLORS.Text,S);
 
-        print(row(5+37),col(47),"Latency ",COLORS.Text,S);
-        print(row(5+37),col(49),"Reverse Bank Select ",COLORS.Text,S);
-        print(row(5+37),col(51),"Device Alias",COLORS.Text,S);
+        // Labels left-aligned to col 41 (= MIDI Out list left edge).
+        print(row(4+37),col(47),"Latency",COLORS.Text,S);
+        print(row(4+37),col(49),"Reverse Bank Select",COLORS.Text,S);
+        print(row(4+37),col(51),"Device Alias",COLORS.Text,S);
         
         need_refresh = 0;
         updated=2;
