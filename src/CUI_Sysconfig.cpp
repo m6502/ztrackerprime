@@ -281,7 +281,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 16;
         cb->y = base_y + 2;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &zt_config_globals.auto_send_panic;
         cb->frame = 1;
 
@@ -302,16 +302,15 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 16;
         cb->y = base_y + 6;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &zt_config_globals.auto_open_midi;
         cb->frame = 1;
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++); // Full Screen cb — update() reads via get_element(5)
-        cb->frame = 0;
         cb->x = 4+16;
         cb->y = base_y + 8;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &zt_config_globals.full_screen;
         cb->frame = 1;
 
@@ -385,10 +384,9 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         cb = new BankSelectCheckBox(ml);
         UI->add_element(cb,tabindex++);
-        cb->frame = 0;
         cb->x = 26;
         cb->y = 49;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->frame = 1;
 
         ti = new AliasTextInput(ml);

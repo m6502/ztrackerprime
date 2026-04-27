@@ -926,6 +926,10 @@ void TextInput::draw(Drawable *S, int active) {
 //
 CheckBox::CheckBox(void) {
     value = NULL;
+    // Default chip width: "Off" (3 chars) is the widest visible state.
+    // Callers can override but should not exceed 3 — wider values cause a
+    // trailing wipe-to-background that can render slightly off the page bg.
+    xsize = 3;
 }
 
 
@@ -1032,11 +1036,12 @@ void CheckBox::draw(Drawable *S, int active) {
     // Both "Off" and "On " are 3 chars, so it's a single source of
     // truth: change the strings and every checkbox in the app follows.
     const int chip_w = (int)strlen(str);
-    // Wipe trailing cells back to page background. Covers both the
-    // caller-reserved xsize beyond the chip AND the Off->On transition
-    // where the chip shrinks 3->2 and the old "f" cell would otherwise
-    // linger. Min wipe extent is 3 (Off width).
-    const int wipe_end = (xsize > 3) ? xsize : 3;
+    // Visible chip is always chip_w cells wide ("Off"=3, "On"=2). Wipe
+    // up to "Off" width so an Off->On transition clears the stale "f"
+    // cell. Caller-supplied xsize is for the click area only — never
+    // expand the painted region beyond chip_w, since the wipe color may
+    // not match every page's background and would render as a bleed.
+    const int wipe_end = 3;
     if (wipe_end > chip_w) {
         for (cx = x + chip_w; cx < x + wipe_end; cx++) {
             printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.Background,S);

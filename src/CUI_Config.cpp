@@ -35,10 +35,9 @@ CUI_Config::CUI_Config(void) {
 
     cb = new CheckBox;
     UI->add_element(cb,0);
-    cb->frame = 0;
     cb->x = 20;
     cb->y = 14;
-    cb->xsize = 5;
+    cb->xsize = 3;
     cb->value = &zt_config_globals.autoload_ztfile;
     cb->frame = 1;
 
@@ -64,10 +63,9 @@ CUI_Config::CUI_Config(void) {
 
     cb = new CheckBox;
     UI->add_element(cb,3);
-    cb->frame = 0;
     cb->x = 20;
     cb->y = 18;
-    cb->xsize = 5;
+    cb->xsize = 3;
     cb->value = &zt_config_globals.record_velocity;
     cb->frame = 1;
 

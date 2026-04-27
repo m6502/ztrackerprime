@@ -61,7 +61,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_centered->frame = 0;
         cb_centered->x = (start_x / 8) + 17;
         cb_centered->y = (start_y / 8) + 14;
-        cb_centered->xsize = 5;
+        cb_centered->xsize = 3;
         cb_centered->value = &zt_config_globals.centered_editing;
         cb_centered->frame = 1;
 
@@ -70,7 +70,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_stepedit->frame = 0;
         cb_stepedit->x = (start_x / 8) + 17 + 16;
         cb_stepedit->y = (start_y / 8) + 14;
-        cb_stepedit->xsize = 5;
+        cb_stepedit->xsize = 3;
         cb_stepedit->value = &zt_config_globals.step_editing;
         cb_stepedit->frame = 1;
 
@@ -79,7 +79,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_recveloc->frame = 0;
         cb_recveloc->x = (start_x / 8) + 17 + 32;
         cb_recveloc->y = (start_y / 8) + 14;
-        cb_recveloc->xsize = 5;
+        cb_recveloc->xsize = 3;
         cb_recveloc->value = &zt_config_globals.record_velocity;
         cb_recveloc->frame = 1;
 
@@ -101,7 +101,7 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_drawmode->frame = 1;
         cb_drawmode->x = (start_x / 8) + 17;
         cb_drawmode->y = (start_y / 8) + 18;
-        cb_drawmode->xsize = 5;
+        cb_drawmode->xsize = 3;
         cb_drawmode->value = &drawmode_val;
 }
 
