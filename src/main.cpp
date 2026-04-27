@@ -1570,7 +1570,18 @@ void global_keys(Drawable *S)
 
 #ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
                 // ----------------------------------------------
-                case SDLK_F4: command=CMD_SWITCH_MIDIMACEDIT; break;
+                // F4 from anywhere -> MIDI Macro editor.
+                // F4 while already on MIDI Macro -> Arpeggio editor.
+                // F4 while already on Arpeggio -> back to MIDI Macro.
+                // (Shift+F4 always jumps directly to Arpeggio.)
+                case SDLK_F4:
+                    if (cur_state == STATE_MIDIMACEDIT)
+                        command = CMD_SWITCH_ARPEDIT;
+                    else if (cur_state == STATE_ARPEDIT)
+                        command = CMD_SWITCH_MIDIMACEDIT;
+                    else
+                        command = CMD_SWITCH_MIDIMACEDIT;
+                    break;
 #endif
                 // ----------------------------------------------
                 case SDLK_F5: command = CMD_PLAY;           break;

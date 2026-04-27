@@ -9,7 +9,7 @@
  *   a name + a sequence of unsigned-short slots terminated by
  *   ZTM_MIDIMAC_END (0x100). Each slot is either:
  *     - a raw byte 0x00..0xFF (sent as part of a packed short MIDI msg)
- *     - ZTM_MIDIMAC_PARAM1 (0x101) — substituted at runtime by the
+ *     - ZTM_MIDIMAC_PARAM1 (0x101) -- substituted at runtime by the
  *       yy of a Zxxyy pattern effect.
  *
  *   On disk: zt_module::build_MIDI_macro / load_MIDI_macro round-trip
@@ -97,7 +97,7 @@ static void mm_store_name(int slot) {
 }
 
 // ---------------------------------------------------------------------------
-// Presets — applied to current slot via 'P' key
+// Presets -- applied to current slot via 'P' key
 
 struct mm_preset { const char *name; const unsigned short *data; int len; };
 
@@ -169,13 +169,13 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     ValueSlider *vs;
     TextInput   *ti;
 
-    // 0 — Slot
+    // 0 -- Slot
     vs = new ValueSlider;
     UI->add_element(vs, 0);
     vs->x = 12; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MAX_MIDIMACROS - 1; vs->value = 0;
 
-    // 1 — Name
+    // 1 -- Name
     ti = new TextInput;
     UI->add_element(ti, 1);
     ti->frame = 1;
@@ -183,13 +183,13 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     ti->xsize = 32; ti->length = ZTM_MIDIMACRONAME_MAXLEN - 1;
     ti->str = (unsigned char*)mm_name_buf;
 
-    // 2 — Length
+    // 2 -- Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
     vs->x = 12; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MIDIMACRO_MAXLEN - 1; vs->value = 0;
 
-    // 3 — Grid focus stub (real UIE so Tab can land here)
+    // 3 -- Grid focus stub (real UIE so Tab can land here)
     MmGridFocus *gf = new MmGridFocus;
     UI->add_element(gf, GRID_ID);
     gf->x = DATA_X; gf->y = DATA_Y;
@@ -316,7 +316,7 @@ void CUI_Midimacroeditor::update() {
         }
     }
 
-    // Grid input — only when focus is parked on the grid stub.
+    // Grid input -- only when focus is parked on the grid stub.
     if (focused == GRID_ID) {
         KBKey key = Keys.checkkey();
         int kstate = Keys.getstate();
@@ -470,7 +470,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     draw_status(S);
     {
         const char *t = file_changed
-            ? "MIDI Macro Editor (F4) [modified — Ctrl+S to save]"
+            ? "MIDI Macro Editor (F4) [modified -- Ctrl+S to save]"
             : "MIDI Macro Editor (F4)";
         printtitle(PAGE_TITLE_ROW_Y, t, COLORS.Text, COLORS.Background, S);
     }
@@ -486,7 +486,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     // On-page hint above the grid header.
     // Two-line header explaining how the macro is invoked from a
     // pattern. Without this the user has no way to know that the
-    // bytes below ever fire — a Z effect in the pattern editor is
+    // bytes below ever fire -- a Z effect in the pattern editor is
     // what triggers them.
     {
         char invoke[96];
@@ -544,7 +544,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         }
     }
 
-    // Cursor highlight — drawn whenever the grid stub holds focus.
+    // Cursor highlight -- drawn whenever the grid stub holds focus.
     // The cell value is preserved (dark text on yellow background)
     // and the active hex digit gets an extra inverse highlight
     // (yellow text on dark background) so the user can see which

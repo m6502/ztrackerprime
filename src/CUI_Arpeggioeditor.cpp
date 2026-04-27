@@ -172,13 +172,13 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ValueSlider *vs;
     TextInput   *ti;
 
-    // 0 — Slot
+    // 0 -- Slot
     vs = new ValueSlider;
     UI->add_element(vs, 0);
     vs->x = 12; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MAX_ARPEGGIOS - 1; vs->value = 0;
 
-    // 1 — Name
+    // 1 -- Name
     ti = new TextInput;
     UI->add_element(ti, 1);
     ti->frame = 1;
@@ -186,31 +186,31 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ti->xsize = 32; ti->length = ZTM_ARPEGGIONAME_MAXLEN - 1;
     ti->str = (unsigned char*)ar_name_buf;
 
-    // 2 — Length
+    // 2 -- Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
     vs->x = 12; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = ZTM_ARPEGGIO_LEN; vs->value = 1;
 
-    // 3 — Speed
+    // 3 -- Speed
     vs = new ValueSlider;
     UI->add_element(vs, 3);
     vs->x = 12; vs->y = BASE_Y + 5; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = 255; vs->value = 1;
 
-    // 4 — Repeat
+    // 4 -- Repeat
     vs = new ValueSlider;
     UI->add_element(vs, 4);
     vs->x = 12; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1; vs->value = 0;
 
-    // 5 — NumCC
+    // 5 -- NumCC
     vs = new ValueSlider;
     UI->add_element(vs, 5);
     vs->x = 12; vs->y = BASE_Y + 7; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC; vs->value = 0;
 
-    // 6..9 — CC#
+    // 6..9 -- CC#
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
         vs = new ValueSlider;
         UI->add_element(vs, 6 + i);
@@ -219,7 +219,7 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
         vs->min = 0; vs->max = 127; vs->value = 0;
     }
 
-    // 10 — Grid focus stub
+    // 10 -- Grid focus stub
     ArGridFocus *gf = new ArGridFocus;
     UI->add_element(gf, GRID_ID);
     gf->x = GRID_X; gf->y = GRID_Y;
@@ -364,7 +364,7 @@ void CUI_Arpeggioeditor::update() {
         if (ar_view_top > ar_cur_step) ar_view_top = ar_cur_step;
     }
 
-    // Page-level P / Shift+Del / Ctrl+Del — work from any focus that
+    // Page-level P / Shift+Del / Ctrl+Del -- work from any focus that
     // isn't the Name TextInput. Without this, pressing P on a slider
     // wedges the app: the slider doesn't consume P, the grid handler
     // only fires on the grid stub, so the keypress sticks in the
@@ -588,7 +588,7 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     draw_status(S);
     {
         const char *t = file_changed
-            ? "Arpeggio Editor (Shift+F4) [modified — Ctrl+S to save]"
+            ? "Arpeggio Editor (Shift+F4) [modified -- Ctrl+S to save]"
             : "Arpeggio Editor (Shift+F4)";
         printtitle(PAGE_TITLE_ROW_Y, t, COLORS.Text, COLORS.Background, S);
     }
