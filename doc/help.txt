@@ -106,9 +106,10 @@
  F2             : Pattern editor - Pressing F2 again while in the pattern
               editing screen brings up the pattern settings.
  F3             : Instrument editor
- F4             : Arpeggio editor
- CTRL-M         : Midimacro editor (works everywhere; SHIFT-F4 also works
-              on systems where F-keys are not eaten by the OS)
+ F4             : MIDI Macro editor
+ SHIFT-F4       : Arpeggio editor
+ CTRL-M         : MIDI Macro editor (alternate; works everywhere even on
+              systems where the OS eats plain F-keys)
  CTRL-SHIFT-M   : Quick MIDI export of current song
  F10            : Song message editor
  F5             : Song play (F5 PatternDisplay widget,

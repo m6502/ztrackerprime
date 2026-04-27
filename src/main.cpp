@@ -1425,15 +1425,17 @@ void global_keys(Drawable *S)
                 break;
 
 
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
             case SDLK_F4:
-                // Any combination involving Shift+F4 opens the Midimacro
-                // editor. Plain Shift-F4 (no other modifier) is the
-                // simplest path and avoids every OS-level F-key shortcut
-                // (macOS Cmd-F4 zoom, Linux/Win Alt-F4 close-window).
-                // Shift+Ctrl+F4, Shift+Cmd+F4, Shift+Alt+F4 also work.
+                // Shift+F4 opens the Arpeggio editor. Plain F4 (handled
+                // in the no-modifier block below) opens the MIDI Macro
+                // editor — the more commonly used of the two. Shift+
+                // Ctrl/Cmd/Alt+F4 also work as long as Shift is held,
+                // since Shift+F4 sidesteps every OS-level F-key
+                // shortcut (macOS Cmd-F4 zoom, Linux/Win Alt-F4
+                // close-window).
                 if (kstate & KS_SHIFT) {
-                    command=CMD_SWITCH_MIDIMACEDIT;
+                    command=CMD_SWITCH_ARPEDIT;
                 }
                 break;
 #endif
@@ -1566,9 +1568,9 @@ void global_keys(Drawable *S)
                 // ----------------------------------------------
                 case SDLK_F3: command=CMD_SWITCH_IEDIT;     break;
 
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
                 // ----------------------------------------------
-                case SDLK_F4: command=CMD_SWITCH_ARPEDIT;   break;
+                case SDLK_F4: command=CMD_SWITCH_MIDIMACEDIT; break;
 #endif
                 // ----------------------------------------------
                 case SDLK_F5: command = CMD_PLAY;           break;
