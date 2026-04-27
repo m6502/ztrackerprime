@@ -19,16 +19,25 @@
  *   On disk: zt_module::build_arpeggio / load_arpeggio (ARPG chunk)
  *   round-trip these structures through .zt save/load.
  *
- *   UI layout (one slider per row to avoid the readout-collision the
- *   two-column layout caused before):
+ *   UI layout (one slider per row, blank row between each slider for
+ *   breathing room; documentation sits above the grid header to mirror
+ *   the CUI_Midimacroeditor placement):
  *     Slot    [slider]
+ *
  *     Name    [textinput]
+ *
  *     Length  [slider]
+ *
  *     Speed   [slider]
+ *
  *     Repeat  [slider]
+ *
  *     NumCC   [slider]
+ *
  *     CC#:    [s0] [s1] [s2] [s3]
- *     [Apply preset]    <- press P in the grid for preset menu
+ *     Trigger from pattern: R<slot> ...   (highlighted)
+ *     Tab into grid; arrows nav cells; ...
+ *     '.' clear; P=preset; ...
  *
  *     STEP  PIT  C0  C1  ...
  *     000   ...  ... ...
@@ -42,8 +51,8 @@
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define GRID_X          4
-#define GRID_HDR_Y      (BASE_Y + 10)
-#define GRID_Y          (BASE_Y + 11)
+#define GRID_HDR_Y      (BASE_Y + 16)
+#define GRID_Y          (BASE_Y + 17)
 #define GRID_VISIBLE    14
 #define GRID_ID         10
 
@@ -195,26 +204,26 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // 3 -- Speed
     vs = new ValueSlider;
     UI->add_element(vs, 3);
-    vs->x = 12; vs->y = BASE_Y + 5; vs->xsize = 18; vs->ysize = 1;
+    vs->x = 12; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = 255; vs->value = 1;
 
     // 4 -- Repeat
     vs = new ValueSlider;
     UI->add_element(vs, 4);
-    vs->x = 12; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
+    vs->x = 12; vs->y = BASE_Y + 8; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1; vs->value = 0;
 
     // 5 -- NumCC
     vs = new ValueSlider;
     UI->add_element(vs, 5);
-    vs->x = 12; vs->y = BASE_Y + 7; vs->xsize = 18; vs->ysize = 1;
+    vs->x = 12; vs->y = BASE_Y + 10; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC; vs->value = 0;
 
     // 6..9 -- CC#
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
         vs = new ValueSlider;
         UI->add_element(vs, 6 + i);
-        vs->x = 12 + i * 16; vs->y = BASE_Y + 8;
+        vs->x = 12 + i * 16; vs->y = BASE_Y + 12;
         vs->xsize = 8; vs->ysize = 1;
         vs->min = 0; vs->max = 127; vs->value = 0;
     }
@@ -601,10 +610,10 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(6), col(BASE_Y),     "Slot",   COLORS.Text, S);
     print(row(6), col(BASE_Y + 2), "Name",   COLORS.Text, S);
     print(row(4), col(BASE_Y + 4), "Length", COLORS.Text, S);
-    print(row(5), col(BASE_Y + 5), "Speed",  COLORS.Text, S);
-    print(row(4), col(BASE_Y + 6), "Repeat", COLORS.Text, S);
-    print(row(5), col(BASE_Y + 7), "NumCC",  COLORS.Text, S);
-    print(row(7), col(BASE_Y + 8), "CC#",    COLORS.Text, S);
+    print(row(5), col(BASE_Y + 6), "Speed",  COLORS.Text, S);
+    print(row(4), col(BASE_Y + 8), "Repeat", COLORS.Text, S);
+    print(row(5), col(BASE_Y + 10), "NumCC", COLORS.Text, S);
+    print(row(7), col(BASE_Y + 12), "CC#",   COLORS.Text, S);
 
     // Preset indicator (right column, top of page)
     {
@@ -614,12 +623,22 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
     }
 
-    // Trigger info goes BELOW the keys-hint at the bottom of the
-    // page (the hint is at GRID_Y + GRID_VISIBLE + 1). The CC#
-    // sliders draw their decorative borders into the row beneath
-    // them, so anything placed at BASE_Y+9 visually collides with
-    // the slider edges; pushing the trigger info to the bottom
-    // gives it a clean row to itself.
+    // Documentation block above the grid header, mirroring the
+    // CUI_Midimacroeditor layout: highlighted Trigger line first,
+    // then keyboard / action hints.
+    {
+        char hdr[96];
+        snprintf(hdr, sizeof(hdr),
+                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
+                 ar_slot);
+        print(row(4), col(BASE_Y + 13), hdr, COLORS.Highlight, S);
+    }
+    print(row(4), col(BASE_Y + 14),
+          "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch",
+          COLORS.Text, S);
+    print(row(4), col(BASE_Y + 15),
+          "'.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
+          COLORS.Text, S);
 
     // Grid header
     {
@@ -669,31 +688,12 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Hint + trigger info below the grid. The hint is split into two
-    // lines because all of it on a single row used to overflow the
-    // right edge of the screen on the default 1024x768 internal
-    // resolution.
-    {
-        int hint_y = GRID_Y + GRID_VISIBLE + 1;
-        print(row(4), col(hint_y),
-              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch",
-              COLORS.Text, S);
-        print(row(4), col(hint_y + 1),
-              "'.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
-              COLORS.Text, S);
-        char hdr[96];
-        snprintf(hdr, sizeof(hdr),
-                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
-                 ar_slot);
-        print(row(4), col(hint_y + 2), hdr, COLORS.Highlight, S);
-    }
-
-    // Status hint when grid has focus
+    // Status hint when grid has focus -- appears below the grid.
     if (UI->cur_element == GRID_ID) {
         char hint[80];
         snprintf(hint, sizeof(hint), "GRID @ step %03X col %d | Tab to leave | digits=value | P=preset",
                  ar_cur_step, ar_cur_col);
-        printBG(col(2), row(BASE_Y + 9), hint, COLORS.Highlight, COLORS.Background, S);
+        printBG(col(2), row(GRID_Y + GRID_VISIBLE + 1), hint, COLORS.Highlight, COLORS.Background, S);
     }
 
     need_refresh = 0; updated = 2;
