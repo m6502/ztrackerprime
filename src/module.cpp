@@ -664,9 +664,10 @@ arpeggio::arpeggio(void) {
     this->name[0]=0;
     this->repeat_pos=0;
     this->length=0;
-    this->num_cc=ZTM_ARPEGGIO_NUM_CC;
+    this->speed=1;          // sane default; constructor used to leave this uninitialised
+    this->num_cc=0;         // 0 = no CC lanes by default; user opts in via num_cc slider
     for (i=0; i<ZTM_ARPEGGIO_NUM_CC; i++)
-        this->cc[i]=ZTM_ARP_EMPTY_CC;
+        this->cc[i]=0;      // CC# 0 default (was ZTM_ARP_EMPTY_CC=0x80 which is out of slider range)
 
     for (i=0; i<ZTM_ARPEGGIO_LEN; i++) {
         this->pitch[i]=ZTM_ARP_EMPTY_PITCH;

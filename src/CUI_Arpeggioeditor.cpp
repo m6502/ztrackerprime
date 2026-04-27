@@ -6,19 +6,36 @@
  *   The arpeggio editor (Shift+F4).
  *
  *   Each song carries up to ZTM_MAX_ARPEGGIOS (256) arpeggios. Each has
- *   a name, length (number of steps), speed (ticks per step), repeat
- *   position (0..length-1), num_cc (0..ZTM_ARPEGGIO_NUM_CC), an array
- *   of cc[] controller numbers, and per-step pitch[] + ccval[][] tables.
+ *   a name, length (number of steps), speed (subticks per step),
+ *   repeat position (0..length-1), num_cc (0..ZTM_ARPEGGIO_NUM_CC), an
+ *   array of cc[] controller numbers, and per-step pitch[] + ccval[][]
+ *   tables.
  *
- *   pitch[i] is an unsigned short; 0x8000 = ZTM_ARP_EMPTY_PITCH means
- *   "no pitch event at this step". Other values are signed semitone
- *   offsets reinterpreted as int16: bit 15 + sign-extension.
- *
- *   ccval[c][i] is an unsigned char; 0x80 = ZTM_ARP_EMPTY_CCVAL means
- *   "no CC event at this step". Other values are 0..127.
+ *   pitch[i] is unsigned short; 0x8000 (ZTM_ARP_EMPTY_PITCH) = no
+ *   pitch event at this step. Other values are signed semitone offsets
+ *   (reinterpreted as int16). ccval[c][i] is unsigned char; 0x80
+ *   (ZTM_ARP_EMPTY_CCVAL) = no CC event. Other values are 0..127.
  *
  *   On disk: zt_module::build_arpeggio / load_arpeggio (ARPG chunk)
  *   round-trip these structures through .zt save/load.
+ *
+ *   UI layout (one slider per row to avoid the readout-collision the
+ *   two-column layout caused before):
+ *     Slot    [slider]
+ *     Name    [textinput]
+ *     Length  [slider]
+ *     Speed   [slider]
+ *     Repeat  [slider]
+ *     NumCC   [slider]
+ *     CC#:    [s0] [s1] [s2] [s3]
+ *     [Apply preset]    <- press P in the grid for preset menu
+ *
+ *     STEP  PIT  C0  C1  ...
+ *     000   ...  ... ...
+ *
+ *   The data grid is reachable via Tab from the last metadata slider;
+ *   arrows then navigate cells. Tab again leaves the grid back to the
+ *   slot slider.
  *
  ******/
 #include "zt.h"
@@ -28,12 +45,13 @@
 #define GRID_HDR_Y      (BASE_Y + 10)
 #define GRID_Y          (BASE_Y + 11)
 #define GRID_VISIBLE    14
+#define GRID_ID         10
 
-static int  ar_slot     = 0;
-static int  ar_cur_step = 0;
-static int  ar_cur_col  = 0;       // 0 = pitch, 1..num_cc = ccval column
-static int  ar_view_top = 0;
-static int  ar_cur_digit = 0;      // 0=hundreds, 1=tens, 2=ones for pitch / ccval
+static int  ar_slot      = 0;
+static int  ar_cur_step  = 0;
+static int  ar_cur_col   = 0;       // 0 = pitch, 1..num_cc = ccval column
+static int  ar_view_top  = 0;
+static int  ar_cur_digit = 0;       // 0=hundreds, 1=tens, 2=ones
 
 static char ar_name_buf[ZTM_ARPEGGIONAME_MAXLEN] = {0};
 
@@ -42,9 +60,7 @@ static char ar_name_buf[ZTM_ARPEGGIONAME_MAXLEN] = {0};
 
 static arpeggio *ar_ensure(int slot) {
     if (slot < 0 || slot >= ZTM_MAX_ARPEGGIOS) return NULL;
-    if (!song->arpeggios[slot]) {
-        song->arpeggios[slot] = new arpeggio;
-    }
+    if (!song->arpeggios[slot]) song->arpeggios[slot] = new arpeggio;
     return song->arpeggios[slot];
 }
 
@@ -59,7 +75,9 @@ static void ar_load_name(int slot) {
 }
 
 static void ar_store_name(int slot) {
-    if (ar_name_buf[0] == 0 && (!song->arpeggios[slot] || song->arpeggios[slot]->isempty())) return;
+    bool any_text = (ar_name_buf[0] != 0);
+    arpeggio *cur = song->arpeggios[slot];
+    if (!any_text && (!cur || cur->isempty())) return;
     arpeggio *a = ar_ensure(slot);
     if (!a) return;
     if (memcmp(a->name, ar_name_buf, ZTM_ARPEGGIONAME_MAXLEN) != 0) {
@@ -69,7 +87,6 @@ static void ar_store_name(int slot) {
     }
 }
 
-// Format the pitch value for display: "+05", "-03", or "..." for empty.
 static void format_pitch(unsigned short v, char buf[4]) {
     if (v == ZTM_ARP_EMPTY_PITCH) { strcpy(buf, "..."); return; }
     int p = (int16_t)v;
@@ -83,6 +100,68 @@ static void format_ccval(unsigned char v, char buf[4]) {
 }
 
 // ---------------------------------------------------------------------------
+// Presets
+
+struct ar_preset {
+    const char *name;
+    int length;
+    int speed;
+    int repeat_pos;
+    int pitches[16];   // -127..127 or 0x8000 sentinel via cast
+    int len_pitches;
+};
+
+static const ar_preset AR_PRESETS[] = {
+    { "Major Triad Up",        3,  6, 0, { 0, 4, 7 },                  3 },
+    { "Minor Triad Up",        3,  6, 0, { 0, 3, 7 },                  3 },
+    { "Major Triad Up+Octave", 4,  6, 0, { 0, 4, 7, 12 },              4 },
+    { "Octave Bounce",         2,  6, 0, { 0, 12 },                    2 },
+    { "Trill (whole step)",    2,  3, 0, { 0, 2 },                     2 },
+    { "Trill (half step)",     2,  3, 0, { 0, 1 },                     2 },
+    { "Major 7 Chord",         4,  6, 0, { 0, 4, 7, 11 },              4 },
+    { "Minor 7 Chord",         4,  6, 0, { 0, 3, 7, 10 },              4 },
+    { "Major Scale (1 oct)",   8,  4, 0, { 0, 2, 4, 5, 7, 9, 11, 12 }, 8 },
+    { "Minor Scale (1 oct)",   8,  4, 0, { 0, 2, 3, 5, 7, 8, 10, 12 }, 8 },
+};
+static const int AR_PRESET_COUNT = sizeof(AR_PRESETS) / sizeof(AR_PRESETS[0]);
+static int ar_preset_index = 0;
+
+static void ar_apply_preset(int idx) {
+    if (idx < 0 || idx >= AR_PRESET_COUNT) return;
+    arpeggio *a = ar_ensure(ar_slot);
+    if (!a) return;
+    const ar_preset &p = AR_PRESETS[idx];
+    a->length     = p.length;
+    a->speed      = p.speed;
+    a->repeat_pos = p.repeat_pos;
+    a->num_cc     = 0;
+    for (int i = 0; i < ZTM_ARPEGGIO_LEN; ++i) a->pitch[i] = ZTM_ARP_EMPTY_PITCH;
+    for (int i = 0; i < p.len_pitches; ++i)
+        a->pitch[i] = (unsigned short)(int16_t)p.pitches[i];
+    if (a->name[0] == 0) {
+        strncpy(a->name, p.name, ZTM_ARPEGGIONAME_MAXLEN - 1);
+        a->name[ZTM_ARPEGGIONAME_MAXLEN - 1] = 0;
+        memcpy(ar_name_buf, a->name, ZTM_ARPEGGIONAME_MAXLEN);
+    }
+    file_changed++;
+    sprintf(szStatmsg, "Applied preset: %s", p.name);
+    statusmsg = szStatmsg;
+    status_change = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Grid focus stub
+
+namespace {
+class ArGridFocus : public UserInterfaceElement {
+public:
+    ArGridFocus() { xsize = 1; ysize = 1; }
+    int update() override { return 0; }
+    void draw(Drawable *S, int active) override { (void)S; (void)active; }
+};
+} // namespace
+
+// ---------------------------------------------------------------------------
 // Constructor / lifecycle
 
 CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
@@ -91,13 +170,11 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ValueSlider *vs;
     TextInput   *ti;
 
-    // 0 — Slot selector
+    // 0 — Slot
     vs = new ValueSlider;
     UI->add_element(vs, 0);
-    vs->x = 12; vs->y = BASE_Y;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->min = 0; vs->max = ZTM_MAX_ARPEGGIOS - 1;
-    vs->value = 0;
+    vs->x = 12; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
+    vs->min = 0; vs->max = ZTM_MAX_ARPEGGIOS - 1; vs->value = 0;
 
     // 1 — Name
     ti = new TextInput;
@@ -107,49 +184,43 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ti->xsize = 32; ti->length = ZTM_ARPEGGIONAME_MAXLEN - 1;
     ti->str = (unsigned char*)ar_name_buf;
 
-    // 2 — Length (number of steps)
+    // 2 — Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
-    vs->x = 12; vs->y = BASE_Y + 4;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->min = 1; vs->max = ZTM_ARPEGGIO_LEN;
-    vs->value = 1;
+    vs->x = 12; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
+    vs->min = 1; vs->max = ZTM_ARPEGGIO_LEN; vs->value = 1;
 
-    // 3 — Speed (ticks per step)
+    // 3 — Speed
     vs = new ValueSlider;
     UI->add_element(vs, 3);
-    vs->x = 12; vs->y = BASE_Y + 5;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->min = 1; vs->max = 255;
-    vs->value = 1;
+    vs->x = 12; vs->y = BASE_Y + 5; vs->xsize = 18; vs->ysize = 1;
+    vs->min = 1; vs->max = 255; vs->value = 1;
 
-    // 4 — Repeat position
+    // 4 — Repeat
     vs = new ValueSlider;
     UI->add_element(vs, 4);
-    vs->x = 12; vs->y = BASE_Y + 6;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1;
-    vs->value = 0;
+    vs->x = 12; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
+    vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1; vs->value = 0;
 
-    // 5 — num_cc (0..4)
+    // 5 — NumCC
     vs = new ValueSlider;
     UI->add_element(vs, 5);
-    vs->x = 12; vs->y = BASE_Y + 7;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC;
-    vs->value = 0;
+    vs->x = 12; vs->y = BASE_Y + 7; vs->xsize = 18; vs->ysize = 1;
+    vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC; vs->value = 0;
 
-    // 6..9 — CC# selectors (which 4 controllers this arpeggio drives).
-    // Stack on a single row, 4 short sliders with readouts.
+    // 6..9 — CC#
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
         vs = new ValueSlider;
         UI->add_element(vs, 6 + i);
-        vs->x = 12 + i * 16;
-        vs->y = BASE_Y + 8;
+        vs->x = 12 + i * 16; vs->y = BASE_Y + 8;
         vs->xsize = 8; vs->ysize = 1;
-        vs->min = 0; vs->max = 127;
-        vs->value = 0;
+        vs->min = 0; vs->max = 127; vs->value = 0;
     }
+
+    // 10 — Grid focus stub
+    ArGridFocus *gf = new ArGridFocus;
+    UI->add_element(gf, GRID_ID);
+    gf->x = GRID_X; gf->y = GRID_Y;
 }
 
 void CUI_Arpeggioeditor::enter(void) {
@@ -158,16 +229,13 @@ void CUI_Arpeggioeditor::enter(void) {
     ar_load_name(ar_slot);
 
     arpeggio *a = song->arpeggios[ar_slot];
-    ValueSlider *vs;
-    vs = (ValueSlider *)UI->get_element(0); vs->value = ar_slot;
-    vs = (ValueSlider *)UI->get_element(2); vs->value = a ? a->length     : 1;
-    vs = (ValueSlider *)UI->get_element(3); vs->value = a ? a->speed      : 1;
-    vs = (ValueSlider *)UI->get_element(4); vs->value = a ? a->repeat_pos : 0;
-    vs = (ValueSlider *)UI->get_element(5); vs->value = a ? a->num_cc     : 0;
-    for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
-        vs = (ValueSlider *)UI->get_element(6 + i);
-        vs->value = a ? a->cc[i] : 0;
-    }
+    ((ValueSlider *)UI->get_element(0))->value = ar_slot;
+    ((ValueSlider *)UI->get_element(2))->value = a ? a->length     : 1;
+    ((ValueSlider *)UI->get_element(3))->value = a ? a->speed      : 1;
+    ((ValueSlider *)UI->get_element(4))->value = a ? a->repeat_pos : 0;
+    ((ValueSlider *)UI->get_element(5))->value = a ? a->num_cc     : 0;
+    for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
+        ((ValueSlider *)UI->get_element(6 + i))->value = a ? a->cc[i] : 0;
     UI->set_focus(0);
     Keys.flush();
 }
@@ -177,7 +245,6 @@ void CUI_Arpeggioeditor::leave(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Update
 
 void CUI_Arpeggioeditor::update() {
     UI->update();
@@ -194,162 +261,148 @@ void CUI_Arpeggioeditor::update() {
         ar_cur_digit = 0;
         ar_load_name(ar_slot);
         arpeggio *a = song->arpeggios[ar_slot];
-        ValueSlider *v;
-        v = (ValueSlider *)UI->get_element(2); v->value = a ? a->length     : 1;
-        v = (ValueSlider *)UI->get_element(3); v->value = a ? a->speed      : 1;
-        v = (ValueSlider *)UI->get_element(4); v->value = a ? a->repeat_pos : 0;
-        v = (ValueSlider *)UI->get_element(5); v->value = a ? a->num_cc     : 0;
-        for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
-            v = (ValueSlider *)UI->get_element(6 + i);
-            v->value = a ? a->cc[i] : 0;
-        }
+        ((ValueSlider *)UI->get_element(2))->value = a ? a->length     : 1;
+        ((ValueSlider *)UI->get_element(3))->value = a ? a->speed      : 1;
+        ((ValueSlider *)UI->get_element(4))->value = a ? a->repeat_pos : 0;
+        ((ValueSlider *)UI->get_element(5))->value = a ? a->num_cc     : 0;
+        for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
+            ((ValueSlider *)UI->get_element(6 + i))->value = a ? a->cc[i] : 0;
+        ti = (TextInput *)UI->get_element(1);
+        if (ti) ti->cursor = 0;
         need_refresh++;
+        doredraw++;
     }
 
     // Name typed
     ti = (TextInput *)UI->get_element(1);
     if (ti && ti->changed) { ar_store_name(ar_slot); ti->changed = 0; }
 
-    // Sync metadata sliders into the song's arp entry (auto-creating
-    // the entry on first edit). Read the slider values, compare with
-    // the entry's stored values, and write back if they differ.
-    {
-        int v_len    = ((ValueSlider *)UI->get_element(2))->value;
-        int v_speed  = ((ValueSlider *)UI->get_element(3))->value;
-        int v_repeat = ((ValueSlider *)UI->get_element(4))->value;
-        int v_numcc  = ((ValueSlider *)UI->get_element(5))->value;
-        int v_cc[ZTM_ARPEGGIO_NUM_CC];
-        for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k) {
-            v_cc[k] = ((ValueSlider *)UI->get_element(6 + k))->value;
-        }
+    // Metadata sliders → arp entry. Auto-create only when the user
+    // actually moves a slider away from defaults (so just visiting a
+    // slot doesn't allocate empty arpeggios).
+    int v_len    = ((ValueSlider *)UI->get_element(2))->value;
+    int v_speed  = ((ValueSlider *)UI->get_element(3))->value;
+    int v_repeat = ((ValueSlider *)UI->get_element(4))->value;
+    int v_numcc  = ((ValueSlider *)UI->get_element(5))->value;
+    int v_cc[ZTM_ARPEGGIO_NUM_CC];
+    for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k)
+        v_cc[k] = ((ValueSlider *)UI->get_element(6 + k))->value;
 
-        arpeggio *a = song->arpeggios[ar_slot];
-        bool need_create =
-            (!a && (v_len != 1 || v_speed != 1 || v_repeat != 0 || v_numcc != 0
-                    || v_cc[0] || v_cc[1] || v_cc[2] || v_cc[3]));
-        if (need_create) a = ar_ensure(ar_slot);
+    arpeggio *a = song->arpeggios[ar_slot];
+    bool any_change = a && (
+        a->length     != v_len    ||
+        a->speed      != v_speed  ||
+        a->repeat_pos != v_repeat ||
+        a->num_cc     != v_numcc  ||
+        a->cc[0] != (unsigned char)v_cc[0] ||
+        a->cc[1] != (unsigned char)v_cc[1] ||
+        a->cc[2] != (unsigned char)v_cc[2] ||
+        a->cc[3] != (unsigned char)v_cc[3]);
+    bool create_now = !a && (v_len != 1 || v_speed != 1 || v_repeat != 0 || v_numcc != 0
+                             || v_cc[0] || v_cc[1] || v_cc[2] || v_cc[3]);
+    if (create_now) { a = ar_ensure(ar_slot); any_change = true; }
 
-        if (a) {
-            if (a->length     != v_len)    { a->length     = v_len;    file_changed++; need_refresh++; }
-            if (a->speed      != v_speed)  { a->speed      = v_speed;  file_changed++; need_refresh++; }
-            if (a->repeat_pos != v_repeat) { a->repeat_pos = v_repeat; file_changed++; need_refresh++; }
-            if (a->num_cc     != v_numcc)  { a->num_cc     = v_numcc;  file_changed++; need_refresh++; }
-            for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k) {
-                if (a->cc[k] != (unsigned char)v_cc[k]) {
-                    a->cc[k] = (unsigned char)v_cc[k];
-                    file_changed++; need_refresh++;
-                }
-            }
-        }
+    if (a && any_change) {
+        a->length     = v_len;
+        a->speed      = v_speed;
+        a->repeat_pos = v_repeat;
+        a->num_cc     = v_numcc;
+        for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k)
+            a->cc[k] = (unsigned char)v_cc[k];
+        file_changed++;
+        need_refresh++;
     }
 
-    // Grid keybindings: only fire when focus is parked on a non-input
-    // tab stop. Sliders and the name TextInput already eat digits/arrows
-    // for their own use, so we only run grid input when no UI element
-    // currently holds focus (cur_element == -1) — the user can press
-    // Tab past the last slider to reach the grid.
-    KBKey key = Keys.checkkey();
+    // Grid input
     int focused = UI->cur_element;
-    bool on_grid = (focused < 0) || (focused >= 10);
-    if (key && on_grid) {
-        arpeggio *a = song->arpeggios[ar_slot];
-        int len     = a ? a->length : 1;
-        int num_cc  = a ? a->num_cc : 0;
-        int max_col = num_cc;   // pitch col 0, then num_cc cc cols
+    if (focused == GRID_ID) {
+        KBKey key = Keys.checkkey();
+        int kstate = Keys.getstate();
+        arpeggio *aa = song->arpeggios[ar_slot];
+        int len     = aa ? aa->length : 1;
+        int num_cc  = aa ? aa->num_cc : 0;
+        int max_col = num_cc;
         bool consumed = false;
 
-        // Decimal digit input → write into current cell at digit position.
-        int digit = -1;
-        if (key >= SDLK_0 && key <= SDLK_9) digit = key - SDLK_0;
-
-        if (digit >= 0) {
-            arpeggio *aa = ar_ensure(ar_slot);
-            if (aa && ar_cur_step < len) {
-                if (ar_cur_col == 0) {
-                    // pitch — 3-digit signed semitone, but treat as
-                    // unsigned 0..ZTM_ARPEGGIO_LEN range and let user
-                    // type the value directly.
-                    int p = (int16_t)aa->pitch[ar_cur_step];
-                    if (aa->pitch[ar_cur_step] == ZTM_ARP_EMPTY_PITCH) p = 0;
-                    if (p < 0) p = -p;
-                    if      (ar_cur_digit == 0) p = (p % 100) + digit * 100;
-                    else if (ar_cur_digit == 1) p = (p / 100) * 100 + digit * 10 + (p % 10);
-                    else                         p = (p / 10) * 10 + digit;
-                    if (p > 127) p = 127;
-                    // preserve sign from existing
-                    int existing = (int16_t)aa->pitch[ar_cur_step];
-                    if (existing < 0 && aa->pitch[ar_cur_step] != ZTM_ARP_EMPTY_PITCH) p = -p;
-                    aa->pitch[ar_cur_step] = (unsigned short)(int16_t)p;
-                } else {
-                    int c = ar_cur_col - 1;
-                    int v = aa->ccval[c][ar_cur_step];
-                    if (v == ZTM_ARP_EMPTY_CCVAL) v = 0;
-                    if      (ar_cur_digit == 0) v = (v % 100) + digit * 100;
-                    else if (ar_cur_digit == 1) v = (v / 100) * 100 + digit * 10 + (v % 10);
-                    else                         v = (v / 10) * 10 + digit;
-                    if (v > 127) v = 127;
-                    aa->ccval[c][ar_cur_step] = (unsigned char)v;
-                }
-                ar_cur_digit = (ar_cur_digit + 1) % 3;
-                if (ar_cur_digit == 0 && ar_cur_step < len - 1) ar_cur_step++;
-                file_changed++;
-                consumed = true;
-            }
-        }
-        else if (key == SDLK_MINUS && ar_cur_col == 0) {
-            // Negate pitch sign
-            arpeggio *aa = ar_ensure(ar_slot);
-            if (aa && ar_cur_step < len) {
-                int p = (int16_t)aa->pitch[ar_cur_step];
-                if (aa->pitch[ar_cur_step] == ZTM_ARP_EMPTY_PITCH) p = 0;
-                aa->pitch[ar_cur_step] = (unsigned short)(int16_t)(-p);
-                file_changed++;
-                consumed = true;
-            }
-        }
-        else if (key == SDLK_PERIOD || key == SDLK_DELETE) {
-            arpeggio *aa = ar_ensure(ar_slot);
-            if (aa && ar_cur_step < len) {
-                if (ar_cur_col == 0)
-                    aa->pitch[ar_cur_step] = ZTM_ARP_EMPTY_PITCH;
-                else
-                    aa->ccval[ar_cur_col - 1][ar_cur_step] = ZTM_ARP_EMPTY_CCVAL;
-                ar_cur_digit = 0;
-                if (ar_cur_step < len - 1) ar_cur_step++;
-                file_changed++;
-                consumed = true;
-            }
+        if (!key) { /* idle */ }
+        else if (key == SDLK_P && !(kstate & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            ar_preset_index = (ar_preset_index + 1) % AR_PRESET_COUNT;
+            ar_apply_preset(ar_preset_index);
+            arpeggio *na = song->arpeggios[ar_slot];
+            ((ValueSlider *)UI->get_element(2))->value = na->length;
+            ((ValueSlider *)UI->get_element(3))->value = na->speed;
+            ((ValueSlider *)UI->get_element(4))->value = na->repeat_pos;
+            ((ValueSlider *)UI->get_element(5))->value = na->num_cc;
+            consumed = true;
         }
         else {
-            switch (key) {
-                case SDLK_LEFT:
-                    if (ar_cur_col > 0) ar_cur_col--;
-                    ar_cur_digit = 0; consumed = true; break;
-                case SDLK_RIGHT:
-                    if (ar_cur_col < max_col) ar_cur_col++;
-                    ar_cur_digit = 0; consumed = true; break;
-                case SDLK_UP:
-                    if (ar_cur_step > 0) ar_cur_step--;
-                    ar_cur_digit = 0; consumed = true; break;
-                case SDLK_DOWN:
-                    if (ar_cur_step < len - 1) ar_cur_step++;
-                    ar_cur_digit = 0; consumed = true; break;
-                case SDLK_PAGEUP:
-                    ar_cur_step -= GRID_VISIBLE;
-                    if (ar_cur_step < 0) ar_cur_step = 0;
-                    ar_cur_digit = 0; consumed = true; break;
-                case SDLK_PAGEDOWN:
-                    ar_cur_step += GRID_VISIBLE;
-                    if (ar_cur_step >= len) ar_cur_step = len - 1;
-                    ar_cur_digit = 0; consumed = true; break;
-                case SDLK_HOME:
-                    ar_cur_step = 0; ar_cur_digit = 0; consumed = true; break;
-                case SDLK_END:
-                    ar_cur_step = len - 1; ar_cur_digit = 0; consumed = true; break;
+            int digit = -1;
+            if (key >= SDLK_0 && key <= SDLK_9) digit = key - SDLK_0;
+
+            if (digit >= 0 && ar_cur_step < len) {
+                arpeggio *aw = ar_ensure(ar_slot);
+                if (aw) {
+                    if (ar_cur_col == 0) {
+                        int existing = (int16_t)aw->pitch[ar_cur_step];
+                        bool was_empty = (aw->pitch[ar_cur_step] == ZTM_ARP_EMPTY_PITCH);
+                        int p = was_empty ? 0 : existing;
+                        int sign = (p < 0) ? -1 : 1;
+                        int abs_p = (p < 0) ? -p : p;
+                        if      (ar_cur_digit == 0) abs_p = (abs_p % 100) + digit * 100;
+                        else if (ar_cur_digit == 1) abs_p = (abs_p / 100) * 100 + digit * 10 + (abs_p % 10);
+                        else                         abs_p = (abs_p / 10) * 10 + digit;
+                        if (abs_p > 127) abs_p = 127;
+                        aw->pitch[ar_cur_step] = (unsigned short)(int16_t)(sign * abs_p);
+                    } else {
+                        int c = ar_cur_col - 1;
+                        int v = aw->ccval[c][ar_cur_step];
+                        if (v == ZTM_ARP_EMPTY_CCVAL) v = 0;
+                        if      (ar_cur_digit == 0) v = (v % 100) + digit * 100;
+                        else if (ar_cur_digit == 1) v = (v / 100) * 100 + digit * 10 + (v % 10);
+                        else                         v = (v / 10) * 10 + digit;
+                        if (v > 127) v = 127;
+                        aw->ccval[c][ar_cur_step] = (unsigned char)v;
+                    }
+                    ar_cur_digit = (ar_cur_digit + 1) % 3;
+                    if (ar_cur_digit == 0 && ar_cur_step < len - 1) ar_cur_step++;
+                    file_changed++;
+                    consumed = true;
+                }
             }
+            else if (key == SDLK_MINUS && ar_cur_col == 0 && ar_cur_step < len) {
+                arpeggio *aw = ar_ensure(ar_slot);
+                if (aw) {
+                    int p = (int16_t)aw->pitch[ar_cur_step];
+                    if (aw->pitch[ar_cur_step] == ZTM_ARP_EMPTY_PITCH) p = 0;
+                    aw->pitch[ar_cur_step] = (unsigned short)(int16_t)(-p);
+                    file_changed++;
+                    consumed = true;
+                }
+            }
+            else if ((key == SDLK_PERIOD || key == SDLK_DELETE) && ar_cur_step < len) {
+                arpeggio *aw = ar_ensure(ar_slot);
+                if (aw) {
+                    if (ar_cur_col == 0)
+                        aw->pitch[ar_cur_step] = ZTM_ARP_EMPTY_PITCH;
+                    else
+                        aw->ccval[ar_cur_col - 1][ar_cur_step] = ZTM_ARP_EMPTY_CCVAL;
+                    ar_cur_digit = 0;
+                    if (ar_cur_step < len - 1) ar_cur_step++;
+                    file_changed++;
+                    consumed = true;
+                }
+            }
+            else if (key == SDLK_LEFT)  { if (ar_cur_col > 0) ar_cur_col--;        ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_RIGHT) { if (ar_cur_col < max_col) ar_cur_col++;  ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_UP)    { if (ar_cur_step > 0) ar_cur_step--;      ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_DOWN)  { if (ar_cur_step < len - 1) ar_cur_step++;ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_PAGEUP)   { ar_cur_step -= GRID_VISIBLE; if (ar_cur_step < 0) ar_cur_step = 0; ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_PAGEDOWN) { ar_cur_step += GRID_VISIBLE; if (ar_cur_step >= len) ar_cur_step = len - 1; ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_HOME)     { ar_cur_step = 0;        ar_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_END)      { ar_cur_step = len - 1;  ar_cur_digit = 0; consumed = true; }
         }
 
-        // Keep cursor visible
+        // Keep the visible window centered on the cursor
         if (ar_cur_step < ar_view_top)                  ar_view_top = ar_cur_step;
         if (ar_cur_step >= ar_view_top + GRID_VISIBLE)  ar_view_top = ar_cur_step - GRID_VISIBLE + 1;
         if (ar_view_top < 0)                            ar_view_top = 0;
@@ -358,12 +411,23 @@ void CUI_Arpeggioeditor::update() {
             Keys.getkey();
             need_refresh++;
             doredraw++;
+        } else if (key) {
+            // Eat unhandled keys on the grid so q/w/e/r/t etc. don't
+            // leak into global handlers. Tab and ESC are already
+            // dispatched by UI::update / global_keys before this runs.
+            if (!(kstate & (KS_CTRL|KS_ALT|KS_META))
+                && key != SDLK_TAB && key != SDLK_ESCAPE
+                && key != SDLK_F1 && key != SDLK_F2 && key != SDLK_F3
+                && key != SDLK_F4 && key != SDLK_F5 && key != SDLK_F6
+                && key != SDLK_F7 && key != SDLK_F8 && key != SDLK_F9
+                && key != SDLK_F10 && key != SDLK_F11 && key != SDLK_F12) {
+                Keys.getkey();
+            }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Draw
 
 void CUI_Arpeggioeditor::draw(Drawable *S) {
     if (S->lock() != 0) return;
@@ -373,16 +437,10 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     printtitle(PAGE_TITLE_ROW_Y, "Arpeggio Editor (Shift+F4)", COLORS.Text, COLORS.Background, S);
 
     arpeggio *a = song->arpeggios[ar_slot];
-    int  length     = a ? a->length     : 1;
     int  num_cc     = a ? a->num_cc     : 0;
+    int  length     = a ? a->length     : 1;
     int  repeat_pos = a ? a->repeat_pos : 0;
 
-    char buf[64];
-
-    // Right-aligned labels in the leftmost 10 columns; the slider /
-    // textinput widgets start at col 12 and ValueSlider draws its own
-    // numeric readout at the right end of the bar so we don't paint
-    // values ourselves any more.
     print(row(6), col(BASE_Y),     "Slot",   COLORS.Text, S);
     print(row(6), col(BASE_Y + 2), "Name",   COLORS.Text, S);
     print(row(4), col(BASE_Y + 4), "Length", COLORS.Text, S);
@@ -390,6 +448,14 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(4), col(BASE_Y + 6), "Repeat", COLORS.Text, S);
     print(row(5), col(BASE_Y + 7), "NumCC",  COLORS.Text, S);
     print(row(7), col(BASE_Y + 8), "CC#",    COLORS.Text, S);
+
+    // Preset indicator
+    {
+        char hdr[80];
+        const ar_preset &p = AR_PRESETS[ar_preset_index];
+        snprintf(hdr, sizeof(hdr), "Preset (P): %s", p.name);
+        print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
+    }
 
     // Grid header
     {
@@ -407,44 +473,52 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     }
 
     // Grid body
+    char buf[64];
     for (int row_i = 0; row_i < GRID_VISIBLE; ++row_i) {
         int step = ar_view_top + row_i;
         int py = GRID_Y + row_i;
         if (step >= length) {
-            // erase trailing rows
-            printBG(col(GRID_X), row(py), "                                              ",
+            printBG(col(GRID_X), row(py),
+                    "                                              ",
                     COLORS.Text, COLORS.Background, S);
             continue;
         }
-        // step number
         snprintf(buf, sizeof(buf), "%03X", step);
         TColor sf = (step == repeat_pos) ? COLORS.Highlight : COLORS.Text;
         printBG(col(GRID_X), row(py), buf, sf, COLORS.Background, S);
 
-        // pitch
         char pbuf[4];
         format_pitch(a ? a->pitch[step] : ZTM_ARP_EMPTY_PITCH, pbuf);
-        TColor fg = (step == ar_cur_step && ar_cur_col == 0) ? COLORS.EditBG : COLORS.EditText;
-        TColor bg = (step == ar_cur_step && ar_cur_col == 0) ? COLORS.Highlight : COLORS.EditBG;
+        bool pcell_focus = (UI->cur_element == GRID_ID && step == ar_cur_step && ar_cur_col == 0);
+        TColor fg = pcell_focus ? COLORS.EditBG : COLORS.EditText;
+        TColor bg = pcell_focus ? COLORS.Highlight : COLORS.EditBG;
         printBG(col(GRID_X + 6), row(py), pbuf, fg, bg, S);
 
-        // ccvals
         for (int i = 0; i < num_cc; ++i) {
             char vbuf[4];
             format_ccval(a ? a->ccval[i][step] : ZTM_ARP_EMPTY_CCVAL, vbuf);
             int cell_col = GRID_X + 11 + i * 5;
-            TColor f = (step == ar_cur_step && ar_cur_col == i + 1) ? COLORS.EditBG : COLORS.EditText;
-            TColor b = (step == ar_cur_step && ar_cur_col == i + 1) ? COLORS.Highlight : COLORS.EditBG;
+            bool ccell_focus = (UI->cur_element == GRID_ID && step == ar_cur_step && ar_cur_col == i + 1);
+            TColor f = ccell_focus ? COLORS.EditBG : COLORS.EditText;
+            TColor b = ccell_focus ? COLORS.Highlight : COLORS.EditBG;
             printBG(col(cell_col), row(py), vbuf, f, b, S);
         }
     }
 
-    // Status hint below the grid
+    // Hint line below the grid
     {
         int hint_y = GRID_Y + GRID_VISIBLE + 1;
         print(row(4), col(hint_y),
-              "Arrows nav | digits 0-9 type value | '-' negate pitch | '.' clear",
+              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch; '.' clear; P=preset",
               COLORS.Text, S);
+    }
+
+    // Status hint when grid has focus
+    if (UI->cur_element == GRID_ID) {
+        char hint[80];
+        snprintf(hint, sizeof(hint), "GRID @ step %03X col %d | Tab to leave | digits=value | P=preset",
+                 ar_cur_step, ar_cur_col);
+        printBG(col(2), row(BASE_Y + 9), hint, COLORS.Highlight, COLORS.Background, S);
     }
 
     need_refresh = 0; updated = 2;

@@ -12,57 +12,67 @@
  *     - ZTM_MIDIMAC_PARAM1 (0x101) — substituted at runtime by the
  *       yy of a Zxxyy pattern effect.
  *
- *   On disk: zt_module::build_MIDI_macro / load_MIDI_macro write/read
- *   the MMAC chunk. So data round-trips through .zt save/load.
+ *   On disk: zt_module::build_MIDI_macro / load_MIDI_macro round-trip
+ *   the MMAC chunk in the .zt file. So data persists across save/load.
+ *
+ *   UI layout:
+ *     Slot   [slider]
+ *     Name   [textinput]
+ *     Length [slider]
+ *     [Apply preset]    <- press P or click for preset menu
+ *
+ *     Data (hex bytes; status byte 0x80+ starts a new MIDI msg):
+ *       <step> <hex byte | "P1" | "..">  ... 8 cells per row
+ *
+ *   The data grid is a ListBox-like sub-widget kept in tab order so
+ *   Tab walks the user from Length into the grid; arrow keys then
+ *   navigate cells. Tab again leaves the grid back to the slot slider.
  *
  ******/
 #include "zt.h"
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define DATA_X          4
+#define DATA_HDR_Y      (BASE_Y + 7)
 #define DATA_Y          (BASE_Y + 8)
-#define DATA_COLS       8     // 8 cells per row
-#define DATA_ROWS       8     // 64 / 8 = 8 rows
-#define CELL_W          4     // "FF " takes 3 chars, +1 gap
-#define CELL_H          1
+#define DATA_COLS       8
+#define DATA_ROWS       8
+#define CELL_W          4
+#define GRID_ID         3
+#define HINT_ID         99   // not added; just an unused sentinel
 
-static int      mm_slot       = 0;       // currently selected macro index
-static int      mm_cur        = 0;       // cursor position in data[] (0..63)
-static int      mm_cur_digit  = 0;       // 0 = high nibble, 1 = low nibble
+static int      mm_slot      = 0;
+static int      mm_cur       = 0;       // 0..ZTM_MIDIMACRO_MAXLEN-1
+static int      mm_cur_digit = 0;       // 0 = high nibble, 1 = low
+
 static char     mm_name_buf[ZTM_MIDIMACRONAME_MAXLEN] = {0};
 
-// Ensure song->midimacros[mm_slot] exists; allocate empty if NULL.
+// ---------------------------------------------------------------------------
+// Helpers
+
 static midimacro *mm_ensure(int slot) {
     if (slot < 0 || slot >= ZTM_MAX_MIDIMACROS) return NULL;
-    if (!song->midimacros[slot]) {
-        song->midimacros[slot] = new midimacro;
-    }
+    if (!song->midimacros[slot]) song->midimacros[slot] = new midimacro;
     return song->midimacros[slot];
 }
 
-// Compute current length: index of first END marker.
 static int mm_length(midimacro *m) {
     if (!m) return 0;
-    for (int i = 0; i < ZTM_MIDIMACRO_MAXLEN; ++i) {
+    for (int i = 0; i < ZTM_MIDIMACRO_MAXLEN; ++i)
         if (m->data[i] == ZTM_MIDIMAC_END) return i;
-    }
     return ZTM_MIDIMACRO_MAXLEN;
 }
 
-// Set length: pad with 0x00 if growing, set END if shrinking.
 static void mm_set_length(midimacro *m, int new_len) {
     if (!m) return;
     if (new_len < 0) new_len = 0;
     if (new_len >= ZTM_MIDIMACRO_MAXLEN) new_len = ZTM_MIDIMACRO_MAXLEN - 1;
-    int cur_len = mm_length(m);
-    if (new_len > cur_len) {
-        for (int i = cur_len; i < new_len; ++i) m->data[i] = 0x00;
-    }
+    int cur = mm_length(m);
+    if (new_len > cur) for (int i = cur; i < new_len; ++i) m->data[i] = 0x00;
     m->data[new_len] = ZTM_MIDIMAC_END;
     file_changed++;
 }
 
-// Pull the macro's name into the editing buffer for the TextInput.
 static void mm_load_name(int slot) {
     midimacro *m = song->midimacros[slot];
     if (m) {
@@ -73,12 +83,10 @@ static void mm_load_name(int slot) {
     }
 }
 
-// Push the editing buffer back into the macro (creating it if needed).
 static void mm_store_name(int slot) {
-    if (mm_name_buf[0] == 0 && (!song->midimacros[slot] || song->midimacros[slot]->isempty())) {
-        // empty name on an empty/missing macro — leave it absent
-        return;
-    }
+    bool any_text = (mm_name_buf[0] != 0);
+    midimacro *cur = song->midimacros[slot];
+    if (!any_text && (!cur || cur->isempty())) return;
     midimacro *m = mm_ensure(slot);
     if (!m) return;
     if (memcmp(m->name, mm_name_buf, ZTM_MIDIMACRONAME_MAXLEN) != 0) {
@@ -88,21 +96,82 @@ static void mm_store_name(int slot) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Presets — applied to current slot via 'P' key
+
+struct mm_preset { const char *name; const unsigned short *data; int len; };
+
+static const unsigned short PRESET_CC_MOD[]    = { 0xB0, 0x01, 0x101 };       // CC1 (Modulation) value=PARAM1
+static const unsigned short PRESET_CC_FILT[]   = { 0xB0, 0x4A, 0x101 };       // CC74 (Filter cutoff) value=PARAM1
+static const unsigned short PRESET_CC_RES[]    = { 0xB0, 0x47, 0x101 };       // CC71 (Resonance) value=PARAM1
+static const unsigned short PRESET_PROG_CHG[]  = { 0xC0, 0x101 };             // Program change to PARAM1
+static const unsigned short PRESET_PITCH_BEND[]= { 0xE0, 0x00, 0x101 };       // Pitch wheel coarse=PARAM1
+static const unsigned short PRESET_ALL_NOTES[] = { 0xB0, 0x7B, 0x00 };        // CC123 All Notes Off
+
+static const mm_preset MM_PRESETS[] = {
+    { "CC 1 Modulation (param=value)",   PRESET_CC_MOD,     3 },
+    { "CC 74 Filter Cutoff (param=value)", PRESET_CC_FILT,  3 },
+    { "CC 71 Resonance (param=value)",   PRESET_CC_RES,     3 },
+    { "Program Change (param=program)",  PRESET_PROG_CHG,   2 },
+    { "Pitch Bend Coarse (param=value)", PRESET_PITCH_BEND, 3 },
+    { "All Notes Off",                   PRESET_ALL_NOTES,  3 },
+};
+static const int MM_PRESET_COUNT = sizeof(MM_PRESETS) / sizeof(MM_PRESETS[0]);
+static int mm_preset_index = 0;
+
+static void mm_apply_preset(int idx) {
+    if (idx < 0 || idx >= MM_PRESET_COUNT) return;
+    midimacro *m = mm_ensure(mm_slot);
+    if (!m) return;
+    const mm_preset &p = MM_PRESETS[idx];
+    for (int i = 0; i < p.len; ++i) m->data[i] = p.data[i];
+    m->data[p.len] = ZTM_MIDIMAC_END;
+    if (m->name[0] == 0) {
+        strncpy(m->name, p.name, ZTM_MIDIMACRONAME_MAXLEN - 1);
+        m->name[ZTM_MIDIMACRONAME_MAXLEN - 1] = 0;
+        memcpy(mm_name_buf, m->name, ZTM_MIDIMACRONAME_MAXLEN);
+    }
+    file_changed++;
+    sprintf(szStatmsg, "Applied preset: %s", p.name);
+    statusmsg = szStatmsg;
+    status_change = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Grid pseudo-element: a tab-stop that does nothing in update() but
+// claims focus so the page-level update() can identify "we are on the
+// grid" reliably.
+
+namespace {
+class MmGridFocus : public UserInterfaceElement {
+public:
+    MmGridFocus() { xsize = 1; ysize = 1; }
+    int update() override {
+        // Return 0 here; the page's update() handles arrow keys + digit
+        // input directly when this element is focused. Tab is consumed
+        // via the SDLK_TAB handling in the page (we set ret=1 there).
+        return 0;
+    }
+    void draw(Drawable *S, int active) override { (void)S; (void)active; }
+};
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Constructor / lifecycle
+
 CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     UI = new UserInterface;
 
     ValueSlider *vs;
     TextInput   *ti;
 
-    // 0 — Slot selector (00..FF)
+    // 0 — Slot
     vs = new ValueSlider;
     UI->add_element(vs, 0);
-    vs->x = 12;  vs->y = BASE_Y;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->value = 0;
-    vs->min = 0; vs->max = ZTM_MAX_MIDIMACROS - 1;
+    vs->x = 12; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
+    vs->min = 0; vs->max = ZTM_MAX_MIDIMACROS - 1; vs->value = 0;
 
-    // 1 — Name TextInput (40 chars max)
+    // 1 — Name
     ti = new TextInput;
     UI->add_element(ti, 1);
     ti->frame = 1;
@@ -110,13 +179,16 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     ti->xsize = 32; ti->length = ZTM_MIDIMACRONAME_MAXLEN - 1;
     ti->str = (unsigned char*)mm_name_buf;
 
-    // 2 — Length slider
+    // 2 — Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
-    vs->x = 12; vs->y = BASE_Y + 4;
-    vs->xsize = 18; vs->ysize = 1;
-    vs->value = 0;
-    vs->min = 0; vs->max = ZTM_MIDIMACRO_MAXLEN - 1;
+    vs->x = 12; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
+    vs->min = 0; vs->max = ZTM_MIDIMACRO_MAXLEN - 1; vs->value = 0;
+
+    // 3 — Grid focus stub (real UIE so Tab can land here)
+    MmGridFocus *gf = new MmGridFocus;
+    UI->add_element(gf, GRID_ID);
+    gf->x = DATA_X; gf->y = DATA_Y;
 }
 
 void CUI_Midimacroeditor::enter(void) {
@@ -124,9 +196,8 @@ void CUI_Midimacroeditor::enter(void) {
     cur_state = STATE_MIDIMACEDIT;
     mm_load_name(mm_slot);
     midimacro *m = song->midimacros[mm_slot];
-    ValueSlider *vs;
-    vs = (ValueSlider *)UI->get_element(0);  vs->value = mm_slot;
-    vs = (ValueSlider *)UI->get_element(2);  vs->value = mm_length(m);
+    ((ValueSlider *)UI->get_element(0))->value = mm_slot;
+    ((ValueSlider *)UI->get_element(2))->value = mm_length(m);
     UI->set_focus(0);
     Keys.flush();
 }
@@ -135,13 +206,15 @@ void CUI_Midimacroeditor::leave(void) {
     mm_store_name(mm_slot);
 }
 
+// ---------------------------------------------------------------------------
+
 void CUI_Midimacroeditor::update() {
     UI->update();
 
     ValueSlider *vs;
     TextInput   *ti;
 
-    // Slot changed?
+    // Slot change
     vs = (ValueSlider *)UI->get_element(0);
     if (vs && vs->value != mm_slot) {
         mm_store_name(mm_slot);
@@ -149,121 +222,154 @@ void CUI_Midimacroeditor::update() {
         mm_cur = 0; mm_cur_digit = 0;
         mm_load_name(mm_slot);
         midimacro *m = song->midimacros[mm_slot];
-        vs = (ValueSlider *)UI->get_element(2);
-        if (vs) vs->value = mm_length(m);
+        ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
+        if (vlen) vlen->value = mm_length(m);
+        // Reset TextInput cursor so we don't render stale cursor past
+        // the new name's end.
+        ti = (TextInput *)UI->get_element(1);
+        if (ti) ti->cursor = 0;
         need_refresh++;
+        doredraw++;
     }
 
-    // Name typed?
+    // Name typed
     ti = (TextInput *)UI->get_element(1);
-    if (ti && ti->changed) {
-        mm_store_name(mm_slot);
-        ti->changed = 0;
-    }
+    if (ti && ti->changed) { mm_store_name(mm_slot); ti->changed = 0; }
 
-    // Length slider changed?
+    // Length slider
     vs = (ValueSlider *)UI->get_element(2);
     if (vs) {
         midimacro *m = song->midimacros[mm_slot];
-        int cur_len = mm_length(m);
-        if (vs->value != cur_len) {
-            midimacro *mm = mm_ensure(mm_slot);
-            mm_set_length(mm, vs->value);
-            if (mm_cur >= vs->value) mm_cur = vs->value > 0 ? vs->value - 1 : 0;
-            need_refresh++;
+        int cur = mm_length(m);
+        if (vs->value != cur) {
+            midimacro *mm = (vs->value > 0) ? mm_ensure(mm_slot) : song->midimacros[mm_slot];
+            if (mm) {
+                mm_set_length(mm, vs->value);
+                if (mm_cur >= vs->value) mm_cur = vs->value > 0 ? vs->value - 1 : 0;
+                need_refresh++;
+            }
         }
     }
 
-    // Data-grid keys: only handled when focus is on the grid (we use
-    // a "grid mode" entered by pressing Tab from the length slider —
-    // simpler than a custom UIE).
-    KBKey key = Keys.checkkey();
-    int kstate = Keys.getstate();
-    int focused_id = UI->cur_element;
-
-    // Grid keybindings are active when no UI element is currently
-    // claiming the key — we check focused_id and let the slider/textinput
-    // consume keys first via UI->update().
-    if (key && focused_id != 1 /* not in name field */) {
-        midimacro *m = song->midimacros[mm_slot];
-        int cur_len = m ? mm_length(m) : 0;
+    // Grid input — only when focus is parked on the grid stub.
+    int focused = UI->cur_element;
+    if (focused == GRID_ID) {
+        KBKey key = Keys.checkkey();
+        int kstate = Keys.getstate();
         bool consumed = false;
 
-        // Hex digit input → write into current slot, advance digit.
-        // Letters E (END) and P (PARAM1) place sentinels.
-        // '.' / Delete clears slot (sets 0x00).
-        int hex = -1;
-        if      (key >= SDLK_0 && key <= SDLK_9) hex = key - SDLK_0;
-        else if (key >= SDLK_A && key <= SDLK_F) hex = (key - SDLK_A) + 10;
-
-        if (focused_id != 0 && focused_id != 2 && cur_len > 0 && mm_cur < cur_len) {
-            if (hex >= 0 && !(kstate & (KS_CTRL|KS_ALT|KS_META))) {
+        if (!key) { /* no key */ }
+        else if (key == SDLK_P && !(kstate & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            // P (no modifier) cycles through presets and applies the
+            // next one. Status line shows which preset just landed.
+            mm_preset_index = (mm_preset_index + 1) % MM_PRESET_COUNT;
+            mm_apply_preset(mm_preset_index);
+            ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
+            if (vlen) vlen->value = mm_length(song->midimacros[mm_slot]);
+            consumed = true;
+        }
+        else {
+            // Helper: ensure macro exists and has at least mm_cur+1 bytes
+            // so the user can type into a fresh slot without first
+            // dragging the Length slider. The macro auto-grows as the
+            // cursor moves past the current END.
+            auto grow_to = [&](int idx) -> midimacro* {
                 midimacro *mm = mm_ensure(mm_slot);
+                if (!mm) return NULL;
+                int len = mm_length(mm);
+                if (idx >= len) {
+                    for (int i = len; i <= idx; ++i) mm->data[i] = 0x00;
+                    if (idx + 1 < ZTM_MIDIMACRO_MAXLEN) mm->data[idx + 1] = ZTM_MIDIMAC_END;
+                    ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
+                    if (vlen) vlen->value = idx + 1;
+                    file_changed++;
+                }
+                return mm;
+            };
+
+            int hex = -1;
+            if      (key >= SDLK_0 && key <= SDLK_9) hex = key - SDLK_0;
+            else if (key >= SDLK_A && key <= SDLK_F) hex = (key - SDLK_A) + 10;
+
+            if (hex >= 0 && !(kstate & (KS_CTRL|KS_ALT|KS_META))) {
+                midimacro *mm = grow_to(mm_cur);
                 if (mm) {
-                    unsigned short cur = mm->data[mm_cur];
-                    if (cur >= ZTM_MIDIMAC_END) cur = 0;   // overwrite sentinel
+                    unsigned short v = mm->data[mm_cur];
+                    if (v >= ZTM_MIDIMAC_END) v = 0;
                     if (mm_cur_digit == 0) {
-                        cur = (cur & 0x0F) | ((hex & 0xF) << 4);
-                        mm->data[mm_cur] = cur;
+                        v = (v & 0x0F) | ((hex & 0xF) << 4);
+                        mm->data[mm_cur] = v;
                         mm_cur_digit = 1;
                     } else {
-                        cur = (cur & 0xF0) | (hex & 0xF);
-                        mm->data[mm_cur] = cur;
+                        v = (v & 0xF0) | (hex & 0xF);
+                        mm->data[mm_cur] = v;
                         mm_cur_digit = 0;
-                        if (mm_cur < cur_len - 1) mm_cur++;
+                        if (mm_cur + 1 < ZTM_MIDIMACRO_MAXLEN - 1) mm_cur++;
                     }
                     file_changed++;
                     consumed = true;
                 }
             }
-            else if (key == SDLK_E) {
+            else if (key == SDLK_E && (kstate & KS_SHIFT)) {
                 midimacro *mm = mm_ensure(mm_slot);
                 if (mm) {
                     mm->data[mm_cur] = ZTM_MIDIMAC_END;
-                    // truncate length up to here
+                    ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
+                    if (vlen) vlen->value = mm_cur;
                     file_changed++;
-                    vs = (ValueSlider *)UI->get_element(2);
-                    if (vs) vs->value = mm_cur;
                     consumed = true;
                 }
             }
-            else if (key == SDLK_P) {
-                midimacro *mm = mm_ensure(mm_slot);
+            else if (key == SDLK_X && (kstate & KS_SHIFT)) {
+                midimacro *mm = grow_to(mm_cur);
                 if (mm) {
                     mm->data[mm_cur] = ZTM_MIDIMAC_PARAM1;
-                    if (mm_cur < cur_len - 1) mm_cur++;
+                    if (mm_cur + 1 < ZTM_MIDIMACRO_MAXLEN - 1) mm_cur++;
                     file_changed++;
                     consumed = true;
                 }
             }
             else if (key == SDLK_PERIOD || key == SDLK_DELETE) {
                 midimacro *mm = mm_ensure(mm_slot);
-                if (mm) {
+                if (mm && mm_cur < mm_length(mm)) {
                     mm->data[mm_cur] = 0x00;
-                    if (mm_cur < cur_len - 1) mm_cur++;
+                    if (mm_cur + 1 < mm_length(mm)) mm_cur++;
                     file_changed++;
                     consumed = true;
                 }
             }
-            else {
-                switch (key) {
-                    case SDLK_LEFT:  if (mm_cur > 0) mm_cur--; mm_cur_digit = 0; consumed = true; break;
-                    case SDLK_RIGHT: if (mm_cur < cur_len - 1) mm_cur++; mm_cur_digit = 0; consumed = true; break;
-                    case SDLK_UP:    if (mm_cur >= DATA_COLS) mm_cur -= DATA_COLS; mm_cur_digit = 0; consumed = true; break;
-                    case SDLK_DOWN:  if (mm_cur + DATA_COLS < cur_len) mm_cur += DATA_COLS; mm_cur_digit = 0; consumed = true; break;
-                    case SDLK_HOME:  mm_cur = 0; mm_cur_digit = 0; consumed = true; break;
-                    case SDLK_END:   mm_cur = cur_len > 0 ? cur_len - 1 : 0; mm_cur_digit = 0; consumed = true; break;
-                }
-            }
+            else if (key == SDLK_LEFT)  { if (mm_cur > 0) mm_cur--;                                   mm_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_RIGHT) { if (mm_cur + 1 < ZTM_MIDIMACRO_MAXLEN - 1) mm_cur++;        mm_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_UP)    { if (mm_cur >= DATA_COLS) mm_cur -= DATA_COLS;               mm_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_DOWN)  { if (mm_cur + DATA_COLS < ZTM_MIDIMACRO_MAXLEN - 1) mm_cur += DATA_COLS; mm_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_HOME)  { mm_cur = 0;                                                 mm_cur_digit = 0; consumed = true; }
+            else if (key == SDLK_END)   { int len = mm_length(song->midimacros[mm_slot]); mm_cur = len > 0 ? len - 1 : 0; mm_cur_digit = 0; consumed = true; }
         }
 
         if (consumed) {
             Keys.getkey();
             need_refresh++;
             doredraw++;
+        } else if (key) {
+            // Silently swallow unhandled keys while on the grid so they
+            // don't leak into global_keys / keyhandler (otherwise typing
+            // qwert in a cell would do mysterious things). Tab and ESC
+            // are pass-through: they're handled by UI::update / global
+            // _keys before this code runs, so they never reach here.
+            // Anything else with no modifiers gets eaten.
+            if (!(kstate & (KS_CTRL|KS_ALT|KS_META))
+                && key != SDLK_TAB && key != SDLK_ESCAPE
+                && key != SDLK_F1 && key != SDLK_F2 && key != SDLK_F3
+                && key != SDLK_F4 && key != SDLK_F5 && key != SDLK_F6
+                && key != SDLK_F7 && key != SDLK_F8 && key != SDLK_F9
+                && key != SDLK_F10 && key != SDLK_F11 && key != SDLK_F12) {
+                Keys.getkey();
+            }
         }
     }
 }
+
+// ---------------------------------------------------------------------------
 
 void CUI_Midimacroeditor::draw(Drawable *S) {
     if (S->lock() != 0) return;
@@ -274,25 +380,34 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
 
     midimacro *m = song->midimacros[mm_slot];
     int cur_len = m ? mm_length(m) : 0;
-
     char buf[64];
 
-    // Slot label + numeric readout
-    print(row(4), col(BASE_Y), "Slot", COLORS.Text, S);
-    snprintf(buf, sizeof(buf), "%03d / %03d", mm_slot, ZTM_MAX_MIDIMACROS - 1);
-    printBG(col(31), row(BASE_Y), buf, COLORS.Text, COLORS.Background, S);
+    print(row(6),  col(BASE_Y),     "Slot",   COLORS.Text, S);
+    print(row(6),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
+    print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
 
-    // Name label
-    print(row(4), col(BASE_Y + 2), "Name", COLORS.Text, S);
-
-    // Length
-    print(row(2), col(BASE_Y + 4), "Length", COLORS.Text, S);
-    snprintf(buf, sizeof(buf), "%03d / %03d", cur_len, ZTM_MIDIMACRO_MAXLEN - 1);
-    printBG(col(31), row(BASE_Y + 4), buf, COLORS.Text, COLORS.Background, S);
-
-    // Status / hint
-    print(row(4), col(BASE_Y + 6), "Data (hex bytes; E=END, P=PARAM1, .=clear)",
+    // On-page hint above the grid header.
+    print(row(DATA_X), col(BASE_Y + 5),
+          "Tab into grid; arrows nav; hex digits type byte; P=preset; Shift+E=END; Shift+X=PARAM1; .=clear",
           COLORS.Text, S);
+    print(row(DATA_X), col(BASE_Y + 6),
+          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
+          COLORS.Text, S);
+
+    // Header showing current preset name (cycles with P).
+    {
+        char hdr[80];
+        const mm_preset &p = MM_PRESETS[mm_preset_index];
+        snprintf(hdr, sizeof(hdr), "Preset (P): %s", p.name);
+        print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
+    }
+
+    // Data grid header
+    print(row(DATA_X - 3), row(DATA_HDR_Y), "##", COLORS.Text, S);
+    for (int gx = 0; gx < DATA_COLS; ++gx) {
+        char h[4]; snprintf(h, sizeof(h), "%02X", gx);
+        print(col(DATA_X + gx * CELL_W), row(DATA_HDR_Y), h, COLORS.Text, S);
+    }
 
     // Data grid
     for (int i = 0; i < ZTM_MIDIMACRO_MAXLEN; ++i) {
@@ -307,47 +422,43 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
 
         if (i < cur_len) {
             unsigned short v = m ? m->data[i] : 0;
-            if (v == ZTM_MIDIMAC_PARAM1) {
-                cell = "P1";
-                fg = COLORS.Highlight;
-            } else if (v >= ZTM_MIDIMAC_END) {
-                cell = "..";
-            } else {
-                snprintf(buf, sizeof(buf), "%02X", v & 0xFF);
-                cell = buf;
-            }
+            if (v == ZTM_MIDIMAC_PARAM1)        { cell = "P1"; fg = COLORS.Highlight; }
+            else if (v >= ZTM_MIDIMAC_END)      { cell = ".."; }
+            else { snprintf(buf, sizeof(buf), "%02X", v & 0xFF); cell = buf; }
         } else {
-            fg = COLORS.Background;   // dim: outside length
-            cell = "..";
+            fg = COLORS.Background; cell = "..";
         }
         printBG(col(px), row(py), cell, fg, bg, S);
-        // Step number every 8 cells: col on the left margin
+
         if (gx == 0) {
-            char snum[6];
-            snprintf(snum, sizeof(snum), "%02X", i);
+            char snum[6]; snprintf(snum, sizeof(snum), "%02X", i);
             print(col(DATA_X - 3), row(py), snum, COLORS.Text, S);
         }
     }
 
-    // Cursor highlight on current cell
-    if (cur_len > 0 && mm_cur < cur_len) {
+    // Cursor highlight — drawn whenever the grid stub holds focus, so
+    // the user can see where typing/arrows will land even before the
+    // macro has any data.
+    if (UI->cur_element == GRID_ID) {
         int gy = mm_cur / DATA_COLS;
         int gx = mm_cur %  DATA_COLS;
         int px = DATA_X + gx * CELL_W;
         int py = DATA_Y + gy;
-        unsigned short v = m ? m->data[mm_cur] : 0;
+        unsigned short v = (m && mm_cur < ZTM_MIDIMACRO_MAXLEN) ? m->data[mm_cur] : ZTM_MIDIMAC_END;
         const char *cell = "..";
         char cbuf[4];
-        if (v == ZTM_MIDIMAC_PARAM1)       cell = "P1";
-        else if (v >= ZTM_MIDIMAC_END)     cell = "..";
+        if      (v == ZTM_MIDIMAC_PARAM1) cell = "P1";
+        else if (v >= ZTM_MIDIMAC_END)    cell = "..";
         else { snprintf(cbuf, sizeof(cbuf), "%02X", v & 0xFF); cell = cbuf; }
         printBG(col(px), row(py), cell, COLORS.EditBG, COLORS.Highlight, S);
-        // Underline the active hex digit
         if (v < ZTM_MIDIMAC_END) {
-            char d[2] = {cell[mm_cur_digit], 0};
+            char d[2] = { cell[mm_cur_digit], 0 };
             printBG(col(px + mm_cur_digit), row(py), d,
                     COLORS.Background, COLORS.Highlight, S);
         }
+        // Status hint: tell the user they're in grid mode + how to leave
+        sprintf(buf, "GRID @ %02X | Tab to leave | digits=byte | P=preset", mm_cur);
+        printBG(col(2), row(BASE_Y + 5), buf, COLORS.Highlight, COLORS.Background, S);
     }
 
     need_refresh = 0; updated = 2;

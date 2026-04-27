@@ -2975,6 +2975,14 @@ static int zt_handle_platform_window_event(const SDL_Event *e)
 {
     switch (e->type) {
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        // macOS Cmd-Tab away and back: SDL stops delivering key-up
+        // events for any keys held during focus loss, so the Keys
+        // queue can come back with stale entries that look like
+        // permanently-pressed arrows. Flush on focus regain so the
+        // app responds to the next real keypress.
+        Keys.flush();
+        zt_request_ui_full_refresh();
+        return 1;
     case SDL_EVENT_WINDOW_EXPOSED:
     case SDL_EVENT_WINDOW_RESTORED:
         zt_request_ui_full_refresh();
