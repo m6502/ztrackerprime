@@ -122,7 +122,10 @@ void CUI_About::leave(void) {
 void CUI_About::update() {
     UI->update();
     if (Keys.size()) {
-        Keys.getkey();
+        int key = Keys.getkey();
+        if (key == SDLK_ESCAPE) {
+            switch_page(UIP_Patterneditor);
+        }
     }
     //need_refresh++;
 }

@@ -19,9 +19,9 @@ CUI_PEParms::CUI_PEParms(void) {
         vs_step = new ValueSlider;
         UI->add_element(vs_step,0);
         vs_step->frame = 1;
-        vs_step->x = (start_x / 8) + 14;
+        vs_step->x = (start_x / 8) + 17;
         vs_step->y = (start_y / 8) + 6; 
-        vs_step->xsize=window_width/8 - 20;
+        vs_step->xsize=window_width/8 - 23;
         vs_step->min = 0;
         vs_step->max = 32;
         vs_step->value = cur_step;   
@@ -29,9 +29,9 @@ CUI_PEParms::CUI_PEParms(void) {
         vs_pat_length = new ValueSlider;
         UI->add_element(vs_pat_length,1);
         vs_pat_length->frame = 1;
-        vs_pat_length->x = (start_x / 8) + 14;
+        vs_pat_length->x = (start_x / 8) + 17;
         vs_pat_length->y = (start_y / 8) + 8; 
-        vs_pat_length->xsize=window_width/8 - 20;
+        vs_pat_length->xsize=window_width/8 - 23;
         vs_pat_length->min = 32;
         vs_pat_length->max = 999;
         vs_pat_length->value = song->patterns[cur_edit_pattern]->length;
@@ -39,9 +39,9 @@ CUI_PEParms::CUI_PEParms(void) {
         vs_highlight = new ValueSlider;
         UI->add_element(vs_highlight,2);
         vs_highlight->frame = 1;
-        vs_highlight->x = (start_x / 8) + 14;
+        vs_highlight->x = (start_x / 8) + 17;
         vs_highlight->y = (start_y / 8) + 10; 
-        vs_highlight->xsize=window_width/8 - 20;
+        vs_highlight->xsize=window_width/8 - 23;
         vs_highlight->min = 1;
         vs_highlight->max = 32;
         vs_highlight->value = zt_config_globals.highlight_increment;
@@ -49,9 +49,9 @@ CUI_PEParms::CUI_PEParms(void) {
         vs_lowlight = new ValueSlider;
         UI->add_element(vs_lowlight,3);
         vs_lowlight->frame = 1;
-        vs_lowlight->x = (start_x / 8) + 14;
+        vs_lowlight->x = (start_x / 8) + 17;
         vs_lowlight->y = (start_y / 8) + 12; 
-        vs_lowlight->xsize=window_width/8 - 20;
+        vs_lowlight->xsize=window_width/8 - 23;
         vs_lowlight->min = 1;
         vs_lowlight->max = 32;
         vs_lowlight->value = zt_config_globals.lowlight_increment;
@@ -59,36 +59,36 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_centered = new CheckBox;
         UI->add_element(cb_centered,4);
         cb_centered->frame = 0;
-        cb_centered->x = (start_x / 8) + 14;
+        cb_centered->x = (start_x / 8) + 17;
         cb_centered->y = (start_y / 8) + 14;
-        cb_centered->xsize = 5;
+        cb_centered->xsize = 3;
         cb_centered->value = &zt_config_globals.centered_editing;
         cb_centered->frame = 1;
 
         cb_stepedit = new CheckBox;
         UI->add_element(cb_stepedit,5);
         cb_stepedit->frame = 0;
-        cb_stepedit->x = (start_x / 8) + 14 + 16;
+        cb_stepedit->x = (start_x / 8) + 17 + 16;
         cb_stepedit->y = (start_y / 8) + 14;
-        cb_stepedit->xsize = 5;
+        cb_stepedit->xsize = 3;
         cb_stepedit->value = &zt_config_globals.step_editing;
         cb_stepedit->frame = 1;
 
         cb_recveloc = new CheckBox;
         UI->add_element(cb_recveloc,6);
         cb_recveloc->frame = 0;
-        cb_recveloc->x = (start_x / 8) + 14 + 32;
+        cb_recveloc->x = (start_x / 8) + 17 + 32;
         cb_recveloc->y = (start_y / 8) + 14;
-        cb_recveloc->xsize = 5;
+        cb_recveloc->xsize = 3;
         cb_recveloc->value = &zt_config_globals.record_velocity;
         cb_recveloc->frame = 1;
 
         vs_speedup = new ValueSlider;
         UI->add_element(vs_speedup,7);
         vs_speedup->frame = 1;
-        vs_speedup->x = (start_x / 8) + 14;
+        vs_speedup->x = (start_x / 8) + 17;
         vs_speedup->y = (start_y / 8) + 16;
-        vs_speedup->xsize=window_width/8 - 20;
+        vs_speedup->xsize=window_width/8 - 23;
         vs_speedup->min=1;
         vs_speedup->max = 32;
         vs_speedup->value = zt_config_globals.control_navigation_amount;
@@ -99,9 +99,9 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_drawmode = new CheckBox;
         UI->add_element(cb_drawmode, 8);
         cb_drawmode->frame = 1;
-        cb_drawmode->x = (start_x / 8) + 14;
+        cb_drawmode->x = (start_x / 8) + 17;
         cb_drawmode->y = (start_y / 8) + 18;
-        cb_drawmode->xsize = 5;
+        cb_drawmode->xsize = 3;
         cb_drawmode->value = &drawmode_val;
 }
 
@@ -182,6 +182,33 @@ void CUI_PEParms::update() {
         UIP_Patterneditor->mode = (drawmode_val) ? PEM_MOUSEDRAW : PEM_REGULARKEYS;
         if (UIP_Patterneditor->mode == PEM_REGULARKEYS) midiInQueue.clear();
     }
+
+    // Live drawing while the popup is open. With DrawMode on, forward
+    // mouse activity to the pattern editor when the cursor is outside
+    // the popup window. Only forward if the queue is empty (so the PE
+    // can refresh its drag from LastX/LastY) or the next pending key
+    // is a mouse-button event — never a keyboard key, which would
+    // hijack the popup's own input.
+    if (UIP_Patterneditor->mode == PEM_MOUSEDRAW) {
+        int win_w = 54 * col(1);
+        int win_h = 20 * row(1);
+        int wx = (INTERNAL_RESOLUTION_X / 2) - (win_w / 2);
+        int wy = (INTERNAL_RESOLUTION_Y / 2) - (win_h / 2);
+        int outside_popup = (LastX < wx) || (LastX >= wx + win_w) ||
+                            (LastY < wy) || (LastY >= wy + win_h);
+        if (outside_popup) {
+            int peeked = Keys.checkkey();
+            int forwardable_key =
+                peeked == 0 ||
+                peeked == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP   << 8) | SDL_BUTTON_LEFT)) ||
+                peeked == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT));
+            if (forwardable_key) {
+                UIP_Patterneditor->update();
+                need_refresh++;
+                need_popup_refresh++;
+            }
+        }
+    }
 }
 
 void CUI_PEParms::draw(Drawable *S) {
@@ -195,23 +222,23 @@ void CUI_PEParms::draw(Drawable *S) {
     for(;start_y % 8;start_y--)
         ;
 
-    vs_step->x = (start_x / 8) + 14;
+    vs_step->x = (start_x / 8) + 17;
     vs_step->y = (start_y / 8) + 6; 
-    vs_pat_length->x = (start_x / 8) + 14;
+    vs_pat_length->x = (start_x / 8) + 17;
     vs_pat_length->y = (start_y / 8) + 8; 
-    vs_highlight->x = (start_x / 8) + 14;
+    vs_highlight->x = (start_x / 8) + 17;
     vs_highlight->y = (start_y / 8) + 10; 
-    vs_lowlight->x = (start_x / 8) + 14;
+    vs_lowlight->x = (start_x / 8) + 17;
     vs_lowlight->y = (start_y / 8) + 12; 
-    cb_centered->x = (start_x / 8) + 14;
+    cb_centered->x = (start_x / 8) + 17;
     cb_centered->y = (start_y / 8) + 14;
-    cb_stepedit->x = (start_x / 8) + 14 + 16;
+    cb_stepedit->x = (start_x / 8) + 17 + 16;
     cb_stepedit->y = (start_y / 8) + 14;
-    cb_recveloc->x = (start_x / 8) + 14 + 32;
+    cb_recveloc->x = (start_x / 8) + 17 + 32;
     cb_recveloc->y = (start_y / 8) + 14;
-    vs_speedup->x = (start_x / 8) + 14;
+    vs_speedup->x = (start_x / 8) + 17;
     vs_speedup->y = (start_y / 8) + 16;
-    cb_drawmode->x = (start_x / 8) + 14;
+    cb_drawmode->x = (start_x / 8) + 17;
     cb_drawmode->y = (start_y / 8) + 18;
 
 
@@ -224,15 +251,18 @@ void CUI_PEParms::draw(Drawable *S) {
         }
         printline(start_x,start_y,143,window_width / 8,COLORS.Highlight,S);
         print(col(textcenter("Pattern Editor Options")),start_y + row(2),"Pattern Editor Options",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(6),"      Step:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(8),"Pat length:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(10)," HighLight:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(12),"  LowLight:",COLORS.Text,S);
-	print(start_x + col(2),start_y + row(14),"  Centered:",COLORS.Text,S);
-	print(start_x + col(20),start_y + row(14),"StepEdit:",COLORS.Text,S);
-    print(start_x + col(36),start_y + row(14),"RecVeloc:",COLORS.Text,S);
-	print(start_x + col(2),start_y + row(16),"   Speedup:",COLORS.Text,S);
-        print(start_x + col(2),start_y + row(18),"  DrawMode:",COLORS.Text,S);
+        // Labels right-align so the colon lands at col 15. The slider/
+        // checkbox x-origin is col 17, so the frame border at col 16
+        // sits between the colon and the chip without stomping either.
+        print(start_x + col(2),start_y + row(6),     "     EditStep:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(8),     "   Pat length:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(10),    "Row Highlight:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(12),    " Row Lowlight:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(14),    "     Centered:",COLORS.Text,S);
+        print(start_x + col(23),start_y + row(14),"StepEdit:",COLORS.Text,S);
+        print(start_x + col(39),start_y + row(14),"RecVeloc:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(16),    "      Speedup:",COLORS.Text,S);
+        print(start_x + col(2),start_y + row(18),    "     DrawMode:",COLORS.Text,S);
         UI->full_refresh();
         UI->draw(S);
         S->unlock();

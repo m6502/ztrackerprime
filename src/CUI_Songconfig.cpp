@@ -37,7 +37,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         ti = new TextInput;
         UI->add_element(ti,0);
         ti->frame = 1;
-        ti->x = 17;
+        ti->x = 20;
         ti->y = base_y;
         ti->xsize=28;
         ti->length=28;
@@ -47,7 +47,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,1);
         vs->frame = 0;
-        vs->x = 17; 
+        vs->x = 20; 
         vs->y = base_y+2; 
         vs->xsize=28;
         vs->min = 60;
@@ -58,7 +58,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,2);
         vs->frame = 0;
-        vs->x = 17; 
+        vs->x = 20; 
         vs->y = base_y+3; 
         vs->xsize=28;
         vs->min = 0;
@@ -69,7 +69,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
     /* Initialize Frame for those two above*/
         fm = new Frame;
         UI->add_gfx(fm,0);
-        fm->x = 17;
+        fm->x = 20;
         fm->y = base_y+2;
         fm->xsize = 28;
         fm->ysize = 2;
@@ -78,31 +78,74 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,3);
         cb->frame = 0;
-        cb->x = 17;
+        cb->x = 20;
         cb->y = base_y+5;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &song->flag_SendMidiClock;
     // END Midi Clock
     /* Initialize MIDI Stop/Start checkbox */
         cb = new CheckBox;
         UI->add_element(cb,4);
         cb->frame = 0;
-        cb->x = 17;
+        cb->x = 20;
         cb->y = base_y+6;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &song->flag_SendMidiStopStart;
     // END Midi Clock
-    /* Initialize Frame for those two above */
+        // Send MIDI Clock + MIDI Stop/Start checkboxes have no surrounding
+        // Frame — its right border char rendered as a yellow stripe to the
+        // right of the chips and the unframed style matches MIDI In Sync /
+        // Chase MIDI Tempo below.
+
+        // Row Highlight + Row Lowlight (the global zt_config_globals values,
+        // surfaced here so song-edit tasks can tweak them without leaving F11).
+        vs = new ValueSlider;
+        UI->add_element(vs, 5);
+        vs->frame = 0;
+        vs->x = 20;
+        vs->y = base_y + 8;
+        vs->xsize = 28;
+        vs->min = 1;
+        vs->max = 64;
+        vs->value = zt_config_globals.highlight_increment;
+
+        vs = new ValueSlider;
+        UI->add_element(vs, 6);
+        vs->frame = 0;
+        vs->x = 20;
+        vs->y = base_y + 9;
+        vs->xsize = 28;
+        vs->min = 1;
+        vs->max = 64;
+        vs->value = zt_config_globals.lowlight_increment;
+
         fm = new Frame;
-        UI->add_gfx(fm,1);
-        fm->x = 17;
-        fm->y = base_y+5; 
-        fm->xsize = 5;
+        UI->add_gfx(fm, 2);
+        fm->x = 20;
+        fm->y = base_y + 8;
+        fm->xsize = 28;
         fm->ysize = 2;
-    // END Frame
+
+        // MIDI In Sync (slave to incoming MIDI clock).
+        cb = new CheckBox;
+        UI->add_element(cb, 7);
+        cb->frame = 0;
+        cb->x = 20;
+        cb->y = base_y + 11;
+        cb->xsize = 3;
+        cb->value = &zt_config_globals.midi_in_sync;
+
+        // Chase MIDI Tempo.
+        cb = new CheckBox;
+        UI->add_element(cb, 8);
+        cb->frame = 0;
+        cb->x = 20;
+        cb->y = base_y + 12;
+        cb->xsize = 3;
+        cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
         oe = new OrderEditor;
-        UI->add_element(oe,5);
+        UI->add_element(oe,9);
         oe->x = 59;
         oe->y = 13;
         oe->xsize = 9;
@@ -125,9 +168,25 @@ void CUI_Songconfig::enter(void) {
     if(!zt_config_globals.lowlight_increment)
         zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
     
+    // F11 toggle: when re-entering Songconfig from itself (LastPage==this,
+    // i.e. user pressed F11 while already on F11), focus the Title field
+    // (id 0) instead of the OrderEditor — common workflow is to press F11
+    // a second time to rename the song.
+    bool toggling = (LastPage == this);
     cur_state = STATE_SONG_CONFIG;
+    // Reset OrderEditor cursor so the focus indicator is always visible
+    // at row 0 (otherwise stale cursor_y/list_start could leave it
+    // scrolled off-screen). Only reset on a fresh entry — toggling to
+    // Title leaves the OrderEditor state alone.
+    if (oe && !toggling) {
+        oe->cursor_y = 0;
+        oe->cursor_x = 0;
+        oe->list_start = 0;
+    }
     Keys.flush();
-    UI->set_focus(5); // set focus to order editor
+    int target = toggling ? 0 : 9;   // 0 = Title TextInput, 9 = OrderEditor
+    UI->set_focus(target);
+    UI->cur_element = target;
 }
 
 void CUI_Songconfig::leave(void) {
@@ -136,9 +195,10 @@ void CUI_Songconfig::leave(void) {
 
 void CUI_Songconfig::update()
 {
-    // Reserve 8 rows at the bottom: 7 for the 55px toolbar (ceil(55/8)) plus
-    // one row of safety so the order editor's frame never overlaps.
-    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 8) ;
+    // Reserve 7 rows at the bottom for the 55 px toolbar (ceil(55/8));
+    // one extra row of safety was previously added but it left the order
+    // list one row short of the F1 Help bottom edge.
+    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 7) ;
 
     ValueSlider *vs;
     TextInput *t;
@@ -149,8 +209,9 @@ void CUI_Songconfig::update()
 
     UI->update();
     vs = (ValueSlider *)UI->get_element(1);
-    if (vs->value != song->bpm) { 
-        song->bpm = vs->value; 
+    if (vs->from_input) vs->from_input = 0;  // BPM slider takes any [min,max]; clamp already applied
+    if (vs->value != song->bpm) {
+        song->bpm = vs->value;
         ztPlayer->set_speed();
 
         if(!zt_config_globals.highlight_increment)
@@ -161,8 +222,31 @@ void CUI_Songconfig::update()
         file_changed++;
     }
     vs = (ValueSlider *)UI->get_element(2);
-    if (vs->value != rev_tpb_tab[song->tpb]) { 
-        song->tpb = tpb_tab[vs->value]; 
+    if (vs->from_input) {
+        // Typed-numeric path. vs->input_value holds the raw number the
+        // user entered (preserved before clamping in Sliders.cpp). Snap
+        // to the nearest valid TPB in tpb_tab[]={2,4,6,8,12,16,24,32,48}
+        // so '8' -> TPB=8 (slider index 3), '5' -> TPB=4 (nearest), etc.
+        // On ties, prefer the higher TPB (more granular, common in
+        // tracker conventions).
+        int typed = vs->input_value;
+        int best_idx = 0;
+        int best_diff = abs(tpb_tab[0] - typed);
+        for (int i = 1; i <= 8; i++) {
+            int diff = abs(tpb_tab[i] - typed);
+            if (diff < best_diff || (diff == best_diff && tpb_tab[i] > typed)) {
+                best_diff = diff;
+                best_idx = i;
+            }
+        }
+        vs->value = best_idx;
+        vs->from_input = 0;
+    }
+    // Clamp slider index to the table range regardless of input source.
+    if (vs->value < 0) vs->value = 0;
+    if (vs->value > 8) vs->value = 8;
+    if (tpb_tab[vs->value] != song->tpb) {
+        song->tpb = tpb_tab[vs->value];
         ztPlayer->set_speed();
         vs->force_f=1; vs->force_v = song->tpb;
 
@@ -170,8 +254,30 @@ void CUI_Songconfig::update()
             zt_config_globals.highlight_increment = song->tpb;
         if(!zt_config_globals.lowlight_increment)
             zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
-        
+
         file_changed++;
+    }
+    vs = (ValueSlider *)UI->get_element(5);
+    if (vs && vs->from_input) vs->from_input = 0;
+    if (vs && vs->value != zt_config_globals.highlight_increment) {
+        zt_config_globals.highlight_increment = vs->value;
+    } else if (vs) {
+        vs->value = zt_config_globals.highlight_increment;
+    }
+    vs = (ValueSlider *)UI->get_element(6);
+    if (vs && vs->from_input) vs->from_input = 0;
+    if (vs && vs->value != zt_config_globals.lowlight_increment) {
+        zt_config_globals.lowlight_increment = vs->value;
+    } else if (vs) {
+        vs->value = zt_config_globals.lowlight_increment;
+    }
+    {
+        CheckBox *cb = (CheckBox *)UI->get_element(7);
+        if (cb && cb->changed)
+            zt_config_globals.midi_in_sync = *(cb->value);
+        cb = (CheckBox *)UI->get_element(8);
+        if (cb && cb->changed)
+            zt_config_globals.midi_in_sync_chase_tempo = *(cb->value);
     }
     if (Keys.size()) {
         Keys.getkey();
@@ -184,22 +290,24 @@ void CUI_Songconfig::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
-        // Right-align Title/BPM/TPB labels so their right edge sits one
-        // char before the textfield/slider start (col 17), matching the
-        // tight "Send MIDI Clock" / "MIDI Stop/Start" pattern below.
-        // "Title" = 5 chars → col 11; "BPM"/"TPB" = 3 chars → col 13.
-        print(row(11),col(base_y),"Title",COLORS.Text,S);
-        print(row(13),col(base_y+2),"BPM",COLORS.Text,S);
-        print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
-        print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
-        print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
-        // Order List label: row 11 (one blank row below page title at 9),
-        // horizontally clear of the OE data (OE starts at column 59, so
-        // put label at column 60 which is inside the OE x-span so it
-        // visually belongs to the list).
-        print(row(60),col(11),"Order List",COLORS.Text,S);
-        printchar(row(17 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
-        printchar(row(17 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
+        // All labels right-align so text ends col 18 (1-char gap before
+        // col-20 controls). Order List is on its own column (col 59)
+        // and is intentionally NOT shifted.
+        print(row(14),col(base_y),"Title",COLORS.Text,S);
+        print(row(16),col(base_y+2),"BPM",COLORS.Text,S);
+        print(row(16),col(base_y+3),"TPB",COLORS.Text,S);
+        print(row(4),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
+        print(row(4),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
+        print(row(5),col(base_y+8),"Row Highlight ",COLORS.Text,S);
+        print(row(6),col(base_y+9),"Row Lowlight ",COLORS.Text,S);
+        printchar(row(20 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
+        printchar(row(20 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
+        print(row(4),col(base_y+11),"   MIDI In Sync",COLORS.Text,S);
+        print(row(3),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
+        // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
+        print(row(59),col(11),"Order List",COLORS.Text,S);
+        printchar(row(20 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
+        printchar(row(20 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
 
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();

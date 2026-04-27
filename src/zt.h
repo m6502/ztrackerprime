@@ -791,5 +791,6 @@ extern int pe_modification;
 extern Drawable * pe_buf;
 
 extern int calcSongSeconds(int cur_row = -1, int cur_ord = -1);
+extern int calcSongMs(int cur_row = -1, int cur_ord = -1);
 
 #endif
