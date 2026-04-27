@@ -268,7 +268,8 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
-        vs->x = 4 + 15;
+        // Left column controls at col 20 to match Global Config (Ctrl+F12).
+        vs->x = 4 + 16;
         vs->y = base_y;
         vs->xsize = 15+1;
         vs->ysize = 1;
@@ -278,7 +279,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
-        cb->x = 4 + 15;
+        cb->x = 4 + 16;
         cb->y = base_y + 2;
         cb->xsize = 5;
         cb->value = &zt_config_globals.auto_send_panic;
@@ -299,7 +300,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
-        cb->x = 4 + 15;
+        cb->x = 4 + 16;
         cb->y = base_y + 6;
         cb->xsize = 5;
         cb->value = &zt_config_globals.auto_open_midi;
@@ -308,7 +309,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++); // Full Screen cb — update() reads via get_element(5)
         cb->frame = 0;
-        cb->x = 4+15;
+        cb->x = 4+16;
         cb->y = base_y + 8;
         cb->xsize = 5;
         cb->value = &zt_config_globals.full_screen;
@@ -317,7 +318,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 #ifndef DISABLED_CONFIGURATION_VALUES
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
-        vs->x = 4+15;
+        vs->x = 4+16;
         vs->y = base_y + 10;
         vs->xsize = 15+4;
         vs->ysize = 1;
@@ -327,7 +328,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
-        vs->x = 4+15;
+        vs->x = 4+16;
         vs->y = base_y + 12;
         vs->xsize = 15+4;
         vs->ysize = 1;
@@ -375,7 +376,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
-        vs->x = 19;                    // align with Prebuffer slider
+        vs->x = 20;                    // align with Prebuffer slider
         vs->y = 47;
         vs->xsize = 15;
         vs->ysize = 1;
@@ -385,7 +386,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new BankSelectCheckBox(ml);
         UI->add_element(cb,tabindex++);
         cb->frame = 0;
-        cb->x = 25;
+        cb->x = 26;
         cb->y = 49;
         cb->xsize = 5;
         cb->frame = 1;
@@ -393,7 +394,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti = new AliasTextInput(ml);
         UI->add_element(ti,tabindex++);
         ti->frame = 1;
-        ti->x = 19;                    // align with Prebuffer slider
+        ti->x = 20;                    // align with Prebuffer slider
         ti->y = 51;
         ti->xsize=42;
         ti->length=41;
@@ -482,15 +483,17 @@ void CUI_Sysconfig::draw(Drawable *S) {
         printtitle(PAGE_TITLE_ROW_Y,"System Configuration (F12)",COLORS.Text,COLORS.Background,S);
         // Labels shifted +3 rows from legacy position: row 12 holds the
         // "Go to page 2" button, rows 11 and 13 are empty gaps.
-        print(row(4),col(TRACKS_ROW_Y+3),"     Prebuffer",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+5)," Panic on stop",COLORS.Text,S);
+        // Labels right-align so text ends at col 18 (1-char gap before
+        // col-20 controls). Matches Global Config (Ctrl+F12).
+        print(row(4),col(TRACKS_ROW_Y+3),"      Prebuffer",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+5),"  Panic on stop",COLORS.Text,S);
         // "MIDI-IN Slave" label intentionally omitted — see F11 (Songconfig).
-        print(row(4),col(TRACKS_ROW_Y+9),"Auto-open MIDI",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+9)," Auto-open MIDI",COLORS.Text,S);
 
-        print(row(4),col(TRACKS_ROW_Y+11),"   Full Screen",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+11),"    Full Screen",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
-        print(row(4),col(TRACKS_ROW_Y+13),"    Key Repeat",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+15),"      Key Wait",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);
 #endif
         print(row(4+37+8),col(TRACKS_ROW_Y+3),"Skin Selection",COLORS.Text,S);
 
