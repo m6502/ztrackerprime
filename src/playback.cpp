@@ -1039,11 +1039,19 @@ void player::callback(void) {
                     case ET_PATT:
                         last_pattern = e->command;
                         break;
-                    case ET_STATUS: 
-                        status_change = 1; 
+                    case ET_STATUS:
+                        status_change = 1;
                         playing_cur_order = e->command;
                         playing_cur_pattern = e->data1;
-                        playing_cur_row = e->extra;//e->data2; 
+                        playing_cur_row = e->extra;//e->data2;
+                        break;
+                    case ET_RAW:
+                        if (!song->track_mute[e->track]) {
+                            unsigned int msg = (unsigned int)e->command
+                                             | ((unsigned int)e->data1 << 8)
+                                             | ((unsigned int)e->data2 << 16);
+                            MidiOut->send(e->device, msg);
+                        }
                         break;
                     case ET_LIGHT:
                         if (++ztPlayer->light_counter>=this->tpb) {
@@ -1496,11 +1504,106 @@ void player::playback(midi_buf *buffer, int ticks)
                     buffer->insert(p_tick,ET_CC,i->midi_device,0xA,evento->effect_data&0x7F,chan,t);
                     break;
 #ifdef USE_ARPEGGIOS
-                  case 'R':  // Rxxxx start arpeggio xxxx (0=last arpeggio) 
+                  case 'R':  // Rxxxx start arpeggio xxxx (one-shot, no loop yet)
+                    {
+                        int arp_idx = evento->effect_data & 0xFF;
+                        arpeggio *arp = (arp_idx >= 0 && arp_idx < ZTM_MAX_ARPEGGIOS)
+                                            ? song->arpeggios[arp_idx] : NULL;
+                        if (arp && !arp->isempty() && arp->length > 0) {
+                            int speed_subticks = arp->speed > 0 ? arp->speed : 1;
+                            unsigned char base_note = (evento->note < 0x80)
+                                                          ? evento->note
+                                                          : Track->last_note;
+                            for (int s = 0; s < arp->length; ++s) {
+                                int step_tick = p_tick + add + s * speed_subticks;
+                                unsigned short raw_p = arp->pitch[s];
+                                if (raw_p != ZTM_ARP_EMPTY_PITCH) {
+                                    int offset = (int16_t)raw_p;
+                                    int note = (int)base_note + offset;
+                                    if (note < 0)   note = 0;
+                                    if (note > 127) note = 127;
+                                    buffer->insert(step_tick, ET_NOTE_ON,
+                                                   i->midi_device, (unsigned char)note,
+                                                   chan | (flags << 4), 0x7F, t, inst);
+                                    // schedule note-off one step later
+                                    int off_tick = p_tick + add + (s + 1) * speed_subticks - 1;
+                                    if (off_tick <= step_tick) off_tick = step_tick + 1;
+                                    buffer->insert(off_tick, ET_NOTE_OFF,
+                                                   i->midi_device, (unsigned char)note,
+                                                   chan, 0x40, t, inst);
+                                }
+                                int n = arp->num_cc;
+                                if (n > ZTM_ARPEGGIO_NUM_CC) n = ZTM_ARPEGGIO_NUM_CC;
+                                for (int c = 0; c < n; ++c) {
+                                    unsigned char v = arp->ccval[c][s];
+                                    if (v == ZTM_ARP_EMPTY_CCVAL) continue;
+                                    buffer->insert(step_tick, ET_CC,
+                                                   i->midi_device, arp->cc[c],
+                                                   v, chan, t, inst);
+                                }
+                            }
+                        }
+                    }
                     break;
 #endif /* USE_ARPEGGIOS */
 #ifdef USE_MIDIMACROS
-                  case 'Z':  // Zxxyy send midimacro xx (with optional param yy) (xx=0, last midimacro is used)
+                  case 'Z':  // Zxxyy send midimacro xx with parameter yy
+                    {
+                        int macro_idx = GET_HIGH_BYTE(evento->effect_data);
+                        int param     = GET_LOW_BYTE(evento->effect_data);
+                        midimacro *m = (macro_idx >= 0 && macro_idx < ZTM_MAX_MIDIMACROS)
+                                           ? song->midimacros[macro_idx] : NULL;
+                        if (m && !m->isempty()) {
+                            // Walk macro data, packing 3-byte short MIDI msgs
+                            // (status + up to 2 data bytes), substituting
+                            // PARAM1 with the yy parameter. A new status byte
+                            // (high bit set) flushes the previous packed msg
+                            // and starts a new one.
+                            unsigned int packed = 0;
+                            int byte_count = 0;
+                            for (int k = 0; k < ZTM_MIDIMACRO_MAXLEN; ++k) {
+                                unsigned short v = m->data[k];
+                                if (v == ZTM_MIDIMAC_END) break;
+                                unsigned char b = (v == ZTM_MIDIMAC_PARAM1)
+                                                      ? (unsigned char)param
+                                                      : (unsigned char)v;
+                                if (b & 0x80) {
+                                    if (byte_count > 0) {
+                                        buffer->insert(p_tick + add, ET_RAW,
+                                                       i->midi_device,
+                                                       packed & 0xFF,
+                                                       (packed >> 8) & 0xFF,
+                                                       (packed >> 16) & 0xFF,
+                                                       t, inst);
+                                    }
+                                    packed = b;
+                                    byte_count = 1;
+                                } else {
+                                    if (byte_count == 0) continue; // running status not supported
+                                    packed |= ((unsigned int)b) << (byte_count * 8);
+                                    byte_count++;
+                                }
+                                if (byte_count == 3) {
+                                    buffer->insert(p_tick + add, ET_RAW,
+                                                   i->midi_device,
+                                                   packed & 0xFF,
+                                                   (packed >> 8) & 0xFF,
+                                                   (packed >> 16) & 0xFF,
+                                                   t, inst);
+                                    packed = 0;
+                                    byte_count = 0;
+                                }
+                            }
+                            if (byte_count > 0) {
+                                buffer->insert(p_tick + add, ET_RAW,
+                                               i->midi_device,
+                                               packed & 0xFF,
+                                               (packed >> 8) & 0xFF,
+                                               (packed >> 16) & 0xFF,
+                                               t, inst);
+                            }
+                        }
+                    }
                     break;
 #endif /* USE_MIDIMACROS */
                   default:
