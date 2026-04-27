@@ -49,7 +49,7 @@ CUI_SongMessage::CUI_SongMessage(void) {
     UI->add_element(tb, 0);
     tb->x = 1;
     tb->y = 12;
-    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    tb->xsize = TextBox::full_width_xsize();
     // Bottom-anchor: same formula as CUI_Help so the textbox never
     // bleeds into the toolbar strip at INTERNAL_RESOLUTION_Y - 55.
     tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
@@ -118,7 +118,7 @@ void CUI_SongMessage::draw(Drawable *S) {
     // Re-run the bottom-anchored sizing in case the window has been
     // resized since the page was constructed.
     CommentEditor *cb = (CommentEditor*)UI->get_element(0);
-    cb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    cb->xsize = TextBox::full_width_xsize();
     cb->ysize = (INTERNAL_RESOLUTION_Y/8) - cb->y - 8;
     // Refresh the null-terminated display mirror so TextBox::draw has
     // a clean string to walk (CDataBuf is not null-terminated; reading

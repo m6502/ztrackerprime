@@ -612,6 +612,10 @@ int UserInterfaceElement::mouseupdate(int cur_element)
 //
 TextInput::TextInput(void) {
     cursor = 0;
+    str = NULL;
+    length = 0;
+    xsize = 0;
+    frame = 0;
 }
 
 
@@ -927,9 +931,11 @@ void TextInput::draw(Drawable *S, int active) {
 CheckBox::CheckBox(void) {
     value = NULL;
     // Default chip width: "Off" (3 chars) is the widest visible state.
-    // Callers can override but should not exceed 3 — wider values cause a
-    // trailing wipe-to-background that can render slightly off the page bg.
     xsize = 3;
+    // Frame is a no-op in CheckBox::draw (the border rendered as a yellow
+    // stripe and added no info) — default to 0 so callers don't need to
+    // reset it from the inherited default of 1.
+    frame = 0;
 }
 
 
@@ -1707,6 +1713,11 @@ TextBox::TextBox()
   bEof = false;
   bUseColors = 1;
   bWordWrap = false;
+}
+
+int TextBox::full_width_xsize()
+{
+    return 78 + ((INTERNAL_RESOLUTION_X - 640) / 8);
 }
 
 
