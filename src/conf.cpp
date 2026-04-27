@@ -252,7 +252,7 @@ ZTConf::ZTConf() {
     control_navigation_amount = 2;
     default_directory[0] = '\0';
     record_velocity = 1;
-    post_load_page = POST_LOAD_INST_EDIT;
+    post_load_page = POST_LOAD_PATTERN_EDIT;
 }
 
 ZTConf::~ZTConf() {
@@ -302,7 +302,7 @@ int ZTConf::load()
   if(Config->get("post_load_page")) {
       post_load_page = atoi(Config->get("post_load_page"));
       if (post_load_page < 0 || post_load_page >= POST_LOAD_PAGE_COUNT)
-          post_load_page = POST_LOAD_INST_EDIT;
+          post_load_page = POST_LOAD_PATTERN_EDIT;
   }
   
   ////////////////////////////////////////////////

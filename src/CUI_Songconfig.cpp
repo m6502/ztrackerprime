@@ -168,18 +168,25 @@ void CUI_Songconfig::enter(void) {
     if(!zt_config_globals.lowlight_increment)
         zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
     
+    // F11 toggle: when re-entering Songconfig from itself (LastPage==this,
+    // i.e. user pressed F11 while already on F11), focus the Title field
+    // (id 0) instead of the OrderEditor — common workflow is to press F11
+    // a second time to rename the song.
+    bool toggling = (LastPage == this);
     cur_state = STATE_SONG_CONFIG;
     // Reset OrderEditor cursor so the focus indicator is always visible
-    // at row 0 on F11 entry (otherwise stale cursor_y/list_start from a
-    // previous visit could leave it scrolled off-screen).
-    if (oe) {
+    // at row 0 (otherwise stale cursor_y/list_start could leave it
+    // scrolled off-screen). Only reset on a fresh entry — toggling to
+    // Title leaves the OrderEditor state alone.
+    if (oe && !toggling) {
         oe->cursor_y = 0;
         oe->cursor_x = 0;
         oe->list_start = 0;
     }
     Keys.flush();
-    UI->set_focus(9); // OrderEditor — last add_element id in the constructor
-    UI->cur_element = 9;  // belt-and-suspenders against any stale focus state
+    int target = toggling ? 0 : 9;   // 0 = Title TextInput, 9 = OrderEditor
+    UI->set_focus(target);
+    UI->cur_element = target;
 }
 
 void CUI_Songconfig::leave(void) {

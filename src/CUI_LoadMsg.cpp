@@ -140,9 +140,11 @@ void CUI_LoadMsg::update() {
         // people who want to verify BPM/TPB/order list before anything else.
         switch (zt_config_globals.post_load_page) {
             case POST_LOAD_PATTERN_EDIT: switch_page(UIP_Patterneditor); break;
+            case POST_LOAD_INST_EDIT:    switch_page(UIP_InstEditor);    break;
+            case POST_LOAD_PLAYSONG:     switch_page(UIP_Playsong);      break;
             case POST_LOAD_SONG_CONFIG:  switch_page(UIP_Songconfig);    break;
-            case POST_LOAD_INST_EDIT:
-            default:                     switch_page(UIP_InstEditor);   break;
+            case POST_LOAD_SONG_MESSAGE: switch_page(UIP_SongMessage);   break;
+            default:                     switch_page(UIP_Patterneditor); break;
         }
     }
 }

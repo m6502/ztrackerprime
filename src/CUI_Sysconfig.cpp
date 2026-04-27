@@ -314,6 +314,15 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->value = &zt_config_globals.full_screen;
         cb->frame = 0;
 
+        // Record Velocity (moved from Ctrl+F12 Global Config).
+        cb = new CheckBox;
+        UI->add_element(cb,tabindex++);
+        cb->x = 4+16;
+        cb->y = base_y + 5;
+        cb->xsize = 3;
+        cb->value = &zt_config_globals.record_velocity;
+        cb->frame = 0;
+
 #ifndef DISABLED_CONFIGURATION_VALUES
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
@@ -488,6 +497,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(TRACKS_ROW_Y+6)," Auto-open MIDI",COLORS.Text,S);
 
         print(row(4),col(TRACKS_ROW_Y+7),"    Full Screen",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
         print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);

@@ -61,19 +61,11 @@ CUI_Config::CUI_Config(void) {
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
 
-    cb = new CheckBox;
-    UI->add_element(cb,3);
-    cb->x = 20;
-    cb->y = 18;
-    cb->xsize = 3;
-    cb->value = &zt_config_globals.record_velocity;
-    cb->frame = 0;
-
-    // Autosave (sec) shares row 18 with Record Velocity to the right of
-    // its checkbox.
+    // Autosave (sec) — moved up to row 18 (was sharing row with Record
+    // Velocity, which has moved to F12 Sysconfig).
     vs = new ValueSlider;
-    UI->add_element(vs,4);
-    vs->x = 40;
+    UI->add_element(vs,3);
+    vs->x = 20;
     vs->y = 18;
     vs->xsize = 15;
     vs->ysize = 1;
@@ -82,7 +74,7 @@ CUI_Config::CUI_Config(void) {
     vs->max = 3600;
 
     vs = new ValueSlider;
-    UI->add_element(vs,5);
+    UI->add_element(vs,4);
     vs->x = 20;
     vs->y = 20;
     vs->xsize = 15;
@@ -99,32 +91,13 @@ CUI_Config::CUI_Config(void) {
     vs->no_tab_stop = 1;  // invisible stub; skip it in UP/DOWN cycling
 #endif
 
-    vs = new ValueSlider;
-    UI->add_element(vs,6);
-    // Row highlight + Row lowlight share row 21. Labels right-align to
-    // end col 18 / col 59 (1-char gap before each slider at x=20 / x=60).
-    vs->x = 20;
-    vs->y = 21;
-    vs->xsize = 13;
-    vs->ysize = 1;
-    vs->value = zt_config_globals.highlight_increment;
-    vs->min = 1;
-    vs->max = 64;
+    // Row Highlight / Row Lowlight live in F11 (Songconfig) only — they
+    // were duplicated here previously.
 
     vs = new ValueSlider;
-    UI->add_element(vs,7);
-    vs->x = 60;
-    vs->y = 21;
-    vs->xsize = 13;
-    vs->ysize = 1;
-    vs->value = zt_config_globals.lowlight_increment;
-    vs->min = 1;
-    vs->max = 64;
-
-    vs = new ValueSlider;
-    UI->add_element(vs,8);
+    UI->add_element(vs,5);
     vs->x = 20;
-    vs->y = 23;
+    vs->y = 22;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.pattern_length;
@@ -132,12 +105,10 @@ CUI_Config::CUI_Config(void) {
     vs->max = 256;
 
     // Post-Load Page: where to land after a successful song load.
-    // Slider with an inline label name (Inst/Pattern/Songconf) drawn
-    // by draw() — same idiom as View Mode above.
     vs = new ValueSlider;
-    UI->add_element(vs, 9);
+    UI->add_element(vs, 6);
     vs->x = 20;
-    vs->y = 24;
+    vs->y = 23;
     vs->xsize = 15;
     vs->ysize = 1;
     vs->value = zt_config_globals.post_load_page;
@@ -148,7 +119,7 @@ CUI_Config::CUI_Config(void) {
     // Tab order: Page-switch button is the LAST tab-stop element so
     // DOWN-arrow from the bottom of the config list wraps cleanly back
     // to Autoload .ZT (tabindex 0).
-    UI->add_element(b,10);
+    UI->add_element(b,7);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
     b->xsize = 18;
     b->x = 4;   // matches Sysconfig F12 button x so the button doesn't jump on page switch
@@ -205,7 +176,7 @@ CUI_Config::CUI_Config(void) {
 */
 
     tb = new TextBox;
-    UI->add_element(tb, 11);
+    UI->add_element(tb, 8);
     tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
     // Align left edge with the 'Go to page 1' button (x=4) above so the
     // page balances visually. Right edge stays where it was — same column
@@ -230,7 +201,7 @@ void CUI_Config::enter(void) {
     Keys.flush();
     // Start with focus on "Go to page 1" so the user can bounce straight
     // back to System Config without tabbing past every field first.
-    UI->set_focus(10);
+    UI->set_focus(7);   // 'Go to page 1' button (was 10 before renumbering)
 }
 
 void CUI_Config::leave(void) {
@@ -302,34 +273,24 @@ void CUI_Config::update() {
     ValueSlider *vs;
     TextInput *ti;
 
-    vs = (ValueSlider *)UI->get_element(4);
+    vs = (ValueSlider *)UI->get_element(3);   // Autosave (was 4)
     if (vs && vs->value != zt_config_globals.autosave_interval_seconds) {
         zt_config_globals.autosave_interval_seconds = vs->value;
     }
 
-    vs = (ValueSlider *)UI->get_element(5);
+    vs = (ValueSlider *)UI->get_element(4);   // View Mode (was 5)
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
     if (vs && vs->value != zt_config_globals.cur_edit_mode) {
         zt_config_globals.cur_edit_mode = vs->value;
     }
 #endif
 
-    vs = (ValueSlider *)UI->get_element(6);
-    if (vs && vs->value != zt_config_globals.highlight_increment) {
-        zt_config_globals.highlight_increment = vs->value;
-    }
-
-    vs = (ValueSlider *)UI->get_element(7);
-    if (vs && vs->value != zt_config_globals.lowlight_increment) {
-        zt_config_globals.lowlight_increment = vs->value;
-    }
-
-    vs = (ValueSlider *)UI->get_element(8);
+    vs = (ValueSlider *)UI->get_element(5);   // Default Pat Len (was 8)
     if (vs && vs->value != zt_config_globals.pattern_length) {
         zt_config_globals.pattern_length = vs->value;
     }
 
-    vs = (ValueSlider *)UI->get_element(9);
+    vs = (ValueSlider *)UI->get_element(6);   // Post-Load Page (was 9)
     if (vs && vs->value != zt_config_globals.post_load_page) {
         zt_config_globals.post_load_page = vs->value;
     }
@@ -377,19 +338,20 @@ void CUI_Config::draw(Drawable *S) {
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         sprintf(buf+strlen(buf),"\n|U| View Mode       |L|[|H|%s|L|]",view_mode_name);
 #endif
-        sprintf(buf+strlen(buf),"\n|U| Row highlight   |L|[|H|%d|L|]",zt_config_globals.highlight_increment);
-        sprintf(buf+strlen(buf),"\n|U| Row lowlight    |L|[|H|%d|L|]",zt_config_globals.lowlight_increment);
+        // Row highlight / Row lowlight live in F11 only — not duplicated here.
         sprintf(buf+strlen(buf),"\n|U| Pattern Len     |L|[|H|%d|L|]",zt_config_globals.pattern_length);
         sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
         sprintf(buf+strlen(buf),"\n|U| Chase MIDI Tempo|L|[|H|%s|L|]",zt_config_globals.midi_in_sync_chase_tempo?"On":"Off");
-        const char *post_load_name = "Inst Editor";
+        const char *post_load_name = "Pattern Edit";
         switch (zt_config_globals.post_load_page) {
             case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Edit"; break;
+            case POST_LOAD_INST_EDIT:    post_load_name = "Inst Editor";  break;
+            case POST_LOAD_PLAYSONG:     post_load_name = "Play Song";    break;
             case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Config";  break;
-            case POST_LOAD_INST_EDIT:
-            default:                     post_load_name = "Inst Editor";  break;
+            case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message"; break;
+            default:                     post_load_name = "Pattern Edit"; break;
         }
         sprintf(buf+strlen(buf),"\n|U| Post-Load Page  |L|[|H|%s|L|]",post_load_name);
         sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
@@ -425,7 +387,7 @@ void CUI_Config::draw(Drawable *S) {
         UI->draw(S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         {
-            ValueSlider *vs = (ValueSlider *)UI->get_element(5);
+            ValueSlider *vs = (ValueSlider *)UI->get_element(4);   // View Mode (was 5)
             if (vs) {
                 const char *view_mode_name = "Regular";
                 switch (zt_config_globals.cur_edit_mode) {
@@ -445,14 +407,16 @@ void CUI_Config::draw(Drawable *S) {
         // Mode pattern above — slider value alone reads as 0/1/2 which
         // is meaningless to the user without the page name beside it).
         {
-            ValueSlider *vs = (ValueSlider *)UI->get_element(9);
+            ValueSlider *vs = (ValueSlider *)UI->get_element(6);   // Post-Load Page (was 9)
             if (vs) {
-                const char *post_load_name = "Inst Editor";
+                const char *post_load_name = "Pattern Edit";
                 switch (zt_config_globals.post_load_page) {
                     case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Edit"; break;
+                    case POST_LOAD_INST_EDIT:    post_load_name = "Inst Editor";  break;
+                    case POST_LOAD_PLAYSONG:     post_load_name = "Play Song";    break;
                     case POST_LOAD_SONG_CONFIG:  post_load_name = "Song Config";  break;
-                    case POST_LOAD_INST_EDIT:
-                    default:                     post_load_name = "Inst Editor";  break;
+                    case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message"; break;
+                    default:                     post_load_name = "Pattern Edit"; break;
                 }
                 char label[20];
                 snprintf(label, sizeof(label), " %-12s", post_load_name);
@@ -468,17 +432,14 @@ void CUI_Config::draw(Drawable *S) {
         print(row(7),col(14),"Autoload .ZT",COLORS.Text,S);
         print(row(28),col(14),"Autoload File",COLORS.Text,S);
         print(row(8),col(16),"Default Dir",COLORS.Text,S);
-        print(row(4),col(18),"Record Velocity",COLORS.Text,S);
-        // Autosave (sec) shares row 18 with Record Velocity. Label
-        // right-aligned to end col 38, slider starts col 40.
-        print(row(25),col(18),"Autosave (sec)",COLORS.Text,S);
+        // Record Velocity moved to F12 (Sysconfig).
+        print(row(5),col(18),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         print(row(7),col(20),"Default View",COLORS.Text,S);
 #endif
-        print(row(6),col(21),"Row highlight",COLORS.Text,S);
-        print(row(48),col(21),"Row lowlight",COLORS.Text,S);
-        print(row(4),col(23),"Default Pat Len",COLORS.Text,S);
-        print(row(5),col(24),"Post-Load Page",COLORS.Text,S);
+        // Row Highlight / Row Lowlight live in F11 (Songconfig) only.
+        print(row(4),col(22),"Default Pat Len",COLORS.Text,S);
+        print(row(5),col(23),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);
