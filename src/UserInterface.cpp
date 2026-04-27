@@ -2907,6 +2907,11 @@ void MidiOutDeviceOpener::OnChange() {
 //
 //
 void MidiOutDeviceOpener::OnSelect(LBNode *selected) {
+    if (selected && selected->int_data >= 0) {
+        midi_out_sel(selected->int_data);
+        OnChange();
+        need_redraw++;
+    }
     ListBox::OnSelect(selected);
 }
 
@@ -2937,8 +2942,13 @@ int MidiOutDeviceOpener::update() {
     b->sync();
     AliasTextInput *t = (AliasTextInput *)al;
     t->sync();
+    if (Keys.checkkey() == SDLK_SPACE) {
+        Keys.getkey();
+        OnSelect(getNode(cur_sel + y_start));
+        need_refresh++; need_redraw++;
+        return 0;
+    }
     return ListBox::update();
-    //return ret;
 }
 
 
@@ -3025,7 +3035,22 @@ void MidiInDeviceOpener::OnChange() {
 //
 //
 void MidiInDeviceOpener::OnSelect(LBNode *selected) {
+    if (selected && selected->int_data >= 0) {
+        midi_in_sel(selected->int_data);
+        OnChange();
+        need_redraw++;
+    }
     ListBox::OnSelect(selected);
+}
+
+int MidiInDeviceOpener::update() {
+    if (Keys.checkkey() == SDLK_SPACE) {
+        Keys.getkey();
+        OnSelect(getNode(cur_sel + y_start));
+        need_refresh++; need_redraw++;
+        return 0;
+    }
+    return ListBox::update();
 }
 
 

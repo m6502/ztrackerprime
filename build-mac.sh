@@ -112,10 +112,13 @@ fi
 echo "Built: $app_path"
 
 if ((run_after_build)); then
+  log_file="${ZT_RUN_LOG:-/tmp/zt-run.log}"
+  : > "$log_file"
+  echo "Logging stdout/stderr to: $log_file"
   if ((${#app_args[@]})); then
-    "$binary_path" "${app_args[@]}" >/dev/null 2>&1 &
+    "$binary_path" "${app_args[@]}" 2>&1 | tee "$log_file" &
   else
-    "$binary_path" >/dev/null 2>&1 &
+    "$binary_path" 2>&1 | tee "$log_file" &
   fi
   echo "Launched: $binary_path"
 fi
