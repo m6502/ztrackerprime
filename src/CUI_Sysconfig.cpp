@@ -466,7 +466,6 @@ void CUI_Sysconfig::update() {
     if (bIsFullscreen) i = 1;
     if ( * cb->value != i) {
         attempt_fullscreen_toggle();
-        attempt_fullscreen_toggle();
     }
     if (Keys.size()) {
         Keys.getkey();
