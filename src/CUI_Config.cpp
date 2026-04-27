@@ -57,7 +57,7 @@ CUI_Config::CUI_Config(void) {
     ti->frame = 1;
     ti->x = 20;
     ti->y = 16;
-    ti->xsize = 50;
+    ti->xsize = 52;   // ends col 72 — matches Autoload File textfield right edge
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
 
@@ -236,46 +236,63 @@ void CUI_Config::leave(void) {
 
 void CUI_Config::update() {
 #ifdef __APPLE__
-    // Enter on Default Dir (tabindex 2) opens a native macOS folder
-    // picker via osascript. Peek the key first so UI->update() doesn't
-    // consume it. The result replaces the TextInput's buffer (which
-    // points at zt_config_globals.default_directory).
-    if (UI->cur_element == 2 && Keys.checkkey() == SDLK_RETURN) {
-        Keys.getkey();
-        FILE *p = popen(
-            "osascript -e 'try' "
-            "-e 'POSIX path of (choose folder with prompt \"Default Dir\")' "
-            "-e 'on error' -e 'return \"\"' -e 'end try'", "r");
+    // Pop a native macOS Finder picker. element_id selects between the
+    // Default Dir (folder picker) and Autoload File (file picker — basename
+    // only). Both share the same Enter-flush so keystrokes pressed inside
+    // the modal dialog don't bounce back into zTracker.
+    auto run_picker = [this](int element_id, char *target_buf, size_t target_size,
+                              bool basename_only, const char *osascript_cmd) {
+        FILE *p = popen(osascript_cmd, "r");
         if (p) {
             char picked[MAX_PATH + 1] = {0};
             if (fgets(picked, sizeof(picked), p)) {
                 size_t n = strlen(picked);
-                while (n > 0 && (picked[n-1] == '\n' || picked[n-1] == '\r' || picked[n-1] == '/')) {
+                while (n > 0 && (picked[n-1] == '\n' || picked[n-1] == '\r' ||
+                                 (!basename_only && picked[n-1] == '/'))) {
                     picked[--n] = '\0';
                 }
                 if (n > 0) {
-                    strncpy(zt_config_globals.default_directory, picked,
-                            sizeof(zt_config_globals.default_directory) - 1);
-                    zt_config_globals.default_directory[sizeof(zt_config_globals.default_directory) - 1] = '\0';
-                    TextInput *ti2 = (TextInput *)UI->get_element(2);
-                    if (ti2) {
-                        ti2->cursor = 0;
-                        ti2->changed = 1;
-                        ti2->need_redraw++;
+                    const char *src = picked;
+                    if (basename_only) {
+                        const char *slash = strrchr(picked, '/');
+                        if (slash) src = slash + 1;
+                    }
+                    strncpy(target_buf, src, target_size - 1);
+                    target_buf[target_size - 1] = '\0';
+                    TextInput *ti = (TextInput *)UI->get_element(element_id);
+                    if (ti) {
+                        ti->cursor = 0;
+                        ti->changed = 1;
+                        ti->need_redraw++;
                     }
                     need_refresh++;
                 }
             }
             pclose(p);
         }
-        // Pump SDL events + flush queued keys so the Enter the user
-        // pressed inside the Finder dialog (and any keystrokes that
-        // landed in zTracker's window while it was unfocused) don't
-        // leak through and re-open the picker on the next update().
         SDL_PumpEvents();
         SDL_FlushEvent(SDL_EVENT_KEY_DOWN);
         SDL_FlushEvent(SDL_EVENT_KEY_UP);
         Keys.flush();
+    };
+
+    // Enter on Default Dir (id 2) opens a folder picker.
+    if (UI->cur_element == 2 && Keys.checkkey() == SDLK_RETURN) {
+        Keys.getkey();
+        run_picker(2, zt_config_globals.default_directory,
+                   sizeof(zt_config_globals.default_directory), false,
+                   "osascript -e 'try' "
+                   "-e 'POSIX path of (choose folder with prompt \"Default Dir\")' "
+                   "-e 'on error' -e 'return \"\"' -e 'end try'");
+    }
+    // Enter on Autoload File (id 1) opens a file picker; basename only.
+    else if (UI->cur_element == 1 && Keys.checkkey() == SDLK_RETURN) {
+        Keys.getkey();
+        run_picker(1, zt_config_globals.autoload_ztfile_filename,
+                   sizeof(zt_config_globals.autoload_ztfile_filename), true,
+                   "osascript -e 'try' "
+                   "-e 'POSIX path of (choose file with prompt \"Autoload File\")' "
+                   "-e 'on error' -e 'return \"\"' -e 'end try'");
     }
 #endif
     UI->update();
