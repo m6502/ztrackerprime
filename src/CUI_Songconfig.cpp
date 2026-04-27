@@ -268,8 +268,8 @@ void CUI_Songconfig::draw(Drawable *S) {
         printchar(row(17 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
         printchar(row(17 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
         // MIDI sync settings (moved from F12 Sysconfig + Ctrl+F12 Global Config).
-        print(row(1),col(base_y+11),"  MIDI In Sync",COLORS.Text,S);
-        print(row(1),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
+        print(row(1),col(base_y+11),"   MIDI In Sync",COLORS.Text,S);
+        print(row(0),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
         // Order List label aligned to the OE x-origin (col 59) so the
         // header sits flush over the "000" index column.
         print(row(59),col(11),"Order List",COLORS.Text,S);
