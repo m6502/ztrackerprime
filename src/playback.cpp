@@ -1504,7 +1504,7 @@ void player::playback(midi_buf *buffer, int ticks)
                     buffer->insert(p_tick,ET_CC,i->midi_device,0xA,evento->effect_data&0x7F,chan,t);
                     break;
 #ifdef USE_ARPEGGIOS
-                  case 'R':  // Rxxxx start arpeggio xxxx (one-shot, no loop yet)
+                  case 'R':  // Rxxxx start arpeggio xxxx (loops at repeat_pos)
                     {
                         int arp_idx = evento->effect_data & 0xFF;
                         arpeggio *arp = (arp_idx >= 0 && arp_idx < ZTM_MAX_ARPEGGIOS)
@@ -1514,9 +1514,24 @@ void player::playback(midi_buf *buffer, int ticks)
                             unsigned char base_note = (evento->note < 0x80)
                                                           ? evento->note
                                                           : Track->last_note;
-                            for (int s = 0; s < arp->length; ++s) {
-                                int step_tick = p_tick + add + s * speed_subticks;
-                                unsigned short raw_p = arp->pitch[s];
+                            // Schedule up to 256 effective steps so a short
+                            // looping arpeggio (e.g. length 4, repeat 0)
+                            // covers a full pattern at typical tempos. The
+                            // user retriggers (or note-off + re-R) to
+                            // replace; without per-track ongoing state in
+                            // the player, this is the cleanest way to get
+                            // real loop behaviour without rewriting the
+                            // scheduler.
+                            int repeat_pos = arp->repeat_pos;
+                            if (repeat_pos < 0)              repeat_pos = 0;
+                            if (repeat_pos >= arp->length)   repeat_pos = arp->length - 1;
+                            const int MAX_SCHEDULED_STEPS = 256;
+                            int s_logical = 0;   // index into arp data
+                            for (int n_emitted = 0;
+                                 n_emitted < MAX_SCHEDULED_STEPS;
+                                 ++n_emitted) {
+                                int step_tick = p_tick + add + n_emitted * speed_subticks;
+                                unsigned short raw_p = arp->pitch[s_logical];
                                 if (raw_p != ZTM_ARP_EMPTY_PITCH) {
                                     int offset = (int16_t)raw_p;
                                     int note = (int)base_note + offset;
@@ -1525,21 +1540,28 @@ void player::playback(midi_buf *buffer, int ticks)
                                     buffer->insert(step_tick, ET_NOTE_ON,
                                                    i->midi_device, (unsigned char)note,
                                                    chan | (flags << 4), 0x7F, t, inst);
-                                    // schedule note-off one step later
-                                    int off_tick = p_tick + add + (s + 1) * speed_subticks - 1;
+                                    int off_tick = p_tick + add + (n_emitted + 1) * speed_subticks - 1;
                                     if (off_tick <= step_tick) off_tick = step_tick + 1;
                                     buffer->insert(off_tick, ET_NOTE_OFF,
                                                    i->midi_device, (unsigned char)note,
                                                    chan, 0x40, t, inst);
                                 }
-                                int n = arp->num_cc;
-                                if (n > ZTM_ARPEGGIO_NUM_CC) n = ZTM_ARPEGGIO_NUM_CC;
-                                for (int c = 0; c < n; ++c) {
-                                    unsigned char v = arp->ccval[c][s];
+                                int nc = arp->num_cc;
+                                if (nc > ZTM_ARPEGGIO_NUM_CC) nc = ZTM_ARPEGGIO_NUM_CC;
+                                for (int c = 0; c < nc; ++c) {
+                                    unsigned char v = arp->ccval[c][s_logical];
                                     if (v == ZTM_ARP_EMPTY_CCVAL) continue;
                                     buffer->insert(step_tick, ET_CC,
                                                    i->midi_device, arp->cc[c],
                                                    v, chan, t, inst);
+                                }
+                                // Advance — loop back to repeat_pos when
+                                // we walk past the end. If repeat_pos == 0
+                                // and length == 1 the same step plays
+                                // forever (same as the user asked).
+                                ++s_logical;
+                                if (s_logical >= arp->length) {
+                                    s_logical = repeat_pos;
                                 }
                             }
                         }
