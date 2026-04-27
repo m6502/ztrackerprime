@@ -86,6 +86,14 @@ int ValueSlider::mouseupdate(int cur_element)
             }
             this->need_redraw++;
         }
+        // Consume the mouse event we just acted on (MOUSE_BUTTON_DOWN
+        // on click, MOUSE_BUTTON_UP on release) before returning.
+        // Without this, the early return below skips the Keys.getkey()
+        // path, the event sits in the queue, and the next frame keeps
+        // re-processing the stale MOUSE_DOWN -- so drag never stops on
+        // mouse release, and a second slider on the same row sees the
+        // same stale event and starts dragging too.
+        if (act) { Keys.getkey(); fixmouse++; }
         return this->ID;
     }
 

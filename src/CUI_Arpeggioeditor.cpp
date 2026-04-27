@@ -669,17 +669,23 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Hint + trigger info below the grid
+    // Hint + trigger info below the grid. The hint is split into two
+    // lines because all of it on a single row used to overflow the
+    // right edge of the screen on the default 1024x768 internal
+    // resolution.
     {
         int hint_y = GRID_Y + GRID_VISIBLE + 1;
         print(row(4), col(hint_y),
-              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch; '.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
+              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch",
+              COLORS.Text, S);
+        print(row(4), col(hint_y + 1),
+              "'.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
               COLORS.Text, S);
         char hdr[96];
         snprintf(hdr, sizeof(hdr),
                  "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
                  ar_slot);
-        print(row(4), col(hint_y + 1), hdr, COLORS.Highlight, S);
+        print(row(4), col(hint_y + 2), hdr, COLORS.Highlight, S);
     }
 
     // Status hint when grid has focus
