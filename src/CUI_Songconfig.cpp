@@ -37,7 +37,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         ti = new TextInput;
         UI->add_element(ti,0);
         ti->frame = 1;
-        ti->x = 17;
+        ti->x = 20;
         ti->y = base_y;
         ti->xsize=28;
         ti->length=28;
@@ -47,7 +47,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,1);
         vs->frame = 0;
-        vs->x = 17; 
+        vs->x = 20; 
         vs->y = base_y+2; 
         vs->xsize=28;
         vs->min = 60;
@@ -58,7 +58,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,2);
         vs->frame = 0;
-        vs->x = 17; 
+        vs->x = 20; 
         vs->y = base_y+3; 
         vs->xsize=28;
         vs->min = 0;
@@ -69,7 +69,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
     /* Initialize Frame for those two above*/
         fm = new Frame;
         UI->add_gfx(fm,0);
-        fm->x = 17;
+        fm->x = 20;
         fm->y = base_y+2;
         fm->xsize = 28;
         fm->ysize = 2;
@@ -78,7 +78,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,3);
         cb->frame = 0;
-        cb->x = 17;
+        cb->x = 20;
         cb->y = base_y+5;
         cb->xsize = 3;
         cb->value = &song->flag_SendMidiClock;
@@ -87,7 +87,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,4);
         cb->frame = 0;
-        cb->x = 17;
+        cb->x = 20;
         cb->y = base_y+6;
         cb->xsize = 3;
         cb->value = &song->flag_SendMidiStopStart;
@@ -102,7 +102,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs, 5);
         vs->frame = 0;
-        vs->x = 17;
+        vs->x = 20;
         vs->y = base_y + 8;
         vs->xsize = 28;
         vs->min = 1;
@@ -112,7 +112,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs, 6);
         vs->frame = 0;
-        vs->x = 17;
+        vs->x = 20;
         vs->y = base_y + 9;
         vs->xsize = 28;
         vs->min = 1;
@@ -121,7 +121,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
 
         fm = new Frame;
         UI->add_gfx(fm, 2);
-        fm->x = 17;
+        fm->x = 20;
         fm->y = base_y + 8;
         fm->xsize = 28;
         fm->ysize = 2;
@@ -130,7 +130,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb, 7);
         cb->frame = 0;
-        cb->x = 17;
+        cb->x = 20;
         cb->y = base_y + 11;
         cb->xsize = 3;
         cb->value = &zt_config_globals.midi_in_sync;
@@ -139,7 +139,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb, 8);
         cb->frame = 0;
-        cb->x = 17;
+        cb->x = 20;
         cb->y = base_y + 12;
         cb->xsize = 3;
         cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
@@ -248,28 +248,24 @@ void CUI_Songconfig::draw(Drawable *S) {
         UI->draw(S);
         draw_status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
-        // Right-align Title/BPM/TPB labels so their right edge sits one
-        // char before the textfield/slider start (col 17), matching the
-        // tight "Send MIDI Clock" / "MIDI Stop/Start" pattern below.
-        // "Title" = 5 chars → col 11; "BPM"/"TPB" = 3 chars → col 13.
-        print(row(11),col(base_y),"Title",COLORS.Text,S);
-        print(row(13),col(base_y+2),"BPM",COLORS.Text,S);
-        print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
-        print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
-        print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
-        // Row Highlight + Row Lowlight sliders share the BPM/TPB column.
-        print(row(2),col(base_y+8),"Row Highlight ",COLORS.Text,S);
-        print(row(3),col(base_y+9),"Row Lowlight ",COLORS.Text,S);
-        printchar(row(17 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
-        printchar(row(17 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
-        // MIDI sync settings (moved from F12 Sysconfig + Ctrl+F12 Global Config).
-        print(row(1),col(base_y+11),"   MIDI In Sync",COLORS.Text,S);
-        print(row(0),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
-        // Order List label aligned to the OE x-origin (col 59) so the
-        // header sits flush over the "000" index column.
+        // All labels right-align so text ends col 18 (1-char gap before
+        // col-20 controls). Order List is on its own column (col 59)
+        // and is intentionally NOT shifted.
+        print(row(14),col(base_y),"Title",COLORS.Text,S);
+        print(row(16),col(base_y+2),"BPM",COLORS.Text,S);
+        print(row(16),col(base_y+3),"TPB",COLORS.Text,S);
+        print(row(4),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
+        print(row(4),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
+        print(row(5),col(base_y+8),"Row Highlight ",COLORS.Text,S);
+        print(row(6),col(base_y+9),"Row Lowlight ",COLORS.Text,S);
+        printchar(row(20 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
+        printchar(row(20 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
+        print(row(4),col(base_y+11),"   MIDI In Sync",COLORS.Text,S);
+        print(row(3),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
+        // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
         print(row(59),col(11),"Order List",COLORS.Text,S);
-        printchar(row(17 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
-        printchar(row(17 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
+        printchar(row(20 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
+        printchar(row(20 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
 
         need_refresh = 0; updated=2;
         ztPlayer->num_orders();
