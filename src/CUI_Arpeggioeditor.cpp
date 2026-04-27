@@ -588,7 +588,7 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     draw_status(S);
     {
         const char *t = file_changed
-            ? "Arpeggio Editor (Shift+F4) [modified - Ctrl+S or Cmd+S saves]"
+            ? "Arpeggio Editor (Shift+F4) [modified - Ctrl+S saves]"
             : "Arpeggio Editor (Shift+F4)";
         printtitle(PAGE_TITLE_ROW_Y, t, COLORS.Text, COLORS.Background, S);
     }

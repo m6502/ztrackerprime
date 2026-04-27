@@ -470,7 +470,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     draw_status(S);
     {
         const char *t = file_changed
-            ? "MIDI Macro Editor (F4) [modified - Ctrl+S or Cmd+S saves]"
+            ? "MIDI Macro Editor (F4) [modified - Ctrl+S saves]"
             : "MIDI Macro Editor (F4)";
         printtitle(PAGE_TITLE_ROW_Y, t, COLORS.Text, COLORS.Background, S);
     }
