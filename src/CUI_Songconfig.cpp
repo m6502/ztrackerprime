@@ -80,7 +80,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->frame = 0;
         cb->x = 17;
         cb->y = base_y+5;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &song->flag_SendMidiClock;
     // END Midi Clock
     /* Initialize MIDI Stop/Start checkbox */
@@ -89,15 +89,15 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->frame = 0;
         cb->x = 17;
         cb->y = base_y+6;
-        cb->xsize = 5;
+        cb->xsize = 3;
         cb->value = &song->flag_SendMidiStopStart;
     // END Midi Clock
     /* Initialize Frame for those two above */
         fm = new Frame;
         UI->add_gfx(fm,1);
         fm->x = 17;
-        fm->y = base_y+5; 
-        fm->xsize = 5;
+        fm->y = base_y+5;
+        fm->xsize = 3;
         fm->ysize = 2;
     // END Frame
 
