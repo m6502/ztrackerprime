@@ -905,9 +905,20 @@ char *hex2note(char *str,unsigned char note)
 //
 void status(const char *msg,Drawable *S)
 {
-    printBG(col(3),row(INITIAL_ROW + 6),"                                                                            ",COLORS.Text,COLORS.Background,S);
+    // Wipe the full status row up to the right screen edge before
+    // drawing the new message. Hardcoded 76-space string left a stale
+    // strip at the right when a long Playing/Looping line shrank to
+    // "Stopped" on a window wider than 640px.
+    const int max_cols = INTERNAL_RESOLUTION_X / FONT_SIZE_X;
+    char wipe[256];
+    int n = max_cols - 3;
+    if (n < 0) n = 0;
+    if (n > (int)sizeof(wipe) - 1) n = sizeof(wipe) - 1;
+    memset(wipe, ' ', n);
+    wipe[n] = '\0';
+    printBG(col(3),row(INITIAL_ROW + 6),wipe,COLORS.Text,COLORS.Background,S);
     printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);
-    screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(80)-1,row(10));
+    screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(max_cols)-1,row(10));
 }
 
 
