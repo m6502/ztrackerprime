@@ -261,7 +261,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(b,tabindex++);
         b->caption = "   Go to page 2   ";
         b->xsize = 18;
-        b->x = 2;
+        b->x = 4;   // align start with "MIDI Out Device Selection" label below
         b->y = 12;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_GotoGlobalConfig;
@@ -301,7 +301,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
         cb->x = 4 + 16;
-        cb->y = base_y + 6;
+        cb->y = base_y + 4;   // moved 2 rows up
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_open_midi;
         cb->frame = 0;
@@ -340,7 +340,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(sk,tabindex++);
         sk->x = 4+35 +10;
         sk->y = base_y + 1;   // "Skin Selection" label sits on the same row as "Prebuffer"; list top border one row below
-        sk->xsize = 19+4;
+        sk->xsize = 19+8;     // ends at col 76, matches MIDI In Device list end
         sk->ysize = 7;   // tight-fit around installed skin count, avoids empty black space
 
         // MIDI Out column — visual order: Refresh (y=28), list (y=30-42),
@@ -485,7 +485,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(TRACKS_ROW_Y+3),"      Prebuffer",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+5),"  Panic on stop",COLORS.Text,S);
         // "MIDI-IN Slave" label intentionally omitted — see F11 (Songconfig).
-        print(row(4),col(TRACKS_ROW_Y+9)," Auto-open MIDI",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+7)," Auto-open MIDI",COLORS.Text,S);
 
         print(row(4),col(TRACKS_ROW_Y+11),"    Full Screen",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
