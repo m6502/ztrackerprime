@@ -92,20 +92,15 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->xsize = 3;
         cb->value = &song->flag_SendMidiStopStart;
     // END Midi Clock
-    /* Initialize Frame for those two above */
-        fm = new Frame;
-        UI->add_gfx(fm,1);
-        fm->x = 17;
-        fm->y = base_y+5;
-        fm->xsize = 3;
-        fm->ysize = 2;
-    // END Frame
+        // Send MIDI Clock + MIDI Stop/Start checkboxes have no surrounding
+        // Frame — its right border char rendered as a yellow stripe to the
+        // right of the chips and the unframed style matches MIDI In Sync /
+        // Chase MIDI Tempo below.
 
-        // Row highlight minor / major (the global zt_config_globals
-        // values, surfaced here so song-edit tasks can tweak them
-        // without leaving F11).
+        // Row Highlight + Row Lowlight (the global zt_config_globals values,
+        // surfaced here so song-edit tasks can tweak them without leaving F11).
         vs = new ValueSlider;
-        UI->add_element(vs, 6);
+        UI->add_element(vs, 5);
         vs->frame = 0;
         vs->x = 17;
         vs->y = base_y + 8;
@@ -115,7 +110,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs->value = zt_config_globals.highlight_increment;
 
         vs = new ValueSlider;
-        UI->add_element(vs, 7);
+        UI->add_element(vs, 6);
         vs->frame = 0;
         vs->x = 17;
         vs->y = base_y + 9;
@@ -133,7 +128,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
 
         // MIDI In Sync (slave to incoming MIDI clock).
         cb = new CheckBox;
-        UI->add_element(cb, 8);
+        UI->add_element(cb, 7);
         cb->frame = 0;
         cb->x = 17;
         cb->y = base_y + 11;
@@ -142,7 +137,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
 
         // Chase MIDI Tempo.
         cb = new CheckBox;
-        UI->add_element(cb, 9);
+        UI->add_element(cb, 8);
         cb->frame = 0;
         cb->x = 17;
         cb->y = base_y + 12;
@@ -150,7 +145,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
         oe = new OrderEditor;
-        UI->add_element(oe,10);
+        UI->add_element(oe,9);
         oe->x = 59;
         oe->y = 13;
         oe->xsize = 9;
@@ -222,23 +217,23 @@ void CUI_Songconfig::update()
 
         file_changed++;
     }
-    vs = (ValueSlider *)UI->get_element(6);
+    vs = (ValueSlider *)UI->get_element(5);
     if (vs && vs->value != zt_config_globals.highlight_increment) {
         zt_config_globals.highlight_increment = vs->value;
     } else if (vs) {
         vs->value = zt_config_globals.highlight_increment;
     }
-    vs = (ValueSlider *)UI->get_element(7);
+    vs = (ValueSlider *)UI->get_element(6);
     if (vs && vs->value != zt_config_globals.lowlight_increment) {
         zt_config_globals.lowlight_increment = vs->value;
     } else if (vs) {
         vs->value = zt_config_globals.lowlight_increment;
     }
     {
-        CheckBox *cb = (CheckBox *)UI->get_element(8);
+        CheckBox *cb = (CheckBox *)UI->get_element(7);
         if (cb && cb->changed)
             zt_config_globals.midi_in_sync = *(cb->value);
-        cb = (CheckBox *)UI->get_element(9);
+        cb = (CheckBox *)UI->get_element(8);
         if (cb && cb->changed)
             zt_config_globals.midi_in_sync_chase_tempo = *(cb->value);
     }
@@ -262,9 +257,9 @@ void CUI_Songconfig::draw(Drawable *S) {
         print(row(13),col(base_y+3),"TPB",COLORS.Text,S);
         print(row(1),col(base_y+5),"Send MIDI Clock",COLORS.Text,S);
         print(row(1),col(base_y+6.),"MIDI Stop/Start",COLORS.Text,S);
-        // Row highlight minor / major sliders share the BPM/TPB column.
-        print(row(1),col(base_y+8),"Row hl minor   ",COLORS.Text,S);
-        print(row(1),col(base_y+9),"Row hl major   ",COLORS.Text,S);
+        // Row Highlight + Row Lowlight sliders share the BPM/TPB column.
+        print(row(2),col(base_y+8),"Row Highlight ",COLORS.Text,S);
+        print(row(3),col(base_y+9),"Row Lowlight ",COLORS.Text,S);
         printchar(row(17 + 27) + 1,col(base_y+8),0x84,COLORS.Highlight,S);
         printchar(row(17 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
         // MIDI sync settings (moved from F12 Sysconfig + Ctrl+F12 Global Config).
