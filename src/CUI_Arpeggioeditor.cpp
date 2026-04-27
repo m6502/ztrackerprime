@@ -223,12 +223,32 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     gf->x = GRID_X; gf->y = GRID_Y;
 }
 
+// Migrate legacy out-of-range values (loaded from old .zt files) into
+// the slider-valid range silently. ZTM_ARP_EMPTY_CC = 0x80 used to be
+// the default cc[i] but is out of range for the cc slider (max 127);
+// num_cc default used to be ZTM_ARPEGGIO_NUM_CC even for an empty arp;
+// speed used to be uninitialised. Migrate in place without setting
+// file_changed so a fresh load doesn't appear "modified".
+static void ar_migrate_legacy(arpeggio *a) {
+    if (!a) return;
+    if (a->speed < 1 || a->speed > 255)              a->speed = 1;
+    if (a->num_cc < 0 || a->num_cc > ZTM_ARPEGGIO_NUM_CC) a->num_cc = 0;
+    if (a->length < 0 || a->length > ZTM_ARPEGGIO_LEN)    a->length = 0;
+    if (a->repeat_pos < 0)                                a->repeat_pos = 0;
+    if (a->length > 0 && a->repeat_pos >= a->length)      a->repeat_pos = a->length - 1;
+    for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
+        if (a->cc[i] > 0x7F) a->cc[i] = 0;
+    }
+}
+
 void CUI_Arpeggioeditor::enter(void) {
     need_refresh++;
     cur_state = STATE_ARPEDIT;
     ar_load_name(ar_slot);
 
     arpeggio *a = song->arpeggios[ar_slot];
+    ar_migrate_legacy(a);
+
     ((ValueSlider *)UI->get_element(0))->value = ar_slot;
     ((ValueSlider *)UI->get_element(2))->value = a ? a->length     : 1;
     ((ValueSlider *)UI->get_element(3))->value = a ? a->speed      : 1;
@@ -236,6 +256,15 @@ void CUI_Arpeggioeditor::enter(void) {
     ((ValueSlider *)UI->get_element(5))->value = a ? a->num_cc     : 0;
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
         ((ValueSlider *)UI->get_element(6 + i))->value = a ? a->cc[i] : 0;
+
+    // Clamp cursor in case the slot was previously edited at a step
+    // that's now out of range.
+    int max_step = a && a->length > 0 ? a->length - 1 : 0;
+    if (ar_cur_step > max_step) ar_cur_step = max_step;
+    int max_col = a ? a->num_cc : 0;
+    if (ar_cur_col > max_col) ar_cur_col = max_col;
+    if (ar_view_top > ar_cur_step) ar_view_top = ar_cur_step;
+
     UI->set_focus(0);
     Keys.flush();
 }
@@ -261,6 +290,7 @@ void CUI_Arpeggioeditor::update() {
         ar_cur_digit = 0;
         ar_load_name(ar_slot);
         arpeggio *a = song->arpeggios[ar_slot];
+        ar_migrate_legacy(a);
         ((ValueSlider *)UI->get_element(2))->value = a ? a->length     : 1;
         ((ValueSlider *)UI->get_element(3))->value = a ? a->speed      : 1;
         ((ValueSlider *)UI->get_element(4))->value = a ? a->repeat_pos : 0;
@@ -309,8 +339,27 @@ void CUI_Arpeggioeditor::update() {
         a->num_cc     = v_numcc;
         for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k)
             a->cc[k] = (unsigned char)v_cc[k];
+        // Keep repeat_pos sane wrt new length.
+        if (a->length > 0 && a->repeat_pos >= a->length) {
+            a->repeat_pos = a->length - 1;
+            ((ValueSlider *)UI->get_element(4))->value = a->repeat_pos;
+        }
         file_changed++;
         need_refresh++;
+    }
+
+    // Cursor sanity: keep cur_step inside [0, length) and cur_col
+    // inside [0, num_cc] every frame, in case length/num_cc shrank.
+    {
+        arpeggio *cur = song->arpeggios[ar_slot];
+        int len     = cur ? cur->length : 1;
+        int max_col = cur ? cur->num_cc : 0;
+        if (len < 1) len = 1;
+        if (ar_cur_step >= len) ar_cur_step = len - 1;
+        if (ar_cur_step < 0)    ar_cur_step = 0;
+        if (ar_cur_col > max_col) ar_cur_col = max_col;
+        if (ar_cur_col < 0)       ar_cur_col = 0;
+        if (ar_view_top > ar_cur_step) ar_view_top = ar_cur_step;
     }
 
     // Grid input
@@ -333,6 +382,41 @@ void CUI_Arpeggioeditor::update() {
             ((ValueSlider *)UI->get_element(3))->value = na->speed;
             ((ValueSlider *)UI->get_element(4))->value = na->repeat_pos;
             ((ValueSlider *)UI->get_element(5))->value = na->num_cc;
+            consumed = true;
+        }
+        else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
+            // Shift+Del / Shift+BS: clear pitch + cc data on this slot
+            // but keep the name and metadata.
+            arpeggio *aw = song->arpeggios[ar_slot];
+            if (aw) {
+                for (int s = 0; s < ZTM_ARPEGGIO_LEN; ++s) {
+                    aw->pitch[s] = ZTM_ARP_EMPTY_PITCH;
+                    for (int c = 0; c < ZTM_ARPEGGIO_NUM_CC; ++c)
+                        aw->ccval[c][s] = ZTM_ARP_EMPTY_CCVAL;
+                }
+                file_changed++;
+                sprintf(szStatmsg, "Cleared step data on arpeggio %d", ar_slot);
+                statusmsg = szStatmsg; status_change = 1;
+            }
+            consumed = true;
+        }
+        else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_CTRL)) {
+            // Ctrl+Del / Ctrl+BS: wipe the entire slot (free + NULL).
+            if (song->arpeggios[ar_slot]) {
+                delete song->arpeggios[ar_slot];
+                song->arpeggios[ar_slot] = NULL;
+                ar_name_buf[0] = 0;
+                ((ValueSlider *)UI->get_element(2))->value = 1;
+                ((ValueSlider *)UI->get_element(3))->value = 1;
+                ((ValueSlider *)UI->get_element(4))->value = 0;
+                ((ValueSlider *)UI->get_element(5))->value = 0;
+                for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
+                    ((ValueSlider *)UI->get_element(6 + i))->value = 0;
+                ar_cur_step = ar_cur_col = 0; ar_view_top = 0;
+                file_changed++;
+                sprintf(szStatmsg, "Deleted arpeggio %d", ar_slot);
+                statusmsg = szStatmsg; status_change = 1;
+            }
             consumed = true;
         }
         else {
@@ -434,7 +518,12 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
 
     UI->draw(S);
     draw_status(S);
-    printtitle(PAGE_TITLE_ROW_Y, "Arpeggio Editor (Shift+F4)", COLORS.Text, COLORS.Background, S);
+    {
+        const char *t = file_changed
+            ? "Arpeggio Editor (Shift+F4) [modified — Ctrl+S to save]"
+            : "Arpeggio Editor (Shift+F4)";
+        printtitle(PAGE_TITLE_ROW_Y, t, COLORS.Text, COLORS.Background, S);
+    }
 
     arpeggio *a = song->arpeggios[ar_slot];
     int  num_cc     = a ? a->num_cc     : 0;
@@ -509,7 +598,7 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     {
         int hint_y = GRID_Y + GRID_VISIBLE + 1;
         print(row(4), col(hint_y),
-              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch; '.' clear; P=preset",
+              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch; '.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
               COLORS.Text, S);
     }
 

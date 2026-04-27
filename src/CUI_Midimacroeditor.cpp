@@ -196,8 +196,13 @@ void CUI_Midimacroeditor::enter(void) {
     cur_state = STATE_MIDIMACEDIT;
     mm_load_name(mm_slot);
     midimacro *m = song->midimacros[mm_slot];
+    int len = mm_length(m);
+    if (mm_cur >= ZTM_MIDIMACRO_MAXLEN) mm_cur = ZTM_MIDIMACRO_MAXLEN - 1;
+    if (mm_cur < 0) mm_cur = 0;
+    if (len > 0 && mm_cur >= len) mm_cur = len - 1;
+    mm_cur_digit = 0;
     ((ValueSlider *)UI->get_element(0))->value = mm_slot;
-    ((ValueSlider *)UI->get_element(2))->value = mm_length(m);
+    ((ValueSlider *)UI->get_element(2))->value = len;
     UI->set_focus(0);
     Keys.flush();
 }
@@ -266,6 +271,34 @@ void CUI_Midimacroeditor::update() {
             mm_apply_preset(mm_preset_index);
             ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
             if (vlen) vlen->value = mm_length(song->midimacros[mm_slot]);
+            consumed = true;
+        }
+        else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
+            // Shift+Del / Shift+BS: clear all bytes on this slot but
+            // keep the name. Length goes to 0 (END at index 0).
+            midimacro *mw = song->midimacros[mm_slot];
+            if (mw) {
+                mw->data[0] = ZTM_MIDIMAC_END;
+                mm_cur = 0; mm_cur_digit = 0;
+                ((ValueSlider *)UI->get_element(2))->value = 0;
+                file_changed++;
+                sprintf(szStatmsg, "Cleared bytes on macro %d", mm_slot);
+                statusmsg = szStatmsg; status_change = 1;
+            }
+            consumed = true;
+        }
+        else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_CTRL)) {
+            // Ctrl+Del / Ctrl+BS: wipe the entire slot.
+            if (song->midimacros[mm_slot]) {
+                delete song->midimacros[mm_slot];
+                song->midimacros[mm_slot] = NULL;
+                mm_name_buf[0] = 0;
+                ((ValueSlider *)UI->get_element(2))->value = 0;
+                mm_cur = 0; mm_cur_digit = 0;
+                file_changed++;
+                sprintf(szStatmsg, "Deleted macro %d", mm_slot);
+                statusmsg = szStatmsg; status_change = 1;
+            }
             consumed = true;
         }
         else {
@@ -376,7 +409,12 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
 
     UI->draw(S);
     draw_status(S);
-    printtitle(PAGE_TITLE_ROW_Y, "MIDI Macro Editor (F4)", COLORS.Text, COLORS.Background, S);
+    {
+        const char *t = file_changed
+            ? "MIDI Macro Editor (F4) [modified — Ctrl+S to save]"
+            : "MIDI Macro Editor (F4)";
+        printtitle(PAGE_TITLE_ROW_Y, t, COLORS.Text, COLORS.Background, S);
+    }
 
     midimacro *m = song->midimacros[mm_slot];
     int cur_len = m ? mm_length(m) : 0;
@@ -391,7 +429,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
           "Tab into grid; arrows nav; hex digits type byte; P=preset; Shift+E=END; Shift+X=PARAM1; .=clear",
           COLORS.Text, S);
     print(row(DATA_X), col(BASE_Y + 6),
-          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
+          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend; Shift+Del=clear, Ctrl+Del=wipe slot",
           COLORS.Text, S);
 
     // Header showing current preset name (cycles with P).
