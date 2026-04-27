@@ -298,9 +298,11 @@ void ValueSliderOFF::draw(Drawable *S, int active) {
         v = value;
     }
     // One char of gap between the slider's right border and the
-    // numeric readout, matching ValueSlider::draw above (which gets
-    // the same effect by prefixing its sprintf format with a space).
-    printBG(col(x+xsize+2),row(cy),str,COLORS.Text,COLORS.Background,S);
+    // numeric readout. ValueSlider::draw uses x+xsize and prefixes the
+    // sprintf format with a leading space (effective text col x+xsize+1);
+    // matching that here so ValueSliderOFF readouts (Patch, Bank) align
+    // with adjacent ValueSliderDL readouts (Default Length, etc.).
+    printBG(col(x+xsize+1),row(cy),str,COLORS.Text,COLORS.Background,S);
     if (active)
         col = COLORS.Highlight;
     else
