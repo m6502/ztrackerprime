@@ -606,17 +606,20 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(5), col(BASE_Y + 7), "NumCC",  COLORS.Text, S);
     print(row(7), col(BASE_Y + 8), "CC#",    COLORS.Text, S);
 
-    // Preset indicator + trigger info
+    // Preset indicator (right column, top of page)
     {
         char hdr[96];
         const ar_preset &p = AR_PRESETS[ar_preset_index];
         snprintf(hdr, sizeof(hdr), "Preset (P): %s", p.name);
         print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
-        snprintf(hdr, sizeof(hdr),
-                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
-                 ar_slot);
-        print(row(40), col(BASE_Y + 2), hdr, COLORS.Highlight, S);
     }
+
+    // Trigger info goes BELOW the keys-hint at the bottom of the
+    // page (the hint is at GRID_Y + GRID_VISIBLE + 1). The CC#
+    // sliders draw their decorative borders into the row beneath
+    // them, so anything placed at BASE_Y+9 visually collides with
+    // the slider edges; pushing the trigger info to the bottom
+    // gives it a clean row to itself.
 
     // Grid header
     {
@@ -666,12 +669,17 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Hint line below the grid
+    // Hint + trigger info below the grid
     {
         int hint_y = GRID_Y + GRID_VISIBLE + 1;
         print(row(4), col(hint_y),
               "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch; '.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
               COLORS.Text, S);
+        char hdr[96];
+        snprintf(hdr, sizeof(hdr),
+                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
+                 ar_slot);
+        print(row(4), col(hint_y + 1), hdr, COLORS.Highlight, S);
     }
 
     // Status hint when grid has focus

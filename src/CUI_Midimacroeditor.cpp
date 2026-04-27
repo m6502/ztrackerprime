@@ -33,8 +33,8 @@
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define DATA_X          4
-#define DATA_HDR_Y      (BASE_Y + 7)
-#define DATA_Y          (BASE_Y + 8)
+#define DATA_HDR_Y      (BASE_Y + 8)
+#define DATA_Y          (BASE_Y + 9)
 #define DATA_COLS       8
 #define DATA_ROWS       8
 #define CELL_W          4
@@ -496,7 +496,10 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         print(row(DATA_X), col(BASE_Y + 5), invoke, COLORS.Highlight, S);
     }
     print(row(DATA_X), col(BASE_Y + 6),
-          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend; Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
+          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
+          COLORS.Text, S);
+    print(row(DATA_X), col(BASE_Y + 7),
+          "Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
           COLORS.Text, S);
 
     // Header showing current preset name (cycles with P).
