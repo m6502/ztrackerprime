@@ -170,7 +170,7 @@ void CUI_Songconfig::enter(void) {
     
     cur_state = STATE_SONG_CONFIG;
     Keys.flush();
-    UI->set_focus(5); // set focus to order editor
+    UI->set_focus(9); // set focus to order editor (id was 5 before renumbering)
 }
 
 void CUI_Songconfig::leave(void) {
