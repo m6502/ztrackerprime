@@ -1474,7 +1474,11 @@ void global_keys(Drawable *S)
                 // Keybindings editor uses Ctrl-S to save bindings to
                 // zt.conf, not the song. Let the page handle it.
                 if (cur_state == STATE_KEYBINDINGS) break;
-                if (kstate & KS_CTRL) {
+                // Accept Cmd+S on macOS in addition to Ctrl+S. Cmd
+                // produces KS_META | KS_ALT in the keystate (see
+                // keybuffer.cpp), not KS_CTRL, so a bare KS_CTRL
+                // bitmask check would never fire on Mac.
+                if ((kstate & KS_CTRL) || (kstate & KS_META)) {
 
                     bool saveas = true ;
 

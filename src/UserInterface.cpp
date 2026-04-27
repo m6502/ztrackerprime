@@ -2907,6 +2907,16 @@ void MidiOutDeviceOpener::OnChange() {
 //
 //
 void MidiOutDeviceOpener::OnSelect(LBNode *selected) {
+    // Click on already-highlighted MIDI Out row toggles the device.
+    // ListBox::mouseupdate calls OnSelect when the user clicks the
+    // currently-selected row (i.e. clicks twice on the same item),
+    // so this gives us double-click-to-toggle for free. Also fires
+    // on Enter/Space via ListBox::update.
+    if (selected && selected->int_data >= 0) {
+        midi_out_sel(selected->int_data);
+        OnChange();
+        need_redraw++;
+    }
     ListBox::OnSelect(selected);
 }
 
@@ -3025,6 +3035,13 @@ void MidiInDeviceOpener::OnChange() {
 //
 //
 void MidiInDeviceOpener::OnSelect(LBNode *selected) {
+    // Click on already-highlighted MIDI In row toggles the device.
+    // Same pattern as the MIDI Out side.
+    if (selected && selected->int_data >= 0) {
+        midi_in_sel(selected->int_data);
+        OnChange();
+        need_redraw++;
+    }
     ListBox::OnSelect(selected);
 }
 
