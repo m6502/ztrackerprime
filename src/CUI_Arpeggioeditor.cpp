@@ -138,11 +138,13 @@ static void ar_apply_preset(int idx) {
     for (int i = 0; i < ZTM_ARPEGGIO_LEN; ++i) a->pitch[i] = ZTM_ARP_EMPTY_PITCH;
     for (int i = 0; i < p.len_pitches; ++i)
         a->pitch[i] = (unsigned short)(int16_t)p.pitches[i];
-    if (a->name[0] == 0) {
-        strncpy(a->name, p.name, ZTM_ARPEGGIONAME_MAXLEN - 1);
-        a->name[ZTM_ARPEGGIONAME_MAXLEN - 1] = 0;
-        memcpy(ar_name_buf, a->name, ZTM_ARPEGGIONAME_MAXLEN);
-    }
+    // Always overwrite the name to follow the preset selection;
+    // without this, cycling through P after the first apply leaves
+    // the name stuck on the very first preset.
+    memset(a->name, 0, ZTM_ARPEGGIONAME_MAXLEN);
+    strncpy(a->name, p.name, ZTM_ARPEGGIONAME_MAXLEN - 1);
+    memset(ar_name_buf, 0, sizeof(ar_name_buf));
+    memcpy(ar_name_buf, a->name, ZTM_ARPEGGIONAME_MAXLEN);
     file_changed++;
     sprintf(szStatmsg, "Applied preset: %s", p.name);
     statusmsg = szStatmsg;
@@ -362,8 +364,72 @@ void CUI_Arpeggioeditor::update() {
         if (ar_view_top > ar_cur_step) ar_view_top = ar_cur_step;
     }
 
-    // Grid input
+    // Page-level P / Shift+Del / Ctrl+Del — work from any focus that
+    // isn't the Name TextInput. Without this, pressing P on a slider
+    // wedges the app: the slider doesn't consume P, the grid handler
+    // only fires on the grid stub, so the keypress sticks in the
+    // Keys queue and never gets popped.
     int focused = UI->cur_element;
+    {
+        KBKey pkey = Keys.checkkey();
+        int   pks  = Keys.getstate();
+        if (pkey && focused != 1) {
+            bool page_consumed = false;
+            if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+                ar_preset_index = (ar_preset_index + 1) % AR_PRESET_COUNT;
+                ar_apply_preset(ar_preset_index);
+                arpeggio *na = song->arpeggios[ar_slot];
+                ((ValueSlider *)UI->get_element(2))->value = na->length;
+                ((ValueSlider *)UI->get_element(3))->value = na->speed;
+                ((ValueSlider *)UI->get_element(4))->value = na->repeat_pos;
+                ((ValueSlider *)UI->get_element(5))->value = na->num_cc;
+                TextInput *tn = (TextInput *)UI->get_element(1);
+                if (tn) tn->cursor = 0;
+                page_consumed = true;
+            }
+            else if ((pkey == SDLK_DELETE || pkey == SDLK_BACKSPACE)
+                     && (pks & KS_SHIFT) && !(pks & KS_CTRL)) {
+                arpeggio *aw = song->arpeggios[ar_slot];
+                if (aw) {
+                    for (int s = 0; s < ZTM_ARPEGGIO_LEN; ++s) {
+                        aw->pitch[s] = ZTM_ARP_EMPTY_PITCH;
+                        for (int c = 0; c < ZTM_ARPEGGIO_NUM_CC; ++c)
+                            aw->ccval[c][s] = ZTM_ARP_EMPTY_CCVAL;
+                    }
+                    file_changed++;
+                    sprintf(szStatmsg, "Cleared step data on arpeggio %d", ar_slot);
+                    statusmsg = szStatmsg; status_change = 1;
+                }
+                page_consumed = true;
+            }
+            else if ((pkey == SDLK_DELETE || pkey == SDLK_BACKSPACE)
+                     && (pks & KS_CTRL)) {
+                if (song->arpeggios[ar_slot]) {
+                    delete song->arpeggios[ar_slot];
+                    song->arpeggios[ar_slot] = NULL;
+                    ar_name_buf[0] = 0;
+                    ((ValueSlider *)UI->get_element(2))->value = 1;
+                    ((ValueSlider *)UI->get_element(3))->value = 1;
+                    ((ValueSlider *)UI->get_element(4))->value = 0;
+                    ((ValueSlider *)UI->get_element(5))->value = 0;
+                    for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
+                        ((ValueSlider *)UI->get_element(6 + i))->value = 0;
+                    ar_cur_step = ar_cur_col = 0; ar_view_top = 0;
+                    file_changed++;
+                    sprintf(szStatmsg, "Deleted arpeggio %d", ar_slot);
+                    statusmsg = szStatmsg; status_change = 1;
+                }
+                page_consumed = true;
+            }
+            if (page_consumed) {
+                Keys.getkey();
+                need_refresh++;
+                doredraw++;
+            }
+        }
+    }
+
+    // Grid input
     if (focused == GRID_ID) {
         KBKey key = Keys.checkkey();
         int kstate = Keys.getstate();
@@ -382,6 +448,8 @@ void CUI_Arpeggioeditor::update() {
             ((ValueSlider *)UI->get_element(3))->value = na->speed;
             ((ValueSlider *)UI->get_element(4))->value = na->repeat_pos;
             ((ValueSlider *)UI->get_element(5))->value = na->num_cc;
+            TextInput *tn = (TextInput *)UI->get_element(1);
+            if (tn) tn->cursor = 0;   // avoid name-text bleed
             consumed = true;
         }
         else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
@@ -538,12 +606,16 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(5), col(BASE_Y + 7), "NumCC",  COLORS.Text, S);
     print(row(7), col(BASE_Y + 8), "CC#",    COLORS.Text, S);
 
-    // Preset indicator
+    // Preset indicator + trigger info
     {
-        char hdr[80];
+        char hdr[96];
         const ar_preset &p = AR_PRESETS[ar_preset_index];
         snprintf(hdr, sizeof(hdr), "Preset (P): %s", p.name);
         print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
+        snprintf(hdr, sizeof(hdr),
+                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
+                 ar_slot);
+        print(row(40), col(BASE_Y + 2), hdr, COLORS.Highlight, S);
     }
 
     // Grid header

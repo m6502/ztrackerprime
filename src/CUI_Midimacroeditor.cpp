@@ -124,13 +124,17 @@ static void mm_apply_preset(int idx) {
     midimacro *m = mm_ensure(mm_slot);
     if (!m) return;
     const mm_preset &p = MM_PRESETS[idx];
+    // Wipe the data slots first (avoid leftover bytes past p.len).
+    for (int i = 0; i < ZTM_MIDIMACRO_MAXLEN; ++i) m->data[i] = ZTM_MIDIMAC_END;
     for (int i = 0; i < p.len; ++i) m->data[i] = p.data[i];
     m->data[p.len] = ZTM_MIDIMAC_END;
-    if (m->name[0] == 0) {
-        strncpy(m->name, p.name, ZTM_MIDIMACRONAME_MAXLEN - 1);
-        m->name[ZTM_MIDIMACRONAME_MAXLEN - 1] = 0;
-        memcpy(mm_name_buf, m->name, ZTM_MIDIMACRONAME_MAXLEN);
-    }
+    // Always update the macro's name AND the editing buffer so the
+    // displayed name follows the preset selection. Reset TextInput
+    // cursor so trailing pixels from a longer prior name don't bleed.
+    memset(m->name, 0, ZTM_MIDIMACRONAME_MAXLEN);
+    strncpy(m->name, p.name, ZTM_MIDIMACRONAME_MAXLEN - 1);
+    memset(mm_name_buf, 0, sizeof(mm_name_buf));
+    memcpy(mm_name_buf, m->name, ZTM_MIDIMACRONAME_MAXLEN);
     file_changed++;
     sprintf(szStatmsg, "Applied preset: %s", p.name);
     statusmsg = szStatmsg;
@@ -256,8 +260,63 @@ void CUI_Midimacroeditor::update() {
         }
     }
 
-    // Grid input — only when focus is parked on the grid stub.
+    // Page-level shortcuts: work from any focus that isn't the Name
+    // TextInput (where letter keys should type into the name). This
+    // also guarantees the keys are consumed, so they can't accumulate
+    // in the Keys queue and stall the app.
     int focused = UI->cur_element;
+    {
+        KBKey pkey = Keys.checkkey();
+        int   pks  = Keys.getstate();
+        if (pkey && focused != 1) {
+            bool page_consumed = false;
+            if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+                mm_preset_index = (mm_preset_index + 1) % MM_PRESET_COUNT;
+                mm_apply_preset(mm_preset_index);
+                ((ValueSlider *)UI->get_element(2))->value = mm_length(song->midimacros[mm_slot]);
+                // Reset name TextInput cursor so trailing chars from a
+                // longer prior name don't paint over the new shorter
+                // name on screen.
+                TextInput *t = (TextInput *)UI->get_element(1);
+                if (t) t->cursor = 0;
+                page_consumed = true;
+            }
+            else if ((pkey == SDLK_DELETE || pkey == SDLK_BACKSPACE)
+                     && (pks & KS_SHIFT) && !(pks & KS_CTRL)) {
+                midimacro *mw = song->midimacros[mm_slot];
+                if (mw) {
+                    mw->data[0] = ZTM_MIDIMAC_END;
+                    mm_cur = 0; mm_cur_digit = 0;
+                    ((ValueSlider *)UI->get_element(2))->value = 0;
+                    file_changed++;
+                    sprintf(szStatmsg, "Cleared bytes on macro %d", mm_slot);
+                    statusmsg = szStatmsg; status_change = 1;
+                }
+                page_consumed = true;
+            }
+            else if ((pkey == SDLK_DELETE || pkey == SDLK_BACKSPACE)
+                     && (pks & KS_CTRL)) {
+                if (song->midimacros[mm_slot]) {
+                    delete song->midimacros[mm_slot];
+                    song->midimacros[mm_slot] = NULL;
+                    mm_name_buf[0] = 0;
+                    ((ValueSlider *)UI->get_element(2))->value = 0;
+                    mm_cur = 0; mm_cur_digit = 0;
+                    file_changed++;
+                    sprintf(szStatmsg, "Deleted macro %d", mm_slot);
+                    statusmsg = szStatmsg; status_change = 1;
+                }
+                page_consumed = true;
+            }
+            if (page_consumed) {
+                Keys.getkey();
+                need_refresh++;
+                doredraw++;
+            }
+        }
+    }
+
+    // Grid input — only when focus is parked on the grid stub.
     if (focused == GRID_ID) {
         KBKey key = Keys.checkkey();
         int kstate = Keys.getstate();
@@ -425,11 +484,19 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
 
     // On-page hint above the grid header.
-    print(row(DATA_X), col(BASE_Y + 5),
-          "Tab into grid; arrows nav; hex digits type byte; P=preset; Shift+E=END; Shift+X=PARAM1; .=clear",
-          COLORS.Text, S);
+    // Two-line header explaining how the macro is invoked from a
+    // pattern. Without this the user has no way to know that the
+    // bytes below ever fire — a Z effect in the pattern editor is
+    // what triggers them.
+    {
+        char invoke[96];
+        snprintf(invoke, sizeof(invoke),
+                 "Trigger from pattern: Z%02Xyy  (yy substitutes for any P1 byte; range 00-7F)",
+                 mm_slot);
+        print(row(DATA_X), col(BASE_Y + 5), invoke, COLORS.Highlight, S);
+    }
     print(row(DATA_X), col(BASE_Y + 6),
-          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend; Shift+Del=clear, Ctrl+Del=wipe slot",
+          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend; Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
           COLORS.Text, S);
 
     // Header showing current preset name (cycles with P).
@@ -474,9 +541,11 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         }
     }
 
-    // Cursor highlight — drawn whenever the grid stub holds focus, so
-    // the user can see where typing/arrows will land even before the
-    // macro has any data.
+    // Cursor highlight — drawn whenever the grid stub holds focus.
+    // The cell value is preserved (dark text on yellow background)
+    // and the active hex digit gets an extra inverse highlight
+    // (yellow text on dark background) so the user can see which
+    // nibble the next keypress will affect.
     if (UI->cur_element == GRID_ID) {
         int gy = mm_cur / DATA_COLS;
         int gx = mm_cur %  DATA_COLS;
@@ -488,16 +557,18 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         if      (v == ZTM_MIDIMAC_PARAM1) cell = "P1";
         else if (v >= ZTM_MIDIMAC_END)    cell = "..";
         else { snprintf(cbuf, sizeof(cbuf), "%02X", v & 0xFF); cell = cbuf; }
+        // Whole cell inverted: dark text on yellow background.
         printBG(col(px), row(py), cell, COLORS.EditBG, COLORS.Highlight, S);
         if (v < ZTM_MIDIMAC_END) {
             char d[2] = { cell[mm_cur_digit], 0 };
+            // Active nibble: yellow text on dark background. Stays
+            // legible against either Highlight or Background page
+            // colors and doesn't overwrite the cell value.
             printBG(col(px + mm_cur_digit), row(py), d,
-                    COLORS.Background, COLORS.Highlight, S);
+                    COLORS.Highlight, COLORS.EditBG, S);
         }
-        // Status hint: tell the user they're in grid mode + how to leave
-        sprintf(buf, "GRID @ %02X | Tab to leave | digits=byte | P=preset", mm_cur);
-        printBG(col(2), row(BASE_Y + 5), buf, COLORS.Highlight, COLORS.Background, S);
     }
+    (void)buf;   // (used elsewhere above)
 
     need_refresh = 0; updated = 2;
     ztPlayer->num_orders();
