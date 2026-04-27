@@ -25,9 +25,9 @@
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define GRID_X          4
-#define GRID_HDR_Y      (BASE_Y + 8)
-#define GRID_Y          (BASE_Y + 9)
-#define GRID_VISIBLE    16
+#define GRID_HDR_Y      (BASE_Y + 10)
+#define GRID_Y          (BASE_Y + 11)
+#define GRID_VISIBLE    14
 
 static int  ar_slot     = 0;
 static int  ar_cur_step = 0;
@@ -111,40 +111,42 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     vs = new ValueSlider;
     UI->add_element(vs, 2);
     vs->x = 12; vs->y = BASE_Y + 4;
-    vs->xsize = 14; vs->ysize = 1;
+    vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = ZTM_ARPEGGIO_LEN;
     vs->value = 1;
 
     // 3 — Speed (ticks per step)
     vs = new ValueSlider;
     UI->add_element(vs, 3);
-    vs->x = 36; vs->y = BASE_Y + 4;
-    vs->xsize = 14; vs->ysize = 1;
+    vs->x = 12; vs->y = BASE_Y + 5;
+    vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = 255;
     vs->value = 1;
 
     // 4 — Repeat position
     vs = new ValueSlider;
     UI->add_element(vs, 4);
-    vs->x = 12; vs->y = BASE_Y + 5;
-    vs->xsize = 14; vs->ysize = 1;
+    vs->x = 12; vs->y = BASE_Y + 6;
+    vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1;
     vs->value = 0;
 
     // 5 — num_cc (0..4)
     vs = new ValueSlider;
     UI->add_element(vs, 5);
-    vs->x = 36; vs->y = BASE_Y + 5;
-    vs->xsize = 14; vs->ysize = 1;
+    vs->x = 12; vs->y = BASE_Y + 7;
+    vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC;
     vs->value = 0;
 
-    // 6..9 — CC# selectors (which 4 controllers this arpeggio drives)
+    // 6..9 — CC# selectors (which 4 controllers this arpeggio drives).
+    // Stack on a single row, 4 short sliders with readouts.
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
         vs = new ValueSlider;
         UI->add_element(vs, 6 + i);
-        vs->x = 12 + i * 12; vs->y = BASE_Y + 6;
-        vs->xsize = 10; vs->ysize = 1;
+        vs->x = 12 + i * 16;
+        vs->y = BASE_Y + 8;
+        vs->xsize = 8; vs->ysize = 1;
         vs->min = 0; vs->max = 127;
         vs->value = 0;
     }
@@ -208,52 +210,48 @@ void CUI_Arpeggioeditor::update() {
     ti = (TextInput *)UI->get_element(1);
     if (ti && ti->changed) { ar_store_name(ar_slot); ti->changed = 0; }
 
-    // Length / speed / repeat / num_cc / cc#
-    arpeggio *a_existing = song->arpeggios[ar_slot];
-    auto write_meta = [&](int field_id, int *target, int dflt) {
-        ValueSlider *v = (ValueSlider *)UI->get_element(field_id);
-        if (!v) return;
-        int cur = a_existing ? *target : dflt;
-        if (v->value != cur) {
-            arpeggio *aa = ar_ensure(ar_slot);
-            if (aa) {
-                // Re-read the target ptr against the new (or freshly-created) arp
-                int *t = NULL;
-                switch (field_id) {
-                    case 2: t = &aa->length;     break;
-                    case 3: t = &aa->speed;      break;
-                    case 4: t = &aa->repeat_pos; break;
-                    case 5: t = &aa->num_cc;     break;
-                    default: break;
-                }
-                if (t) { *t = v->value; file_changed++; need_refresh++; }
-            }
+    // Sync metadata sliders into the song's arp entry (auto-creating
+    // the entry on first edit). Read the slider values, compare with
+    // the entry's stored values, and write back if they differ.
+    {
+        int v_len    = ((ValueSlider *)UI->get_element(2))->value;
+        int v_speed  = ((ValueSlider *)UI->get_element(3))->value;
+        int v_repeat = ((ValueSlider *)UI->get_element(4))->value;
+        int v_numcc  = ((ValueSlider *)UI->get_element(5))->value;
+        int v_cc[ZTM_ARPEGGIO_NUM_CC];
+        for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k) {
+            v_cc[k] = ((ValueSlider *)UI->get_element(6 + k))->value;
         }
-    };
-    write_meta(2, NULL, 1);
-    write_meta(3, NULL, 1);
-    write_meta(4, NULL, 0);
-    write_meta(5, NULL, 0);
 
-    // CC# selectors 6..9
-    for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
-        ValueSlider *v = (ValueSlider *)UI->get_element(6 + i);
-        if (!v) continue;
-        int cur = a_existing ? a_existing->cc[i] : 0;
-        if (v->value != cur) {
-            arpeggio *aa = ar_ensure(ar_slot);
-            if (aa) {
-                aa->cc[i] = (unsigned char)v->value;
-                file_changed++;
-                need_refresh++;
+        arpeggio *a = song->arpeggios[ar_slot];
+        bool need_create =
+            (!a && (v_len != 1 || v_speed != 1 || v_repeat != 0 || v_numcc != 0
+                    || v_cc[0] || v_cc[1] || v_cc[2] || v_cc[3]));
+        if (need_create) a = ar_ensure(ar_slot);
+
+        if (a) {
+            if (a->length     != v_len)    { a->length     = v_len;    file_changed++; need_refresh++; }
+            if (a->speed      != v_speed)  { a->speed      = v_speed;  file_changed++; need_refresh++; }
+            if (a->repeat_pos != v_repeat) { a->repeat_pos = v_repeat; file_changed++; need_refresh++; }
+            if (a->num_cc     != v_numcc)  { a->num_cc     = v_numcc;  file_changed++; need_refresh++; }
+            for (int k = 0; k < ZTM_ARPEGGIO_NUM_CC; ++k) {
+                if (a->cc[k] != (unsigned char)v_cc[k]) {
+                    a->cc[k] = (unsigned char)v_cc[k];
+                    file_changed++; need_refresh++;
+                }
             }
         }
     }
 
-    // Grid keybindings — only when focus is NOT on the name TextInput.
+    // Grid keybindings: only fire when focus is parked on a non-input
+    // tab stop. Sliders and the name TextInput already eat digits/arrows
+    // for their own use, so we only run grid input when no UI element
+    // currently holds focus (cur_element == -1) — the user can press
+    // Tab past the last slider to reach the grid.
     KBKey key = Keys.checkkey();
     int focused = UI->cur_element;
-    if (key && focused != 1) {
+    bool on_grid = (focused < 0) || (focused >= 10);
+    if (key && on_grid) {
         arpeggio *a = song->arpeggios[ar_slot];
         int len     = a ? a->length : 1;
         int num_cc  = a ? a->num_cc : 0;
@@ -377,33 +375,21 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     arpeggio *a = song->arpeggios[ar_slot];
     int  length     = a ? a->length     : 1;
     int  num_cc     = a ? a->num_cc     : 0;
-    int  speed      = a ? a->speed      : 1;
     int  repeat_pos = a ? a->repeat_pos : 0;
 
     char buf[64];
 
-    // Labels for the metadata sliders
-    print(row(4),  col(BASE_Y),     "Slot",   COLORS.Text, S);
-    snprintf(buf, sizeof(buf), "%03d / %03d", ar_slot, ZTM_MAX_ARPEGGIOS - 1);
-    printBG(col(31), row(BASE_Y), buf, COLORS.Text, COLORS.Background, S);
-
-    print(row(4),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
-
-    print(row(2),  col(BASE_Y + 4), "Length", COLORS.Text, S);
-    print(row(28), col(BASE_Y + 4), "Speed",  COLORS.Text, S);
-    snprintf(buf, sizeof(buf), "%03d", length); printBG(col(27), row(BASE_Y+4), buf, COLORS.Text, COLORS.Background, S);
-    snprintf(buf, sizeof(buf), "%03d", speed);  printBG(col(51), row(BASE_Y+4), buf, COLORS.Text, COLORS.Background, S);
-
-    print(row(2),  col(BASE_Y + 5), "Repeat", COLORS.Text, S);
-    print(row(28), col(BASE_Y + 5), "NumCC",  COLORS.Text, S);
-    snprintf(buf, sizeof(buf), "%03d", repeat_pos); printBG(col(27), row(BASE_Y+5), buf, COLORS.Text, COLORS.Background, S);
-    snprintf(buf, sizeof(buf), "%d",   num_cc);     printBG(col(51), row(BASE_Y+5), buf, COLORS.Text, COLORS.Background, S);
-
-    print(row(8), col(BASE_Y + 6),  "CC#:",  COLORS.Text, S);
-    for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
-        snprintf(buf, sizeof(buf), "%03d", a ? a->cc[i] : 0);
-        printBG(col(22 + i*12), row(BASE_Y+6), buf, COLORS.Text, COLORS.Background, S);
-    }
+    // Right-aligned labels in the leftmost 10 columns; the slider /
+    // textinput widgets start at col 12 and ValueSlider draws its own
+    // numeric readout at the right end of the bar so we don't paint
+    // values ourselves any more.
+    print(row(6), col(BASE_Y),     "Slot",   COLORS.Text, S);
+    print(row(6), col(BASE_Y + 2), "Name",   COLORS.Text, S);
+    print(row(4), col(BASE_Y + 4), "Length", COLORS.Text, S);
+    print(row(5), col(BASE_Y + 5), "Speed",  COLORS.Text, S);
+    print(row(4), col(BASE_Y + 6), "Repeat", COLORS.Text, S);
+    print(row(5), col(BASE_Y + 7), "NumCC",  COLORS.Text, S);
+    print(row(7), col(BASE_Y + 8), "CC#",    COLORS.Text, S);
 
     // Grid header
     {
@@ -453,12 +439,13 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Status hint
-    print(row(4), row(GRID_Y + GRID_VISIBLE + 1) / 8 * 8 / 8 ? 0 : 0, "", COLORS.Text, S);
-    int hint_y = GRID_Y + GRID_VISIBLE + 1;
-    print(row(4), col(hint_y),
-          "Arrows nav | digits 0-9 type value | '-' negate pitch | '.' clear",
-          COLORS.Text, S);
+    // Status hint below the grid
+    {
+        int hint_y = GRID_Y + GRID_VISIBLE + 1;
+        print(row(4), col(hint_y),
+              "Arrows nav | digits 0-9 type value | '-' negate pitch | '.' clear",
+              COLORS.Text, S);
+    }
 
     need_refresh = 0; updated = 2;
     ztPlayer->num_orders();
