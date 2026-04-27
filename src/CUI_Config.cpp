@@ -207,9 +207,12 @@ CUI_Config::CUI_Config(void) {
     tb = new TextBox;
     UI->add_element(tb, 11);
     tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
-    tb->x = 1;
+    // Align left edge with the 'Go to page 1' button (x=4) above so the
+    // page balances visually. Right edge stays where it was — same column
+    // count, just shifted right by 3.
+    tb->x = 4;
     tb->y = 26;
-    tb->xsize = 78;
+    tb->xsize = 75;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
         int remain = max_rows - tb->y - 1 - 9;
