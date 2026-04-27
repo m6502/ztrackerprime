@@ -33,8 +33,8 @@
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define DATA_X          4
-#define DATA_HDR_Y      (BASE_Y + 8)
-#define DATA_Y          (BASE_Y + 9)
+#define DATA_HDR_Y      (BASE_Y + 6)
+#define DATA_Y          (BASE_Y + 7)
 #define DATA_COLS       8
 #define DATA_ROWS       8
 #define CELL_W          4
@@ -483,25 +483,6 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     print(row(6),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
     print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
 
-    // On-page hint above the grid header.
-    // Two-line header explaining how the macro is invoked from a
-    // pattern. Without this the user has no way to know that the
-    // bytes below ever fire -- a Z effect in the pattern editor is
-    // what triggers them.
-    {
-        char invoke[96];
-        snprintf(invoke, sizeof(invoke),
-                 "Trigger from pattern: Z%02Xyy  (yy substitutes for any P1 byte; range 00-7F)",
-                 mm_slot);
-        print(row(DATA_X), col(BASE_Y + 5), invoke, COLORS.Highlight, S);
-    }
-    print(row(DATA_X), col(BASE_Y + 6),
-          "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
-          COLORS.Text, S);
-    print(row(DATA_X), col(BASE_Y + 7),
-          "Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
-          COLORS.Text, S);
-
     // Header showing current preset name (cycles with P).
     {
         char hdr[80];
@@ -542,6 +523,24 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
             char snum[6]; snprintf(snum, sizeof(snum), "%02X", i);
             print(col(DATA_X - 3), row(py), snum, COLORS.Text, S);
         }
+    }
+
+    // Documentation block below the grid: highlighted "Trigger from
+    // pattern" line first, then context / shortcut hints. Placement
+    // mirrors CUI_Arpeggioeditor (also below its data grid).
+    {
+        int hint_y = DATA_Y + DATA_ROWS + 1;
+        char invoke[96];
+        snprintf(invoke, sizeof(invoke),
+                 "Trigger from pattern: Z%02Xyy  (yy substitutes for any P1 byte; range 00-7F)",
+                 mm_slot);
+        print(row(DATA_X), col(hint_y),     invoke, COLORS.Highlight, S);
+        print(row(DATA_X), col(hint_y + 1),
+              "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
+              COLORS.Text, S);
+        print(row(DATA_X), col(hint_y + 2),
+              "Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
+              COLORS.Text, S);
     }
 
     // Cursor highlight -- drawn whenever the grid stub holds focus.

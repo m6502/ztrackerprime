@@ -20,8 +20,8 @@
  *   round-trip these structures through .zt save/load.
  *
  *   UI layout (one slider per row, blank row between each slider for
- *   breathing room; documentation sits above the grid header to mirror
- *   the CUI_Midimacroeditor placement):
+ *   breathing room; documentation sits below the grid to mirror the
+ *   CUI_Midimacroeditor placement):
  *     Slot    [slider]
  *
  *     Name    [textinput]
@@ -35,12 +35,13 @@
  *     NumCC   [slider]
  *
  *     CC#:    [s0] [s1] [s2] [s3]
- *     Trigger from pattern: R<slot> ...   (highlighted)
- *     Tab into grid; arrows nav cells; ...
- *     '.' clear; P=preset; ...
  *
  *     STEP  PIT  C0  C1  ...
  *     000   ...  ... ...
+ *
+ *     Trigger from pattern: R<slot> ...   (highlighted)
+ *     Tab into grid; arrows nav cells; ...
+ *     '.' clear; P=preset; ...
  *
  *   The data grid is reachable via Tab from the last metadata slider;
  *   arrows then navigate cells. Tab again leaves the grid back to the
@@ -51,8 +52,8 @@
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define GRID_X          4
-#define GRID_HDR_Y      (BASE_Y + 16)
-#define GRID_Y          (BASE_Y + 17)
+#define GRID_HDR_Y      (BASE_Y + 14)
+#define GRID_Y          (BASE_Y + 15)
 #define GRID_VISIBLE    14
 #define GRID_ID         10
 
@@ -623,23 +624,6 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
     }
 
-    // Documentation block above the grid header, mirroring the
-    // CUI_Midimacroeditor layout: highlighted Trigger line first,
-    // then keyboard / action hints.
-    {
-        char hdr[96];
-        snprintf(hdr, sizeof(hdr),
-                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
-                 ar_slot);
-        print(row(4), col(BASE_Y + 13), hdr, COLORS.Highlight, S);
-    }
-    print(row(4), col(BASE_Y + 14),
-          "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch",
-          COLORS.Text, S);
-    print(row(4), col(BASE_Y + 15),
-          "'.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
-          COLORS.Text, S);
-
     // Grid header
     {
         int x = GRID_X;
@@ -688,12 +672,30 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Status hint when grid has focus -- appears below the grid.
+    // Documentation block below the grid: highlighted "Trigger from
+    // pattern" line first, then keyboard / action hints. Placement
+    // mirrors CUI_Midimacroeditor (also below its data grid).
+    {
+        int hint_y = GRID_Y + GRID_VISIBLE + 1;
+        char hdr[96];
+        snprintf(hdr, sizeof(hdr),
+                 "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
+                 ar_slot);
+        print(row(4), col(hint_y),     hdr, COLORS.Highlight, S);
+        print(row(4), col(hint_y + 1),
+              "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch",
+              COLORS.Text, S);
+        print(row(4), col(hint_y + 2),
+              "'.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
+              COLORS.Text, S);
+    }
+
+    // Status hint when grid has focus -- shown beneath the doc block.
     if (UI->cur_element == GRID_ID) {
         char hint[80];
         snprintf(hint, sizeof(hint), "GRID @ step %03X col %d | Tab to leave | digits=value | P=preset",
                  ar_cur_step, ar_cur_col);
-        printBG(col(2), row(GRID_Y + GRID_VISIBLE + 1), hint, COLORS.Highlight, COLORS.Background, S);
+        printBG(col(2), row(GRID_Y + GRID_VISIBLE + 4), hint, COLORS.Highlight, COLORS.Background, S);
     }
 
     need_refresh = 0; updated = 2;
