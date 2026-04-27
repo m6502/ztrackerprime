@@ -14,6 +14,9 @@ class ValueSlider : public UserInterfaceElement {
         int clear;
         int newclick;
         int focus;  // new value here
+        int from_input;  // set when value was just set via numeric SliderInput popup;
+                         // callers can use this to disambiguate typed-value vs arrow-step
+                         // for sliders backed by an index table (e.g. TPB).
         explicit ValueSlider(int fset = 0);
         virtual ~ValueSlider() = default ;
         int mouseupdate(int cur_element);

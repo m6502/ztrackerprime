@@ -14,6 +14,7 @@ ValueSlider::ValueSlider(int fset)
     ysize   = 1;
     newclick= 1;
     focus = fset;
+    from_input = 0;
 }
 
 
@@ -120,6 +121,7 @@ int ValueSlider::update() {
         if (!UIP_SliderInput->canceled) {
             changed++;
             value = c;
+            from_input = 1;
         }
         if (window_stack.isempty())
             needaclear++; 
@@ -332,6 +334,7 @@ int ValueSliderDL::update() {
         if (!UIP_SliderInput->canceled) {
             changed++;
             value = c;
+            from_input = 1;
         }
         needaclear++; need_refresh++;
     }

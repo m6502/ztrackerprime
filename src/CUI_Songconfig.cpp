@@ -169,8 +169,17 @@ void CUI_Songconfig::enter(void) {
         zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
     
     cur_state = STATE_SONG_CONFIG;
+    // Reset OrderEditor cursor so the focus indicator is always visible
+    // at row 0 on F11 entry (otherwise stale cursor_y/list_start from a
+    // previous visit could leave it scrolled off-screen).
+    if (oe) {
+        oe->cursor_y = 0;
+        oe->cursor_x = 0;
+        oe->list_start = 0;
+    }
     Keys.flush();
-    UI->set_focus(9); // set focus to order editor (id was 5 before renumbering)
+    UI->set_focus(9); // OrderEditor — last add_element id in the constructor
+    UI->cur_element = 9;  // belt-and-suspenders against any stale focus state
 }
 
 void CUI_Songconfig::leave(void) {
@@ -206,6 +215,23 @@ void CUI_Songconfig::update()
     }
     vs = (ValueSlider *)UI->get_element(2);
     if (vs->value != rev_tpb_tab[song->tpb]) {
+        // The TPB slider's `value` is an INDEX into tpb_tab[] {2,4,6,8,12,
+        // 16,24,32,48}, not the actual TPB. Arrow steps move through the
+        // index. But typed-numeric input (vs->from_input) gives the user's
+        // intended TPB literally — they pressed "4" because they want
+        // TPB=4, not slider index 4 (which would map to TPB=12).
+        // When from_input is set and the typed value matches a real TPB,
+        // remap value through rev_tpb_tab so the index lines up.
+        if (vs->from_input) {
+            bool valid_tpb = false;
+            for (int i = 0; i <= 8; i++) {
+                if (tpb_tab[i] == vs->value) { valid_tpb = true; break; }
+            }
+            if (valid_tpb) {
+                vs->value = rev_tpb_tab[vs->value];
+            }
+            vs->from_input = 0;
+        }
         song->tpb = tpb_tab[vs->value];
         ztPlayer->set_speed();
         vs->force_f=1; vs->force_v = song->tpb;
