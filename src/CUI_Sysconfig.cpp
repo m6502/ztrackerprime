@@ -352,69 +352,14 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         sk->xsize = 19+8;     // ends at col 76, matches MIDI In Device list end
         sk->ysize = 7;   // tight-fit around installed skin count, avoids empty black space
 
-        // MIDI Out column — visual order: Refresh (y=28), list (y=30-42),
-        // Open device (y=45), Latency (y=47), Bank (y=49), Alias (y=51).
-        // tabindex follows the same order so UP/DOWN navigates top-to-bottom.
+        // MIDI In column lives on the LEFT, MIDI Out on the RIGHT (+37
+        // offset). Layout: Refresh (y=28), list (y=30-42), Open device
+        // (y=45). MIDI Out also has Latency (y=47), Bank (y=49), Alias
+        // (y=51). tabindex order: MIDI In group first, then MIDI Out.
         b = new Button;
         UI->add_element(b,tabindex++);
         b->caption = " Refresh";
         b->x = 4+26;
-        b->y = 48 - 16 -2-2;
-        b->xsize = 9;
-        b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_RefreshMidiOutDeviceList;
-
-        ml = new MidiOutDeviceOpener;
-        UI->add_element(ml,tabindex++);
-        midioutdevlist = ml;
-        ml->x = 4;
-        ml->y = 48 - 16-2;
-        ml->xsize=35;
-        ml->ysize = 13;
-
-        b = new Button;
-        UI->add_element(b,tabindex++);
-        b->caption = " Open device   ";
-        b->x = 4+21;
-        b->y = 45;
-        b->xsize = 14;
-        b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
-        midiout_action_button = b;
-
-        vs = new LatencyValueSlider(ml);
-        UI->add_element(vs,tabindex++);
-        vs->x = 20;                    // align with Prebuffer slider
-        vs->y = 47;
-        vs->xsize = 15;
-        vs->ysize = 1;
-        vs->min = 0;
-        vs->max = 255;
-
-        cb = new BankSelectCheckBox(ml);
-        UI->add_element(cb,tabindex++);
-        cb->x = 26;
-        cb->y = 49;
-        cb->xsize = 3;
-        cb->frame = 0;
-
-        ti = new AliasTextInput(ml);
-        UI->add_element(ti,tabindex++);
-        ti->frame = 1;
-        ti->x = 20;                    // align with Prebuffer slider
-        ti->y = 51;
-        ti->xsize=42;
-        ti->length=41;
-
-        ml->lvs = vs;  // link midi out list to latency value slider
-        ml->bscb = cb; // link midi out list to bank select checkbox
-        ml->al = ti;
-
-        // MIDI In column — same visual order: Refresh, list, Open device.
-        b = new Button;
-        UI->add_element(b,tabindex++);
-        b->caption = " Refresh";
-        b->x = 4+26+37;
         b->y = 48 - 16 -2-2;
         b->xsize = 9;
         b->ysize = 1;
@@ -423,10 +368,38 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         mi = new MidiInDeviceOpener;
         midiindevlist = mi;
         UI->add_element(mi,tabindex++);
-        mi->x = 4+37;
+        mi->x = 4;
         mi->y = 48 - 16-2;
         mi->xsize=35;
         mi->ysize = 13;
+
+        b = new Button;
+        UI->add_element(b,tabindex++);
+        b->caption = " Open device   ";
+        b->x = 4+21;
+        b->y = 45;
+        b->xsize = 14;
+        b->ysize = 1;
+        b->OnClick = (ActFunc)BTNCLK_ForgetMidiInDevice;
+        midiin_action_button = b;
+
+        // MIDI Out column (right side, +37 offset).
+        b = new Button;
+        UI->add_element(b,tabindex++);
+        b->caption = " Refresh";
+        b->x = 4+26+37;
+        b->y = 48 - 16 -2-2;
+        b->xsize = 9;
+        b->ysize = 1;
+        b->OnClick = (ActFunc)BTNCLK_RefreshMidiOutDeviceList;
+
+        ml = new MidiOutDeviceOpener;
+        UI->add_element(ml,tabindex++);
+        midioutdevlist = ml;
+        ml->x = 4+37;
+        ml->y = 48 - 16-2;
+        ml->xsize=35;
+        ml->ysize = 13;
 
         b = new Button;
         UI->add_element(b,tabindex++);
@@ -435,8 +408,43 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->y = 45;
         b->xsize = 14;
         b->ysize = 1;
-        b->OnClick = (ActFunc)BTNCLK_ForgetMidiInDevice;
-        midiin_action_button = b;
+        b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
+        midiout_action_button = b;
+
+        vs = new LatencyValueSlider(ml);
+        UI->add_element(vs,tabindex++);
+        vs->x = 20+37;
+        vs->y = 47;
+        vs->xsize = 15;
+        vs->ysize = 1;
+        vs->min = 0;
+        vs->max = 255;
+
+        cb = new BankSelectCheckBox(ml);
+        UI->add_element(cb,tabindex++);
+        cb->x = 26+37;
+        cb->y = 49;
+        cb->xsize = 3;
+        cb->frame = 0;
+
+        ti = new AliasTextInput(ml);
+        UI->add_element(ti,tabindex++);
+        ti->frame = 1;
+        ti->x = 20+37;
+        ti->y = 51;
+        // Alias visible width must fit between x=57 and the right edge.
+        // Default 640px screen = 80 cols, so available = 80-57-1 = 22.
+        // Wider screens get more room. The buffer (length) holds up to
+        // 41 chars regardless — TextInput scrolls horizontally.
+        {
+            const int avail = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 57 - 1;
+            ti->xsize  = (avail > 42) ? 42 : (avail > 1 ? avail : 1);
+            ti->length = 41;
+        }
+
+        ml->lvs = vs;  // link midi out list to latency value slider
+        ml->bscb = cb; // link midi out list to bank select checkbox
+        ml->al = ti;
 
 }
 
@@ -504,12 +512,13 @@ void CUI_Sysconfig::draw(Drawable *S) {
 #endif
         print(row(4+37+8),col(TRACKS_ROW_Y+3),"Skin Selection",COLORS.Text,S);
 
-        print(row(4),col(28),"MIDI Out Device Selection",COLORS.Text,S);
-        print(row(4+37),col(28),"MIDI In Device Selection",COLORS.Text,S);
+        // MIDI In on the LEFT (col 4), MIDI Out on the RIGHT (col 4+37).
+        print(row(4),col(28),"MIDI In Device Selection",COLORS.Text,S);
+        print(row(4+37),col(28),"MIDI Out Device Selection",COLORS.Text,S);
 
-        print(row(5),col(47),"Latency ",COLORS.Text,S);
-        print(row(5),col(49),"Reverse Bank Select ",COLORS.Text,S);
-        print(row(5),col(51),"Device Alias",COLORS.Text,S);
+        print(row(5+37),col(47),"Latency ",COLORS.Text,S);
+        print(row(5+37),col(49),"Reverse Bank Select ",COLORS.Text,S);
+        print(row(5+37),col(51),"Device Alias",COLORS.Text,S);
         
         need_refresh = 0;
         updated=2;
