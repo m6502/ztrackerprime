@@ -15,6 +15,7 @@ ValueSlider::ValueSlider(int fset)
     newclick= 1;
     focus = fset;
     from_input = 0;
+    input_value = 0;
 }
 
 
@@ -121,6 +122,7 @@ int ValueSlider::update() {
         if (!UIP_SliderInput->canceled) {
             changed++;
             value = c;
+            input_value = c;  // preserve raw before any clamping
             from_input = 1;
         }
         if (window_stack.isempty())
@@ -334,6 +336,7 @@ int ValueSliderDL::update() {
         if (!UIP_SliderInput->canceled) {
             changed++;
             value = c;
+            input_value = c;  // preserve raw before any clamping
             from_input = 1;
         }
         needaclear++; need_refresh++;

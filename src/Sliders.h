@@ -17,6 +17,9 @@ class ValueSlider : public UserInterfaceElement {
         int from_input;  // set when value was just set via numeric SliderInput popup;
                          // callers can use this to disambiguate typed-value vs arrow-step
                          // for sliders backed by an index table (e.g. TPB).
+        int input_value; // raw typed number from the popup, preserved BEFORE clamping
+                         // so callers can see the user's literal input even if it falls
+                         // outside [min,max]. Only valid when from_input == 1.
         explicit ValueSlider(int fset = 0);
         virtual ~ValueSlider() = default ;
         int mouseupdate(int cur_element);

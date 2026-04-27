@@ -249,6 +249,7 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
     this->wTimerRes = res;
     this->fillbuff = this->playing = this->counter = this->wTimerID = 0;
     this->ztTimerID = 0;
+    this->playback_start_ms = 0;
 //  this->hr_timer = new hires_timer;
     this->playing_cur_row = 1;
     init();
@@ -641,8 +642,9 @@ void player::play(int row, int pattern,int pm, int loopmode)
   playing_buffer = play_buffer[cur_buf];
 
   playing = 1;
+  playback_start_ms = SDL_GetTicks();
   zt_set_window_title("zt - [playing]");
-}   
+}
 
 
 

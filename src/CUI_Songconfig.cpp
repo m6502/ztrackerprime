@@ -202,8 +202,9 @@ void CUI_Songconfig::update()
 
     UI->update();
     vs = (ValueSlider *)UI->get_element(1);
-    if (vs->value != song->bpm) { 
-        song->bpm = vs->value; 
+    if (vs->from_input) vs->from_input = 0;  // BPM slider takes any [min,max]; clamp already applied
+    if (vs->value != song->bpm) {
+        song->bpm = vs->value;
         ztPlayer->set_speed();
 
         if(!zt_config_globals.highlight_increment)
@@ -214,24 +215,30 @@ void CUI_Songconfig::update()
         file_changed++;
     }
     vs = (ValueSlider *)UI->get_element(2);
-    if (vs->value != rev_tpb_tab[song->tpb]) {
-        // The TPB slider's `value` is an INDEX into tpb_tab[] {2,4,6,8,12,
-        // 16,24,32,48}, not the actual TPB. Arrow steps move through the
-        // index. But typed-numeric input (vs->from_input) gives the user's
-        // intended TPB literally — they pressed "4" because they want
-        // TPB=4, not slider index 4 (which would map to TPB=12).
-        // When from_input is set and the typed value matches a real TPB,
-        // remap value through rev_tpb_tab so the index lines up.
-        if (vs->from_input) {
-            bool valid_tpb = false;
-            for (int i = 0; i <= 8; i++) {
-                if (tpb_tab[i] == vs->value) { valid_tpb = true; break; }
+    if (vs->from_input) {
+        // Typed-numeric path. vs->input_value holds the raw number the
+        // user entered (preserved before clamping in Sliders.cpp). Snap
+        // to the nearest valid TPB in tpb_tab[]={2,4,6,8,12,16,24,32,48}
+        // so '8' -> TPB=8 (slider index 3), '5' -> TPB=4 (nearest), etc.
+        // On ties, prefer the higher TPB (more granular, common in
+        // tracker conventions).
+        int typed = vs->input_value;
+        int best_idx = 0;
+        int best_diff = abs(tpb_tab[0] - typed);
+        for (int i = 1; i <= 8; i++) {
+            int diff = abs(tpb_tab[i] - typed);
+            if (diff < best_diff || (diff == best_diff && tpb_tab[i] > typed)) {
+                best_diff = diff;
+                best_idx = i;
             }
-            if (valid_tpb) {
-                vs->value = rev_tpb_tab[vs->value];
-            }
-            vs->from_input = 0;
         }
+        vs->value = best_idx;
+        vs->from_input = 0;
+    }
+    // Clamp slider index to the table range regardless of input source.
+    if (vs->value < 0) vs->value = 0;
+    if (vs->value > 8) vs->value = 8;
+    if (tpb_tab[vs->value] != song->tpb) {
         song->tpb = tpb_tab[vs->value];
         ztPlayer->set_speed();
         vs->force_f=1; vs->force_v = song->tpb;
@@ -244,12 +251,14 @@ void CUI_Songconfig::update()
         file_changed++;
     }
     vs = (ValueSlider *)UI->get_element(5);
+    if (vs && vs->from_input) vs->from_input = 0;
     if (vs && vs->value != zt_config_globals.highlight_increment) {
         zt_config_globals.highlight_increment = vs->value;
     } else if (vs) {
         vs->value = zt_config_globals.highlight_increment;
     }
     vs = (ValueSlider *)UI->get_element(6);
+    if (vs && vs->from_input) vs->from_input = 0;
     if (vs && vs->value != zt_config_globals.lowlight_increment) {
         zt_config_globals.lowlight_increment = vs->value;
     } else if (vs) {

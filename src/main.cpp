@@ -950,10 +950,15 @@ void update_status(Drawable *S)
   if (ztPlayer->playing) {
 
     char time[128],time2[64];
-    int ms = calcSongMs(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
+    // Elapsed time: wall-clock since play() started. This is immune to
+    // row-quantization (calcSongMs jumps by tpb*bpm row chunks, which
+    // skips intermediate tenths — at BPM=120 TPB=4 the .4 tenth never
+    // shows because rows hit 0.375 and 0.500 with no value in between).
+    int ms = (int)((uint64_t)SDL_GetTicks() - ztPlayer->playback_start_ms);
     int sec = ms / 1000;
     int tenth = (ms % 1000) / 100;
     sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|.|H|%d|U|", sec/60, sec%60, tenth);
+    // Total time: still derived from song length (independent of playhead).
     ms = calcSongMs();
     sec = ms / 1000;
     tenth = (ms % 1000) / 100;
