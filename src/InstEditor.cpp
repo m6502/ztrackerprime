@@ -552,11 +552,15 @@ void InstEditor::draw(Drawable *S, int active)
     printcharBG(col(x + 24),row(cy+y),168,COLORS.Lowlight,COLORS.EditBG,S);
   }
 
+  // Extend frame to include the instrument-number / used-mark column on
+  // the left (cols x-4..x-1) so the bordered area covers ALL displayed
+  // content, matching the OrderEditor / pattern-track-frame convention
+  // in F2 where row labels live inside the frame.
   frm->type=0;
-  frm->x=x; frm->y=y; frm->xsize=xsize; frm->ysize=ysize;
+  frm->x=x-4; frm->y=y; frm->xsize=xsize+4; frm->ysize=ysize;
   frm->draw(S,0);
-  
-  screenmanager.Update(col(x-4),row(y-1),col(x+xsize+1),row(y+ysize+1));
+
+  screenmanager.Update(col(x-5),row(y-1),col(x+xsize+1),row(y+ysize+1));
 }
 
 
