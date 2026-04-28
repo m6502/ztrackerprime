@@ -35,7 +35,7 @@
 // SPACE_AT_BOTTOM mirrors the CUI_Patterneditor constant: 8 rows are
 // reserved at the bottom of the screen for the toolbar.
 #define SPACE_AT_BOTTOM 8
-#define DATA_X          4
+#define DATA_X          12
 #define DATA_HDR_Y      (BASE_Y + 6)
 #define DATA_Y          (BASE_Y + 7)
 #define DATA_COLS       8
@@ -177,13 +177,39 @@ public:
     }
     void OnChange() override {
         clear();
-        for (int i = 0; i < MM_PRESET_COUNT; ++i) {
+        // insertItem with is_sorted=false prepends to the head, so walk
+        // backwards to end up with the array's natural order on screen.
+        for (int i = MM_PRESET_COUNT - 1; i >= 0; --i) {
             LBNode *p = insertItem((char *)MM_PRESETS[i].name);
             if (p) {
                 p->int_data = i;
                 if (i == mm_preset_index) p->checked = true;
             }
         }
+    }
+    int update() override {
+        // Robustness pass over ListBox: stay focused on edge arrow keys
+        // (the parent's "ret = -1/1" surrendered focus the moment the
+        // user pressed Up after clicking the first item). Also accept
+        // Space as a synonym for Enter.
+        KBKey k = Keys.checkkey();
+        if (k == SDLK_SPACE) {
+            Keys.getkey();
+            LBNode *n = getNode(cur_sel + y_start);
+            if (n) OnSelect(n);
+            need_refresh++;
+            need_redraw++;
+            return 0;
+        }
+        if (k == SDLK_UP && cur_sel == 0 && y_start == 0) {
+            Keys.getkey();
+            return 0;
+        }
+        if (k == SDLK_DOWN && cur_sel + y_start >= num_elements - 1) {
+            Keys.getkey();
+            return 0;
+        }
+        return ListBox::update();
     }
     void OnSelect(LBNode *selected) override {
         if (!selected) return;
@@ -237,7 +263,7 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     // Enter to apply). Replaces the invisible P-cycle.
     MmPresetSelector *ps = new MmPresetSelector;
     UI->add_element(ps, PRESET_LIST_ID);
-    ps->x = 42; ps->y = BASE_Y + 2;
+    ps->x = 47; ps->y = BASE_Y + 2;
     ps->xsize = 38;
     ps->ysize = MM_PRESET_COUNT - 1;   // ListBox interprets ysize as last visible row
 }
@@ -545,7 +571,7 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
-    print(row(42), col(BASE_Y), "Presets (Tab/Arrows/Enter; P=cycle)", COLORS.Text, S);
+    print(row(47), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
 
     // Data grid header
     print(row(DATA_X - 3), row(DATA_HDR_Y), "##", COLORS.Text, S);

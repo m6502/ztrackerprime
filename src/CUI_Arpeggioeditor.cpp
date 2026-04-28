@@ -189,13 +189,38 @@ public:
     }
     void OnChange() override {
         clear();
-        for (int i = 0; i < AR_PRESET_COUNT; ++i) {
+        // insertItem prepends when is_sorted=false, so walk backwards to
+        // preserve the array's natural order in the visible list.
+        for (int i = AR_PRESET_COUNT - 1; i >= 0; --i) {
             LBNode *p = insertItem((char *)AR_PRESETS[i].name);
             if (p) {
                 p->int_data = i;
                 if (i == ar_preset_index) p->checked = true;
             }
         }
+    }
+    int update() override {
+        // Robustness pass over ListBox: keep focus on edge Up/Down keys
+        // (parent's default surrenders focus on first Up after click).
+        // Accept Space as a synonym for Enter.
+        KBKey k = Keys.checkkey();
+        if (k == SDLK_SPACE) {
+            Keys.getkey();
+            LBNode *n = getNode(cur_sel + y_start);
+            if (n) OnSelect(n);
+            need_refresh++;
+            need_redraw++;
+            return 0;
+        }
+        if (k == SDLK_UP && cur_sel == 0 && y_start == 0) {
+            Keys.getkey();
+            return 0;
+        }
+        if (k == SDLK_DOWN && cur_sel + y_start >= num_elements - 1) {
+            Keys.getkey();
+            return 0;
+        }
+        return ListBox::update();
     }
     void OnSelect(LBNode *selected) override {
         if (!selected) return;
@@ -273,7 +298,7 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // 11 -- Preset list (always-visible, SkinSelector-style).
     ArPresetSelector *ps = new ArPresetSelector;
     UI->add_element(ps, PRESET_LIST_ID);
-    ps->x = 42; ps->y = BASE_Y + 2;
+    ps->x = 46; ps->y = BASE_Y + 2;
     ps->xsize = 32;
     ps->ysize = AR_PRESET_COUNT - 1;
 }
@@ -673,7 +698,7 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(7), col(BASE_Y + 12), "CC#",   COLORS.Text, S);
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
-    print(row(42), col(BASE_Y), "Presets (Tab/Arrows/Enter; P=cycle)", COLORS.Text, S);
+    print(row(46), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
 
     // Grid header
     {
