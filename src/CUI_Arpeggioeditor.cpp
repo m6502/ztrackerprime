@@ -62,6 +62,7 @@
 #define GRID_VISIBLE    14
 #define GRID_ID         10
 #define PRESET_LIST_ID  11
+#define KEYJAZZ_ID      12
 
 static int  ar_slot      = 0;
 static int  ar_cur_step  = 0;
@@ -238,6 +239,46 @@ public:
     void draw(Drawable *S, int active) override { (void)S; (void)active; }
 };
 
+// Keyjazz focus stub. A dedicated tab stop the user lands on (via Tab
+// or mouse click) to enter keyjazz mode. Only when this element is
+// focused do the QWERTY keyjazz keys fire MIDI noteOn -- keeps the
+// other tab stops (sliders, listbox, grid) free for their own keypress
+// handling.
+//
+// The stub itself does nothing in update(); the page-level keyjazz
+// handler in CUI_Arpeggioeditor::update() reads UI->cur_element ==
+// KEYJAZZ_ID and dispatches notes. Mouse clicks land via mouseupdate
+// (inherited from UserInterfaceElement) which checks bounds + sets
+// focus.
+class ArKeyjazzFocus : public UserInterfaceElement {
+public:
+    ArKeyjazzFocus() { xsize = 64; ysize = 3; }
+    int update() override {
+        // Eat plain TAB so it advances focus normally. Keyjazz keys are
+        // handled in the page update so they can read base_octave +
+        // current arpeggio state without duplicating mapping here.
+        return 0;
+    }
+    int mouseupdate(int cur_element) override {
+        KBKey key = Keys.checkkey();
+        if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
+            if (checkclick(col(this->x), row(this->y),
+                           col(this->x + this->xsize),
+                           row(this->y + this->ysize))) {
+                Keys.getkey();
+                need_redraw++;
+                return this->ID;
+            }
+        }
+        return cur_element;
+    }
+    void draw(Drawable *, int) override {
+        // The page draws the visible Keyjazz panel (with focus highlight
+        // when active==true) so this stub stays a non-visual focus
+        // anchor.
+    }
+};
+
 // Inline preset selector -- mirrors the F11 SkinSelector ergonomics so
 // the full preset catalogue is visible (replaces the invisible P-cycle).
 class ArPresetSelector : public ListBox {
@@ -406,6 +447,19 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ps->x = 47; ps->y = BASE_Y + 2;
     ps->xsize = 32;
     ps->ysize = AR_PRESET_COUNT - 1;
+
+    // 12 -- Keyjazz slot. Tab here (or click) to enter keyjazz mode;
+    // only then do Q/W/E/R/T/Y/U/I/O/P + 2/3/5/6/7 / Z/X/C/V/B/N/M +
+    // S/D/G/H/J fire MIDI notes via cur_inst. Without this dedicated
+    // tab stop, the keyjazz keys would conflict with other widgets
+    // that consume letter keys (Name TextInput typing, listbox
+    // typeahead).
+    ArKeyjazzFocus *kj = new ArKeyjazzFocus;
+    UI->add_element(kj, KEYJAZZ_ID);
+    kj->x = 4;
+    kj->y = CHARS_Y - SPACE_AT_BOTTOM - 7;
+    kj->xsize = 80;
+    kj->ysize = 3;
 }
 
 // Migrate legacy out-of-range values (loaded from old .zt files) into
@@ -580,12 +634,10 @@ void CUI_Arpeggioeditor::update() {
     {
         KBKey pkey = Keys.checkkey();
         int   pks  = Keys.getstate();
-        // Keyjazz audition: only on widgets that don't consume letter
-        // keys (so NOT the Name TextInput at id=1 and NOT the preset
-        // listbox at PRESET_LIST_ID where letters drive typeahead).
-        // Plain key only -- no Ctrl/Alt/Meta/Shift, otherwise modifier
-        // shortcuts get hijacked.
-        if (pkey && focused != 1 && focused != PRESET_LIST_ID
+        // Keyjazz: only fires when focus is on the dedicated Keyjazz
+        // slot. Tab to it (or click) to enter; the slot's draw()
+        // highlights so the user can see the mode is active.
+        if (pkey && focused == KEYJAZZ_ID
             && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
             int sc = (int)Keys.getcode();
             int off = ar_keyjazz_offset_for_scancode(sc);
@@ -904,24 +956,31 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Keyjazz panel: visible label + key->note legend so the user knows
-    // pressing tracker keys plays single MIDI notes via cur_inst. Active
-    // any time focus is NOT on the Name TextInput (id=1) and NOT on the
-    // preset listbox (PRESET_LIST_ID). Lower octave = base_octave-1,
-    // upper = base_octave. Currently selected octave shown in the title.
+    // Keyjazz panel: dedicated tab stop (KEYJAZZ_ID). Title flips
+    // between dim "Tab here..." (not focused) and active "[ACTIVE]"
+    // (focused) so the user can see whether the keys will fire notes.
     {
         int kj_y = CHARS_Y - SPACE_AT_BOTTOM - 7;
+        bool active = (UI->cur_element == KEYJAZZ_ID);
         char hdr[96];
-        snprintf(hdr, sizeof(hdr),
-                 "Keyjazz (current octave %d -- play notes via cur_inst):",
-                 base_octave);
-        print(row(4), col(kj_y),     hdr, COLORS.Highlight, S);
+        if (active) {
+            snprintf(hdr, sizeof(hdr),
+                     "[KEYJAZZ ACTIVE -- octave %d  press notes; Tab to leave]",
+                     base_octave);
+            printBG(col(4), row(kj_y), hdr,
+                    COLORS.EditBG, COLORS.Highlight, S);
+        } else {
+            snprintf(hdr, sizeof(hdr),
+                     " Keyjazz (Tab here to enter; current octave %d) ",
+                     base_octave);
+            print(row(4), col(kj_y), hdr, COLORS.Lowlight, S);
+        }
         print(row(4), col(kj_y + 1),
               "  upper:  Q=C  W=D  E=E  R=F  T=G  Y=A  U=B  I=C+1  O=D+1  P=E+1",
-              COLORS.Text, S);
+              active ? COLORS.Text : COLORS.Lowlight, S);
         print(row(4), col(kj_y + 2),
               "  lower:  Z=C-1 X=D-1 C=E-1 V=F-1 B=G-1 N=A-1 M=B-1   sharps: 2/3/5/6/7  S/D/G/H/J",
-              COLORS.Text, S);
+              active ? COLORS.Text : COLORS.Lowlight, S);
     }
 
     // Documentation block anchored just above the toolbar (SPACE_AT_BOTTOM
