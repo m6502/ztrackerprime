@@ -15,8 +15,14 @@ enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_
 // Editor (F3) — matches the long-standing behaviour. Pattern Editor
 // (F2) suits arrangers who go straight to writing notes; Song Config
 // (F11) suits people who want to verify BPM/TPB/order list first.
-enum E_post_load_page { POST_LOAD_INST_EDIT = 0, POST_LOAD_PATTERN_EDIT, POST_LOAD_SONG_CONFIG };
-#define POST_LOAD_PAGE_COUNT 3
+enum E_post_load_page {
+    POST_LOAD_PATTERN_EDIT = 0,
+    POST_LOAD_INST_EDIT,
+    POST_LOAD_PLAYSONG,        // F5 (Playsong page)
+    POST_LOAD_SONG_CONFIG,     // F11 (Order list / Song config)
+    POST_LOAD_SONG_MESSAGE     // F10 (Song message editor)
+};
+#define POST_LOAD_PAGE_COUNT 5
 
 
 //  New class ZTConf puts all global variables in one place

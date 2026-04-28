@@ -212,7 +212,7 @@ void CUI_KeyBindings::draw(Drawable *S)
                 COLORS.Background);
 
     char buf[96];
-    snprintf(buf, sizeof(buf), "Keyboard Shortcuts (Ctrl+Alt+K)%s",
+    snprintf(buf, sizeof(buf), "Keybindings Editor (Ctrl+Alt+K)%s",
              dirty ? "   [unsaved]" : "");
     printtitle(PAGE_TITLE_ROW_Y, buf, COLORS.Text, COLORS.Background, S);
 

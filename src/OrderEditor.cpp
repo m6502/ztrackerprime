@@ -32,11 +32,40 @@ int OrderEditor::mouseupdate(int cur_element) {
             need_refresh++;
             old_playing_ord = ztPlayer->playing_cur_order;
         }
-    } 
+    }
     else if (old_playing_ord != -1 && !ztPlayer->playing) {
         old_playing_ord = -1;
         need_redraw++;
         need_refresh++;
+    }
+
+    KBKey key = Keys.checkkey();
+    if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
+        // Indices column at col(x..x+3); value column with frame at
+        // col(x+4..x+7). Accept clicks anywhere in the widget bounds
+        // (col(x)..col(x+xsize)).
+        if (checkclick(col(this->x), row(this->y),
+                       col(this->x + this->xsize), row(this->y + this->ysize))) {
+            int clicked_row = (MousePressY / 8) - this->y;
+            if (clicked_row < 0) clicked_row = 0;
+            if (clicked_row >= ysize) clicked_row = ysize - 1;
+            int new_order = clicked_row + list_start;
+            if (new_order < 0) new_order = 0;
+            if (new_order >= ZTM_ORDERLIST_LEN) new_order = ZTM_ORDERLIST_LEN - 1;
+            cursor_y = clicked_row;
+            // If click landed in the value column, snap cursor_x to the
+            // digit column under the mouse; otherwise leave it alone.
+            int clicked_col = (MousePressX / 8) - this->x;
+            if (clicked_col >= 4 && clicked_col <= 6) {
+                cursor_x = clicked_col - 4;
+            }
+            cur_edit_order = new_order;
+            cur_edit_pattern = song->orderlist[new_order];
+            Keys.getkey();
+            need_redraw++;
+            need_refresh++;
+            return this->ID;   // request focus
+        }
     }
     return cur_element;
 }

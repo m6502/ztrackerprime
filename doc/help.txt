@@ -5,7 +5,7 @@
  Home/End    : Just try them
  PgUp/PgDn   : Up/down 16 rows
  Ins/Del     : Insert/delete row on current track
-              Hold CTRL for ALL tracks
+               Hold CTRL for ALL tracks
 
  Tab         : Next track
  SHIFT-TAB   : Previous track
@@ -27,11 +27,11 @@
  SHIFT-,     : Select previous instrument.
  SHIFT-.     : Select next instrument.
  SHIFT-~     : Switch between regular and effect-draw mode
-              Use TAB here to switch edit mode
+               Use TAB here to switch edit mode
 
  CTRL-1 => 0 : Change the step-value in the pattern editor
  ALT-`       : Set previous note's length to distance between
-              note and current cursor position
+               note and current cursor position
  ScrollLock  : Follow playback toggle (cursor follows playback position)
 
 |L|%==|H|Pattern Operations|L|==%|U|
@@ -52,27 +52,27 @@
  CTRL-B : Marks the beginning of a select block.
  CTRL-E : Marks the end of a select block.
  CTRL-L : Select whole track, pressing it again will select the entire
-              pattern.
+          pattern.
  CTRL-U : Unselect block
  ALT-D  : Select one beat (press multiple times to select next beats)
 
  CTRL-C : Copy the selected block to the clipboard.
  CTRL-P : Copy pattern, paste to next empty pattern,
-              and jump to new pattern
+          and jump to new pattern
  CTRL-V : Paste the contents of the clipboard to the cursor location.
  CTRL-O : Overwrite paste
  CTRL-M : Merge paste the contents of the clipboard with the contents
-              of the location you're pasting to.
+          of the location you're pasting to.
  CTRL-X : Cut the selected block. (remove and copy to clipboard)
  CTRL-Z : Clear block (hold this one)
 
  CTRL-N : Set length of first row of block to length of block
  CTRL-W : Clear unused volumes
  CTRL-I : Interpolate values through selection (note, vol, or fx param,
-              depending on which column the cursor is on; falls back to
-              effect-data interpolation when no selection column applies)
+          depending on which column the cursor is on; falls back to
+          effect-data interpolation when no selection column applies)
  CTRL-T : Set all effect and effect data fields of block to same
-              value as first row in block
+          value as first row in block
  CTRL-K : Interpolate volume (block)
  ALT-Q  : Transpose block up
  ALT-A  : Transpose block down
@@ -81,8 +81,8 @@
  CTRL-[ : Decrease all volumes in block by 8
  CTRL-] : Increase all volumes in block by 8
  CTRL-` : Set all note's lengths in selection to distance
-              between note and next note
- ALT-S  : Set instruments in block to current instrument
+          between note and next note
+ ALT-S      : Set instruments in block to current instrument
  SHIFT-move : Block selection (movements are arrows and PgUp/PgDn)
 
 
@@ -104,22 +104,23 @@
 
  F1             : Help (That is this text)
  F2             : Pattern editor - Pressing F2 again while in the pattern
-              editing screen brings up the pattern settings.
+                  editing screen brings up the pattern settings.
  F3             : Instrument editor
- F4             : MIDI Macro editor
+ F4             : MIDI Macro editor (toggles to Arpeggio editor when
+                  already on it)
  SHIFT-F4       : Arpeggio editor
  CTRL-M         : MIDI Macro editor (alternate; works everywhere even on
-              systems where the OS eats plain F-keys)
+                  systems where the OS eats plain F-keys)
  CTRL-SHIFT-M   : Quick MIDI export of current song
  F10            : Song message editor
  F5             : Song play (F5 PatternDisplay widget,
-              left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)
+                  left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)
  F6             : Pattern Play - will play the current pattern being edited.
  F7             : Start the song at the current row -
-              If in the pattern edit mode, F7 will start at the current
-              row, at the first instance of the pattern in the pattern
-              order.  If in the pattern order screen, F7 will start the
-              song at the cursor position (by pattern).
+                  If in the pattern edit mode, F7 will start at the current
+                  row, at the first instance of the pattern in the pattern
+                  order.  If in the pattern order screen, F7 will start the
+                  song at the cursor position (by pattern).
  SHIFT-F11      : Set current order
  SHIFT-F7       : Play song from the current order
  F8             : Stop playback
@@ -140,17 +141,16 @@
 
  Up/Down   : Cycles through widgets
  TAB       : Cycles forwards through widgets
-              (in Help: jumps to next section)
+             (in Help: jumps to next section)
  SHIFT-TAB : Cycles backwards through widgets
-              (in Help: jumps to previous section)
+             (in Help: jumps to previous section)
  ENTER     : Confirms choice
  SPACE     : Toggles an option or clicks a button
 
  Sliders   : If you hold CTRL while using LEFT/RIGHT the slider will move in
-              bigger steps
+             bigger steps
  Listboxes : Up/Down scroll, Space toggles select-items in a list box
  Popups    : ESC closes, all other UI keys apply
-
 
 |L|%==|H|Effects|L|==%|U|
 
@@ -158,7 +158,7 @@
  B  00 : Set "[" in the midi file.
  B  01 : Set "]" in the midi file.
  Cxxxx : Pattern break - setting the C marker denotes the end of a
-              pattern.  ex: C0000 will skip to the next pattern, row 0
+         pattern.  ex: C0000 will skip to the next pattern, row 0
  D..xx : Delay note/volume/cut - by xxxx sub-ticks.
  Exxxx : Pitch slide down, E0000 will repeat the last portamento command.
  Fxxxx : Pitch slide up, F0000 will repeat the last portamento down command.
@@ -166,15 +166,14 @@
  Q..xx : Retrig note every xx subticks
  R..xx : Start arpeggio xx.  R0000 will continue the last arpeggio
  Sxxyy : xx is the CC (Continuous Controller) number, yy is the value (0-80).
-              ex. S0142 will set CC #01 (Mod Wheel) to a value of 42.
-              >=80 sends last value
+         ex. S0142 will set CC #01 (Mod Wheel) to a value of 42.
+         >=80 sends last value
  T..xx : Set tempo to xx bpm
  Wxxxx : Absolute pitch set, between 0 and 3FFF, 2000 is no pitch change,
-              0 is max down, 3FFF is max up
+         0 is max down, 3FFF is max up
  X..xx : Set panning, 00=left, 40=center, 7F=right
  Zxxyy : Send midimacro xx with parameter yy.  00 repeats the last used
-              value
-
+         value
 
 |L|%==|H|Troubleshooting|L|==%|U|
 
@@ -184,7 +183,6 @@
    A: If you have any other applications open, try closing them.  If this
  	   doesn't work, perhaps you're drunk.  If drunk, fall down.  end if.
 
-
  Display issues:
 
    Q: The screen is beige/gray and is displaying  "This unit is in accordance
@@ -192,14 +190,12 @@
    A: You are looking at the back of the monitor.  For best results, look at
       the front, or "screen" of your monitor.
 
-
    Q: The screen is black and zTracker is not responding to any key/mouse
       commands.
    A: Your computer is not turned on.  Press the "power" switch on the front
       of the housing and follow the resulting prompts.  You may also want to
       gently pat the front of your pants using two outstretched fingers, to
       ensure that you haven't wet yourself.
-
 
    Q: The screen is displaying a small cyan and red airplane on what appears
       to be an airfield surrounded by buildings.  Occasionally, a small red
@@ -210,49 +206,42 @@
       of your plane by pressing the "," and "/" keys.  The "." key will cause
       your plane to invert - up is down, and down is up - watch out!
 
-
 |L|%==|H|The Merits of zTracker|L|==%|U|
 
-
-  	Congratulations on your decision to use zTracker, the champagne of midi
+ Congratulations on your decision to use zTracker, the champagne of midi
  sequencers.  Simply by choosing to employ zTracker as your personal midi
  geisha, you've now moved yourself one notch further from "idiot" and
  closer to "ultra-smartass".  (Refer to fig 1.1)  However, the fact that
  you're reading the help file kicks you back one notch towards "idiot".  A
  pointless exercise or a profound metaphor for our existence?  Only
  continued use will tell - but if the rash persists, discontinue use
- immediately.  Otherwise:
+ immediately. Otherwise:
 
- 	You, like the zTracker development team, [see fig 1.2] feel that
+ You, like the zTracker development team, [see fig 1.2] feel that
  trackers are simply the best way to exert precise, megalomaniacal control
  over sound.  But you're addicted to the high-fidelity, knob twiddling,
  credit-card-maxed-out world of professional MIDI equipment.  Is there
  some common ground where these two worlds meet, an interdimensional
  portal sort of like the moongates first seen in Ultima IV? [see fig 1.3]
 
+ The answer is yes.  The answer is also zTracker.
 
- 	The answer is yes.  The answer is also zTracker.
+ To sum up: yes, zTracker.
 
- 	To sum up: yes, zTracker.
-
-
- 	In the past, those who exhibited proficiency with
+ In the past, those who exhibited proficiency with
  light-and-switch-adorned gadgetry coupled with the need for complete
  control of as many elements as possible were limited to careers in the
  already saturated mad science and evil genius fields.
 
+ Until zTracker.
 
- 	Until zTracker.
-
-
- 	In these volatile times of sugarfree sugar and piano-playing robots,
+ In these volatile times of sugarfree sugar and piano-playing robots,
  many people are changing careers as many as twelve times during their
  lifetime. An exciting career in the lucrative and burgeoning field of
  musicianship awaits you!  Are you ready to meet the challenge?  Then join
  in the cry:
 
- 	zTracker : it is a midi tracker for writing music!
-
+ zTracker : it is a midi tracker for writing music!
 
 |L|%==|H|Documentation Credits|L|==%|U|
 
@@ -261,4 +250,3 @@
    * Quasimojo/Chill
    * Opaque Fear
    * Daniel Kahlin
-

@@ -14,6 +14,8 @@ ValueSlider::ValueSlider(int fset)
     ysize   = 1;
     newclick= 1;
     focus = fset;
+    from_input = 0;
+    input_value = 0;
 }
 
 
@@ -128,6 +130,8 @@ int ValueSlider::update() {
         if (!UIP_SliderInput->canceled) {
             changed++;
             value = c;
+            input_value = c;  // preserve raw before any clamping
+            from_input = 1;
         }
         if (window_stack.isempty())
             needaclear++; 
@@ -301,6 +305,11 @@ void ValueSliderOFF::draw(Drawable *S, int active) {
             sprintf(str,"%.2d",value);
         v = value;
     }
+    // One char of gap between the slider's right border and the
+    // numeric readout. ValueSlider::draw uses x+xsize and prefixes the
+    // sprintf format with a leading space (effective text col x+xsize+1);
+    // matching that here so ValueSliderOFF readouts (Patch, Bank) align
+    // with adjacent ValueSliderDL readouts (Default Length, etc.).
     printBG(col(x+xsize+1),row(cy),str,COLORS.Text,COLORS.Background,S);
     if (active)
         col = COLORS.Highlight;
@@ -313,7 +322,7 @@ void ValueSliderOFF::draw(Drawable *S, int active) {
         printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
         printchar(col(x+xsize),row(y),0x83,COLORS.Highlight,S);
     }
-    screenmanager.Update(col(x-1),row(y-1),col(x+xsize+7),row(y+1));
+    screenmanager.Update(col(x-1),row(y-1),col(x+xsize+8),row(y+1));
     changed = 0;
 }
 
@@ -337,6 +346,8 @@ int ValueSliderDL::update() {
         if (!UIP_SliderInput->canceled) {
             changed++;
             value = c;
+            input_value = c;  // preserve raw before any clamping
+            from_input = 1;
         }
         needaclear++; need_refresh++;
     }

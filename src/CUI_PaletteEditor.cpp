@@ -955,10 +955,13 @@ static void draw_swatch(Drawable *S, int slot, int selected, int channel_edit) {
     S->drawVLine(x0,     y0, y1, border);
     S->drawVLine(x1 - 1, y0, y1, border);
 
-    // Pattern-line preview to the right of the swatch.
+    // Pattern-line preview to the right of the swatch. Width is sized
+    // for the 8-char preview text ("C-5 01..") plus a 1-char border
+    // padding on each side; the swatch's own width is intentionally
+    // narrower than this.
     int px0 = x1 + col(1);
     int py0 = y0;
-    int px1 = px0 + col(PE_SWATCH_W);
+    int px1 = px0 + col(9);
     int py1 = py0 + row(PE_SWATCH_H);
     S->fillRect(px0, py0, px1, py1, COLORS.EditBG);
     print(px0 + 2, py0 + 2,              "C-5 01..", c, S);

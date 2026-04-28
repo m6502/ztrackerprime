@@ -235,6 +235,11 @@ class TextBox : public UserInterfaceElement {
         int update();
         void draw(Drawable *S, int active);
         int mouseupdate(int cur_element);
+
+        // Responsive full-width helper: 78 cols at 640px-wide windows,
+        // grows by 1 col per 8px of extra resolution. Centralized so
+        // callers don't copy-paste the formula.
+        static int full_width_xsize();
 };
 
 class CommentEditor : public TextBox {
@@ -379,7 +384,7 @@ class MidiInDeviceOpener : public ListBox {
         MidiInDeviceOpener ();
         ~MidiInDeviceOpener () = default ;
 
-//        virtual int update();
+        virtual int update();
 //        virtual void draw(Drawable *S, int active);
 
         virtual int mouseupdate(int cur_element);

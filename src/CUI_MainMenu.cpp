@@ -95,40 +95,40 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Arpeggio Editor",          "Shift-F4",             CMD_SWITCH_ARPEDIT,         NULL},
 #endif
     {MM_CMD,        "Help",                     "F1",                   CMD_SWITCH_HELP,            NULL},
-    {MM_CMD,        "About",                    "Alt-F12",              CMD_SWITCH_ABOUT,           NULL},
+    {MM_CMD,        "About",                    "Alt+F12",              CMD_SWITCH_ABOUT,           NULL},
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_SUBHEADING, "Playback",                 NULL,                   0,                          NULL},
     {MM_CMD,        "Play Song",                "F5",                   CMD_PLAY,                   NULL},
     {MM_CMD,        "Play Pattern",             "F6",                   CMD_PLAY_PAT,               NULL},
     {MM_CMD,        "Play From Cursor",         "F7",                   CMD_PLAY_PAT_LINE,          NULL},
-    {MM_CMD,        "Play From Order",          "Shift-F7",             CMD_PLAY_ORDER,             NULL},
+    {MM_CMD,        "Play From Order",          "Shift+F7",             CMD_PLAY_ORDER,             NULL},
     {MM_CMD,        "Stop",                     "F8",                   CMD_STOP,                   NULL},
     {MM_FUNC,       "Panic (all MIDI off)",     "F9",                   0,                          mm_panic},
-    {MM_FUNC,       "Hard Panic",               "Shift-F9",             0,                          mm_hard_panic},
+    {MM_FUNC,       "Hard Panic",               "Shift+F9",             0,                          mm_hard_panic},
     {MM_FUNC,       "Toggle Follow Playback",   "ScrollLock",           0,                          mm_toggle_follow_playback},
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_SUBHEADING, "File",                     NULL,                   0,                          NULL},
-    {MM_CMD,        "Load Song...",             "Ctrl-L",               CMD_SWITCH_LOAD,            NULL},
-    {MM_CMD,        "Save Song / Save As...",   "Ctrl-S",               CMD_SWITCH_SAVE,            NULL},
+    {MM_CMD,        "Load Song...",             "Ctrl+L",               CMD_SWITCH_LOAD,            NULL},
+    {MM_CMD,        "Save Song / Save As...",   "Ctrl+S",               CMD_SWITCH_SAVE,            NULL},
     // CMD_NEWSONG / CMD_MIDI_EXPORT don't exist as enum values; the
-    // user-facing shortcut still works (Ctrl-Alt-N / Ctrl-Shift-M),
+    // user-facing shortcut still works (Ctrl+Alt+N / Ctrl+Shift+M),
     // so we list it as info-only here. Future: wire to dedicated cmds.
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_SUBHEADING, "Settings",                 NULL,                   0,                          NULL},
     {MM_CMD,        "System Configuration",     "F12",                  CMD_SWITCH_SYSCONF,         NULL},
-    {MM_CMD,        "Global Configuration",     "Ctrl-F12",             CMD_SWITCH_CONFIG,          NULL},
+    {MM_CMD,        "Global Configuration",     "Ctrl+F12",             CMD_SWITCH_CONFIG,          NULL},
 #ifndef DISABLE_PALETTE_EDITOR
-    {MM_CMD,        "Palette Editor",           "Shift-Ctrl-F12",       CMD_SWITCH_PALETTE,         NULL},
+    {MM_CMD,        "Palette Editor",           "Shift+Ctrl+F12",       CMD_SWITCH_PALETTE,         NULL},
 #endif
-    {MM_CMD,        "Keybindings Editor",       "Ctrl-Alt-K",           CMD_SWITCH_KEYBINDINGS,     NULL},
-    {MM_CMD,        "Lua Console",              "Ctrl-Alt-L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
-    {MM_FUNC,       "Toggle Fullscreen",        "Alt-Enter",            0,                          mm_toggle_fullscreen},
+    {MM_CMD,        "Keybindings Editor",       "Ctrl+Alt+K",           CMD_SWITCH_KEYBINDINGS,     NULL},
+    {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
+    {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
-    {MM_FUNC,       "Quit",                     "Ctrl-Q",               0,                          mm_quit},
+    {MM_FUNC,       "Quit",                     "Ctrl+Q",               0,                          mm_quit},
 };
 
 static const int MM_COUNT = sizeof(MM_ENTRIES) / sizeof(MM_ENTRIES[0]);

@@ -87,6 +87,13 @@ EOF
   exit 1
 fi
 
+# zlib/libpng are vendored under extlibs/, so we don't need (and don't want)
+# any inherited LDFLAGS/CPPFLAGS pointing at /usr/local/opt/* (Intel-Homebrew
+# leftovers on Apple Silicon machines). Clearing them avoids the
+#   ld: warning: search path '/usr/local/opt/zlib/lib' not found
+# warning during link.
+unset LDFLAGS CPPFLAGS
+
 configure_args=(
   -S "$script_dir"
   -B "$build_dir"
@@ -112,10 +119,13 @@ fi
 echo "Built: $app_path"
 
 if ((run_after_build)); then
+  log_file="${ZT_RUN_LOG:-/tmp/zt-run.log}"
+  : > "$log_file"
+  echo "Logging stdout/stderr to: $log_file"
   if ((${#app_args[@]})); then
-    "$binary_path" "${app_args[@]}" >/dev/null 2>&1 &
+    "$binary_path" "${app_args[@]}" 2>&1 | tee "$log_file" &
   else
-    "$binary_path" >/dev/null 2>&1 &
+    "$binary_path" 2>&1 | tee "$log_file" &
   fi
   echo "Launched: $binary_path"
 fi

@@ -25,7 +25,7 @@ static PatternUndo g_undo;
 // INTERNAL_RESOLUTION_Y - 55. At 8px per character row that's ceil(55/8) = 7
 // rows; we reserve one extra row so the pattern's bottom border never touches
 // the toolbar. Matches the legacy layout (40 rows = 0..039 at 480px height).
-#define SPACE_AT_BOTTOM                 8
+#define SPACE_AT_BOTTOM                 7
 
 
 int PATTERN_EDIT_ROWS = 100;
@@ -1678,6 +1678,23 @@ void CUI_Patterneditor::update()
             statusmsg = "Nothing to undo";
           }
           status_change = 1; need_refresh++; key = 0;
+        }
+
+        // Cmd+N (macOS): set length of first note of selection to length of
+        // the selection. Mirrors the Ctrl+N binding documented in help.txt;
+        // on Mac the global Alt+N → New Song would otherwise win because
+        // SDL maps Cmd to KS_META|KS_ALT.
+        if ((kstate & KS_META) && !(kstate & KS_CTRL) && !(kstate & KS_SHIFT) && key == SDLK_N) {
+          if (selected &&
+            (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
+            ) {
+            j = (select_row_end+1 - select_row_start)*(96/song->tpb);
+            for(i=select_track_start;i<=select_track_end;i++)
+              song->patterns[cur_edit_pattern]->tracks[i]->update_event(select_row_start,-1,-1,-1,j,-1,-1);
+            file_changed++;
+            need_refresh++;
+          }
+          key = 0;
         }
 
         // Double Pattern: Ctrl+Shift+G
@@ -3560,18 +3577,6 @@ void CUI_Patterneditor::draw(Drawable *S)
     }
     
     draw_status_vars(S);
-
-    // Show playback position at bottom of pattern area when playing
-    if (ztPlayer->playing) {
-        static char playinfo[128];
-        snprintf(playinfo, 128, " Playing: Ord %03d  Pat %03d  Row %03d/%03d  BPM %d  TPB %d  Step %d ",
-            ztPlayer->playing_cur_order,
-            ztPlayer->playing_cur_pattern,
-            ztPlayer->playing_cur_row,
-            song->patterns[ztPlayer->playing_cur_pattern] ? song->patterns[ztPlayer->playing_cur_pattern]->length : 0,
-            song->bpm, song->tpb, cur_step);
-        print(row(1), col(CHARS_Y - 2), playinfo, COLORS.Data, S);
-    }
 
     printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
     
