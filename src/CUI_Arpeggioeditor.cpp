@@ -217,23 +217,17 @@ public:
         return ListBox::update();
     }
     int mouseupdate(int parent_cur) override {
-        // Single-click should apply the preset under the cursor. The base
-        // class only fires OnSelect when the click lands on the row that
-        // was already the cur_sel AND the listbox was already focused --
-        // which means a fresh click on a new row only moves the cursor
-        // and the user has to click a SECOND time to apply. Detect the
-        // mouse-down -> mouse-state-1 transition ourselves and fire
-        // OnSelect on the freshly-set cur_sel.
+        // Single-click should always apply the preset under the cursor.
+        // Detect the mouse-down -> mousestate transition and fire OnSelect
+        // on the freshly-set cur_sel. The parent ListBox already fires
+        // OnSelect when the clicked row equals cur_sel AND the listbox is
+        // already focused, so on that one path OnSelect runs twice; that
+        // is harmless (same preset applied twice = same data).
         int prev_mousestate = mousestate;
         int new_cur = ListBox::mouseupdate(parent_cur);
         if (mousestate && !prev_mousestate && new_cur == this->ID) {
             LBNode *p = getNode(cur_sel + y_start);
-            if (p && p->int_data != ar_preset_index) {
-                // Skip when the base already applied (clicking the cur_sel
-                // row while focused) -- ar_preset_index just got updated,
-                // so a stale int_data check is enough to dedupe.
-                OnSelect(p);
-            }
+            if (p) OnSelect(p);
         }
         return new_cur;
     }

@@ -201,13 +201,15 @@ public:
         return ListBox::update();
     }
     int mouseupdate(int parent_cur) override {
+        // See ArPresetSelector::mouseupdate -- always fire OnSelect on a
+        // fresh click landing on the listbox; the harmless double-apply
+        // on the parent's same-row-while-focused path beats the previous
+        // dedupe-guard's missed-click bug.
         int prev_mousestate = mousestate;
         int new_cur = ListBox::mouseupdate(parent_cur);
         if (mousestate && !prev_mousestate && new_cur == this->ID) {
             LBNode *p = getNode(cur_sel + y_start);
-            if (p && p->int_data != mm_preset_index) {
-                OnSelect(p);
-            }
+            if (p) OnSelect(p);
         }
         return new_cur;
     }
