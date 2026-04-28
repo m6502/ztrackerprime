@@ -51,6 +51,9 @@
 #include "zt.h"
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
+// SPACE_AT_BOTTOM mirrors the CUI_Patterneditor constant: 8 rows are
+// reserved at the bottom of the screen for the toolbar.
+#define SPACE_AT_BOTTOM 8
 #define GRID_X          4
 #define GRID_HDR_Y      (BASE_Y + 14)
 #define GRID_Y          (BASE_Y + 15)
@@ -672,11 +675,12 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         }
     }
 
-    // Documentation block below the grid: highlighted "Trigger from
-    // pattern" line first, then keyboard / action hints. Placement
-    // mirrors CUI_Midimacroeditor (also below its data grid).
+    // Documentation block anchored just above the toolbar (SPACE_AT_BOTTOM
+    // = 8 rows reserved for the toolbar). Pinning to CHARS_Y instead of
+    // GRID_Y+GRID_VISIBLE keeps the line vertically stable as the grid
+    // changes shape.
     {
-        int hint_y = GRID_Y + GRID_VISIBLE + 1;
+        int hint_y = CHARS_Y - SPACE_AT_BOTTOM - 3;
         char hdr[96];
         snprintf(hdr, sizeof(hdr),
                  "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
@@ -690,12 +694,12 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
               COLORS.Text, S);
     }
 
-    // Status hint when grid has focus -- shown beneath the doc block.
+    // Status hint when grid has focus -- one row above the doc block.
     if (UI->cur_element == GRID_ID) {
         char hint[80];
         snprintf(hint, sizeof(hint), "GRID @ step %03X col %d | Tab to leave | digits=value | P=preset",
                  ar_cur_step, ar_cur_col);
-        printBG(col(2), row(GRID_Y + GRID_VISIBLE + 4), hint, COLORS.Highlight, COLORS.Background, S);
+        printBG(col(2), row(CHARS_Y - SPACE_AT_BOTTOM - 5), hint, COLORS.Highlight, COLORS.Background, S);
     }
 
     need_refresh = 0; updated = 2;

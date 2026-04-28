@@ -32,6 +32,9 @@
 #include "zt.h"
 
 #define BASE_Y          (TRACKS_ROW_Y + 0)
+// SPACE_AT_BOTTOM mirrors the CUI_Patterneditor constant: 8 rows are
+// reserved at the bottom of the screen for the toolbar.
+#define SPACE_AT_BOTTOM 8
 #define DATA_X          4
 #define DATA_HDR_Y      (BASE_Y + 6)
 #define DATA_Y          (BASE_Y + 7)
@@ -525,11 +528,11 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         }
     }
 
-    // Documentation block below the grid: highlighted "Trigger from
-    // pattern" line first, then context / shortcut hints. Placement
-    // mirrors CUI_Arpeggioeditor (also below its data grid).
+    // Documentation block anchored just above the toolbar (SPACE_AT_BOTTOM
+    // = 8 rows). Pinning to CHARS_Y instead of DATA_Y+DATA_ROWS keeps the
+    // line vertically stable as the data area changes.
     {
-        int hint_y = DATA_Y + DATA_ROWS + 1;
+        int hint_y = CHARS_Y - SPACE_AT_BOTTOM - 3;
         char invoke[96];
         snprintf(invoke, sizeof(invoke),
                  "Trigger from pattern: Z%02Xyy  (yy substitutes for any P1 byte; range 00-7F)",
