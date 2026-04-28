@@ -97,17 +97,10 @@ static inline void zt_text_input_stop(void) {
 
 // Song Message editor: editor mutates song->songmessage->songmessage
 // (a CDataBuf) in place, and ztfile-io::build_song_message() already
-// serializes that CDataBuf into the .zt file. So unblocking F10 is
-// safe — typed text persists across save/reload.
-//#define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
-// Both Arpeggio and MIDI Macro editor pages are reachable. The data
-// classes (arpeggio / midimacro) and .zt file chunks (ARPG / MMAC)
-// already round-trip safely; the editor UIs themselves are still
-// stubs (single name TextInput) and the pattern effects R/Z parse
-// but don't yet play back. Building out real editing UI + playback
-// is a follow-up PR.
-//#define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
-//#define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+// F10 Song Message editor, Shift+F4 Arpeggio editor, F4 MIDI Macro
+// editor are all live. The DISABLE_UNFINISHED_* gates that surrounded
+// them have been removed (no need for compile-time WIP toggles for
+// features that ship).
 
 
 // ------------------------------------------------------------------------------------------------
@@ -610,17 +603,9 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
         CMD_SWITCH_SONGLEN,
 
 
-#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
         CMD_SWITCH_SONGMSG,
-#endif
-
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
         CMD_SWITCH_ARPEDIT,
-#endif
-
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
         CMD_SWITCH_MIDIMACEDIT,
-#endif
 
         CMD_SWITCH_LUA_CONSOLE,
 
