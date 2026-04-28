@@ -1493,25 +1493,14 @@ void global_keys(Drawable *S)
                 c.is_arpedit_state     = (cur_state == STATE_ARPEDIT);
                 c.song_has_filename    = (song->filename[0] != '\0' &&
                                           song->filename[0] != ' ');
-                // Diagnostic: write the dispatch outcome to the status
-                // line so a freeze/no-op can be traced from the visible
-                // status text (the in-app "what happened" oracle until
-                // there is a real log).
-                SaveKeyAction act = dispatch_save_key(c);
-                switch (act) {
+                switch (dispatch_save_key(c)) {
                     case SAVE_KEY_PASS_THROUGH:
                     case SAVE_KEY_LET_PAGE_HANDLE:
-                        sprintf(szStatmsg, "S key: pass-through (cur_state=%d ctrl=%d alt=%d)",
-                                cur_state, c.kstate_ctrl, c.kstate_has_alt);
-                        statusmsg = szStatmsg; status_change = 1;
                         break;
                     case SAVE_KEY_SWALLOW:
                         // Drain the buffer to avoid the "stuck Ctrl-S
                         // freezes the page" bug.
                         (void)Keys.getkey();
-                        sprintf(szStatmsg, "Ctrl-S/Cmd-S swallowed in editor (cur_state=%d)",
-                                cur_state);
-                        statusmsg = szStatmsg; status_change = 1;
                         return;
                     case SAVE_KEY_OPEN_SAVE_POPUP:
                         popup_window(UIP_SaveMsg);
