@@ -121,7 +121,9 @@ static const mm_preset MM_PRESETS[] = {
     { "All Notes Off",                   PRESET_ALL_NOTES,  3 },
 };
 static const int MM_PRESET_COUNT = sizeof(MM_PRESETS) / sizeof(MM_PRESETS[0]);
-static int mm_preset_index = 0;
+static int  mm_preset_index = 0;
+// See ar_preset_just_applied in CUI_Arpeggioeditor.cpp -- same role here.
+static bool mm_preset_just_applied = false;
 
 static void mm_apply_preset(int idx) {
     if (idx < 0 || idx >= MM_PRESET_COUNT) return;
@@ -218,6 +220,7 @@ public:
         // Refresh checkmarks to follow the new selection.
         selectNone();
         selected->checked = true;
+        mm_preset_just_applied = true;
         ListBox::OnSelect(selected);
     }
     void OnSelectChange() override {}
@@ -295,6 +298,22 @@ void CUI_Midimacroeditor::update() {
 
     ValueSlider *vs;
     TextInput   *ti;
+
+    // Preset just applied via the listbox -- pull macro length into
+    // the slider widget BEFORE the slider->macro sync block, or stale
+    // widget values would overwrite the preset on the next frame.
+    if (mm_preset_just_applied) {
+        mm_preset_just_applied = false;
+        midimacro *m = song->midimacros[mm_slot];
+        if (m) {
+            ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
+            if (vlen) vlen->value = mm_length(m);
+        }
+        TextInput *t = (TextInput *)UI->get_element(1);
+        if (t) t->cursor = 0;
+        need_refresh++;
+        doredraw++;
+    }
 
     // Slot change
     vs = (ValueSlider *)UI->get_element(0);

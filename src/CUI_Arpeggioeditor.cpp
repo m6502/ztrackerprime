@@ -138,7 +138,14 @@ static const ar_preset AR_PRESETS[] = {
     { "Minor Scale (1 oct)",   8,  4, 0, { 0, 2, 3, 5, 7, 8, 10, 12 }, 8 },
 };
 static const int AR_PRESET_COUNT = sizeof(AR_PRESETS) / sizeof(AR_PRESETS[0]);
-static int ar_preset_index = 0;
+static int  ar_preset_index = 0;
+// Set by ArPresetSelector::OnSelect when Enter/Space lands on a preset.
+// CUI_Arpeggioeditor::update() polls this BEFORE the slider->arpeggio
+// sync block so the freshly-applied preset's length/speed/etc. survive
+// (otherwise stale slider widget values would immediately overwrite the
+// preset on the next frame, which looked like a UI freeze on Enter and
+// "Space selects but values don't change" on Space).
+static bool ar_preset_just_applied = false;
 
 static void ar_apply_preset(int idx) {
     if (idx < 0 || idx >= AR_PRESET_COUNT) return;
@@ -228,6 +235,7 @@ public:
         ar_apply_preset(ar_preset_index);
         selectNone();
         selected->checked = true;
+        ar_preset_just_applied = true;
         ListBox::OnSelect(selected);
     }
     void OnSelectChange() override {}
@@ -360,6 +368,26 @@ void CUI_Arpeggioeditor::update() {
 
     ValueSlider *vs;
     TextInput   *ti;
+
+    // Preset just applied via the listbox -- pull arpeggio data into
+    // the slider widgets BEFORE the slider->arpeggio sync block, or
+    // stale widget values will overwrite the preset back to defaults.
+    if (ar_preset_just_applied) {
+        ar_preset_just_applied = false;
+        arpeggio *a = song->arpeggios[ar_slot];
+        if (a) {
+            ((ValueSlider *)UI->get_element(2))->value = a->length;
+            ((ValueSlider *)UI->get_element(3))->value = a->speed;
+            ((ValueSlider *)UI->get_element(4))->value = a->repeat_pos;
+            ((ValueSlider *)UI->get_element(5))->value = a->num_cc;
+            for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
+                ((ValueSlider *)UI->get_element(6 + i))->value = a->cc[i];
+            TextInput *t = (TextInput *)UI->get_element(1);
+            if (t) t->cursor = 0;
+        }
+        need_refresh++;
+        doredraw++;
+    }
 
     // Slot change
     vs = (ValueSlider *)UI->get_element(0);
