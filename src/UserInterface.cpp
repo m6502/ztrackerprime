@@ -2026,7 +2026,7 @@ ListBox::~ListBox() {
 // ------------------------------------------------------------------------------------------------
 //
 //
-int ListBox::mouseupdate(int cur_element) 
+int ListBox::mouseupdate(int cur_element)
 {
   KBKey key,act=0;
   key = Keys.checkkey();
@@ -2035,9 +2035,17 @@ int ListBox::mouseupdate(int cur_element)
 
   color_itemsel = &COLORS.EditBG;
   color_itemnosel = &COLORS.EditText;
-  
-  if (!bMouseIsDown) mousestate = 0;
-  
+
+  // Defensive reset: if the button is no longer held but our drag
+  // tracking thinks it is, clear it. We DO this AFTER the switch below
+  // so the BUTTON_UP_LEFT case can still observe mousestate==1 and act
+  // accordingly. (The previous order cleared mousestate first; the
+  // BUTTON_UP case then saw 0, gated `act++` failed, the up event
+  // sat in the Keys FIFO and blocked every subsequent input. That was
+  // the "click on listbox freezes UI; Cmd-Tab unfreezes via FOCUS_GAINED
+  // -> Keys.flush()" bug.) Drag handling that needs the post-up state
+  // is below the switch and reads mousestate after this reset.
+
   if (mousestate) {
 
     int i = (LastY/8) - this->y ;
@@ -2103,15 +2111,14 @@ int ListBox::mouseupdate(int cur_element)
 
     case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
 
-      // Always consume the button-up. Previous behaviour gated `act++`
-      // on mousestate, but the `if (!bMouseIsDown) mousestate = 0;` line
-      // at the top of mouseupdate clears mousestate BEFORE the up event
-      // reaches this case (bMouseIsDown is already false because the
-      // event-loop's mouseupbuttonhandler ran first). With act gated,
-      // the button-up sat in the Keys FIFO forever and blocked every
-      // subsequent keypress behind it -- the "click in F4 freezes the
-      // UI, Cmd-Tab unfreezes via Keys.flush() on FOCUS_GAINED" bug.
-      act++;
+      // mousestate is still 1 here for the listbox we clicked on,
+      // because the bMouseIsDown defensive reset is now AFTER this
+      // switch (was previously BEFORE, which clobbered our state and
+      // left the button-up event stuck in the Keys queue, freezing
+      // the UI). For listboxes that did NOT receive the click,
+      // mousestate is 0 and act stays 0 -- the click target's own
+      // mouseupdate (ValueSlider, etc.) consumes the event.
+      if (mousestate) act++;
       mousestate=0;
       break;
 
@@ -2123,6 +2130,11 @@ int ListBox::mouseupdate(int cur_element)
       break ;
     } ;
   }
+
+  // Defensive reset AFTER the switch so the BUTTON_UP_LEFT case above
+  // can observe mousestate==1. Without this ordering the queued up
+  // event sat unconsumed and blocked all subsequent input.
+  if (!bMouseIsDown) mousestate = 0;
 
   if (cur_sel != old_cur_sel || y_start != old_y_start) OnSelectChange() ;
 
