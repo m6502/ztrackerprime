@@ -298,7 +298,7 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // 11 -- Preset list (always-visible, SkinSelector-style).
     ArPresetSelector *ps = new ArPresetSelector;
     UI->add_element(ps, PRESET_LIST_ID);
-    ps->x = 46; ps->y = BASE_Y + 2;
+    ps->x = 47; ps->y = BASE_Y + 2;
     ps->xsize = 32;
     ps->ysize = AR_PRESET_COUNT - 1;
 }
@@ -698,7 +698,7 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(7), col(BASE_Y + 12), "CC#",   COLORS.Text, S);
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
-    print(row(46), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
+    print(row(47), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
 
     // Grid header
     {
