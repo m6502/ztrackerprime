@@ -77,6 +77,7 @@
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
+extern "C" void zt_macos_disable_cmd_w(void);
 #endif
 
 #if defined(__APPLE__)
@@ -2703,6 +2704,23 @@ void mousewheelhandler(SDL_MouseWheelEvent *e) {
     }
     const SDL_Keymod mods = SDL_GetModState();
     if ((mods & SDL_KMOD_CTRL) == 0) {
+        // Plain scroll (no Ctrl): drive the active page's text view
+        // by synthesising Up/Down keypresses. TextBox / CommentEditor
+        // already handle these for line-by-line scrolling, so the wheel
+        // just feeds them their existing input. Limited to text-heavy
+        // states (F1 Help, About, Song Message) -- other pages keep
+        // their current "wheel does nothing" behaviour.
+        if (e->y != 0 &&
+            (cur_state == STATE_HELP ||
+             cur_state == STATE_ABOUT ||
+             cur_state == STATE_SONG_MESSAGE)) {
+            const KBKey synth = (e->y > 0) ? SDLK_UP : SDLK_DOWN;
+            int steps = (e->y > 0) ? e->y : -e->y;
+            // 3 lines per detent feels right -- single-line was sluggish.
+            steps *= 3;
+            if (steps > 64) steps = 64;
+            for (int i = 0; i < steps; ++i) Keys.insert(synth);
+        }
         return;
     }
 
@@ -3165,6 +3183,10 @@ static int zt_backend_set_video_mode(char *errstr)
     // use it as Transpose-Up (KS_HAS_ALT treats Cmd as Alt). Quit reachable
     // via Ctrl-Q / Ctrl-Alt-Q.
     zt_macos_disable_cmd_q();
+    // Free Cmd-W from the Window menu's Close item so it reaches our
+    // keyhandler instead of dismissing the SDL window. Pattern Editor
+    // treats Cmd-W as Ctrl-W (clear unused volumes in selection).
+    zt_macos_disable_cmd_w();
 #endif
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {

@@ -1939,9 +1939,12 @@ void CUI_Patterneditor::update()
             break;
             
           case SDLK_W:
+            // Clear unused volumes (only on rows whose note is empty).
+            // Triggered by Ctrl-W; Cmd-W on macOS reaches us via the
+            // separate KS_HAS_ALT block below.
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++) {
-                for(j=select_row_start;j<=select_row_end;j++) {         
+                for(j=select_row_start;j<=select_row_end;j++) {
                   e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j);
                   if (e)
                     if (e->note > 0x7F)
@@ -1987,7 +1990,24 @@ void CUI_Patterneditor::update()
           case SDLK_9: cur_step=9;  need_refresh++; statusmsg = "Step set to 9"; break;
           case SDLK_0: cur_step=0;  need_refresh++; statusmsg = "Step set to 0"; break;
 
-            
+          case SDLK_W:
+            // Cmd-W on macOS (Alt-W elsewhere) does the same as Ctrl-W:
+            // clear unused volumes (rows whose note is empty) in selection.
+            // macOS users would otherwise hit the OS "Close Window" handler;
+            // see zt_macos_disable_cmd_w() in macos_menu.mm.
+            if (selected) {
+              for (i = select_track_start; i <= select_track_end; i++) {
+                for (j = select_row_start; j <= select_row_end; j++) {
+                  e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j);
+                  if (e)
+                    if (e->note > 0x7F)
+                      e->vol = 0x80;
+                }
+              }
+              need_refresh++;
+            }
+            break;
+
           case SDLK_P: // copy to new pattern
             // select all of current pattern
             {
