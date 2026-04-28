@@ -384,7 +384,7 @@ class MidiInDeviceOpener : public ListBox {
         MidiInDeviceOpener ();
         ~MidiInDeviceOpener () = default ;
 
-//        virtual int update();
+        virtual int update();
 //        virtual void draw(Drawable *S, int active);
 
         virtual int mouseupdate(int cur_element);
