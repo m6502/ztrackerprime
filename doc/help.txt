@@ -113,8 +113,11 @@
                   systems where the OS eats plain F-keys)
  CTRL-SHIFT-M   : Quick MIDI export of current song
  F10            : Song message editor
- F5             : Song play (F5 PatternDisplay widget,
-                  left-right/space/alt-1 thru alt-0/alt-f9/alt-f10)
+ F5             : Song play. PgUp / PgDn toggles between the pattern
+                  display and the per-track VU meter view (32 channels
+                  visible; up/down on the VU view scrolls through all
+                  64 tracks). Left/right/space/alt-1..0/alt-f9/alt-f10
+                  drive playback control as before.
  F6             : Pattern Play - will play the current pattern being edited.
  F7             : Start the song at the current row -
                   If in the pattern edit mode, F7 will start at the current
