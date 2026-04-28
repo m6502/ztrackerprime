@@ -176,10 +176,28 @@ public:
         }
     }
     int update() override {
-        // Robustness pass over ListBox: keep focus on edge Up/Down keys
-        // (parent's default surrenders focus on first Up after click).
-        // Accept Space as a synonym for Enter.
+        // Robustness pass over ListBox:
+        //  * P (no modifier) cycles through presets even when the listbox
+        //    holds focus -- ListBox's typeahead would otherwise eat the
+        //    keypress as a prefix-jump rather than running the cycle.
+        //  * Space is a synonym for Enter (apply the highlighted preset).
+        //  * Up at top / Down at bottom no longer surrender focus to the
+        //    previous/next tab stop; the parent's "ret = -1/1" was the
+        //    reason arrows appeared dead after a click on the first row.
         KBKey k = Keys.checkkey();
+        int   ks = Keys.getstate();
+        if (k == SDLK_P && !(ks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            Keys.getkey();
+            ar_preset_index = (ar_preset_index + 1) % AR_PRESET_COUNT;
+            ar_apply_preset(ar_preset_index);
+            ar_preset_just_applied = true;
+            selectNone();
+            setCheck(ar_preset_index, true);
+            setCursor(ar_preset_index);
+            need_refresh++;
+            need_redraw++;
+            return 0;
+        }
         if (k == SDLK_SPACE) {
             Keys.getkey();
             LBNode *n = getNode(cur_sel + y_start);
@@ -197,6 +215,27 @@ public:
             return 0;
         }
         return ListBox::update();
+    }
+    int mouseupdate(int parent_cur) override {
+        // Single-click should apply the preset under the cursor. The base
+        // class only fires OnSelect when the click lands on the row that
+        // was already the cur_sel AND the listbox was already focused --
+        // which means a fresh click on a new row only moves the cursor
+        // and the user has to click a SECOND time to apply. Detect the
+        // mouse-down -> mouse-state-1 transition ourselves and fire
+        // OnSelect on the freshly-set cur_sel.
+        int prev_mousestate = mousestate;
+        int new_cur = ListBox::mouseupdate(parent_cur);
+        if (mousestate && !prev_mousestate && new_cur == this->ID) {
+            LBNode *p = getNode(cur_sel + y_start);
+            if (p && p->int_data != ar_preset_index) {
+                // Skip when the base already applied (clicking the cur_sel
+                // row while focused) -- ar_preset_index just got updated,
+                // so a stale int_data check is enough to dedupe.
+                OnSelect(p);
+            }
+        }
+        return new_cur;
     }
     void OnSelect(LBNode *selected) override {
         if (!selected) return;

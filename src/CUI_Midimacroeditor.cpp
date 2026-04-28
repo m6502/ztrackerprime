@@ -166,11 +166,22 @@ public:
         }
     }
     int update() override {
-        // Robustness pass over ListBox: stay focused on edge arrow keys
-        // (the parent's "ret = -1/1" surrendered focus the moment the
-        // user pressed Up after clicking the first item). Also accept
-        // Space as a synonym for Enter.
+        // See ArPresetSelector::update for the rationale on the P / Space /
+        // edge-arrow handling -- same semantics here.
         KBKey k = Keys.checkkey();
+        int   ks = Keys.getstate();
+        if (k == SDLK_P && !(ks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            Keys.getkey();
+            mm_preset_index = (mm_preset_index + 1) % MM_PRESET_COUNT;
+            mm_apply_preset(mm_preset_index);
+            mm_preset_just_applied = true;
+            selectNone();
+            setCheck(mm_preset_index, true);
+            setCursor(mm_preset_index);
+            need_refresh++;
+            need_redraw++;
+            return 0;
+        }
         if (k == SDLK_SPACE) {
             Keys.getkey();
             LBNode *n = getNode(cur_sel + y_start);
@@ -188,6 +199,17 @@ public:
             return 0;
         }
         return ListBox::update();
+    }
+    int mouseupdate(int parent_cur) override {
+        int prev_mousestate = mousestate;
+        int new_cur = ListBox::mouseupdate(parent_cur);
+        if (mousestate && !prev_mousestate && new_cur == this->ID) {
+            LBNode *p = getNode(cur_sel + y_start);
+            if (p && p->int_data != mm_preset_index) {
+                OnSelect(p);
+            }
+        }
+        return new_cur;
     }
     void OnSelect(LBNode *selected) override {
         if (!selected) return;
