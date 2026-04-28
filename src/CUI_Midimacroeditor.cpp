@@ -607,20 +607,22 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         }
     }
 
-    // Documentation block anchored just above the toolbar (SPACE_AT_BOTTOM
-    // = 8 rows). Pinning to CHARS_Y instead of DATA_Y+DATA_ROWS keeps the
-    // line vertically stable as the data area changes.
+    // Documentation block pinned to the same x/y anchor that the
+    // CUI_Arpeggioeditor uses (column 4, three rows above the
+    // SPACE_AT_BOTTOM toolbar margin). Hardcoding the column here -- not
+    // DATA_X -- keeps F4 / Shift+F4 visually aligned even if the data
+    // grid's x moves.
     {
         int hint_y = CHARS_Y - SPACE_AT_BOTTOM - 3;
         char invoke[96];
         snprintf(invoke, sizeof(invoke),
                  "Trigger from pattern: Z%02Xyy  (yy substitutes for any P1 byte; range 00-7F)",
                  mm_slot);
-        print(row(DATA_X), col(hint_y),     invoke, COLORS.Highlight, S);
-        print(row(DATA_X), col(hint_y + 1),
+        print(row(4), col(hint_y),     invoke, COLORS.Highlight, S);
+        print(row(4), col(hint_y + 1),
               "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
               COLORS.Text, S);
-        print(row(DATA_X), col(hint_y + 2),
+        print(row(4), col(hint_y + 2),
               "Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
               COLORS.Text, S);
     }
