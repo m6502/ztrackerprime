@@ -1477,10 +1477,15 @@ void global_keys(Drawable *S)
                 if (cur_state == STATE_KEYBINDINGS) break;
                 // F4 (MIDI Macro editor) and Shift+F4 (Arpeggio editor)
                 // shouldn't pop the Save Song dialog while the user is
-                // working with the table data. Swallow Ctrl-S there so
-                // it stays a no-op until they return to F2/F3.
-                if (cur_state == STATE_MIDIMACEDIT ||
-                    cur_state == STATE_ARPEDIT) break;
+                // working with the table data. CONSUME the key here
+                // (otherwise it sits in the buffer and every subsequent
+                // checkkey() returns it again -- which looks like the
+                // page froze).
+                if ((cur_state == STATE_MIDIMACEDIT ||
+                     cur_state == STATE_ARPEDIT) && (kstate & KS_CTRL)) {
+                    (void)Keys.getkey();
+                    return;
+                }
                 // IMPORTANT: this is Ctrl-S only. Cmd-S (which is
                 // KS_META | KS_ALT on macOS) is reserved for the
                 // Pattern Editor's "Set Instrument on selection"
