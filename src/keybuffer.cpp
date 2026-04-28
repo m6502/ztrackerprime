@@ -38,7 +38,12 @@
  *
  ******/
 
-#include "zt.h"
+// keybuffer.cpp only needs the KeyBuffer class declaration plus the
+// SDL_KMOD_* / SDLK_* macros surfaced through keybuffer.h. zt.h was a
+// cargo-cult include from the rest of the tree; pulling it in made it
+// impossible to compile keybuffer.cpp into the unit-test executables
+// without also dragging in SDL3, the Lua engine, and the world.
+#include "keybuffer.h"
 
 /*
 class KeyBuffer {
@@ -76,7 +81,11 @@ void KeyBuffer::flush(void) {
 KBKey KeyBuffer::checkkey(void) {
     unsigned char a=0;
     KBKey ret = 0;
-    if (head != tail) {
+    // Use cursize, not head!=tail: when the ring is exactly full,
+    // head wraps back to tail and the head!=tail check incorrectly
+    // reports "empty" with 200 keys still pending. Found by the
+    // tests/test_keybuffer.cpp overflow drain test.
+    if (cursize > 0) {
         a=tail+1;
         if (a>=maxsize) a = 0;
         ret = buffer[a].key;
@@ -88,7 +97,7 @@ KBKey KeyBuffer::checkkey(void) {
 }
 KBKey KeyBuffer::getkey(void) {
     KBKey ret=0;
-    if (head != tail) {
+    if (cursize > 0) {
         ++tail;
         --cursize;
         if (tail>=maxsize) tail = 0;

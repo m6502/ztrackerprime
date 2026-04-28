@@ -50,3 +50,19 @@ add_executable(test_save_key
 target_include_directories(test_save_key PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_save_key PRIVATE cxx_std_17)
 add_test(NAME save_key COMMAND test_save_key)
+
+# Real KeyBuffer (src/keybuffer.{h,cpp}) compiled under sdl_stub.h with
+# the ZT_TEST_NO_SDL guard. Exercises the actual SDL_KMOD -> KS_*
+# translation, FIFO ordering, peek-vs-consume semantics, macOS Cmd ->
+# KS_META|KS_ALT mapping, keypad-to-digit normalisation, and overflow.
+add_executable(test_keybuffer
+    test_keybuffer.cpp
+    "${CMAKE_SOURCE_DIR}/src/keybuffer.cpp"
+)
+target_include_directories(test_keybuffer PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/tests"
+)
+target_compile_definitions(test_keybuffer PRIVATE ZT_TEST_NO_SDL)
+target_compile_features(test_keybuffer PRIVATE cxx_std_17)
+add_test(NAME keybuffer COMMAND test_keybuffer)
