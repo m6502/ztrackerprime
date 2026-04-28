@@ -77,6 +77,56 @@ static void mm_quit(void) {
     quit();
 }
 
+// Build a CLI invocation string that re-launches zt with the same
+// state the user has now (open MIDI in ports, MIDI clock chase target,
+// loaded song file) and copy it to the system clipboard. Pairs with
+// the --midi-in / --midi-clock CLI flags so the user can paste the
+// command anywhere (Discord, a launcher script, a stage cheat sheet)
+// to reproduce this session.
+static void mm_copy_relaunch_cmd(void) {
+    char buf[1024];
+    int n = 0;
+    n += snprintf(buf + n, sizeof(buf) - n, "zt");
+
+    // MIDI clock chase: which input port is the master? Use the first
+    // open one when chase is on. (Multi-master clock makes no sense.)
+    int clock_port_idx = -1;
+    if (zt_config_globals.midi_in_sync_chase_tempo && MidiIn) {
+        for (unsigned j = 0; j < MidiIn->numMidiDevs; j++) {
+            if (MidiIn->QueryDevice(j)) { clock_port_idx = (int)j; break; }
+        }
+    }
+    if (clock_port_idx >= 0) {
+        n += snprintf(buf + n, sizeof(buf) - n,
+                      " --midi-clock \"%s\"",
+                      MidiIn->midiInDev[clock_port_idx]->szName);
+    }
+
+    // Every OTHER open MIDI in port becomes a --midi-in flag.
+    if (MidiIn) {
+        for (unsigned j = 0; j < MidiIn->numMidiDevs; j++) {
+            if ((int)j == clock_port_idx) continue;
+            if (!MidiIn->QueryDevice(j)) continue;
+            n += snprintf(buf + n, sizeof(buf) - n,
+                          " --midi-in \"%s\"",
+                          MidiIn->midiInDev[j]->szName);
+        }
+    }
+
+    // Song filename (positional). The codebase stores it as an
+    // unsigned char[] that may contain a leading space sentinel for
+    // "no name", so guard against that.
+    if (song && song->filename[0] != '\0' && song->filename[0] != ' ') {
+        n += snprintf(buf + n, sizeof(buf) - n,
+                      " %s", (const char *)song->filename);
+    }
+
+    SDL_SetClipboardText(buf);
+    snprintf(szStatmsg, sizeof(szStatmsg), "Copied to clipboard: %s", buf);
+    statusmsg = szStatmsg;
+    status_change = 1;
+}
+
 // ----------------------------------------------------------------------
 // Menu table. Order on screen = order here.
 // ----------------------------------------------------------------------
@@ -112,6 +162,7 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_SUBHEADING, "File",                     NULL,                   0,                          NULL},
     {MM_CMD,        "Load Song...",             "Ctrl+L",               CMD_SWITCH_LOAD,            NULL},
     {MM_CMD,        "Save Song / Save As...",   "Ctrl+S",               CMD_SWITCH_SAVE,            NULL},
+    {MM_FUNC,       "Copy Relaunch Command",    NULL,                   0,                          mm_copy_relaunch_cmd},
     // CMD_NEWSONG / CMD_MIDI_EXPORT don't exist as enum values; the
     // user-facing shortcut still works (Ctrl+Alt+N / Ctrl+Shift+M),
     // so we list it as info-only here. Future: wire to dedicated cmds.
