@@ -446,8 +446,13 @@ void switch_page(CUI_Page *page)
     if (ActivePage->UI)
         ActivePage->UI->full_refresh();
     // Clear any stale status message from the previous page so it
-    // doesn't bleed onto the newly activated page.
-    statusmsg = (char*)" ";
+    // doesn't bleed onto the newly activated page — but only when
+    // we're stopped. While playing, the playhead status line should
+    // carry through page changes; otherwise it briefly blanks and
+    // flashes back in on every F1/F2/F3/etc switch.
+    if (!ztPlayer || !ztPlayer->playing) {
+        statusmsg = (char*)" ";
+    }
 
 
   // <Manu> TO-DO Check if still needed, but not problematic if not
@@ -900,9 +905,20 @@ char *hex2note(char *str,unsigned char note)
 //
 void status(const char *msg,Drawable *S)
 {
-    printBG(col(3),row(INITIAL_ROW + 6),"                                                                            ",COLORS.Text,COLORS.Background,S);
+    // Wipe the full status row up to the right screen edge before
+    // drawing the new message. Hardcoded 76-space string left a stale
+    // strip at the right when a long Playing/Looping line shrank to
+    // "Stopped" on a window wider than 640px.
+    const int max_cols = INTERNAL_RESOLUTION_X / FONT_SIZE_X;
+    char wipe[256];
+    int n = max_cols - 3;
+    if (n < 0) n = 0;
+    if (n > (int)sizeof(wipe) - 1) n = sizeof(wipe) - 1;
+    memset(wipe, ' ', n);
+    wipe[n] = '\0';
+    printBG(col(3),row(INITIAL_ROW + 6),wipe,COLORS.Text,COLORS.Background,S);
     printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);
-    screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(80)-1,row(10));
+    screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(max_cols)-1,row(10));
 }
 
 
@@ -928,25 +944,32 @@ void update_status(Drawable *S)
   int i,o=0;
   char str[10];
 
-  // Refresh the playing/looping status line on the pages where it makes
-  // sense (Pattern Editor + Play Song). Other pages (Help, Instrument
-  // Editor, Sys Config…) keep the status bar quiet so the playback line
-  // doesn't bleed over their own UI.
-  if (ztPlayer->playing && (cur_state == STATE_PEDIT || cur_state == STATE_PLAY)) {
+  // Refresh the playing/looping status line on every page so the user
+  // can always see where playback is, regardless of which view they're
+  // currently editing in.
+  if (ztPlayer->playing) {
+
+    char time[128],time2[64];
+    // Elapsed time: wall-clock since play() started. This is immune to
+    // row-quantization (calcSongMs jumps by tpb*bpm row chunks, which
+    // skips intermediate tenths — at BPM=120 TPB=4 the .4 tenth never
+    // shows because rows hit 0.375 and 0.500 with no value in between).
+    int ms = (int)((uint64_t)SDL_GetTicks() - ztPlayer->playback_start_ms);
+    int sec = ms / 1000;
+    int tenth = (ms % 1000) / 100;
+    sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|.|H|%d|U|", sec/60, sec%60, tenth);
+    // Total time: still derived from song length (independent of playhead).
+    ms = calcSongMs();
+    sec = ms / 1000;
+    tenth = (ms % 1000) / 100;
+    sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|.|H|%d|U|", time2, sec/60, sec%60, tenth);
 
     if (ztPlayer->playmode) {
-
-      char time[128],time2[64];
-      int sec;
-      sec = calcSongSeconds(ztPlayer->playing_cur_row, ztPlayer->playing_cur_order);
-      sprintf(time2, "|H|%.2d|U|:|H|%.2d|U|",sec/60,sec%60);
-      sec = calcSongSeconds();
-      sprintf(time, "%s/|H|%.2d|U|:|H|%.2d|U|",time2,sec/60,sec%60);
-      sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time);
+      sprintf(szStatmsg,"Playing, Ord: |H|%.3d|U|/|H|%.3d|U|, Pat: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
     }
     else {
 
-      sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length);
+      sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
     }
 
     statusmsg = szStatmsg;
@@ -958,10 +981,6 @@ void update_status(Drawable *S)
       cur_edit_row     = ztPlayer->playing_cur_row;
       need_refresh++;
     }
-  }
-  else if (ztPlayer->playing && cur_state != STATE_PEDIT && cur_state != STATE_PLAY) {
-    // Keep statusmsg quiet on Help/InstEdit/SysConfig/etc while playing.
-    statusmsg = (char*)" ";
   }
 
   if (S->lock() == 0) {

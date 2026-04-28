@@ -60,18 +60,20 @@
 #define SAVE_TEXTINPUT_POS_Y         (SAVE_BUTTONS_BASE_Y + 0)
 
 
+// Tighten button stack so it doesn't extend below the right-hand file
+// list. TextInput->first button gap = 1 row, between buttons = 1 row.
 #define SAVE_ZT_BUTTON_POS_X         FILE_LIST_POS_X_CHARS
-#define SAVE_ZT_BUTTON_POS_Y         (SAVE_TEXTINPUT_POS_Y + 1 + 1)
+#define SAVE_ZT_BUTTON_POS_Y         (SAVE_TEXTINPUT_POS_Y + 1)
 
 
 #define SAVE_MID_BUTTON_POS_X        FILE_LIST_POS_X_CHARS
-#define SAVE_MID_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1 + 1)
+#define SAVE_MID_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1)
 
 #define SAVE_MID_MC_BUTTON_POS_X     FILE_LIST_POS_X_CHARS
-#define SAVE_MID_MC_BUTTON_POS_Y     (SAVE_MID_BUTTON_POS_Y + 1 + 1)
+#define SAVE_MID_MC_BUTTON_POS_Y     (SAVE_MID_BUTTON_POS_Y + 1)
 
 #define SAVE_MID_PT_BUTTON_POS_X     FILE_LIST_POS_X_CHARS
-#define SAVE_MID_PT_BUTTON_POS_Y     (SAVE_MID_MC_BUTTON_POS_Y + 1 + 1)
+#define SAVE_MID_PT_BUTTON_POS_Y     (SAVE_MID_MC_BUTTON_POS_Y + 1)
 
 //#define SAVE_GBA_BUTTON_POS_X        FILE_LIST_POS_X_CHARS
 //#define SAVE_GBA_BUTTON_POS_Y        (SAVE_ZT_BUTTON_POS_Y + 1 + 1 + 1 + 1)

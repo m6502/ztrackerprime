@@ -87,6 +87,13 @@ EOF
   exit 1
 fi
 
+# zlib/libpng are vendored under extlibs/, so we don't need (and don't want)
+# any inherited LDFLAGS/CPPFLAGS pointing at /usr/local/opt/* (Intel-Homebrew
+# leftovers on Apple Silicon machines). Clearing them avoids the
+#   ld: warning: search path '/usr/local/opt/zlib/lib' not found
+# warning during link.
+unset LDFLAGS CPPFLAGS
+
 configure_args=(
   -S "$script_dir"
   -B "$build_dir"

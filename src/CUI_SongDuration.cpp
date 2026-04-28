@@ -16,38 +16,42 @@ void BTNCLK_close_songduration(void) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-int calcSongSeconds(int cur_row, int cur_ord)
+// Returns whole-seconds duration. For sub-second precision use
+// calcSongMs() — same row-walk, but expressed in milliseconds so the
+// caller can render MM:SS.t without the integer-truncation chunkiness.
+int calcSongMs(int cur_row, int cur_ord)
 {
     int o = 0;
-    int rows = 0;
-    int seconds;
-    int cr=0;
-    
+    int64_t rows = 0;
+    int64_t cr = 0;
+
     while (o < ZTM_ORDERLIST_LEN && song->orderlist[o] == 0x101) {
         o++;
     }
 
-    while( o < ZTM_ORDERLIST_LEN && song->orderlist[o] < 0x100) {
-        rows += song->patterns[song->orderlist[o]]->length;
+    while (o < ZTM_ORDERLIST_LEN && song->orderlist[o] < 0x100) {
+        int len = song->patterns[song->orderlist[o]]->length;
+        rows += len;
         if (cur_row != -1) {
-            if (o<cur_ord)
-                cr+=song->patterns[song->orderlist[o]]->length;
-            if (o == cur_ord)
-                cr+=cur_row;
+            if (o < cur_ord) cr += len;
+            if (o == cur_ord) cr += cur_row;
         }
         o++;
-        while (o < ZTM_ORDERLIST_LEN && song->orderlist[o]==0x101)
+        while (o < ZTM_ORDERLIST_LEN && song->orderlist[o] == 0x101)
             o++;
     }
-    if (rows>0)
-        seconds = (((rows)/song->tpb)*60)/song->bpm;
-    else 
-        seconds=0;
-    if (cur_row > -1 && rows > 0) {
-        seconds = seconds*cr / rows;
-    }
-        
-    return seconds;
+
+    if (song->tpb <= 0 || song->bpm <= 0) return 0;
+
+    // Time per row = 60/(tpb*bpm) seconds → milliseconds = row*60000/(tpb*bpm).
+    int64_t denom = (int64_t)song->tpb * (int64_t)song->bpm;
+    int64_t target_rows = (cur_row > -1) ? cr : rows;
+    return (int)((target_rows * 60000) / denom);
+}
+
+int calcSongSeconds(int cur_row, int cur_ord)
+{
+    return calcSongMs(cur_row, cur_ord) / 1000;
 }
 
 

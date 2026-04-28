@@ -612,6 +612,10 @@ int UserInterfaceElement::mouseupdate(int cur_element)
 //
 TextInput::TextInput(void) {
     cursor = 0;
+    str = NULL;
+    length = 0;
+    xsize = 0;
+    frame = 0;
 }
 
 
@@ -926,6 +930,12 @@ void TextInput::draw(Drawable *S, int active) {
 //
 CheckBox::CheckBox(void) {
     value = NULL;
+    // Default chip width: "Off" (3 chars) is the widest visible state.
+    xsize = 3;
+    // Frame is a no-op in CheckBox::draw (the border rendered as a yellow
+    // stripe and added no info) — default to 0 so callers don't need to
+    // reset it from the inherited default of 1.
+    frame = 0;
 }
 
 
@@ -1014,31 +1024,52 @@ int CheckBox::update() {
 //
 //
 void CheckBox::draw(Drawable *S, int active) {
+    // Hidden placeholder: callers can hide a checkbox (without renumbering
+    // get_element() indices elsewhere) by setting xsize=0. Honour that.
+    if (xsize <= 0) {
+        changed = 0;
+        return;
+    }
     int cx,cy=y;
     TColor f,b;
     const char *str;
-    for(cx=x;cx<x+xsize;cx++) {
-        printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
-    }
     if (*value)
         str = "On";
     else
         str = "Off";
+    // Visible chip width derives from the string length so the dark
+    // background is exactly as wide as the text (no trailing padding).
+    // Both "Off" and "On " are 3 chars, so it's a single source of
+    // truth: change the strings and every checkbox in the app follows.
+    const int chip_w = (int)strlen(str);
+    // Visible chip is always chip_w cells wide ("Off"=3, "On"=2). Wipe
+    // up to "Off" width so an Off->On transition clears the stale "f"
+    // cell. Caller-supplied xsize is for the click area only — never
+    // expand the painted region beyond chip_w, since the wipe color may
+    // not match every page's background and would render as a bleed.
+    const int wipe_end = 3;
+    if (wipe_end > chip_w) {
+        for (cx = x + chip_w; cx < x + wipe_end; cx++) {
+            printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.Background,S);
+        }
+    }
+    for(cx=x;cx<x+chip_w;cx++) {
+        printBG(col(cx),row(cy)," ",COLORS.Text,COLORS.EditBG,S);
+    }
     if (active) {
         f = COLORS.EditBG;
-        b = COLORS.Highlight; 
+        b = COLORS.Highlight;
     } else {
         f = COLORS.EditText;
         b = COLORS.EditBG;
     }
     printBG(col(x),col(y),str,f,b,S);
-    if (frame) {
-        printline(col(x),row(y-1),0x86,xsize,COLORS.Lowlight,S);
-        printline(col(x),row(y+1),0x81,xsize,COLORS.Highlight,S);
-        printchar(col(x-1),row(y),0x84,COLORS.Lowlight,S);
-        printchar(col(x+xsize),row(y),0x83,COLORS.Highlight,S);
-    }
-    screenmanager.Update(col(x-1),row(y-1),col(x+xsize+1),row(y+1));
+    // Frame border is intentionally never drawn around checkboxes — the
+    // border chars rendered as a yellow stripe next to the chip and added
+    // no information on top of the dark chip background. Callers may still
+    // set frame=1, but the flag is a no-op here.
+    int dirty_w = (xsize > chip_w) ? xsize : chip_w;
+    screenmanager.Update(col(x-1),row(y-1),col(x+dirty_w+1),row(y+1));
     changed = 0;
 }
 
@@ -1682,6 +1713,11 @@ TextBox::TextBox()
   bEof = false;
   bUseColors = 1;
   bWordWrap = false;
+}
+
+int TextBox::full_width_xsize()
+{
+    return 78 + ((INTERNAL_RESOLUTION_X - 640) / 8);
 }
 
 

@@ -228,7 +228,7 @@ void CUI_LuaConsole::draw(Drawable *S)
                 fx2, row(input_row() + 1) - 1, page_bg);
 
     // --- Title ---
-    printtitle(PAGE_TITLE_ROW_Y, "Lua Console (Esc/F2 to close)",
+    printtitle(PAGE_TITLE_ROW_Y, "Lua Console (Ctrl+Alt+L)",
                title_fg, page_bg, S);
 
     // --- Scrollback background (distinct shade, so the console area is

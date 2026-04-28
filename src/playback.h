@@ -149,6 +149,11 @@ class player {
         int light_counter;
         int skip;
         int loop_mode;
+        // Wall-clock timestamp (SDL_GetTicks ms) when play() was invoked.
+        // Used by the status display to show real elapsed time, immune
+        // to row-quantization artifacts (.4s skip) that happen when
+        // calcSongMs jumps in tpb*bpm-row chunks.
+        uint64_t playback_start_ms;
 
         zt_module *song;
         pattern patt_memory;

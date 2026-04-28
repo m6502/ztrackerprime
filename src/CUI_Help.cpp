@@ -13,7 +13,7 @@ CUI_Help::CUI_Help(void) {
     UI->add_element(tb, 0);
     tb->x = 1;
     tb->y = 12;
-    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    tb->xsize = TextBox::full_width_xsize();
     // Bottom-anchor: fill from tb->y down to ~5 rows above screen bottom.
     tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
     //tb->text = "This is a test of the textbox reader\n\nit is supposed to work";
@@ -327,7 +327,7 @@ void CUI_Help::update() {
 
 void CUI_Help::draw(Drawable *S) {
 
-    tb->xsize = 78 + ((INTERNAL_RESOLUTION_X-640)/8);
+    tb->xsize = TextBox::full_width_xsize();
     // Bottom-anchor: fill from tb->y down to ~5 rows above screen bottom.
     tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
 
