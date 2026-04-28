@@ -119,6 +119,7 @@ static void format_ccval(unsigned char v, char buf[4]) {
 
 #include "preset_data.h"
 #include "preset_selector.h"
+#include "page_sync.h"
 
 static int  ar_preset_index = 0;
 // Set by ArPresetSelector::OnSelect when Enter/Space lands on a preset.
@@ -377,16 +378,20 @@ void CUI_Arpeggioeditor::update() {
     // Preset just applied via the listbox -- pull arpeggio data into
     // the slider widgets BEFORE the slider->arpeggio sync block, or
     // stale widget values will overwrite the preset back to defaults.
+    // Behaviour lives in refresh_arp_widgets_from_data (page_sync.h)
+    // and is exercised by tests/test_page_sync.cpp.
     if (ar_preset_just_applied) {
         ar_preset_just_applied = false;
         arpeggio *a = song->arpeggios[ar_slot];
         if (a) {
-            ((ValueSlider *)UI->get_element(2))->value = a->length;
-            ((ValueSlider *)UI->get_element(3))->value = a->speed;
-            ((ValueSlider *)UI->get_element(4))->value = a->repeat_pos;
-            ((ValueSlider *)UI->get_element(5))->value = a->num_cc;
+            ArpSliders w;
+            refresh_arp_widgets_from_data(w, *a);
+            ((ValueSlider *)UI->get_element(2))->value = w.length;
+            ((ValueSlider *)UI->get_element(3))->value = w.speed;
+            ((ValueSlider *)UI->get_element(4))->value = w.repeat_pos;
+            ((ValueSlider *)UI->get_element(5))->value = w.num_cc;
             for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i)
-                ((ValueSlider *)UI->get_element(6 + i))->value = a->cc[i];
+                ((ValueSlider *)UI->get_element(6 + i))->value = w.cc[i];
             TextInput *t = (TextInput *)UI->get_element(1);
             if (t) t->cursor = 0;
         }

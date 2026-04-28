@@ -74,6 +74,7 @@
 #include "zt.h"
 #include "lua_engine.h"
 #include "keybindings.h"
+#include "save_key_dispatch.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -1471,51 +1472,48 @@ void global_keys(Drawable *S)
 
               break ;
 
-            case SDLK_S: // save
-                // Keybindings editor uses Ctrl-S to save bindings to
-                // zt.conf, not the song. Let the page handle it.
-                if (cur_state == STATE_KEYBINDINGS) break;
-                // F4 (MIDI Macro editor) and Shift+F4 (Arpeggio editor)
-                // shouldn't pop the Save Song dialog while the user is
-                // working with the table data. CONSUME the key here
-                // (otherwise it sits in the buffer and every subsequent
-                // checkkey() returns it again -- which looks like the
-                // page froze).
-                if ((cur_state == STATE_MIDIMACEDIT ||
-                     cur_state == STATE_ARPEDIT) && (kstate & KS_CTRL)) {
-                    (void)Keys.getkey();
-                    return;
-                }
+            case SDLK_S: {
                 // IMPORTANT: this is Ctrl-S only. Cmd-S (which is
                 // KS_META | KS_ALT on macOS) is reserved for the
                 // Pattern Editor's "Set Instrument on selection"
                 // shortcut (CUI_Patterneditor.cpp gated on
                 // KS_HAS_ALT). Don't widen this check to KS_META --
                 // doing so steals Cmd-S from that shortcut.
-                if (kstate & KS_CTRL) {
-
-                    bool saveas = true ;
-
-                    if(kstate & KS_SHIFT) saveas = true ;
-                    else
-                    {
-                          if (song->filename[0] != '\0') {
-                              if (song->filename[0] != ' ') {
-                                  popup_window(UIP_SaveMsg);
-                                  saveas = false ;
-                              }
-                          }
-                    }
-
-                    if(saveas) command = CMD_SWITCH_SAVE;
-                    else {
-                    }
-
-                    key = Keys.getkey();
-                    clear++;
+                //
+                // Decision split into a pure function (save_key_dispatch.h)
+                // so the per-page rules (Keybindings page handles it
+                // itself; F4/Shift+F4 swallow it; everything else opens
+                // Save / Save-As) can be unit-tested.
+                SaveKeyContext c;
+                c.kstate_ctrl          = (kstate & KS_CTRL)  != 0;
+                c.kstate_shift         = (kstate & KS_SHIFT) != 0;
+                c.is_keybindings_state = (cur_state == STATE_KEYBINDINGS);
+                c.is_macroedit_state   = (cur_state == STATE_MIDIMACEDIT);
+                c.is_arpedit_state     = (cur_state == STATE_ARPEDIT);
+                c.song_has_filename    = (song->filename[0] != '\0' &&
+                                          song->filename[0] != ' ');
+                switch (dispatch_save_key(c)) {
+                    case SAVE_KEY_PASS_THROUGH:
+                    case SAVE_KEY_LET_PAGE_HANDLE:
+                        break;
+                    case SAVE_KEY_SWALLOW:
+                        // Drain the buffer to avoid the "stuck Ctrl-S
+                        // freezes the page" bug.
+                        (void)Keys.getkey();
+                        return;
+                    case SAVE_KEY_OPEN_SAVE_POPUP:
+                        popup_window(UIP_SaveMsg);
+                        (void)Keys.getkey();
+                        clear++;
+                        break;
+                    case SAVE_KEY_OPEN_SAVE_AS:
+                        command = CMD_SWITCH_SAVE;
+                        (void)Keys.getkey();
+                        clear++;
+                        break;
                 }
-
                 break;
+            }
 
 
 
