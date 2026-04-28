@@ -5,10 +5,14 @@
 // treated as Alt-equivalent via KS_HAS_ALT). Quit is still reachable from
 // the keyboard via Ctrl-Q (or Ctrl-Alt-Q) and from the macOS app-menu
 // click — only the keyboard shortcut on the menu item is cleared.
+//
+// Same treatment for Cmd-W: the Window menu's Close item would otherwise
+// dismiss the SDL window instead of letting Cmd-W reach the app. The user
+// expects Cmd-W to behave like Ctrl-W (clear unused volumes in selection).
 
 #import <Cocoa/Cocoa.h>
 
-extern "C" void zt_macos_disable_cmd_q(void)
+static void zt_strip_key_equivalent_for_selector(SEL sel)
 {
     NSMenu *mainMenu = [NSApp mainMenu];
     if (!mainMenu) return;
@@ -16,11 +20,21 @@ extern "C" void zt_macos_disable_cmd_q(void)
         NSMenu *submenu = [topItem submenu];
         if (!submenu) continue;
         for (NSMenuItem *item in [submenu itemArray]) {
-            // Identify the Quit item by selector (locale-independent).
-            if ([item action] == @selector(terminate:)) {
+            if ([item action] == sel) {
                 [item setKeyEquivalent:@""];
                 [item setKeyEquivalentModifierMask:0];
             }
         }
     }
+}
+
+extern "C" void zt_macos_disable_cmd_q(void)
+{
+    zt_strip_key_equivalent_for_selector(@selector(terminate:));
+}
+
+extern "C" void zt_macos_disable_cmd_w(void)
+{
+    // performClose: is the standard "Close Window" action.
+    zt_strip_key_equivalent_for_selector(@selector(performClose:));
 }

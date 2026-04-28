@@ -100,11 +100,13 @@ static inline void zt_text_input_stop(void) {
 // serializes that CDataBuf into the .zt file. So unblocking F10 is
 // safe — typed text persists across save/reload.
 //#define DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
-#define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
-// Midimacro editor is reachable now (Ctrl-M / Shift-F4). Leave the
-// "unfinished" macro undefined so the dispatch and case blocks compile.
-// NOTE: the editor itself is still a 10–15% stub (single "name" text
-// field not wired to song data) — finishing it is a separate PR.
+// Both Arpeggio and MIDI Macro editor pages are reachable. The data
+// classes (arpeggio / midimacro) and .zt file chunks (ARPG / MMAC)
+// already round-trip safely; the editor UIs themselves are still
+// stubs (single name TextInput) and the pattern effects R/Z parse
+// but don't yet play back. Building out real editing UI + playback
+// is a follow-up PR.
+//#define DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
 //#define DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
 
 

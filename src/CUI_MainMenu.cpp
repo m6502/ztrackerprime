@@ -89,7 +89,10 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Song Message",             "F10",                  CMD_SWITCH_SONGMSG,         NULL},
 #endif
 #ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
-    {MM_CMD,        "Midimacro Editor",         "Ctrl+M",               CMD_SWITCH_MIDIMACEDIT,     NULL},
+    {MM_CMD,        "MIDI Macro Editor",        "F4",                   CMD_SWITCH_MIDIMACEDIT,     NULL},
+#endif
+#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
+    {MM_CMD,        "Arpeggio Editor",          "Shift-F4",             CMD_SWITCH_ARPEDIT,         NULL},
 #endif
     {MM_CMD,        "Help",                     "F1",                   CMD_SWITCH_HELP,            NULL},
     {MM_CMD,        "About",                    "Alt+F12",              CMD_SWITCH_ABOUT,           NULL},

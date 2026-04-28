@@ -74,9 +74,11 @@
 #include "zt.h"
 #include "lua_engine.h"
 #include "keybindings.h"
+#include "save_key_dispatch.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
+extern "C" void zt_macos_disable_cmd_w(void);
 #endif
 
 #if defined(__APPLE__)
@@ -1446,15 +1448,17 @@ void global_keys(Drawable *S)
                 break;
 
 
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
+#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
             case SDLK_F4:
-                // Any combination involving Shift+F4 opens the Midimacro
-                // editor. Plain Shift-F4 (no other modifier) is the
-                // simplest path and avoids every OS-level F-key shortcut
-                // (macOS Cmd-F4 zoom, Linux/Win Alt-F4 close-window).
-                // Shift+Ctrl+F4, Shift+Cmd+F4, Shift+Alt+F4 also work.
+                // Shift+F4 opens the Arpeggio editor. Plain F4 (handled
+                // in the no-modifier block below) opens the MIDI Macro
+                // editor — the more commonly used of the two. Shift+
+                // Ctrl/Cmd/Alt+F4 also work as long as Shift is held,
+                // since Shift+F4 sidesteps every OS-level F-key
+                // shortcut (macOS Cmd-F4 zoom, Linux/Win Alt-F4
+                // close-window).
                 if (kstate & KS_SHIFT) {
-                    command=CMD_SWITCH_MIDIMACEDIT;
+                    command=CMD_SWITCH_ARPEDIT;
                 }
                 break;
 #endif
@@ -1489,34 +1493,49 @@ void global_keys(Drawable *S)
 
               break ;
 
-            case SDLK_S: // save
-                // Keybindings editor uses Ctrl-S to save bindings to
-                // zt.conf, not the song. Let the page handle it.
-                if (cur_state == STATE_KEYBINDINGS) break;
-                if (kstate & KS_CTRL) {
-
-                    bool saveas = true ;
-
-                    if(kstate & KS_SHIFT) saveas = true ;
-                    else
-                    {
-                          if (song->filename[0] != '\0') {
-                              if (song->filename[0] != ' ') {
-                                  popup_window(UIP_SaveMsg);
-                                  saveas = false ;
-                              }
-                          }
-                    }
-
-                    if(saveas) command = CMD_SWITCH_SAVE;
-                    else {
-                    }
-
-                    key = Keys.getkey();
-                    clear++;
+            case SDLK_S: {
+                // IMPORTANT: this is Ctrl-S only. Cmd-S (which is
+                // KS_META | KS_ALT on macOS) is reserved for the
+                // Pattern Editor's "Set Instrument on selection"
+                // shortcut (CUI_Patterneditor.cpp gated on
+                // KS_HAS_ALT). Don't widen this check to KS_META --
+                // doing so steals Cmd-S from that shortcut.
+                //
+                // Decision split into a pure function (save_key_dispatch.h)
+                // so the per-page rules (Keybindings page handles it
+                // itself; F4/Shift+F4 swallow it; everything else opens
+                // Save / Save-As) can be unit-tested.
+                SaveKeyContext c;
+                c.kstate_ctrl          = (kstate & KS_CTRL)  != 0;
+                c.kstate_shift         = (kstate & KS_SHIFT) != 0;
+                c.kstate_has_alt       = KS_HAS_ALT(kstate);
+                c.is_keybindings_state = (cur_state == STATE_KEYBINDINGS);
+                c.is_macroedit_state   = (cur_state == STATE_MIDIMACEDIT);
+                c.is_arpedit_state     = (cur_state == STATE_ARPEDIT);
+                c.song_has_filename    = (song->filename[0] != '\0' &&
+                                          song->filename[0] != ' ');
+                switch (dispatch_save_key(c)) {
+                    case SAVE_KEY_PASS_THROUGH:
+                    case SAVE_KEY_LET_PAGE_HANDLE:
+                        break;
+                    case SAVE_KEY_SWALLOW:
+                        // Drain the buffer to avoid the "stuck Ctrl-S
+                        // freezes the page" bug.
+                        (void)Keys.getkey();
+                        return;
+                    case SAVE_KEY_OPEN_SAVE_POPUP:
+                        popup_window(UIP_SaveMsg);
+                        (void)Keys.getkey();
+                        clear++;
+                        break;
+                    case SAVE_KEY_OPEN_SAVE_AS:
+                        command = CMD_SWITCH_SAVE;
+                        (void)Keys.getkey();
+                        clear++;
+                        break;
                 }
-
                 break;
+            }
 
 
 
@@ -1587,9 +1606,20 @@ void global_keys(Drawable *S)
                 // ----------------------------------------------
                 case SDLK_F3: command=CMD_SWITCH_IEDIT;     break;
 
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
+#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
                 // ----------------------------------------------
-                case SDLK_F4: command=CMD_SWITCH_ARPEDIT;   break;
+                // F4 from anywhere -> MIDI Macro editor.
+                // F4 while already on MIDI Macro -> Arpeggio editor.
+                // F4 while already on Arpeggio -> back to MIDI Macro.
+                // (Shift+F4 always jumps directly to Arpeggio.)
+                case SDLK_F4:
+                    if (cur_state == STATE_MIDIMACEDIT)
+                        command = CMD_SWITCH_ARPEDIT;
+                    else if (cur_state == STATE_ARPEDIT)
+                        command = CMD_SWITCH_MIDIMACEDIT;
+                    else
+                        command = CMD_SWITCH_MIDIMACEDIT;
+                    break;
 #endif
                 // ----------------------------------------------
                 case SDLK_F5: command = CMD_PLAY;           break;
@@ -2705,6 +2735,23 @@ void mousewheelhandler(SDL_MouseWheelEvent *e) {
     }
     const SDL_Keymod mods = SDL_GetModState();
     if ((mods & SDL_KMOD_CTRL) == 0) {
+        // Plain scroll (no Ctrl): drive the active page's text view
+        // by synthesising Up/Down keypresses. TextBox / CommentEditor
+        // already handle these for line-by-line scrolling, so the wheel
+        // just feeds them their existing input. Limited to text-heavy
+        // states (F1 Help, About, Song Message) -- other pages keep
+        // their current "wheel does nothing" behaviour.
+        if (e->y != 0 &&
+            (cur_state == STATE_HELP ||
+             cur_state == STATE_ABOUT ||
+             cur_state == STATE_SONG_MESSAGE)) {
+            const KBKey synth = (e->y > 0) ? SDLK_UP : SDLK_DOWN;
+            int steps = (e->y > 0) ? e->y : -e->y;
+            // 3 lines per detent feels right -- single-line was sluggish.
+            steps *= 3;
+            if (steps > 64) steps = 64;
+            for (int i = 0; i < steps; ++i) Keys.insert(synth);
+        }
         return;
     }
 
@@ -2994,6 +3041,14 @@ static int zt_handle_platform_window_event(const SDL_Event *e)
 {
     switch (e->type) {
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        // macOS Cmd-Tab away and back: SDL stops delivering key-up
+        // events for any keys held during focus loss, so the Keys
+        // queue can come back with stale entries that look like
+        // permanently-pressed arrows. Flush on focus regain so the
+        // app responds to the next real keypress.
+        Keys.flush();
+        zt_request_ui_full_refresh();
+        return 1;
     case SDL_EVENT_WINDOW_EXPOSED:
     case SDL_EVENT_WINDOW_RESTORED:
         zt_request_ui_full_refresh();
@@ -3159,6 +3214,10 @@ static int zt_backend_set_video_mode(char *errstr)
     // use it as Transpose-Up (KS_HAS_ALT treats Cmd as Alt). Quit reachable
     // via Ctrl-Q / Ctrl-Alt-Q.
     zt_macos_disable_cmd_q();
+    // Free Cmd-W from the Window menu's Close item so it reaches our
+    // keyhandler instead of dismissing the SDL window. Pattern Editor
+    // treats Cmd-W as Ctrl-W (clear unused volumes in selection).
+    zt_macos_disable_cmd_w();
 #endif
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {

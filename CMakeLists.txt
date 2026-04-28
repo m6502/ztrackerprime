@@ -360,3 +360,11 @@ else()
           "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
   )
 endif()
+
+
+# --- Tests ---------------------------------------------------------------
+option(ZT_BUILD_TESTS "Build the standalone unit-test harness (run with ctest)" ON)
+if(ZT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

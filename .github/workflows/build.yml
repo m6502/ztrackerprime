@@ -140,6 +140,9 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j
 
+      - name: Run unit tests
+        run: ctest --test-dir build --output-on-failure
+
       - name: Stage release
         run: |
           mkdir -p dist/ztrackerprime-linux-x86_64

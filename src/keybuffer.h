@@ -1,7 +1,16 @@
 #ifndef _KEYBUFFER_H
 #define _KEYBUFFER_H
 
+// Production builds include real SDL3. Test executables build with
+// -DZT_TEST_NO_SDL plus tests/sdl_stub.h on the include path; we pull
+// the stub in here so any cpp that #includes keybuffer.h gets the
+// SDL_KMOD_* / SDLK_* macros without each test source repeating the
+// include.
+#ifdef ZT_TEST_NO_SDL
+#include "sdl_stub.h"
+#else
 #include <SDL.h>
+#endif
 
 #define KS_NO_SHIFT_KEYS 0
 #define KS_ALT   1

@@ -59,7 +59,8 @@ enum Emeventtypes {
     ET_PATT,
     ET_PITCH,
     ET_MSTART,
-    ET_LOOP                   // <Manu> definimos el evento de loop [EN: define the loop event]
+    ET_LOOP,                  // <Manu> definimos el evento de loop [EN: define the loop event]
+    ET_RAW                    // raw 3-byte short MIDI msg packed in command|data1|data2
 };
 
 struct midi_event {
