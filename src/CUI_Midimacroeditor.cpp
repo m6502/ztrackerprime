@@ -211,6 +211,9 @@ public:
         int new_cur = ListBox::mouseupdate(parent_cur);
         if (mousestate && !prev_mousestate && new_cur == this->ID) {
             apply_event(preset_on_click(snapshot(), cur_sel + y_start));
+            sprintf(szStatmsg, "Macro preset click row=%d idx=%d",
+                    cur_sel + y_start, mm_preset_index);
+            statusmsg = szStatmsg; status_change = 1;
         }
         return new_cur;
     }

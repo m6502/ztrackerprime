@@ -2103,8 +2103,15 @@ int ListBox::mouseupdate(int cur_element)
 
     case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT)):
 
-      if (mousestate) act++;
-
+      // Always consume the button-up. Previous behaviour gated `act++`
+      // on mousestate, but the `if (!bMouseIsDown) mousestate = 0;` line
+      // at the top of mouseupdate clears mousestate BEFORE the up event
+      // reaches this case (bMouseIsDown is already false because the
+      // event-loop's mouseupbuttonhandler ran first). With act gated,
+      // the button-up sat in the Keys FIFO forever and blocked every
+      // subsequent keypress behind it -- the "click in F4 freezes the
+      // UI, Cmd-Tab unfreezes via Keys.flush() on FOCUS_GAINED" bug.
+      act++;
       mousestate=0;
       break;
 

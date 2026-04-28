@@ -10,8 +10,10 @@
 // Locks down the contract that the listbox / preset selectors / global
 // keyhandler depend on.
 
-#define ZT_TEST_NO_SDL
-#include "sdl_stub.h"
+// ZT_TEST_NO_SDL is set via tests/CMakeLists.txt's
+// target_compile_definitions(test_keybuffer PRIVATE ZT_TEST_NO_SDL).
+// keybuffer.h reads that define and pulls in tests/sdl_stub.h instead
+// of the real <SDL.h>.
 #include "keybuffer.h"
 
 #include <cstdio>
