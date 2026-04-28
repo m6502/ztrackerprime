@@ -101,26 +101,11 @@ static void mm_store_name(int slot) {
 }
 
 // ---------------------------------------------------------------------------
-// Presets -- applied to current slot via 'P' key
+// Presets (data + pure apply function live in preset_data.h so a unit
+// test can verify them without dragging in SDL/UI globals).
 
-struct mm_preset { const char *name; const unsigned short *data; int len; };
+#include "preset_data.h"
 
-static const unsigned short PRESET_CC_MOD[]    = { 0xB0, 0x01, 0x101 };       // CC1 (Modulation) value=PARAM1
-static const unsigned short PRESET_CC_FILT[]   = { 0xB0, 0x4A, 0x101 };       // CC74 (Filter cutoff) value=PARAM1
-static const unsigned short PRESET_CC_RES[]    = { 0xB0, 0x47, 0x101 };       // CC71 (Resonance) value=PARAM1
-static const unsigned short PRESET_PROG_CHG[]  = { 0xC0, 0x101 };             // Program change to PARAM1
-static const unsigned short PRESET_PITCH_BEND[]= { 0xE0, 0x00, 0x101 };       // Pitch wheel coarse=PARAM1
-static const unsigned short PRESET_ALL_NOTES[] = { 0xB0, 0x7B, 0x00 };        // CC123 All Notes Off
-
-static const mm_preset MM_PRESETS[] = {
-    { "CC 1 Modulation (param=value)",   PRESET_CC_MOD,     3 },
-    { "CC 74 Filter Cutoff (param=value)", PRESET_CC_FILT,  3 },
-    { "CC 71 Resonance (param=value)",   PRESET_CC_RES,     3 },
-    { "Program Change (param=program)",  PRESET_PROG_CHG,   2 },
-    { "Pitch Bend Coarse (param=value)", PRESET_PITCH_BEND, 3 },
-    { "All Notes Off",                   PRESET_ALL_NOTES,  3 },
-};
-static const int MM_PRESET_COUNT = sizeof(MM_PRESETS) / sizeof(MM_PRESETS[0]);
 static int  mm_preset_index = 0;
 // See ar_preset_just_applied in CUI_Arpeggioeditor.cpp -- same role here.
 static bool mm_preset_just_applied = false;
@@ -129,20 +114,11 @@ static void mm_apply_preset(int idx) {
     if (idx < 0 || idx >= MM_PRESET_COUNT) return;
     midimacro *m = mm_ensure(mm_slot);
     if (!m) return;
-    const mm_preset &p = MM_PRESETS[idx];
-    // Wipe the data slots first (avoid leftover bytes past p.len).
-    for (int i = 0; i < ZTM_MIDIMACRO_MAXLEN; ++i) m->data[i] = ZTM_MIDIMAC_END;
-    for (int i = 0; i < p.len; ++i) m->data[i] = p.data[i];
-    m->data[p.len] = ZTM_MIDIMAC_END;
-    // Always update the macro's name AND the editing buffer so the
-    // displayed name follows the preset selection. Reset TextInput
-    // cursor so trailing pixels from a longer prior name don't bleed.
-    memset(m->name, 0, ZTM_MIDIMACRONAME_MAXLEN);
-    strncpy(m->name, p.name, ZTM_MIDIMACRONAME_MAXLEN - 1);
+    mm_apply_preset_to(m, idx);
     memset(mm_name_buf, 0, sizeof(mm_name_buf));
     memcpy(mm_name_buf, m->name, ZTM_MIDIMACRONAME_MAXLEN);
     file_changed++;
-    sprintf(szStatmsg, "Applied preset: %s", p.name);
+    sprintf(szStatmsg, "Applied preset: %s", MM_PRESETS[idx].name);
     statusmsg = szStatmsg;
     status_change = 1;
 }

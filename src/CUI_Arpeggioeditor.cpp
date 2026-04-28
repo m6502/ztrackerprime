@@ -114,30 +114,11 @@ static void format_ccval(unsigned char v, char buf[4]) {
 }
 
 // ---------------------------------------------------------------------------
-// Presets
+// Presets (data + pure apply function live in preset_data.h so a unit
+// test can verify them without dragging in SDL/UI globals).
 
-struct ar_preset {
-    const char *name;
-    int length;
-    int speed;
-    int repeat_pos;
-    int pitches[16];   // -127..127 or 0x8000 sentinel via cast
-    int len_pitches;
-};
+#include "preset_data.h"
 
-static const ar_preset AR_PRESETS[] = {
-    { "Major Triad Up",        3,  6, 0, { 0, 4, 7 },                  3 },
-    { "Minor Triad Up",        3,  6, 0, { 0, 3, 7 },                  3 },
-    { "Major Triad Up+Octave", 4,  6, 0, { 0, 4, 7, 12 },              4 },
-    { "Octave Bounce",         2,  6, 0, { 0, 12 },                    2 },
-    { "Trill (whole step)",    2,  3, 0, { 0, 2 },                     2 },
-    { "Trill (half step)",     2,  3, 0, { 0, 1 },                     2 },
-    { "Major 7 Chord",         4,  6, 0, { 0, 4, 7, 11 },              4 },
-    { "Minor 7 Chord",         4,  6, 0, { 0, 3, 7, 10 },              4 },
-    { "Major Scale (1 oct)",   8,  4, 0, { 0, 2, 4, 5, 7, 9, 11, 12 }, 8 },
-    { "Minor Scale (1 oct)",   8,  4, 0, { 0, 2, 3, 5, 7, 8, 10, 12 }, 8 },
-};
-static const int AR_PRESET_COUNT = sizeof(AR_PRESETS) / sizeof(AR_PRESETS[0]);
 static int  ar_preset_index = 0;
 // Set by ArPresetSelector::OnSelect when Enter/Space lands on a preset.
 // CUI_Arpeggioeditor::update() polls this BEFORE the slider->arpeggio
@@ -151,23 +132,11 @@ static void ar_apply_preset(int idx) {
     if (idx < 0 || idx >= AR_PRESET_COUNT) return;
     arpeggio *a = ar_ensure(ar_slot);
     if (!a) return;
-    const ar_preset &p = AR_PRESETS[idx];
-    a->length     = p.length;
-    a->speed      = p.speed;
-    a->repeat_pos = p.repeat_pos;
-    a->num_cc     = 0;
-    for (int i = 0; i < ZTM_ARPEGGIO_LEN; ++i) a->pitch[i] = ZTM_ARP_EMPTY_PITCH;
-    for (int i = 0; i < p.len_pitches; ++i)
-        a->pitch[i] = (unsigned short)(int16_t)p.pitches[i];
-    // Always overwrite the name to follow the preset selection;
-    // without this, cycling through P after the first apply leaves
-    // the name stuck on the very first preset.
-    memset(a->name, 0, ZTM_ARPEGGIONAME_MAXLEN);
-    strncpy(a->name, p.name, ZTM_ARPEGGIONAME_MAXLEN - 1);
+    ar_apply_preset_to(a, idx);
     memset(ar_name_buf, 0, sizeof(ar_name_buf));
     memcpy(ar_name_buf, a->name, ZTM_ARPEGGIONAME_MAXLEN);
     file_changed++;
-    sprintf(szStatmsg, "Applied preset: %s", p.name);
+    sprintf(szStatmsg, "Applied preset: %s", AR_PRESETS[idx].name);
     statusmsg = szStatmsg;
     status_change = 1;
 }
