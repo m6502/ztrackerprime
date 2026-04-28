@@ -31,11 +31,13 @@
  ******/
 #include "zt.h"
 
+#include "editor_layout.h"
+
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 // SPACE_AT_BOTTOM mirrors the CUI_Patterneditor constant: 8 rows are
 // reserved at the bottom of the screen for the toolbar.
 #define SPACE_AT_BOTTOM 8
-#define DATA_X          12
+#define DATA_X          ZT_EDITOR_INPUT_X
 #define DATA_HDR_Y      (BASE_Y + 6)
 #define DATA_Y          (BASE_Y + 7)
 #define DATA_COLS       8
@@ -240,21 +242,21 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     // 0 -- Slot
     vs = new ValueSlider;
     UI->add_element(vs, 0);
-    vs->x = 12; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MAX_MIDIMACROS - 1; vs->value = 0;
 
     // 1 -- Name
     ti = new TextInput;
     UI->add_element(ti, 1);
     ti->frame = 1;
-    ti->x = 12; ti->y = BASE_Y + 2;
+    ti->x = ZT_EDITOR_INPUT_X; ti->y = BASE_Y + 2;
     ti->xsize = 32; ti->length = ZTM_MIDIMACRONAME_MAXLEN - 1;
     ti->str = (unsigned char*)mm_name_buf;
 
     // 2 -- Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
-    vs->x = 12; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MIDIMACRO_MAXLEN - 1; vs->value = 0;
 
     // 3 -- Grid focus stub (real UIE so Tab can land here)

@@ -50,6 +50,8 @@
  ******/
 #include "zt.h"
 
+#include "editor_layout.h"
+
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 // SPACE_AT_BOTTOM mirrors the CUI_Patterneditor constant: 8 rows are
 // reserved at the bottom of the screen for the toolbar.
@@ -260,46 +262,46 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // 0 -- Slot
     vs = new ValueSlider;
     UI->add_element(vs, 0);
-    vs->x = 12; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y;     vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MAX_ARPEGGIOS - 1; vs->value = 0;
 
     // 1 -- Name
     ti = new TextInput;
     UI->add_element(ti, 1);
     ti->frame = 1;
-    ti->x = 12; ti->y = BASE_Y + 2;
+    ti->x = ZT_EDITOR_INPUT_X; ti->y = BASE_Y + 2;
     ti->xsize = 32; ti->length = ZTM_ARPEGGIONAME_MAXLEN - 1;
     ti->str = (unsigned char*)ar_name_buf;
 
     // 2 -- Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
-    vs->x = 12; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = ZTM_ARPEGGIO_LEN; vs->value = 1;
 
     // 3 -- Speed
     vs = new ValueSlider;
     UI->add_element(vs, 3);
-    vs->x = 12; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = 255; vs->value = 1;
 
     // 4 -- Repeat
     vs = new ValueSlider;
     UI->add_element(vs, 4);
-    vs->x = 12; vs->y = BASE_Y + 8; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 8; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1; vs->value = 0;
 
     // 5 -- NumCC
     vs = new ValueSlider;
     UI->add_element(vs, 5);
-    vs->x = 12; vs->y = BASE_Y + 10; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 10; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC; vs->value = 0;
 
     // 6..9 -- CC#
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
         vs = new ValueSlider;
         UI->add_element(vs, 6 + i);
-        vs->x = 12 + i * 16; vs->y = BASE_Y + 12;
+        vs->x = ZT_EDITOR_INPUT_X + i * 16; vs->y = BASE_Y + 12;
         vs->xsize = 8; vs->ysize = 1;
         vs->min = 0; vs->max = 127; vs->value = 0;
     }
