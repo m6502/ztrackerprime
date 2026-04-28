@@ -53,8 +53,28 @@ struct SDL_Window;
 extern SDL_Window *zt_main_window;
 extern bool zt_text_input_is_active;
 
+// Queued window title — written by anyone (including non-main threads
+// such as the CoreMIDI input callback), applied by the main loop on
+// the main thread. Touching SDL_SetWindowTitle from a worker thread
+// crashes on macOS because AppKit's NSWindow setTitle: is main-thread-
+// only.
+extern char zt_pending_window_title[256];
+extern volatile int zt_pending_window_title_dirty;
+
 static inline void zt_set_window_title(const char *title) {
-    if (zt_main_window) SDL_SetWindowTitle(zt_main_window, title);
+    if (!title) return;
+    size_t i = 0;
+    for (; i + 1 < sizeof(zt_pending_window_title) && title[i]; ++i) {
+        zt_pending_window_title[i] = title[i];
+    }
+    zt_pending_window_title[i] = '\0';
+    zt_pending_window_title_dirty = 1;
+}
+
+static inline void zt_apply_pending_window_title(void) {
+    if (!zt_pending_window_title_dirty) return;
+    zt_pending_window_title_dirty = 0;
+    if (zt_main_window) SDL_SetWindowTitle(zt_main_window, zt_pending_window_title);
 }
 
 static inline void zt_destroy_surface(SDL_Surface *surface) {

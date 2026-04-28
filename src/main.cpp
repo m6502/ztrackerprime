@@ -114,6 +114,8 @@ CScreenUpdateManager screenmanager;
 Skin *CurrentSkin = NULL;
 
 SDL_Window *zt_main_window = NULL;
+char zt_pending_window_title[256] = "";
+volatile int zt_pending_window_title_dirty = 0;
 bool zt_text_input_is_active = false;
 static SDL_Renderer *zt_renderer = NULL;
 static SDL_Texture *zt_frame_texture = NULL;
@@ -3628,7 +3630,12 @@ int main(int argc, char *argv[])
             break;
 
           case SDL_EVENT_QUIT:
-            quit();
+            // macOS Cmd+Q / Dock "Quit" / system shutdown: honour the
+            // OS-level quit request immediately. Going through quit()
+            // pushed a RUSure popup that the OS-driven event loop
+            // never delivered keystrokes to (and repeated SDL_EVENT_QUIT
+            // events stacked further popups), wedging the app.
+            doquit();
             break;
 
           default:
@@ -3642,6 +3649,8 @@ int main(int argc, char *argv[])
       if (action(screen_buffer)) {
         break;
       }
+
+      zt_apply_pending_window_title();
 
       static int next_frame_redraw_all = 0;
       if(next_frame_redraw_all) {

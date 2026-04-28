@@ -589,19 +589,10 @@ midiIn::~midiIn() {
 }
 
 UINT midiIn::AddDevice(int dev) {
-    intlist *t;
-    UINT error;
-    error = midiInDev[dev]->open();
+    UINT error = midiInDev[dev]->open();
     if (error != MMSYSERR_NOERROR)
         return error;
-    t = devlist_head;
-
-    if(devlist_head != NULL) {
-      
-      delete(devlist_head) ;
-    }
-
-    devlist_head = new intlist(dev,t);
+    devlist_head = new intlist(dev, devlist_head);
     return 0;
 }
 
