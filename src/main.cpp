@@ -3590,34 +3590,73 @@ static void zt_print_cli_help(const char *progname) {
         progname, progname, progname, progname);
 }
 
+// Strip leading '-' or '--' so we accept "-midi-in" or "--midi-in" --
+// dash-count tolerant. Returns NULL if `s` had no leading dash (the
+// caller treats that as a positional argument, not a flag).
+static const char *zt_cli_strip_leading_dashes(const char *s) {
+    if (!s || s[0] != '-') return NULL;
+    while (*s == '-') ++s;
+    if (*s == '\0') return NULL;   // bare "-" or "--" => not a flag we know
+    return s;
+}
+
+// Match a flag name. Accepts both `--flag value` (next argv element) and
+// `--flag=value` (= separator) forms, and is dash-count tolerant. On a
+// match, *value_out points either at argv[i+1] (consuming it) or at the
+// substring after `=`. Returns 1 on match (and possibly advances *i if
+// the next-argv form), 0 on no-match, -1 on missing-arg error.
+static int zt_cli_match_flag_with_value(int argc, char *argv[], int *i,
+                                        const char *flag_name,
+                                        const char **value_out) {
+    const char *a = argv[*i];
+    if (!a) return 0;
+    const char *body = zt_cli_strip_leading_dashes(a);
+    if (!body) return 0;            // not a flag-shaped argv
+    const char *eq   = strchr(body, '=');
+    size_t name_len  = eq ? (size_t)(eq - body) : strlen(body);
+    size_t need_len = strlen(flag_name);
+    if (name_len != need_len) return 0;
+    if (strncmp(body, flag_name, need_len) != 0) return 0;
+    if (eq) {
+        *value_out = eq + 1;
+        return 1;
+    }
+    if (*i + 1 >= argc) {
+        fprintf(stderr, "zt: --%s requires a port name or index\n", flag_name);
+        return -1;
+    }
+    *value_out = argv[++(*i)];
+    return 1;
+}
+
+static bool zt_cli_match_flag(const char *a, const char *flag_name) {
+    const char *body = zt_cli_strip_leading_dashes(a);
+    if (!body) return false;        // not flag-shaped, never a flag match
+    if (strchr(body, '=')) return false;   // "--flag=foo" not handled here
+    return strcmp(body, flag_name) == 0;
+}
+
 static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
     for (int i = 1; i < argc; i++) {
         const char *a = argv[i];
         if (!a || a[0] == '\0') continue;
-        if (strcmp(a, "-h") == 0 || strcmp(a, "--help") == 0) {
+
+        if (zt_cli_match_flag(a, "h") || zt_cli_match_flag(a, "help")) {
             out->show_help = true;
             return 0;
         }
-        if (strcmp(a, "--list-midi-in") == 0) {
+        if (zt_cli_match_flag(a, "list-midi-in")) {
             out->list_midi_in = true;
             continue;
         }
-        if (strcmp(a, "--midi-in") == 0) {
-            if (i + 1 >= argc) {
-                fprintf(stderr, "zt: --midi-in requires a port name or index\n");
-                return -1;
-            }
-            out->midi_in_port = argv[++i];
-            continue;
-        }
-        if (strcmp(a, "--midi-clock") == 0) {
-            if (i + 1 >= argc) {
-                fprintf(stderr, "zt: --midi-clock requires a port name or index\n");
-                return -1;
-            }
-            out->midi_clock_port = argv[++i];
-            continue;
-        }
+        const char *value = NULL;
+        int r = zt_cli_match_flag_with_value(argc, argv, &i, "midi-in", &value);
+        if (r < 0) return -1;
+        if (r > 0) { out->midi_in_port = value; continue; }
+        r = zt_cli_match_flag_with_value(argc, argv, &i, "midi-clock", &value);
+        if (r < 0) return -1;
+        if (r > 0) { out->midi_clock_port = value; continue; }
+
         if (a[0] == '-') {
             fprintf(stderr, "zt: unknown flag '%s' (try --help)\n", a);
             return -1;
