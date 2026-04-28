@@ -57,8 +57,8 @@
 // reserved at the bottom of the screen for the toolbar.
 #define SPACE_AT_BOTTOM 8
 #define GRID_X          4
-#define GRID_HDR_Y      (BASE_Y + 14)
-#define GRID_Y          (BASE_Y + 15)
+#define GRID_HDR_Y      (BASE_Y + 15)
+#define GRID_Y          (BASE_Y + 16)
 #define GRID_VISIBLE    14
 #define GRID_ID         10
 #define PRESET_LIST_ID  11
@@ -276,32 +276,32 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // 2 -- Length
     vs = new ValueSlider;
     UI->add_element(vs, 2);
-    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 5; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = ZTM_ARPEGGIO_LEN; vs->value = 1;
 
     // 3 -- Speed
     vs = new ValueSlider;
     UI->add_element(vs, 3);
-    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 6; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 7; vs->xsize = 18; vs->ysize = 1;
     vs->min = 1; vs->max = 255; vs->value = 1;
 
     // 4 -- Repeat
     vs = new ValueSlider;
     UI->add_element(vs, 4);
-    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 8; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 9; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_LEN - 1; vs->value = 0;
 
     // 5 -- NumCC
     vs = new ValueSlider;
     UI->add_element(vs, 5);
-    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 10; vs->xsize = 18; vs->ysize = 1;
+    vs->x = ZT_EDITOR_INPUT_X; vs->y = BASE_Y + 11; vs->xsize = 18; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_ARPEGGIO_NUM_CC; vs->value = 0;
 
     // 6..9 -- CC#
     for (int i = 0; i < ZTM_ARPEGGIO_NUM_CC; ++i) {
         vs = new ValueSlider;
         UI->add_element(vs, 6 + i);
-        vs->x = ZT_EDITOR_INPUT_X + i * 16; vs->y = BASE_Y + 12;
+        vs->x = ZT_EDITOR_INPUT_X + i * 16; vs->y = BASE_Y + 13;
         vs->xsize = 8; vs->ysize = 1;
         vs->min = 0; vs->max = 127; vs->value = 0;
     }
@@ -731,11 +731,11 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
 
     print(row(6), col(BASE_Y),     "Slot",   COLORS.Text, S);
     print(row(6), col(BASE_Y + 2), "Name",   COLORS.Text, S);
-    print(row(4), col(BASE_Y + 4), "Length", COLORS.Text, S);
-    print(row(5), col(BASE_Y + 6), "Speed",  COLORS.Text, S);
-    print(row(4), col(BASE_Y + 8), "Repeat", COLORS.Text, S);
-    print(row(5), col(BASE_Y + 10), "NumCC", COLORS.Text, S);
-    print(row(7), col(BASE_Y + 12), "CC#",   COLORS.Text, S);
+    print(row(4), col(BASE_Y + 5), "Length", COLORS.Text, S);
+    print(row(5), col(BASE_Y + 7), "Speed",  COLORS.Text, S);
+    print(row(4), col(BASE_Y + 9), "Repeat", COLORS.Text, S);
+    print(row(5), col(BASE_Y + 11), "NumCC", COLORS.Text, S);
+    print(row(7), col(BASE_Y + 13), "CC#",   COLORS.Text, S);
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
     print(row(47), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
