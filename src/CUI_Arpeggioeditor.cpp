@@ -59,6 +59,7 @@
 #define GRID_Y          (BASE_Y + 15)
 #define GRID_VISIBLE    14
 #define GRID_ID         10
+#define PRESET_LIST_ID  11
 
 static int  ar_slot      = 0;
 static int  ar_cur_step  = 0;
@@ -174,6 +175,38 @@ public:
     int update() override { return 0; }
     void draw(Drawable *S, int active) override { (void)S; (void)active; }
 };
+
+// Inline preset selector -- mirrors the F11 SkinSelector ergonomics so
+// the full preset catalogue is visible (replaces the invisible P-cycle).
+class ArPresetSelector : public ListBox {
+public:
+    ArPresetSelector() {
+        empty_message = "No presets";
+        is_sorted = false;
+        use_checks = true;
+        use_key_select = true;
+        OnChange();
+    }
+    void OnChange() override {
+        clear();
+        for (int i = 0; i < AR_PRESET_COUNT; ++i) {
+            LBNode *p = insertItem((char *)AR_PRESETS[i].name);
+            if (p) {
+                p->int_data = i;
+                if (i == ar_preset_index) p->checked = true;
+            }
+        }
+    }
+    void OnSelect(LBNode *selected) override {
+        if (!selected) return;
+        ar_preset_index = selected->int_data;
+        ar_apply_preset(ar_preset_index);
+        selectNone();
+        selected->checked = true;
+        ListBox::OnSelect(selected);
+    }
+    void OnSelectChange() override {}
+};
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -236,6 +269,13 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ArGridFocus *gf = new ArGridFocus;
     UI->add_element(gf, GRID_ID);
     gf->x = GRID_X; gf->y = GRID_Y;
+
+    // 11 -- Preset list (always-visible, SkinSelector-style).
+    ArPresetSelector *ps = new ArPresetSelector;
+    UI->add_element(ps, PRESET_LIST_ID);
+    ps->x = 42; ps->y = BASE_Y + 2;
+    ps->xsize = 32;
+    ps->ysize = AR_PRESET_COUNT - 1;
 }
 
 // Migrate legacy out-of-range values (loaded from old .zt files) into
@@ -388,7 +428,8 @@ void CUI_Arpeggioeditor::update() {
         int   pks  = Keys.getstate();
         if (pkey && focused != 1) {
             bool page_consumed = false;
-            if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))
+                && focused != PRESET_LIST_ID) {
                 ar_preset_index = (ar_preset_index + 1) % AR_PRESET_COUNT;
                 ar_apply_preset(ar_preset_index);
                 arpeggio *na = song->arpeggios[ar_slot];
@@ -398,6 +439,12 @@ void CUI_Arpeggioeditor::update() {
                 ((ValueSlider *)UI->get_element(5))->value = na->num_cc;
                 TextInput *tn = (TextInput *)UI->get_element(1);
                 if (tn) tn->cursor = 0;
+                ListBox *psel = dynamic_cast<ListBox *>(UI->get_element(PRESET_LIST_ID));
+                if (psel) {
+                    psel->selectNone();
+                    psel->setCheck(ar_preset_index, true);
+                    psel->setCursor(ar_preset_index);
+                }
                 page_consumed = true;
             }
             else if ((pkey == SDLK_DELETE || pkey == SDLK_BACKSPACE)
@@ -463,6 +510,12 @@ void CUI_Arpeggioeditor::update() {
             ((ValueSlider *)UI->get_element(5))->value = na->num_cc;
             TextInput *tn = (TextInput *)UI->get_element(1);
             if (tn) tn->cursor = 0;   // avoid name-text bleed
+            ListBox *psel = dynamic_cast<ListBox *>(UI->get_element(PRESET_LIST_ID));
+            if (psel) {
+                psel->selectNone();
+                psel->setCheck(ar_preset_index, true);
+                psel->setCursor(ar_preset_index);
+            }
             consumed = true;
         }
         else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
@@ -619,13 +672,8 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     print(row(5), col(BASE_Y + 10), "NumCC", COLORS.Text, S);
     print(row(7), col(BASE_Y + 12), "CC#",   COLORS.Text, S);
 
-    // Preset indicator (right column, top of page)
-    {
-        char hdr[96];
-        const ar_preset &p = AR_PRESETS[ar_preset_index];
-        snprintf(hdr, sizeof(hdr), "Preset (P): %s", p.name);
-        print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
-    }
+    // Label above the inline Preset listbox (Tab to focus, Enter to apply).
+    print(row(42), col(BASE_Y), "Presets (Tab/Arrows/Enter; P=cycle)", COLORS.Text, S);
 
     // Grid header
     {

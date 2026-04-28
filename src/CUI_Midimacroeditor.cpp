@@ -42,6 +42,7 @@
 #define DATA_ROWS       8
 #define CELL_W          4
 #define GRID_ID         3
+#define PRESET_LIST_ID  4
 #define HINT_ID         99   // not added; just an unused sentinel
 
 static int      mm_slot      = 0;
@@ -161,6 +162,40 @@ public:
     }
     void draw(Drawable *S, int active) override { (void)S; (void)active; }
 };
+
+// Inline preset selector -- modeled after SkinSelector on F11.
+// Always visible to the right of the sliders so the full preset
+// catalogue is in view (replaces the invisible P-cycle).
+class MmPresetSelector : public ListBox {
+public:
+    MmPresetSelector() {
+        empty_message = "No presets";
+        is_sorted = false;   // preserve hand-curated order
+        use_checks = true;
+        use_key_select = true;
+        OnChange();
+    }
+    void OnChange() override {
+        clear();
+        for (int i = 0; i < MM_PRESET_COUNT; ++i) {
+            LBNode *p = insertItem((char *)MM_PRESETS[i].name);
+            if (p) {
+                p->int_data = i;
+                if (i == mm_preset_index) p->checked = true;
+            }
+        }
+    }
+    void OnSelect(LBNode *selected) override {
+        if (!selected) return;
+        mm_preset_index = selected->int_data;
+        mm_apply_preset(mm_preset_index);
+        // Refresh checkmarks to follow the new selection.
+        selectNone();
+        selected->checked = true;
+        ListBox::OnSelect(selected);
+    }
+    void OnSelectChange() override {}
+};
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -196,6 +231,15 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     MmGridFocus *gf = new MmGridFocus;
     UI->add_element(gf, GRID_ID);
     gf->x = DATA_X; gf->y = DATA_Y;
+
+    // 4 -- Preset list. Mirrors the F11 SkinSelector ergonomics so
+    // every preset is visible at once (Tab to focus, arrows to move,
+    // Enter to apply). Replaces the invisible P-cycle.
+    MmPresetSelector *ps = new MmPresetSelector;
+    UI->add_element(ps, PRESET_LIST_ID);
+    ps->x = 42; ps->y = BASE_Y + 2;
+    ps->xsize = 38;
+    ps->ysize = MM_PRESET_COUNT - 1;   // ListBox interprets ysize as last visible row
 }
 
 void CUI_Midimacroeditor::enter(void) {
@@ -273,7 +317,8 @@ void CUI_Midimacroeditor::update() {
         int   pks  = Keys.getstate();
         if (pkey && focused != 1) {
             bool page_consumed = false;
-            if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))
+                && focused != PRESET_LIST_ID) {
                 mm_preset_index = (mm_preset_index + 1) % MM_PRESET_COUNT;
                 mm_apply_preset(mm_preset_index);
                 ((ValueSlider *)UI->get_element(2))->value = mm_length(song->midimacros[mm_slot]);
@@ -282,6 +327,13 @@ void CUI_Midimacroeditor::update() {
                 // name on screen.
                 TextInput *t = (TextInput *)UI->get_element(1);
                 if (t) t->cursor = 0;
+                // Mirror the new selection in the visible listbox.
+                ListBox *psel = dynamic_cast<ListBox *>(UI->get_element(PRESET_LIST_ID));
+                if (psel) {
+                    psel->selectNone();
+                    psel->setCheck(mm_preset_index, true);
+                    psel->setCursor(mm_preset_index);
+                }
                 page_consumed = true;
             }
             else if ((pkey == SDLK_DELETE || pkey == SDLK_BACKSPACE)
@@ -333,6 +385,12 @@ void CUI_Midimacroeditor::update() {
             mm_apply_preset(mm_preset_index);
             ValueSlider *vlen = (ValueSlider *)UI->get_element(2);
             if (vlen) vlen->value = mm_length(song->midimacros[mm_slot]);
+            ListBox *psel = dynamic_cast<ListBox *>(UI->get_element(PRESET_LIST_ID));
+            if (psel) {
+                psel->selectNone();
+                psel->setCheck(mm_preset_index, true);
+                psel->setCursor(mm_preset_index);
+            }
             consumed = true;
         }
         else if ((key == SDLK_DELETE || key == SDLK_BACKSPACE) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
@@ -486,13 +544,8 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     print(row(6),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
     print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
 
-    // Header showing current preset name (cycles with P).
-    {
-        char hdr[80];
-        const mm_preset &p = MM_PRESETS[mm_preset_index];
-        snprintf(hdr, sizeof(hdr), "Preset (P): %s", p.name);
-        print(row(40), col(BASE_Y), hdr, COLORS.Text, S);
-    }
+    // Label above the inline Preset listbox (Tab to focus, Enter to apply).
+    print(row(42), col(BASE_Y), "Presets (Tab/Arrows/Enter; P=cycle)", COLORS.Text, S);
 
     // Data grid header
     print(row(DATA_X - 3), row(DATA_HDR_Y), "##", COLORS.Text, S);
