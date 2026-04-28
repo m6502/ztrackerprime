@@ -57,7 +57,7 @@ static void test_keybindings_lets_page_handle() {
 // REGRESSION: Ctrl-S in F4 (MIDI Macro editor) must SWALLOW. The
 // previous bug was the dispatcher returned a default that opened the
 // Save Song dialog, which yanked the user out of mid-edit.
-static void test_macroedit_swallows() {
+static void test_macroedit_ctrl_s_swallows() {
     SaveKeyContext c = ctx();
     c.kstate_ctrl          = true;
     c.is_macroedit_state   = true;
@@ -66,12 +66,39 @@ static void test_macroedit_swallows() {
 }
 
 // REGRESSION: same for Shift+F4 (Arpeggio editor).
-static void test_arpedit_swallows() {
+static void test_arpedit_ctrl_s_swallows() {
     SaveKeyContext c = ctx();
     c.kstate_ctrl       = true;
     c.is_arpedit_state  = true;
     c.song_has_filename = true;
     CHECK_EQ((int)dispatch_save_key(c), (int)SAVE_KEY_SWALLOW);
+}
+
+// REGRESSION (2026-04-28): On macOS, users instinctively press Cmd-S
+// (KS_HAS_ALT, since Cmd maps to KS_META|KS_ALT). The original swallow
+// rule only matched KS_CTRL, so Cmd-S in F4 fell through to PASS_THROUGH
+// -- the key sat in the buffer, the page locked up. Now both Ctrl-S and
+// Cmd-S in F4/Shift+F4 swallow.
+static void test_macroedit_cmd_s_swallows_on_macos() {
+    SaveKeyContext c = ctx();
+    c.kstate_has_alt       = true;       // Cmd-S on macOS
+    c.is_macroedit_state   = true;
+    c.song_has_filename    = true;
+    CHECK_EQ((int)dispatch_save_key(c), (int)SAVE_KEY_SWALLOW);
+}
+static void test_arpedit_cmd_s_swallows_on_macos() {
+    SaveKeyContext c = ctx();
+    c.kstate_has_alt    = true;
+    c.is_arpedit_state  = true;
+    CHECK_EQ((int)dispatch_save_key(c), (int)SAVE_KEY_SWALLOW);
+}
+// And: Cmd-S OUTSIDE the editor states must NOT swallow -- it has its
+// own meaning (Pattern Editor's "Set Instrument on selection" via
+// KS_HAS_ALT).
+static void test_cmd_s_outside_editor_passes_through() {
+    SaveKeyContext c = ctx();
+    c.kstate_has_alt = true;
+    CHECK_EQ((int)dispatch_save_key(c), (int)SAVE_KEY_PASS_THROUGH);
 }
 
 // Ctrl-S with a saved filename pops the in-place save popup.
@@ -117,8 +144,11 @@ static void test_macroedit_without_ctrl_passes_through() {
 int main() {
     test_no_modifier_passes_through();
     test_keybindings_lets_page_handle();
-    test_macroedit_swallows();
-    test_arpedit_swallows();
+    test_macroedit_ctrl_s_swallows();
+    test_arpedit_ctrl_s_swallows();
+    test_macroedit_cmd_s_swallows_on_macos();
+    test_arpedit_cmd_s_swallows_on_macos();
+    test_cmd_s_outside_editor_passes_through();
     test_default_with_filename_opens_save_popup();
     test_default_without_filename_opens_save_as();
     test_shift_ctrl_forces_save_as();

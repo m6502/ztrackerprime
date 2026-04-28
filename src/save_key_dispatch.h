@@ -37,6 +37,11 @@ enum SaveKeyAction {
 struct SaveKeyContext {
     bool kstate_ctrl;          // KS_CTRL bit set
     bool kstate_shift;         // KS_SHIFT bit set
+    bool kstate_has_alt;       // KS_HAS_ALT(kstate): Alt or macOS Cmd
+                               //   (KS_ALT or KS_META) without Ctrl/Shift.
+                               //   Lets the F4/Shift+F4 swallow rule
+                               //   catch Cmd-S on macOS, where users
+                               //   reflexively press Cmd-S.
     bool is_keybindings_state; // cur_state == STATE_KEYBINDINGS
     bool is_macroedit_state;   // cur_state == STATE_MIDIMACEDIT
     bool is_arpedit_state;     // cur_state == STATE_ARPEDIT
@@ -44,10 +49,19 @@ struct SaveKeyContext {
 };
 
 inline SaveKeyAction dispatch_save_key(const SaveKeyContext &c) {
+    // F4 / Shift+F4 must swallow ANY S-with-modifier so the user is
+    // never yanked out of the table editor mid-stroke. Both Ctrl-S
+    // (Linux/Windows habit) and Cmd-S (macOS habit) are caught here.
+    // Without this, the unhandled key sat in the Keys buffer and
+    // every subsequent checkkey() returned the same event -- the
+    // "page froze on Ctrl-S" symptom.
+    if (c.is_macroedit_state && (c.kstate_ctrl || c.kstate_has_alt))
+        return SAVE_KEY_SWALLOW;
+    if (c.is_arpedit_state   && (c.kstate_ctrl || c.kstate_has_alt))
+        return SAVE_KEY_SWALLOW;
+
     if (!c.kstate_ctrl)          return SAVE_KEY_PASS_THROUGH;
     if (c.is_keybindings_state)  return SAVE_KEY_LET_PAGE_HANDLE;
-    if (c.is_macroedit_state)    return SAVE_KEY_SWALLOW;
-    if (c.is_arpedit_state)      return SAVE_KEY_SWALLOW;
     if (c.kstate_shift)          return SAVE_KEY_OPEN_SAVE_AS;
     if (c.song_has_filename)     return SAVE_KEY_OPEN_SAVE_POPUP;
     return SAVE_KEY_OPEN_SAVE_AS;

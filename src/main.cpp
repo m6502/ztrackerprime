@@ -1487,6 +1487,7 @@ void global_keys(Drawable *S)
                 SaveKeyContext c;
                 c.kstate_ctrl          = (kstate & KS_CTRL)  != 0;
                 c.kstate_shift         = (kstate & KS_SHIFT) != 0;
+                c.kstate_has_alt       = KS_HAS_ALT(kstate);
                 c.is_keybindings_state = (cur_state == STATE_KEYBINDINGS);
                 c.is_macroedit_state   = (cur_state == STATE_MIDIMACEDIT);
                 c.is_arpedit_state     = (cur_state == STATE_ARPEDIT);
