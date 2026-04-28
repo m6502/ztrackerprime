@@ -224,7 +224,9 @@ public:
         selectNone();
         selected->checked = true;
         mm_preset_just_applied = true;
-        ListBox::OnSelect(selected);
+        // See ArPresetSelector::OnSelect -- NOT calling ListBox::OnSelect
+        // here because its `mousestate = 0` clobbers the click before
+        // BUTTON_UP arrives, leaving the up event stuck in Keys.
     }
     void OnSelectChange() override {}
 };

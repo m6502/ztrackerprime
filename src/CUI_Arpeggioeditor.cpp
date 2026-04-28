@@ -133,23 +133,16 @@ static int  ar_preset_index = 0;
 static bool ar_preset_just_applied = false;
 
 // ---------------------------------------------------------------------------
-// Keyjazz audition: while focus is on a non-text widget (NOT the Name
-// TextInput, NOT the preset listbox), pressing a tracker keyjazz key
-// (Q/W/E/R/T/Y/U/I/9/0/O/P + 2/3/5/6/7 upper octave; Z/X/C/V/B/N/M +
-// S/D/G/H/J lower octave) plays the current arpeggio with that key's
-// pitch as the base note, stepping through pitch[] entries at the
-// song-BPM-derived speed interval.
-
-static bool   ar_audition_active        = false;
-static int    ar_audition_base_note     = 60;
-static int    ar_audition_step          = 0;
-static Uint64 ar_audition_step_start_ms = 0;
-static int    ar_audition_step_ms       = 0;
-static int    ar_audition_last_note     = -1;
+// Keyjazz: while focus is on a non-text widget (NOT Name TextInput, NOT
+// preset listbox), the tracker keyjazz keys play a single MIDI note on
+// the current instrument -- exactly like the pattern editor's keyjazz.
+// Press R -> F at base_octave (e.g. F-4). Hold for sustain. Release:
+// main.cpp's existing key-up handler clears jazz_set_state and sends
+// noteOff via the shared infrastructure.
 
 static int ar_keyjazz_offset_for_scancode(int sc) {
     switch (sc) {
-        // Top row -- upper octave
+        // Top row -- upper octave (12*base_octave + 0..16)
         case SDL_SCANCODE_Q: return 0;
         case SDL_SCANCODE_2: return 1;
         case SDL_SCANCODE_W: return 2;
@@ -167,7 +160,7 @@ static int ar_keyjazz_offset_for_scancode(int sc) {
         case SDL_SCANCODE_O: return 14;
         case SDL_SCANCODE_0: return 15;
         case SDL_SCANCODE_P: return 16;
-        // Bottom row -- lower octave
+        // Bottom row -- lower octave (12*(base_octave-1) + 0..11)
         case SDL_SCANCODE_Z: return -12;
         case SDL_SCANCODE_S: return -11;
         case SDL_SCANCODE_X: return -10;
@@ -184,70 +177,41 @@ static int ar_keyjazz_offset_for_scancode(int sc) {
     return -127;
 }
 
-static void ar_audition_send_note_off() {
-    if (ar_audition_last_note >= 0 && song && song->instruments[cur_inst]) {
-        MidiOut->noteOff(song->instruments[cur_inst]->midi_device,
-                         (unsigned char)ar_audition_last_note,
-                         song->instruments[cur_inst]->channel,
-                         0x0, 0);
+// SDL scancode -> SDLK_* mapping for the keyjazz keys, so we can call
+// jazz_set_state with the same id main.cpp's key-up path will receive.
+static int ar_keyjazz_keysym_for_scancode(int sc) {
+    switch (sc) {
+        case SDL_SCANCODE_Q: return SDLK_Q;
+        case SDL_SCANCODE_W: return SDLK_W;
+        case SDL_SCANCODE_E: return SDLK_E;
+        case SDL_SCANCODE_R: return SDLK_R;
+        case SDL_SCANCODE_T: return SDLK_T;
+        case SDL_SCANCODE_Y: return SDLK_Y;
+        case SDL_SCANCODE_U: return SDLK_U;
+        case SDL_SCANCODE_I: return SDLK_I;
+        case SDL_SCANCODE_O: return SDLK_O;
+        case SDL_SCANCODE_P: return SDLK_P;
+        case SDL_SCANCODE_2: return SDLK_2;
+        case SDL_SCANCODE_3: return SDLK_3;
+        case SDL_SCANCODE_5: return SDLK_5;
+        case SDL_SCANCODE_6: return SDLK_6;
+        case SDL_SCANCODE_7: return SDLK_7;
+        case SDL_SCANCODE_9: return SDLK_9;
+        case SDL_SCANCODE_0: return SDLK_0;
+        case SDL_SCANCODE_Z: return SDLK_Z;
+        case SDL_SCANCODE_X: return SDLK_X;
+        case SDL_SCANCODE_C: return SDLK_C;
+        case SDL_SCANCODE_V: return SDLK_V;
+        case SDL_SCANCODE_B: return SDLK_B;
+        case SDL_SCANCODE_N: return SDLK_N;
+        case SDL_SCANCODE_M: return SDLK_M;
+        case SDL_SCANCODE_S: return SDLK_S;
+        case SDL_SCANCODE_D: return SDLK_D;
+        case SDL_SCANCODE_G: return SDLK_G;
+        case SDL_SCANCODE_H: return SDLK_H;
+        case SDL_SCANCODE_J: return SDLK_J;
     }
-    ar_audition_last_note = -1;
-}
-
-static void ar_audition_stop() {
-    ar_audition_send_note_off();
-    ar_audition_active = false;
-    ar_audition_step   = 0;
-}
-
-static void ar_audition_play_step(arpeggio *a, int step_idx) {
-    if (!a || step_idx < 0 || step_idx >= a->length) return;
-    unsigned short raw = a->pitch[step_idx];
-    if (raw == ZTM_ARP_EMPTY_PITCH) return;
-    int offset = (int16_t)raw;
-    int note = ar_audition_base_note + offset;
-    if (note < 0)   note = 0;
-    if (note > 127) note = 127;
-    if (song && song->instruments[cur_inst]) {
-        MidiOut->noteOn(song->instruments[cur_inst]->midi_device,
-                        (unsigned char)note,
-                        song->instruments[cur_inst]->channel,
-                        100, MAX_TRACKS, 0);
-    }
-    ar_audition_last_note = note;
-}
-
-static void ar_audition_start(int base_note) {
-    arpeggio *a = song ? song->arpeggios[ar_slot] : NULL;
-    if (!a || a->isempty() || a->length <= 0) return;
-    ar_audition_stop();
-    ar_audition_base_note = base_note;
-    ar_audition_step      = 0;
-    int bpm   = (song && song->bpm > 0) ? song->bpm : 120;
-    int speed = (a->speed > 0) ? a->speed : 6;
-    ar_audition_step_ms = (speed * 60000) / (96 * bpm);
-    if (ar_audition_step_ms < 5) ar_audition_step_ms = 5;
-    ar_audition_step_start_ms = SDL_GetTicks();
-    ar_audition_active = true;
-    ar_audition_play_step(a, 0);
-}
-
-static void ar_audition_tick() {
-    if (!ar_audition_active) return;
-    arpeggio *a = song ? song->arpeggios[ar_slot] : NULL;
-    if (!a) { ar_audition_stop(); return; }
-    Uint64 now = SDL_GetTicks();
-    if ((Sint64)(now - ar_audition_step_start_ms) < ar_audition_step_ms) return;
-    ar_audition_send_note_off();
-    int next = ar_audition_step + 1;
-    if (next >= a->length) {
-        int rp = a->repeat_pos;
-        if (rp < 0 || rp >= a->length) { ar_audition_stop(); return; }
-        next = rp;
-    }
-    ar_audition_step          = next;
-    ar_audition_step_start_ms = now;
-    ar_audition_play_step(a, next);
+    return 0;
 }
 
 static void ar_apply_preset(int idx) {
@@ -362,7 +326,14 @@ public:
         selectNone();
         selected->checked = true;
         ar_preset_just_applied = true;
-        ListBox::OnSelect(selected);
+        // Deliberately NOT calling ListBox::OnSelect here -- the base
+        // sets mousestate=0 which clobbers the click that triggered us
+        // BEFORE the matching BUTTON_UP arrives. With mousestate=0 the
+        // up event's `if (mousestate) act++` gate fails, the event sits
+        // stuck in the Keys FIFO, and every subsequent keypress is
+        // blocked behind it. Symptom: clicking a preset killed cursor
+        // arrows + click-on-CC#-sliders. mousestate gets cleared by
+        // BUTTON_UP_LEFT's case naturally on the up event.
     }
     void OnSelectChange() override {}
 };
@@ -484,17 +455,12 @@ void CUI_Arpeggioeditor::enter(void) {
 }
 
 void CUI_Arpeggioeditor::leave(void) {
-    ar_audition_stop();
     ar_store_name(ar_slot);
 }
 
 // ---------------------------------------------------------------------------
 
 void CUI_Arpeggioeditor::update() {
-    // Advance any active keyjazz audition. Done BEFORE UI->update() so
-    // timing isn't perturbed by widget input handling on the same frame.
-    ar_audition_tick();
-
     UI->update();
 
     ValueSlider *vs;
@@ -623,11 +589,19 @@ void CUI_Arpeggioeditor::update() {
             && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
             int sc = (int)Keys.getcode();
             int off = ar_keyjazz_offset_for_scancode(sc);
-            if (off != -127) {
-                int base = 12 * base_octave + off;
-                if (base < 0)   base = 0;
-                if (base > 127) base = 127;
-                ar_audition_start(base);
+            int sym = ar_keyjazz_keysym_for_scancode(sc);
+            if (off != -127 && sym != 0 &&
+                song && song->instruments[cur_inst] &&
+                !jazz_note_is_active(sym)) {
+                int note = 12 * base_octave + off;
+                if (note < 0)   note = 0;
+                if (note > 127) note = 127;
+                MidiOut->noteOn(song->instruments[cur_inst]->midi_device,
+                                (unsigned char)note,
+                                song->instruments[cur_inst]->channel,
+                                100, MAX_TRACKS, 0);
+                jazz_set_state(sym, (unsigned char)note,
+                               song->instruments[cur_inst]->channel);
                 Keys.getkey();
                 need_refresh++;
                 return;
@@ -928,6 +902,26 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
             TColor b = ccell_focus ? COLORS.Highlight : COLORS.EditBG;
             printBG(col(cell_col), row(py), vbuf, f, b, S);
         }
+    }
+
+    // Keyjazz panel: visible label + key->note legend so the user knows
+    // pressing tracker keys plays single MIDI notes via cur_inst. Active
+    // any time focus is NOT on the Name TextInput (id=1) and NOT on the
+    // preset listbox (PRESET_LIST_ID). Lower octave = base_octave-1,
+    // upper = base_octave. Currently selected octave shown in the title.
+    {
+        int kj_y = CHARS_Y - SPACE_AT_BOTTOM - 7;
+        char hdr[96];
+        snprintf(hdr, sizeof(hdr),
+                 "Keyjazz (current octave %d -- play notes via cur_inst):",
+                 base_octave);
+        print(row(4), col(kj_y),     hdr, COLORS.Highlight, S);
+        print(row(4), col(kj_y + 1),
+              "  upper:  Q=C  W=D  E=E  R=F  T=G  Y=A  U=B  I=C+1  O=D+1  P=E+1",
+              COLORS.Text, S);
+        print(row(4), col(kj_y + 2),
+              "  lower:  Z=C-1 X=D-1 C=E-1 V=F-1 B=G-1 N=A-1 M=B-1   sharps: 2/3/5/6/7  S/D/G/H/J",
+              COLORS.Text, S);
     }
 
     // Documentation block anchored just above the toolbar (SPACE_AT_BOTTOM
