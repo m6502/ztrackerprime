@@ -175,6 +175,27 @@
  Zxxyy : Send midimacro xx with parameter yy.  00 repeats the last used
          value
 
+|L|%==|H|Command-Line Arguments|L|==%|U|
+
+ zt [options] [song.zt]
+
+   -h, --help                 Show CLI help on stderr and exit.
+       --list-midi-in         List available MIDI input ports (with
+                              indices) and exit.
+       --midi-in <name|index> Open this MIDI input port at startup.
+                              Match by case-sensitive substring of the
+                              device name OR by 0-based index.
+       --midi-clock <name|index>
+                              Open the port AND enable MIDI-clock chase
+                              (sets midi_in_sync + midi_in_sync_chase_
+                              tempo so the song tempo follows incoming
+                              F8 MIDI clock from that port).
+
+ Examples:
+   zt mysong.zt
+   zt --midi-in "IAC Driver Bus 1"
+   zt --midi-clock 0 mysong.zt
+
 |L|%==|H|Troubleshooting|L|==%|U|
 
  Timing issues:

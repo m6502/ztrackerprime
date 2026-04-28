@@ -3543,8 +3543,124 @@ static void zt_backend_shutdown_runtime(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// ---------------------------------------------------------------------------
+// CLI parsing.
+// Recognised flags:
+//   -h, --help                   print usage + exit
+//       --list-midi-in           after MIDI init, list input ports + exit
+//       --midi-in <name|index>   open this MIDI input port at startup
+//       --midi-clock <name|index>  open + enable midi_in_sync +
+//                                  midi_in_sync_chase_tempo so the song's
+//                                  BPM follows incoming MIDI clock.
+// First positional arg (if any) is treated as a .zt song to load on boot.
+
+struct ZtCliArgs {
+    bool        show_help       = false;
+    bool        list_midi_in    = false;
+    const char *song_filename   = NULL;
+    const char *midi_in_port    = NULL;   // pure listening
+    const char *midi_clock_port = NULL;   // listen + clock chase
+};
+
+static void zt_print_cli_help(const char *progname) {
+    fprintf(stdout,
+        "Usage: %s [options] [song.zt]\n"
+        "\n"
+        "Options:\n"
+        "  -h, --help                  Show this help and exit.\n"
+        "      --list-midi-in          List available MIDI input ports and\n"
+        "                              exit. Use the printed index or name\n"
+        "                              with --midi-in / --midi-clock.\n"
+        "      --midi-in <name|index>  Open the named MIDI input port at\n"
+        "                              startup. <name> matches by case-\n"
+        "                              sensitive substring against the\n"
+        "                              OS-reported device name; <index> is\n"
+        "                              the 0-based number from\n"
+        "                              --list-midi-in.\n"
+        "      --midi-clock <name|index>\n"
+        "                              Open the port AND enable MIDI clock\n"
+        "                              chase: turns on midi_in_sync +\n"
+        "                              midi_in_sync_chase_tempo so the song\n"
+        "                              tempo follows incoming F8 clock.\n"
+        "\n"
+        "Examples:\n"
+        "  %s mysong.zt\n"
+        "  %s --midi-in \"IAC Driver Bus 1\"\n"
+        "  %s --midi-clock 0 mysong.zt\n",
+        progname, progname, progname, progname);
+}
+
+static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
+    for (int i = 1; i < argc; i++) {
+        const char *a = argv[i];
+        if (!a || a[0] == '\0') continue;
+        if (strcmp(a, "-h") == 0 || strcmp(a, "--help") == 0) {
+            out->show_help = true;
+            return 0;
+        }
+        if (strcmp(a, "--list-midi-in") == 0) {
+            out->list_midi_in = true;
+            continue;
+        }
+        if (strcmp(a, "--midi-in") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "zt: --midi-in requires a port name or index\n");
+                return -1;
+            }
+            out->midi_in_port = argv[++i];
+            continue;
+        }
+        if (strcmp(a, "--midi-clock") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "zt: --midi-clock requires a port name or index\n");
+                return -1;
+            }
+            out->midi_clock_port = argv[++i];
+            continue;
+        }
+        if (a[0] == '-') {
+            fprintf(stderr, "zt: unknown flag '%s' (try --help)\n", a);
+            return -1;
+        }
+        // First positional = song filename. Subsequent positionals ignored.
+        if (!out->song_filename) out->song_filename = a;
+    }
+    return 0;
+}
+
+// Resolve a MIDI in port spec to an index in MidiIn->midiInDev[].
+// Accepts an integer index or a case-sensitive substring of the device
+// name. Returns -1 if not found.
+static int zt_resolve_midi_in_port(const char *spec) {
+    if (!spec || !MidiIn) return -1;
+    char *end = NULL;
+    long n = strtol(spec, &end, 10);
+    if (end && *end == '\0' && n >= 0 && (unsigned)n < MidiIn->numMidiDevs) {
+        return (int)n;
+    }
+    for (unsigned j = 0; j < MidiIn->numMidiDevs; j++) {
+        if (MidiIn->midiInDev[j] && strstr(MidiIn->midiInDev[j]->szName, spec)) {
+            return (int)j;
+        }
+    }
+    return -1;
+}
+
 int main(int argc, char *argv[])
 {
+  ZtCliArgs cli_args;
+  if (zt_parse_cli(argc, argv, &cli_args) != 0) {
+      return 2;
+  }
+  if (cli_args.show_help) {
+      const char *prog = (argc > 0 && argv[0]) ? argv[0] : "zt";
+      // Strip path so "Usage: /path/to/zt" doesn't dominate the line.
+      const char *base = strrchr(prog, '/');
+      if (!base) base = strrchr(prog, '\\');
+      zt_print_cli_help(base ? base + 1 : prog);
+      return 0;
+  }
+
   char *w;
   const char path_sep =
 #if defined(_WIN32)
@@ -3553,13 +3669,13 @@ int main(int argc, char *argv[])
     '/';
 #endif
 
-  // Get the zt directory and store it globally
-  if(argc > 1) {
-    if(argv[1] != NULL && argv[1][0] != '\0') {
-      zt_get_current_directory(1024,zt_filename);
+  // Build zt_filename from cwd + the positional song arg (if any).
+  // Kept for parity with the historical argv[1] handling; the actual
+  // song load below uses cli_args.song_filename directly.
+  if (cli_args.song_filename && cli_args.song_filename[0] != '\0') {
+      zt_get_current_directory(1024, zt_filename);
       strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
-      strcat(zt_filename,argv[1]);
-    }
+      strcat(zt_filename, cli_args.song_filename);
   }
 
   bool launched_from_bundle = false;
@@ -3617,12 +3733,54 @@ int main(int argc, char *argv[])
     return -1;
   }
 
+  // CLI MIDI handling. Runs after initSDL because that's where MidiIn
+  // is populated (setup_midi() inside initSDL fills numMidiDevs and
+  // midiInDev[]). --list-midi-in is a one-shot informational mode that
+  // prints + exits before we touch any song state.
+  if (cli_args.list_midi_in) {
+      fprintf(stdout, "MIDI input ports (%u):\n", MidiIn ? MidiIn->numMidiDevs : 0u);
+      if (MidiIn) {
+          for (unsigned j = 0; j < MidiIn->numMidiDevs; j++) {
+              if (MidiIn->midiInDev[j]) {
+                  fprintf(stdout, "  [%u] %s\n", j, MidiIn->midiInDev[j]->szName);
+              }
+          }
+      }
+      return 0;
+  }
+  if (cli_args.midi_in_port) {
+      int idx = zt_resolve_midi_in_port(cli_args.midi_in_port);
+      if (idx >= 0) {
+          MidiIn->AddDevice(idx);
+          fprintf(stderr, "zt: opened MIDI in [%d] %s\n",
+                  idx, MidiIn->midiInDev[idx]->szName);
+      } else {
+          fprintf(stderr, "zt: --midi-in port not found: %s\n",
+                  cli_args.midi_in_port);
+      }
+  }
+  if (cli_args.midi_clock_port) {
+      int idx = zt_resolve_midi_in_port(cli_args.midi_clock_port);
+      if (idx >= 0) {
+          MidiIn->AddDevice(idx);
+          zt_config_globals.midi_in_sync             = 1;
+          zt_config_globals.midi_in_sync_chase_tempo = 1;
+          fprintf(stderr, "zt: opened MIDI clock source [%d] %s "
+                          "(sync + tempo chase enabled)\n",
+                  idx, MidiIn->midiInDev[idx]->szName);
+      } else {
+          fprintf(stderr, "zt: --midi-clock port not found: %s\n",
+                  cli_args.midi_clock_port);
+      }
+  }
+
   if (screen_buffer_surface != NULL) {
 
     initGFX();
 
-    if(argc > 1 && argv[1] != NULL && argv[1][0] != '\0') song->load(argv[1]);
-    else {
+    if (cli_args.song_filename && cli_args.song_filename[0] != '\0') {
+      song->load((char *)cli_args.song_filename);
+    } else {
       if (zt_config_globals.autoload_ztfile) {
         if (strlen(zt_config_globals.autoload_ztfile_filename)) {
           song->load(zt_config_globals.autoload_ztfile_filename);
