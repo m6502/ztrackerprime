@@ -1508,15 +1508,21 @@ int VUPlay::draw_one_row(char str[72], event *e, int track) {
                 latency[track].e.effect_data,
                 latency[track].longevity);
 
-        // Bar measure derivation. Cast paranoia kept from the original;
-        // formula reads "fade init_vol toward 0 as longevity decays".
+        // Bar measure: linear fade from init_vol -> 0 as longevity
+        // decays from init_longevity -> 0. Mapped onto 0..16 cells.
+        //
+        // Original formula was a Frankenstein chain of float casts that
+        // for typical inst_vol/longevity values returned 0 and the bar
+        // never showed visually. Replace with a clean ratio-of-ratios:
+        //   measure = init_vol * longevity / init_longevity / 8
+        // i.e. just-played vol=128 -> 16 cells, vol=64 -> 8, half-decayed
+        // vol=128 -> 8, fully decayed -> 0.
         strcat(str, " ");
         if (!measure && latency[track].init_longevity > 0) {
-            measure = (int)((float)latency[track].init_vol
-                            - (float)((float)(1 - (float)((float)latency[track].init_vol
-                                * (float)((float)latency[track].longevity / (float)latency[track].init_longevity)))
-                                * (float)latency[track].init_vol) / 10);
-            measure /= 100;
+            int v = latency[track].init_vol;
+            int l = latency[track].longevity;
+            int il = latency[track].init_longevity;
+            measure = (v * l) / (il * 8);
         }
         if (measure > 16) measure = 16;
         if (measure < 0)  measure = 0;
