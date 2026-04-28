@@ -132,6 +132,124 @@ static int  ar_preset_index = 0;
 // "Space selects but values don't change" on Space).
 static bool ar_preset_just_applied = false;
 
+// ---------------------------------------------------------------------------
+// Keyjazz audition: while focus is on a non-text widget (NOT the Name
+// TextInput, NOT the preset listbox), pressing a tracker keyjazz key
+// (Q/W/E/R/T/Y/U/I/9/0/O/P + 2/3/5/6/7 upper octave; Z/X/C/V/B/N/M +
+// S/D/G/H/J lower octave) plays the current arpeggio with that key's
+// pitch as the base note, stepping through pitch[] entries at the
+// song-BPM-derived speed interval.
+
+static bool   ar_audition_active        = false;
+static int    ar_audition_base_note     = 60;
+static int    ar_audition_step          = 0;
+static Uint64 ar_audition_step_start_ms = 0;
+static int    ar_audition_step_ms       = 0;
+static int    ar_audition_last_note     = -1;
+
+static int ar_keyjazz_offset_for_scancode(int sc) {
+    switch (sc) {
+        // Top row -- upper octave
+        case SDL_SCANCODE_Q: return 0;
+        case SDL_SCANCODE_2: return 1;
+        case SDL_SCANCODE_W: return 2;
+        case SDL_SCANCODE_3: return 3;
+        case SDL_SCANCODE_E: return 4;
+        case SDL_SCANCODE_R: return 5;
+        case SDL_SCANCODE_5: return 6;
+        case SDL_SCANCODE_T: return 7;
+        case SDL_SCANCODE_6: return 8;
+        case SDL_SCANCODE_Y: return 9;
+        case SDL_SCANCODE_7: return 10;
+        case SDL_SCANCODE_U: return 11;
+        case SDL_SCANCODE_I: return 12;
+        case SDL_SCANCODE_9: return 13;
+        case SDL_SCANCODE_O: return 14;
+        case SDL_SCANCODE_0: return 15;
+        case SDL_SCANCODE_P: return 16;
+        // Bottom row -- lower octave
+        case SDL_SCANCODE_Z: return -12;
+        case SDL_SCANCODE_S: return -11;
+        case SDL_SCANCODE_X: return -10;
+        case SDL_SCANCODE_D: return -9;
+        case SDL_SCANCODE_C: return -8;
+        case SDL_SCANCODE_V: return -7;
+        case SDL_SCANCODE_G: return -6;
+        case SDL_SCANCODE_B: return -5;
+        case SDL_SCANCODE_H: return -4;
+        case SDL_SCANCODE_N: return -3;
+        case SDL_SCANCODE_J: return -2;
+        case SDL_SCANCODE_M: return -1;
+    }
+    return -127;
+}
+
+static void ar_audition_send_note_off() {
+    if (ar_audition_last_note >= 0 && song && song->instruments[cur_inst]) {
+        MidiOut->noteOff(song->instruments[cur_inst]->midi_device,
+                         (unsigned char)ar_audition_last_note,
+                         song->instruments[cur_inst]->channel,
+                         0x0, 0);
+    }
+    ar_audition_last_note = -1;
+}
+
+static void ar_audition_stop() {
+    ar_audition_send_note_off();
+    ar_audition_active = false;
+    ar_audition_step   = 0;
+}
+
+static void ar_audition_play_step(arpeggio *a, int step_idx) {
+    if (!a || step_idx < 0 || step_idx >= a->length) return;
+    unsigned short raw = a->pitch[step_idx];
+    if (raw == ZTM_ARP_EMPTY_PITCH) return;
+    int offset = (int16_t)raw;
+    int note = ar_audition_base_note + offset;
+    if (note < 0)   note = 0;
+    if (note > 127) note = 127;
+    if (song && song->instruments[cur_inst]) {
+        MidiOut->noteOn(song->instruments[cur_inst]->midi_device,
+                        (unsigned char)note,
+                        song->instruments[cur_inst]->channel,
+                        100, MAX_TRACKS, 0);
+    }
+    ar_audition_last_note = note;
+}
+
+static void ar_audition_start(int base_note) {
+    arpeggio *a = song ? song->arpeggios[ar_slot] : NULL;
+    if (!a || a->isempty() || a->length <= 0) return;
+    ar_audition_stop();
+    ar_audition_base_note = base_note;
+    ar_audition_step      = 0;
+    int bpm   = (song && song->bpm > 0) ? song->bpm : 120;
+    int speed = (a->speed > 0) ? a->speed : 6;
+    ar_audition_step_ms = (speed * 60000) / (96 * bpm);
+    if (ar_audition_step_ms < 5) ar_audition_step_ms = 5;
+    ar_audition_step_start_ms = SDL_GetTicks();
+    ar_audition_active = true;
+    ar_audition_play_step(a, 0);
+}
+
+static void ar_audition_tick() {
+    if (!ar_audition_active) return;
+    arpeggio *a = song ? song->arpeggios[ar_slot] : NULL;
+    if (!a) { ar_audition_stop(); return; }
+    Uint64 now = SDL_GetTicks();
+    if ((Sint64)(now - ar_audition_step_start_ms) < ar_audition_step_ms) return;
+    ar_audition_send_note_off();
+    int next = ar_audition_step + 1;
+    if (next >= a->length) {
+        int rp = a->repeat_pos;
+        if (rp < 0 || rp >= a->length) { ar_audition_stop(); return; }
+        next = rp;
+    }
+    ar_audition_step          = next;
+    ar_audition_step_start_ms = now;
+    ar_audition_play_step(a, next);
+}
+
 static void ar_apply_preset(int idx) {
     if (idx < 0 || idx >= AR_PRESET_COUNT) return;
     arpeggio *a = ar_ensure(ar_slot);
@@ -366,12 +484,17 @@ void CUI_Arpeggioeditor::enter(void) {
 }
 
 void CUI_Arpeggioeditor::leave(void) {
+    ar_audition_stop();
     ar_store_name(ar_slot);
 }
 
 // ---------------------------------------------------------------------------
 
 void CUI_Arpeggioeditor::update() {
+    // Advance any active keyjazz audition. Done BEFORE UI->update() so
+    // timing isn't perturbed by widget input handling on the same frame.
+    ar_audition_tick();
+
     UI->update();
 
     ValueSlider *vs;
@@ -491,6 +614,25 @@ void CUI_Arpeggioeditor::update() {
     {
         KBKey pkey = Keys.checkkey();
         int   pks  = Keys.getstate();
+        // Keyjazz audition: only on widgets that don't consume letter
+        // keys (so NOT the Name TextInput at id=1 and NOT the preset
+        // listbox at PRESET_LIST_ID where letters drive typeahead).
+        // Plain key only -- no Ctrl/Alt/Meta/Shift, otherwise modifier
+        // shortcuts get hijacked.
+        if (pkey && focused != 1 && focused != PRESET_LIST_ID
+            && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            int sc = (int)Keys.getcode();
+            int off = ar_keyjazz_offset_for_scancode(sc);
+            if (off != -127) {
+                int base = 12 * base_octave + off;
+                if (base < 0)   base = 0;
+                if (base > 127) base = 127;
+                ar_audition_start(base);
+                Keys.getkey();
+                need_refresh++;
+                return;
+            }
+        }
         if (pkey && focused != 1) {
             bool page_consumed = false;
             if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))
