@@ -105,6 +105,7 @@ static void mm_store_name(int slot) {
 // test can verify them without dragging in SDL/UI globals).
 
 #include "preset_data.h"
+#include "preset_selector.h"
 
 static int  mm_preset_index = 0;
 // See ar_preset_just_applied in CUI_Arpeggioeditor.cpp -- same role here.
@@ -165,29 +166,34 @@ public:
             }
         }
     }
+    PresetCursor snapshot() const {
+        PresetCursor s;
+        s.num_items    = MM_PRESET_COUNT;
+        s.active_index = mm_preset_index;
+        s.cursor_row   = cur_sel + y_start;
+        return s;
+    }
+    void apply_event(const PresetEvent &e) {
+        if (e.new_cursor_row >= 0) setCursor(e.new_cursor_row);
+        if (e.fire_apply) {
+            int row = (e.new_cursor_row >= 0) ? e.new_cursor_row : (cur_sel + y_start);
+            LBNode *p = getNode(row);
+            if (p) OnSelect(p);
+        }
+    }
     int update() override {
-        // See ArPresetSelector::update for the rationale on the P / Space /
-        // edge-arrow handling -- same semantics here.
         KBKey k = Keys.checkkey();
         int   ks = Keys.getstate();
         if (k == SDLK_P && !(ks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
             Keys.getkey();
-            mm_preset_index = (mm_preset_index + 1) % MM_PRESET_COUNT;
-            mm_apply_preset(mm_preset_index);
-            mm_preset_just_applied = true;
-            selectNone();
-            setCheck(mm_preset_index, true);
-            setCursor(mm_preset_index);
-            need_refresh++;
-            need_redraw++;
+            apply_event(preset_on_cycle(snapshot()));
+            need_refresh++; need_redraw++;
             return 0;
         }
-        if (k == SDLK_SPACE) {
+        if (k == SDLK_SPACE || k == SDLK_RETURN) {
             Keys.getkey();
-            LBNode *n = getNode(cur_sel + y_start);
-            if (n) OnSelect(n);
-            need_refresh++;
-            need_redraw++;
+            apply_event(preset_on_apply(snapshot()));
+            need_refresh++; need_redraw++;
             return 0;
         }
         if (k == SDLK_UP && cur_sel == 0 && y_start == 0) {
@@ -201,15 +207,10 @@ public:
         return ListBox::update();
     }
     int mouseupdate(int parent_cur) override {
-        // See ArPresetSelector::mouseupdate -- always fire OnSelect on a
-        // fresh click landing on the listbox; the harmless double-apply
-        // on the parent's same-row-while-focused path beats the previous
-        // dedupe-guard's missed-click bug.
         int prev_mousestate = mousestate;
         int new_cur = ListBox::mouseupdate(parent_cur);
         if (mousestate && !prev_mousestate && new_cur == this->ID) {
-            LBNode *p = getNode(cur_sel + y_start);
-            if (p) OnSelect(p);
+            apply_event(preset_on_click(snapshot(), cur_sel + y_start));
         }
         return new_cur;
     }

@@ -13,9 +13,18 @@ add_executable(test_presets
     test_presets.cpp
     module_stub.cpp
 )
-target_include_directories(test_presets PRIVATE
-    "${CMAKE_SOURCE_DIR}/src"
-)
+target_include_directories(test_presets PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_presets PRIVATE cxx_std_17)
 
 add_test(NAME presets COMMAND test_presets)
+
+# Pure-function tests for the preset listbox click / arrow / Space / P-cycle
+# decision logic. Has no module.h dependencies -- preset_selector.h is fully
+# self-contained.
+add_executable(test_selector
+    test_selector.cpp
+)
+target_include_directories(test_selector PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_selector PRIVATE cxx_std_17)
+
+add_test(NAME selector COMMAND test_selector)

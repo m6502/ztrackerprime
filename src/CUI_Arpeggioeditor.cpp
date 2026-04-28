@@ -118,6 +118,7 @@ static void format_ccval(unsigned char v, char buf[4]) {
 // test can verify them without dragging in SDL/UI globals).
 
 #include "preset_data.h"
+#include "preset_selector.h"
 
 static int  ar_preset_index = 0;
 // Set by ArPresetSelector::OnSelect when Enter/Space lands on a preset.
@@ -175,59 +176,61 @@ public:
             }
         }
     }
+    // Build a PresetCursor snapshot from current ListBox state.
+    PresetCursor snapshot() const {
+        PresetCursor s;
+        s.num_items     = AR_PRESET_COUNT;
+        s.active_index  = ar_preset_index;
+        s.cursor_row    = cur_sel + y_start;
+        return s;
+    }
+    // Apply a PresetEvent decision: optionally fire the preset, optionally
+    // move the visible cursor + checkmark.
+    void apply_event(const PresetEvent &e) {
+        if (e.new_cursor_row >= 0) setCursor(e.new_cursor_row);
+        if (e.fire_apply) {
+            int row = (e.new_cursor_row >= 0) ? e.new_cursor_row : (cur_sel + y_start);
+            LBNode *p = getNode(row);
+            if (p) OnSelect(p);
+        }
+    }
     int update() override {
-        // Robustness pass over ListBox:
-        //  * P (no modifier) cycles through presets even when the listbox
-        //    holds focus -- ListBox's typeahead would otherwise eat the
-        //    keypress as a prefix-jump rather than running the cycle.
-        //  * Space is a synonym for Enter (apply the highlighted preset).
-        //  * Up at top / Down at bottom no longer surrender focus to the
-        //    previous/next tab stop; the parent's "ret = -1/1" was the
-        //    reason arrows appeared dead after a click on the first row.
+        // Translate KBKey events into preset_selector decisions.
         KBKey k = Keys.checkkey();
         int   ks = Keys.getstate();
         if (k == SDLK_P && !(ks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
             Keys.getkey();
-            ar_preset_index = (ar_preset_index + 1) % AR_PRESET_COUNT;
-            ar_apply_preset(ar_preset_index);
-            ar_preset_just_applied = true;
-            selectNone();
-            setCheck(ar_preset_index, true);
-            setCursor(ar_preset_index);
-            need_refresh++;
-            need_redraw++;
+            apply_event(preset_on_cycle(snapshot()));
+            need_refresh++; need_redraw++;
             return 0;
         }
-        if (k == SDLK_SPACE) {
+        if (k == SDLK_SPACE || k == SDLK_RETURN) {
             Keys.getkey();
-            LBNode *n = getNode(cur_sel + y_start);
-            if (n) OnSelect(n);
-            need_refresh++;
-            need_redraw++;
+            apply_event(preset_on_apply(snapshot()));
+            need_refresh++; need_redraw++;
             return 0;
         }
         if (k == SDLK_UP && cur_sel == 0 && y_start == 0) {
             Keys.getkey();
+            // preset_on_up at top is a "consumed, no move" event.
             return 0;
         }
         if (k == SDLK_DOWN && cur_sel + y_start >= num_elements - 1) {
             Keys.getkey();
             return 0;
         }
+        // Non-edge arrows + everything else falls through to ListBox.
         return ListBox::update();
     }
     int mouseupdate(int parent_cur) override {
-        // Single-click should always apply the preset under the cursor.
-        // Detect the mouse-down -> mousestate transition and fire OnSelect
-        // on the freshly-set cur_sel. The parent ListBox already fires
-        // OnSelect when the clicked row equals cur_sel AND the listbox is
-        // already focused, so on that one path OnSelect runs twice; that
-        // is harmless (same preset applied twice = same data).
+        // preset_on_click decides every mouse-down landing on the listbox.
+        // Detect the mouse-down -> mousestate transition; ListBox::mouseupdate
+        // has already moved cur_sel via setCursor by the time it returns,
+        // so we read the post-click row from there.
         int prev_mousestate = mousestate;
         int new_cur = ListBox::mouseupdate(parent_cur);
         if (mousestate && !prev_mousestate && new_cur == this->ID) {
-            LBNode *p = getNode(cur_sel + y_start);
-            if (p) OnSelect(p);
+            apply_event(preset_on_click(snapshot(), cur_sel + y_start));
         }
         return new_cur;
     }
