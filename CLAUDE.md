@@ -2,6 +2,8 @@
 
 This file is loaded automatically by Claude Code (and other AI agents that support `CLAUDE.md`) when working in this repo. It distills the conventions and gotchas that have been learned the hard way during zTracker Prime development. **Read this before making changes.**
 
+For deeper material — recipes, foot-gun details, effect reference, glossary, coding conventions — see [`.claude/skills/ztrackerprime/SKILL.md`](.claude/skills/ztrackerprime/SKILL.md) and the `references/` + `recipes/` directories alongside it.
+
 ---
 
 ## Repository overview
