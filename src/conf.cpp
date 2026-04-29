@@ -253,6 +253,7 @@ ZTConf::ZTConf() {
     default_directory[0] = '\0';
     record_velocity = 1;
     post_load_page = POST_LOAD_PATTERN_EDIT;
+    note_audition_step_mode = ZT_NAS_ONE;
 }
 
 ZTConf::~ZTConf() {
@@ -303,6 +304,13 @@ int ZTConf::load()
       post_load_page = atoi(Config->get("post_load_page"));
       if (post_load_page < 0 || post_load_page >= POST_LOAD_PAGE_COUNT)
           post_load_page = POST_LOAD_PATTERN_EDIT;
+  }
+  if(Config->get("note_audition_step_mode")) {
+      note_audition_step_mode = atoi(Config->get("note_audition_step_mode"));
+      if (note_audition_step_mode < ZT_NAS_NONE ||
+          note_audition_step_mode > ZT_NAS_EDITSTEP) {
+          note_audition_step_mode = ZT_NAS_ONE;
+      }
   }
   
   ////////////////////////////////////////////////
@@ -397,6 +405,9 @@ int ZTConf::save() {
 
     sprintf(s, "%d", post_load_page);
     Config->set("post_load_page", s);
+
+    sprintf(s, "%d", note_audition_step_mode);
+    Config->set("note_audition_step_mode", s);
 
     Config->set("skin", skin);
 
