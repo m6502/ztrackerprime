@@ -4,6 +4,50 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
+--------------------------------------------------
+
+        + Shift+F3 is now the CC Console. It loads Paketti
+          CCizer-format `.txt` files (one slot per line:
+          `<CC# 0..127 | "PB"> <name>`, `#` comments, blank lines OK)
+          and renders each slot as a horizontal slider or a 2-char
+          knob; tweak with Left/Right (Shift x8, Ctrl x16) and the
+          page sends MIDI CC out (or 14-bit Pitch Bend for `PB`
+          slots) on the current channel. Press V on the focused
+          row to toggle slider/knob — the choice persists to a
+          `<basename>.cc-view` sidecar next to the .txt so the
+          Paketti file itself stays untouched. [ / ] picks the
+          MIDI channel, Backspace resets the slot to its default
+          (0 for CC, 8192 center for PB), Ctrl+S saves the sidecar,
+          ESC returns to the Pattern Editor.
+        + 13 reference banks ship under `ccizer/` (sc88st, microfreak,
+          minilogue, monologue, Prophet6, deepmind6, waldorf_blofeld,
+          tb03, se02, pro800, polyend_synth_mode, polyend_performance_mode,
+          midi_control_example) — reused from the Paketti project. Drop
+          your own `.txt` files in the same folder; format reference is
+          `ccizer/README.md`.
+        + New `ccizer_folder=` zt.conf key overrides the default folder
+          resolution (search order: zt.conf override -> ./ccizer next to
+          the binary -> macOS `Resources/ccizer` -> Linux `share/zt/ccizer`
+          -> ~/.config/zt/ccizer). A GUI picker on F12 is on the followup
+          list, see docs/plans/cc-followup-todo.md.
+        * Shortcuts & MIDI Mappings moves from Shift+F3 to Shift+F2.
+          Shift+F3 was the page's previous slot but is now needed for
+          the CC Console; Shift+F2 sits naturally next to plain F2
+          (Pattern Editor) and the page title + ESC menu entry update
+          to match.
+        + tests/test_ccizer.cpp adds a 51-check suite covering the
+          parser, comment / blank-line handling, out-of-range CC#
+          rejection, view-hint sidecar round-trip, MIDI byte builder
+          for CC + 14-bit PB, folder resolution overrides, and `.txt`
+          directory scan. Linux CI runs it with the other 5 suites
+          via ctest.
+
+        ! Pattern-drawing CCs (Shift+§ scroll/step-follow record),
+          per-instrument CCizer bank assignment, and CC MIDI Learn
+          are intentionally deferred — see
+          docs/plans/cc-followup-todo.md.
+
 zt 2026_04_29 (Unified Shortcuts & MIDI Mappings page)
 ------------------------------------------------------
 

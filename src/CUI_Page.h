@@ -501,6 +501,34 @@ class CUI_LuaConsole : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// CC Console (Shift+F3). Loads CCizer-format `.txt` files from the
+// configured ccizer_folder; each slot is shown as a slider or knob and
+// sends MIDI CC out to the current MIDI Out device when tweaked.
+class CUI_CcConsole : public CUI_Page {
+    public:
+        int focus;          // 0 = file list, 1 = slot grid
+        int file_cur;       // selected file index
+        int file_top;       // scroll offset for file list
+        int slot_cur;       // selected slot in loaded file
+        int slot_top;       // scroll offset for slot grid
+        int channel;        // 1..16
+        int loaded;         // is `loaded_file` populated?
+        char status_line[160];
+        char folder[1024];
+        int  num_files;
+        char files[256][256];
+
+        CUI_CcConsole();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+
+        void rescan_folder(void);
+        void load_selected(void);
+};
+
 // Unified Shortcuts & MIDI Mappings page. cursor_y picks an action;
 // cursor_x picks the column to edit:
 //   0 = keyboard binding

@@ -255,6 +255,7 @@ ZTConf::ZTConf() {
     record_velocity = 1;
     post_load_page = POST_LOAD_PATTERN_EDIT;
     note_audition_step_mode = ZT_NAS_ONE;
+    ccizer_folder[0] = '\0';
 }
 
 ZTConf::~ZTConf() {
@@ -312,6 +313,11 @@ int ZTConf::load()
           note_audition_step_mode > ZT_NAS_EDITSTEP) {
           note_audition_step_mode = ZT_NAS_ONE;
       }
+  }
+  temp = Config->get("ccizer_folder");
+  if (temp) {
+      strncpy(ccizer_folder, temp, MAX_PATH);
+      ccizer_folder[MAX_PATH] = '\0';
   }
   
   ////////////////////////////////////////////////
@@ -447,6 +453,8 @@ int ZTConf::save() {
 
     sprintf(s, "%d", note_audition_step_mode);
     Config->set("note_audition_step_mode", s);
+
+    Config->set("ccizer_folder", ccizer_folder);
 
     Config->set("skin", skin);
 

@@ -66,3 +66,13 @@ target_include_directories(test_keybuffer PRIVATE
 target_compile_definitions(test_keybuffer PRIVATE ZT_TEST_NO_SDL)
 target_compile_features(test_keybuffer PRIVATE cxx_std_17)
 add_test(NAME keybuffer COMMAND test_keybuffer)
+
+# CCizer parser, sidecar, MIDI byte builder, folder resolution. Pure C/C++
+# (no SDL). The test pulls ccizer.cpp in via #include so the same translation
+# unit lands in the test binary; no need to add it to the source list.
+add_executable(test_ccizer
+    test_ccizer.cpp
+)
+target_include_directories(test_ccizer PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_ccizer PRIVATE cxx_std_17)
+add_test(NAME ccizer COMMAND test_ccizer)

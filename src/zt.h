@@ -339,7 +339,8 @@ enum state {
   STATE_LUA_CONSOLE,
   STATE_PALETTE_EDITOR,
   STATE_KEYBINDINGS,
-  STATE_MIDI_MAPPINGS
+  STATE_MIDI_MAPPINGS,
+  STATE_CCCONSOLE
 } ;
 
 
@@ -610,7 +611,8 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
 
         CMD_SWITCH_LUA_CONSOLE,
 
-        CMD_SWITCH_KEYBINDINGS
+        CMD_SWITCH_KEYBINDINGS,
+        CMD_SWITCH_CCCONSOLE
 
     };
 
@@ -765,6 +767,7 @@ extern CUI_Arpeggioeditor *UIP_Arpeggioeditor;
 extern CUI_Midimacroeditor *UIP_Midimacroeditor;
 extern CUI_LuaConsole *UIP_LuaConsole;
 extern CUI_KeyBindings *UIP_KeyBindings;
+extern CUI_CcConsole *UIP_CcConsole;
 extern CUI_Help *UIP_Help;
 extern CUI_MainMenu *UIP_MainMenu;
 

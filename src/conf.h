@@ -103,6 +103,11 @@ class ZTConf {
         // sequence at coarse intervals but still wanted single-row
         // auditioning.
         int note_audition_step_mode;
+
+        // Folder containing CCizer-format `.txt` files for the CC Console
+        // (Shift+F3). Empty = use the default-resolve order in
+        // zt_ccizer_resolve_folder().
+        char ccizer_folder[MAX_PATH + 1];
 };
 
 // Allowed values for zt_config_globals.note_audition_step_mode.

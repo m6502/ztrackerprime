@@ -292,7 +292,7 @@ void CUI_KeyBindings::draw(Drawable *S)
                 COLORS.Background);
 
     char title[96];
-    snprintf(title, sizeof(title), "Shortcuts & MIDI Mappings (Shift+F3)%s",
+    snprintf(title, sizeof(title), "Shortcuts & MIDI Mappings (Shift+F2)%s",
              dirty ? "   [unsaved]" : "");
     printtitle(PAGE_TITLE_ROW_Y, title, COLORS.Text, COLORS.Background, S);
 
