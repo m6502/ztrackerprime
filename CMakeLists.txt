@@ -75,6 +75,7 @@ set(ZT_SOURCES
   extlibs/zlib/trees.c
   extlibs/zlib/zutil.c
   src/CDataBuf.cpp
+  src/zt_crash.cpp
   src/conf.cpp
   src/edit_cols.cpp
   src/font.cpp
@@ -185,6 +186,14 @@ endif()
 
 target_compile_definitions(zt PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
 target_compile_definitions(zt PRIVATE PNG_ARM_NEON_OPT=0)
+
+# Crash handler uses backtrace_symbols which needs symbol names to be
+# exported. -rdynamic is the GNU ld flag (also accepted by lld); the
+# Apple linker exports symbols from executables by default so this is
+# a no-op there. MSVC has its own debug-info pipeline.
+if(NOT WIN32 AND NOT APPLE)
+  target_link_options(zt PRIVATE "-rdynamic")
+endif()
 
 # Inject build date as ZT_BUILD_DATE so the version string in the UI reflects
 # when the binary was actually built, instead of a stale hardcoded value.

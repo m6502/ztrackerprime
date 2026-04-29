@@ -80,6 +80,11 @@ void CUI_SongMessage::enter(void) {
     }
     if (cb) {
         cb->target = buffer;
+        // Land the caret at the end of the existing message so the
+        // user can resume typing immediately (matches the legacy
+        // append-only behaviour). Home / Left / arrows can move it
+        // back to edit earlier text.
+        cb->cursor = buffer ? (unsigned)buffer->getsize() : 0u;
         cb->refresh_display();
     }
     zt_text_input_start();

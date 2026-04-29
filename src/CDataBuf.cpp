@@ -128,6 +128,37 @@ void CDataBuf::pushstr(const char *str) {
         this->pushc(str[i++]);
 }
 
+void CDataBuf::insert_at(unsigned int pos, char c) {
+    if (pos > this->buffsize) pos = this->buffsize;
+    if (this->buffsize + 1 > this->allocsize) {
+        unsigned int newalloc = this->allocsize ? this->allocsize : DATABUF_CHUNK_SIZE;
+        while (newalloc < this->buffsize + 1)
+            newalloc += DATABUF_CHUNK_SIZE;
+        char *nb = (char *)realloc(this->buffer, newalloc);
+        if (!nb) return;
+        this->buffer = nb;
+        this->allocsize = newalloc;
+    }
+    if (pos < this->buffsize) {
+        memmove(&this->buffer[pos + 1],
+                &this->buffer[pos],
+                (size_t)(this->buffsize - pos));
+    }
+    this->buffer[pos] = c;
+    ++this->buffsize;
+}
+
+void CDataBuf::erase_at(unsigned int pos) {
+    if (this->buffsize == 0) return;
+    if (pos >= this->buffsize) return;
+    if (pos + 1 < this->buffsize) {
+        memmove(&this->buffer[pos],
+                &this->buffer[pos + 1],
+                (size_t)(this->buffsize - pos - 1));
+    }
+    --this->buffsize;
+}
+
 void CDataBuf::pushc(const int c) {
     this->pushc((char) c);
 }

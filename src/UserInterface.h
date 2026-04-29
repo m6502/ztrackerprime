@@ -246,6 +246,11 @@ class CommentEditor : public TextBox {
     public:
 
         CDataBuf *target;
+        // Insertion-point offset into target. Backspace removes the
+        // character before cursor, typed chars and Return insert AT
+        // cursor (not at end), Left / Right / Home / End move it.
+        // Clamped to [0, target->getsize()] every refresh_display.
+        unsigned int cursor;
 
         CommentEditor();
         ~CommentEditor();
@@ -263,13 +268,25 @@ class CommentEditor : public TextBox {
         // target. CDataBuf is a binary buffer (pushc does not append
         // a trailing \0), so feeding getbuffer() directly into
         // TextBox::draw — which walks text[sc] until it hits a null —
-        // would read uninitialized heap past the actual data and
-        // render garbage / hang. Call this after every push/pop and
-        // once per draw to keep the displayed string clean.
+        // would render garbage past the live size. Call after every
+        // push/pop/insert/erase and once per draw to keep the
+        // displayed string clean. Also injects a visible caret
+        // character at the cursor position so the user can see where
+        // the next keystroke will land.
         void refresh_display();
 
+        // Override to draw a layered cursor: TextBox::draw renders the
+        // cursor cell as a solid block, then we re-print the
+        // underlying character on top in the EditBG color so the user
+        // sees both the cursor location AND the character it covers
+        // (DOS-era inverted-cursor effect).
+        void draw(Drawable *S, int active) override;
+
     private:
-        // Managed null-terminated mirror of target's contents.
+        // Managed null-terminated mirror of target's contents PLUS a
+        // caret character inserted at cursor position. The mirror is
+        // exactly target->getsize()+2 bytes when populated (one for
+        // the caret, one for the terminating null).
         char *_display;
         int   _display_alloc;
 };
