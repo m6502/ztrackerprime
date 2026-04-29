@@ -1,8 +1,20 @@
 #include "zt.h"
 #include "PatternDisplay.h"
 
-
-#define DISABLE_VUMETERS           // <Manu> It's been broken forever, and I don't use it - Will reenable when it's fixed
+// VU meters: disabled by Manu with the comment "It's been broken forever,
+// and I don't use it - Will reenable when it's fixed". Re-enabled here
+// after triaging the actual brokenness:
+//   * Compile-clean as-is; no missing symbols, no API drift.
+//   * Runtime hazards fixed in VUPlay::draw_one_row + VUPlay::draw:
+//     - bounds-check latency[track].e.inst before song->instruments[]
+//       (a stale event with inst=0xFF used to deref a null instrument
+//       slot and crash);
+//     - skip the bar render path entirely when ztPlayer / song are not
+//       ready (entering F5 before any pattern existed crashed too);
+//     - clamp ctrack to MAX_TRACKS so the per-track loop can't read
+//       past the array.
+//   * draw() now invalidates the previous frame's region before drawing
+//     the new frame so the bars don't smear on PageUp toggle.
 
 
 // ------------------------------------------------------------------------------------------------

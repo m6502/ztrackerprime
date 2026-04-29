@@ -1390,72 +1390,60 @@ void VUPlay::draw(Drawable *S, int)
   int y = 15;
   int vol_len;
   int i;
-  
-  if(ztPlayer->playing && (this->cur_row < ztPlayer->cur_row - 2 || 
-    this->cur_row > ztPlayer->cur_row)) {
-  
+
+  // Bail early if the playback engine or song isn't ready -- entering
+  // F5 before any data exists used to crash on song->patterns[NULL].
+  if (!ztPlayer || !song) return;
+
+  // Clamp track range so the loop below can't read past arrays.
+  int track_count = num_channels;
+  if (starttrack < 0)                           starttrack = 0;
+  if (starttrack >= MAX_TRACKS)                 starttrack = MAX_TRACKS - 1;
+  if (starttrack + track_count > MAX_TRACKS)    track_count = MAX_TRACKS - starttrack;
+
+  if (ztPlayer->playing && (this->cur_row < ztPlayer->cur_row - 2 ||
+                            this->cur_row > ztPlayer->cur_row)) {
+
     pattern = ztPlayer->playing_cur_pattern;
     cur_row = ztPlayer->playing_cur_row;
     cur_order = ztPlayer->playing_cur_order;
-    
+
+    // Defensive: ensure pattern slot exists before reading it.
+    if (pattern < 0 || pattern >= ZTM_MAX_PATTERNS) return;
+    if (!song->patterns[pattern]) return;
+
     sprintf(str," Tk  Instrument               Note  Vol  FX    Length ................");
-    
     printBG(col(x),row(y - 1),str,COLORS.Text,COLORS.Background,S);
     color = COLORS.EditText;
 
-    for (ctrack = starttrack; ctrack < starttrack + num_channels; ctrack++) {
-
-      e = song->patterns[pattern]->tracks[ctrack]->get_event(cur_row);
+    for (ctrack = starttrack; ctrack < starttrack + track_count; ctrack++) {
+      track *trk = song->patterns[pattern]->tracks[ctrack];
+      e = trk ? trk->get_event(cur_row) : NULL;
       vol_len = this->draw_one_row(str,e, ctrack);
       printBG(col(x),row(y + 1 + ctrack - starttrack),str,color,(ctrack%2)?COLORS.EditBGlow:COLORS.Black,S);
-      
-      // Print the bar
-      
-      if(vol_len > 0) {
 
-        //strcpy(str,"                ");
-        strcpy(str,"");
-
-//        for(i = 0; i < 17; str[i++] = '\0') ;
-//        for(i = 0; i < vol_len; str[i++] = '=');
-        
-        // <Manu> Cambio estas dos lineas guarrisimas comentadas por estos dos fors() [EN: replacing those two filthy commented-out lines with these two for() loops]
-       
-        for(i = 0; i < 17; i++) {
-        
-          str[i] = '\0' ;
-        }
-        
-        for(i = 0; i < vol_len; i++) {
-        
-          str[i] = '=' ;
-        }
-        
+      if (vol_len > 0) {
+        for (i = 0; i < 17; i++) str[i] = '\0';
+        for (i = 0; i < vol_len; i++) str[i] = '=';
         printBG(col(x+54),row(y + 1 + ctrack - starttrack),str,COLORS.Highlight,COLORS.EditBGhigh,S);
       }
     }
-  }
-  else {
-    
-    if(! ztPlayer->playing) {
-      
-      color = COLORS.EditText;
-
-      for (ctrack = starttrack; ctrack < starttrack + num_channels; ctrack++) {
-        
-        e = NULL;
-        this->draw_one_row(str,e, ctrack);
-        printBG(col(x),row(y + 1 + ctrack - starttrack),str,color,(ctrack%2)?COLORS.EditBGlow:COLORS.Black,S);
-      }
+  } else if (!ztPlayer->playing) {
+    color = COLORS.EditText;
+    for (ctrack = starttrack; ctrack < starttrack + track_count; ctrack++) {
+      e = NULL;
+      this->draw_one_row(str,e, ctrack);
+      printBG(col(x),row(y + 1 + ctrack - starttrack),str,color,(ctrack%2)?COLORS.EditBGlow:COLORS.Black,S);
     }
   }
-  
-  // Display the outline
-  
-  S->drawHLine((y+num_channels+1)*8,(x)*8,(x+71)*8,COLORS.Highlight);
-  S->drawVLine((x+71)*8,y*8,(y+num_channels)*8,COLORS.Highlight); // why doesn't this work ?
-  
-  screenmanager.UpdateWH(col(x),row(y),col(x+71),row(y+28));//num_channels)); why oens'tthis work either
+
+  // Outline. The previous code's drawHLine/drawVLine sat next to a
+  // "why doesn't this work" comment; calling Drawable::drawHLine/VLine
+  // is fine in current SDL3 wrapper, leaving them in for the visual.
+  S->drawHLine((y+track_count+1)*8,(x)*8,(x+71)*8,COLORS.Highlight);
+  S->drawVLine((x+71)*8,y*8,(y+track_count)*8,COLORS.Highlight);
+
+  screenmanager.UpdateWH(col(x),row(y),col(x+71),row(y+track_count+2));
 }
 
 
@@ -1464,6 +1452,17 @@ void VUPlay::draw(Drawable *S, int)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// Helper: map an event's instrument byte to a usable instrument slot
+// or NULL. Pattern data uses 0xFF (and out-of-range values) to mean
+// "no instrument". The original code dereferenced song->instruments[]
+// without this check, so a stale latency entry with inst=0xFF crashed
+// the moment the VU view was opened.
+static instrument *vu_safe_instrument(unsigned int inst) {
+    if (!song) return NULL;
+    if (inst >= MAX_INSTS) return NULL;
+    return song->instruments[inst];
+}
+
 int VUPlay::draw_one_row(char str[72], event *e, int track) {
 
     char *w;
@@ -1471,11 +1470,15 @@ int VUPlay::draw_one_row(char str[72], event *e, int track) {
 
     measure = 0;
     sprintf(str,"");
-    // New Data
+    // New data: copy the event into the latency record, but only
+    // touch instrument-derived defaults when the inst slot resolves.
     if(e && e->note <128) {
         latency[track].e = *e;
-        latency[track].longevity = latency[track].init_longevity = e->length ? e->length : song->instruments[e->inst]->default_length;
-        latency[track].init_vol = (e->vol < 128) ? e->vol : song->instruments[e->inst]->default_volume;
+        instrument *inst = vu_safe_instrument(e->inst);
+        latency[track].longevity = latency[track].init_longevity =
+            e->length ? e->length : (inst ? inst->default_length : 0);
+        latency[track].init_vol =
+            (e->vol < 128) ? e->vol : (inst ? inst->default_volume : 0);
         measure = latency[track].init_vol / 16 * 127;
     }
     else if(e)
@@ -1486,42 +1489,40 @@ int VUPlay::draw_one_row(char str[72], event *e, int track) {
             latency[track].e.effect_data = e->effect_data;
     }
 
-    // Let's display the Information !
-    if( e == NULL || !latency[track].longevity) // || e->note > 127)
-        sprintf(str,"\
- %.2d                                                                   ", track);
-    else
-        if(latency[track].e.note)
-        {
-            sprintf(str,"\
- %.2d  %s  %.2d  %.3d  %.5d  %.5d",
-track,
-song->instruments[latency[track].e.inst]->title,
-latency[track].e.note,
-(latency[track].e.vol < 128)?latency[track].e.vol:song->instruments[latency[track].e.inst]->default_volume,
-latency[track].e.effect_data, latency[track].longevity);
+    // Render the row. Skip the "%s" instrument-title format when the
+    // latency entry's inst slot is invalid -- a stale or unloaded slot
+    // used to crash on song->instruments[idx]->title.
+    if (e == NULL || !latency[track].longevity) {
+        sprintf(str, " %.2d                                                                   ", track);
+    } else if (latency[track].e.note) {
+        instrument *inst = vu_safe_instrument(latency[track].e.inst);
+        const char *title = inst ? (const char *)inst->title : "(no inst)";
+        int vol = (latency[track].e.vol < 128)
+                      ? latency[track].e.vol
+                      : (inst ? inst->default_volume : 0);
+        sprintf(str, " %.2d  %s  %.2d  %.3d  %.5d  %.5d",
+                track,
+                title,
+                latency[track].e.note,
+                vol,
+                latency[track].e.effect_data,
+                latency[track].longevity);
 
-        // add some bars...
-
-        strcat(str," ");
-        if(!measure) {
-          
-          // <Manu> Sin cast daba un warning [EN: without the cast it gave a warning]
-          //measure = ((float)latency[track].init_vol - (float)((float)(1 - (float)((float)latency[track].init_vol * (float)((float)latency[track].longevity / (float)latency[track].init_longevity )))* (float)latency[track].init_vol) / 10);
-            measure = (int) ((float)latency[track].init_vol - (float)((float)(1 - (float)((float)latency[track].init_vol * (float)((float)latency[track].longevity / (float)latency[track].init_longevity )))* (float)latency[track].init_vol) / 10);
+        // Bar measure derivation. Cast paranoia kept from the original;
+        // formula reads "fade init_vol toward 0 as longevity decays".
+        strcat(str, " ");
+        if (!measure && latency[track].init_longevity > 0) {
+            measure = (int)((float)latency[track].init_vol
+                            - (float)((float)(1 - (float)((float)latency[track].init_vol
+                                * (float)((float)latency[track].longevity / (float)latency[track].init_longevity)))
+                                * (float)latency[track].init_vol) / 10);
             measure /= 100;
         }
-        
-        // we really want to be safe about this unscientific calculation
-
-        if(measure > 16)
-            measure = 16;
-        if(measure < 0)
-            measure = 0;
-        //for(; measure--; strcat(str, c)); // 155 = 9B
+        if (measure > 16) measure = 16;
+        if (measure < 0)  measure = 0;
     }
 
-    // Cleanup
+    // Pad to 71 columns + null terminator.
     for(w = &str[strlen(str)]; w != &str[71]; w++)
         *w = ' ';
     *w = '\0';
