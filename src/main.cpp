@@ -1395,10 +1395,8 @@ void global_keys(Drawable *S)
                 // Ctrl-M = open Midimacro editor (the obvious-name
                 // shortcut; works regardless of macOS F-key mode).
                 if ((kstate & KS_CTRL) && !(kstate & KS_SHIFT)) {
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
                     command = CMD_SWITCH_MIDIMACEDIT;
                     key = Keys.getkey();
-#endif
                     break;
                 }
                 // Ctrl-Shift-M = quick MIDI export to .mid file.
@@ -1448,7 +1446,6 @@ void global_keys(Drawable *S)
                 break;
 
 
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
             case SDLK_F4:
                 // Shift+F4 opens the Arpeggio editor. Plain F4 (handled
                 // in the no-modifier block below) opens the MIDI Macro
@@ -1461,7 +1458,6 @@ void global_keys(Drawable *S)
                     command=CMD_SWITCH_ARPEDIT;
                 }
                 break;
-#endif
 
 
             //case SDLK_F9: // load
@@ -1482,14 +1478,12 @@ void global_keys(Drawable *S)
                 }
                 break;
 
-#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
             case SDLK_F10:
 
                 if (kstate == KS_NO_SHIFT_KEYS) {
 
                     command = CMD_SWITCH_SONGMSG;
                 }
-#endif
 
               break ;
 
@@ -1606,7 +1600,6 @@ void global_keys(Drawable *S)
                 // ----------------------------------------------
                 case SDLK_F3: command=CMD_SWITCH_IEDIT;     break;
 
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
                 // ----------------------------------------------
                 // F4 from anywhere -> MIDI Macro editor.
                 // F4 while already on MIDI Macro -> Arpeggio editor.
@@ -1620,7 +1613,6 @@ void global_keys(Drawable *S)
                     else
                         command = CMD_SWITCH_MIDIMACEDIT;
                     break;
-#endif
                 // ----------------------------------------------
                 case SDLK_F5: command = CMD_PLAY;           break;
                 // ----------------------------------------------
@@ -1685,29 +1677,23 @@ void global_keys(Drawable *S)
             doredraw++; clear++;
             break;
 
-#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
         // ------------------------------------------------------------------------
         case CMD_SWITCH_SONGMSG:
             switch_page(UIP_SongMessage);
             doredraw++; clear++;
             break;
-#endif
 
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
         // ------------------------------------------------------------------------
         case CMD_SWITCH_ARPEDIT:
             switch_page(UIP_Arpeggioeditor);
             doredraw++; clear++;
             break;
-#endif
 
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
         // ------------------------------------------------------------------------
         case CMD_SWITCH_MIDIMACEDIT:
             switch_page(UIP_Midimacroeditor);
             doredraw++; clear++;
             break;
-#endif
 
         // ------------------------------------------------------------------------
         case CMD_SWITCH_PEDIT:

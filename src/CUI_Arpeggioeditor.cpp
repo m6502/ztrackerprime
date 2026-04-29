@@ -62,6 +62,7 @@
 #define GRID_VISIBLE    14
 #define GRID_ID         10
 #define PRESET_LIST_ID  11
+#define KEYJAZZ_ID      12
 
 static int  ar_slot      = 0;
 static int  ar_cur_step  = 0;
@@ -132,6 +133,88 @@ static int  ar_preset_index = 0;
 // "Space selects but values don't change" on Space).
 static bool ar_preset_just_applied = false;
 
+// ---------------------------------------------------------------------------
+// Keyjazz: while focus is on a non-text widget (NOT Name TextInput, NOT
+// preset listbox), the tracker keyjazz keys play a single MIDI note on
+// the current instrument -- exactly like the pattern editor's keyjazz.
+// Press R -> F at base_octave (e.g. F-4). Hold for sustain. Release:
+// main.cpp's existing key-up handler clears jazz_set_state and sends
+// noteOff via the shared infrastructure.
+
+static int ar_keyjazz_offset_for_scancode(int sc) {
+    switch (sc) {
+        // Top row -- upper octave (12*base_octave + 0..16)
+        case SDL_SCANCODE_Q: return 0;
+        case SDL_SCANCODE_2: return 1;
+        case SDL_SCANCODE_W: return 2;
+        case SDL_SCANCODE_3: return 3;
+        case SDL_SCANCODE_E: return 4;
+        case SDL_SCANCODE_R: return 5;
+        case SDL_SCANCODE_5: return 6;
+        case SDL_SCANCODE_T: return 7;
+        case SDL_SCANCODE_6: return 8;
+        case SDL_SCANCODE_Y: return 9;
+        case SDL_SCANCODE_7: return 10;
+        case SDL_SCANCODE_U: return 11;
+        case SDL_SCANCODE_I: return 12;
+        case SDL_SCANCODE_9: return 13;
+        case SDL_SCANCODE_O: return 14;
+        case SDL_SCANCODE_0: return 15;
+        case SDL_SCANCODE_P: return 16;
+        // Bottom row -- lower octave (12*(base_octave-1) + 0..11)
+        case SDL_SCANCODE_Z: return -12;
+        case SDL_SCANCODE_S: return -11;
+        case SDL_SCANCODE_X: return -10;
+        case SDL_SCANCODE_D: return -9;
+        case SDL_SCANCODE_C: return -8;
+        case SDL_SCANCODE_V: return -7;
+        case SDL_SCANCODE_G: return -6;
+        case SDL_SCANCODE_B: return -5;
+        case SDL_SCANCODE_H: return -4;
+        case SDL_SCANCODE_N: return -3;
+        case SDL_SCANCODE_J: return -2;
+        case SDL_SCANCODE_M: return -1;
+    }
+    return -127;
+}
+
+// SDL scancode -> SDLK_* mapping for the keyjazz keys, so we can call
+// jazz_set_state with the same id main.cpp's key-up path will receive.
+static int ar_keyjazz_keysym_for_scancode(int sc) {
+    switch (sc) {
+        case SDL_SCANCODE_Q: return SDLK_Q;
+        case SDL_SCANCODE_W: return SDLK_W;
+        case SDL_SCANCODE_E: return SDLK_E;
+        case SDL_SCANCODE_R: return SDLK_R;
+        case SDL_SCANCODE_T: return SDLK_T;
+        case SDL_SCANCODE_Y: return SDLK_Y;
+        case SDL_SCANCODE_U: return SDLK_U;
+        case SDL_SCANCODE_I: return SDLK_I;
+        case SDL_SCANCODE_O: return SDLK_O;
+        case SDL_SCANCODE_P: return SDLK_P;
+        case SDL_SCANCODE_2: return SDLK_2;
+        case SDL_SCANCODE_3: return SDLK_3;
+        case SDL_SCANCODE_5: return SDLK_5;
+        case SDL_SCANCODE_6: return SDLK_6;
+        case SDL_SCANCODE_7: return SDLK_7;
+        case SDL_SCANCODE_9: return SDLK_9;
+        case SDL_SCANCODE_0: return SDLK_0;
+        case SDL_SCANCODE_Z: return SDLK_Z;
+        case SDL_SCANCODE_X: return SDLK_X;
+        case SDL_SCANCODE_C: return SDLK_C;
+        case SDL_SCANCODE_V: return SDLK_V;
+        case SDL_SCANCODE_B: return SDLK_B;
+        case SDL_SCANCODE_N: return SDLK_N;
+        case SDL_SCANCODE_M: return SDLK_M;
+        case SDL_SCANCODE_S: return SDLK_S;
+        case SDL_SCANCODE_D: return SDLK_D;
+        case SDL_SCANCODE_G: return SDLK_G;
+        case SDL_SCANCODE_H: return SDLK_H;
+        case SDL_SCANCODE_J: return SDLK_J;
+    }
+    return 0;
+}
+
 static void ar_apply_preset(int idx) {
     if (idx < 0 || idx >= AR_PRESET_COUNT) return;
     arpeggio *a = ar_ensure(ar_slot);
@@ -154,6 +237,46 @@ public:
     ArGridFocus() { xsize = 1; ysize = 1; }
     int update() override { return 0; }
     void draw(Drawable *S, int active) override { (void)S; (void)active; }
+};
+
+// Keyjazz focus stub. A dedicated tab stop the user lands on (via Tab
+// or mouse click) to enter keyjazz mode. Only when this element is
+// focused do the QWERTY keyjazz keys fire MIDI noteOn -- keeps the
+// other tab stops (sliders, listbox, grid) free for their own keypress
+// handling.
+//
+// The stub itself does nothing in update(); the page-level keyjazz
+// handler in CUI_Arpeggioeditor::update() reads UI->cur_element ==
+// KEYJAZZ_ID and dispatches notes. Mouse clicks land via mouseupdate
+// (inherited from UserInterfaceElement) which checks bounds + sets
+// focus.
+class ArKeyjazzFocus : public UserInterfaceElement {
+public:
+    ArKeyjazzFocus() { xsize = 64; ysize = 3; }
+    int update() override {
+        // Eat plain TAB so it advances focus normally. Keyjazz keys are
+        // handled in the page update so they can read base_octave +
+        // current arpeggio state without duplicating mapping here.
+        return 0;
+    }
+    int mouseupdate(int cur_element) override {
+        KBKey key = Keys.checkkey();
+        if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
+            if (checkclick(col(this->x), row(this->y),
+                           col(this->x + this->xsize),
+                           row(this->y + this->ysize))) {
+                Keys.getkey();
+                need_redraw++;
+                return this->ID;
+            }
+        }
+        return cur_element;
+    }
+    void draw(Drawable *, int) override {
+        // The page draws the visible Keyjazz panel (with focus highlight
+        // when active==true) so this stub stays a non-visual focus
+        // anchor.
+    }
 };
 
 // Inline preset selector -- mirrors the F11 SkinSelector ergonomics so
@@ -244,7 +367,14 @@ public:
         selectNone();
         selected->checked = true;
         ar_preset_just_applied = true;
-        ListBox::OnSelect(selected);
+        // Deliberately NOT calling ListBox::OnSelect here -- the base
+        // sets mousestate=0 which clobbers the click that triggered us
+        // BEFORE the matching BUTTON_UP arrives. With mousestate=0 the
+        // up event's `if (mousestate) act++` gate fails, the event sits
+        // stuck in the Keys FIFO, and every subsequent keypress is
+        // blocked behind it. Symptom: clicking a preset killed cursor
+        // arrows + click-on-CC#-sliders. mousestate gets cleared by
+        // BUTTON_UP_LEFT's case naturally on the up event.
     }
     void OnSelectChange() override {}
 };
@@ -317,6 +447,19 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     ps->x = 47; ps->y = BASE_Y + 2;
     ps->xsize = 32;
     ps->ysize = AR_PRESET_COUNT - 1;
+
+    // 12 -- Keyjazz slot. Tab here (or click) to enter keyjazz mode;
+    // only then do Q/W/E/R/T/Y/U/I/O/P + 2/3/5/6/7 / Z/X/C/V/B/N/M +
+    // S/D/G/H/J fire MIDI notes via cur_inst. Without this dedicated
+    // tab stop, the keyjazz keys would conflict with other widgets
+    // that consume letter keys (Name TextInput typing, listbox
+    // typeahead).
+    ArKeyjazzFocus *kj = new ArKeyjazzFocus;
+    UI->add_element(kj, KEYJAZZ_ID);
+    kj->x = 4;
+    kj->y = CHARS_Y - SPACE_AT_BOTTOM - 7;
+    kj->xsize = 80;
+    kj->ysize = 3;
 }
 
 // Migrate legacy out-of-range values (loaded from old .zt files) into
@@ -491,6 +634,31 @@ void CUI_Arpeggioeditor::update() {
     {
         KBKey pkey = Keys.checkkey();
         int   pks  = Keys.getstate();
+        // Keyjazz: only fires when focus is on the dedicated Keyjazz
+        // slot. Tab to it (or click) to enter; the slot's draw()
+        // highlights so the user can see the mode is active.
+        if (pkey && focused == KEYJAZZ_ID
+            && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))) {
+            int sc = (int)Keys.getcode();
+            int off = ar_keyjazz_offset_for_scancode(sc);
+            int sym = ar_keyjazz_keysym_for_scancode(sc);
+            if (off != -127 && sym != 0 &&
+                song && song->instruments[cur_inst] &&
+                !jazz_note_is_active(sym)) {
+                int note = 12 * base_octave + off;
+                if (note < 0)   note = 0;
+                if (note > 127) note = 127;
+                MidiOut->noteOn(song->instruments[cur_inst]->midi_device,
+                                (unsigned char)note,
+                                song->instruments[cur_inst]->channel,
+                                100, MAX_TRACKS, 0);
+                jazz_set_state(sym, (unsigned char)note,
+                               song->instruments[cur_inst]->channel);
+                Keys.getkey();
+                need_refresh++;
+                return;
+            }
+        }
         if (pkey && focused != 1) {
             bool page_consumed = false;
             if (pkey == SDLK_P && !(pks & (KS_CTRL|KS_ALT|KS_META|KS_SHIFT))
@@ -786,6 +954,33 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
             TColor b = ccell_focus ? COLORS.Highlight : COLORS.EditBG;
             printBG(col(cell_col), row(py), vbuf, f, b, S);
         }
+    }
+
+    // Keyjazz panel: dedicated tab stop (KEYJAZZ_ID). Title flips
+    // between dim "Tab here..." (not focused) and active "[ACTIVE]"
+    // (focused) so the user can see whether the keys will fire notes.
+    {
+        int kj_y = CHARS_Y - SPACE_AT_BOTTOM - 7;
+        bool active = (UI->cur_element == KEYJAZZ_ID);
+        char hdr[96];
+        if (active) {
+            snprintf(hdr, sizeof(hdr),
+                     "[KEYJAZZ ACTIVE -- octave %d  press notes; Tab to leave]",
+                     base_octave);
+            printBG(col(4), row(kj_y), hdr,
+                    COLORS.EditBG, COLORS.Highlight, S);
+        } else {
+            snprintf(hdr, sizeof(hdr),
+                     " Keyjazz (Tab here to enter; current octave %d) ",
+                     base_octave);
+            print(row(4), col(kj_y), hdr, COLORS.Lowlight, S);
+        }
+        print(row(4), col(kj_y + 1),
+              "  upper:  Q=C  W=D  E=E  R=F  T=G  Y=A  U=B  I=C+1  O=D+1  P=E+1",
+              active ? COLORS.Text : COLORS.Lowlight, S);
+        print(row(4), col(kj_y + 2),
+              "  lower:  Z=C-1 X=D-1 C=E-1 V=F-1 B=G-1 N=A-1 M=B-1   sharps: 2/3/5/6/7  S/D/G/H/J",
+              active ? COLORS.Text : COLORS.Lowlight, S);
     }
 
     // Documentation block anchored just above the toolbar (SPACE_AT_BOTTOM

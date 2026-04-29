@@ -85,15 +85,9 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Pattern Editor",           "F2",                   CMD_SWITCH_PEDIT,           NULL},
     {MM_CMD,        "Instrument Editor",        "F3",                   CMD_SWITCH_IEDIT,           NULL},
     {MM_CMD,        "Song Configuration",       "F11",                  CMD_SWITCH_SONGCONF,        NULL},
-#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
     {MM_CMD,        "Song Message",             "F10",                  CMD_SWITCH_SONGMSG,         NULL},
-#endif
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
     {MM_CMD,        "MIDI Macro Editor",        "F4",                   CMD_SWITCH_MIDIMACEDIT,     NULL},
-#endif
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
     {MM_CMD,        "Arpeggio Editor",          "Shift-F4",             CMD_SWITCH_ARPEDIT,         NULL},
-#endif
     {MM_CMD,        "Help",                     "F1",                   CMD_SWITCH_HELP,            NULL},
     {MM_CMD,        "About",                    "Alt+F12",              CMD_SWITCH_ABOUT,           NULL},
 
@@ -237,9 +231,7 @@ void CUI_MainMenu::update(void) {
                 case CMD_SWITCH_PEDIT:        switch_page(UIP_Patterneditor);     break;
                 case CMD_SWITCH_IEDIT:        switch_page(UIP_InstEditor);        break;
                 case CMD_SWITCH_SONGCONF:     switch_page(UIP_Songconfig);        break;
-#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
                 case CMD_SWITCH_SONGMSG:      switch_page(UIP_SongMessage);       break;
-#endif
                 case CMD_SWITCH_HELP:         switch_page(UIP_Help);              break;
                 case CMD_SWITCH_ABOUT:        switch_page(UIP_About);             break;
                 case CMD_SWITCH_LOAD:         switch_page(UIP_Loadscreen);        break;
@@ -249,12 +241,8 @@ void CUI_MainMenu::update(void) {
                 case CMD_SWITCH_PALETTE:      switch_page(UIP_PaletteEditor);     break;
                 case CMD_SWITCH_KEYBINDINGS:  switch_page(UIP_KeyBindings);       break;
                 case CMD_SWITCH_LUA_CONSOLE:  switch_page(UIP_LuaConsole);        break;
-#ifndef DISABLE_UNFINISHED_F4_MIDI_MACRO_EDITOR
                 case CMD_SWITCH_MIDIMACEDIT:  switch_page(UIP_Midimacroeditor);   break;
-#endif
-#ifndef DISABLE_UNFINISHED_F4_ARPEGGIO_EDITOR
                 case CMD_SWITCH_ARPEDIT:      switch_page(UIP_Arpeggioeditor);    break;
-#endif
                 case CMD_PLAY:
                     if (cur_state != STATE_PLAY) switch_page(UIP_Playsong);
                     if (song->orderlist[0] != 0x100 && !ztPlayer->playing) {
