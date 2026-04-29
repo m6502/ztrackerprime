@@ -70,9 +70,18 @@ void CUI_SongMessage::enter(void) {
     need_refresh++;
     cur_state = STATE_SONG_MESSAGE;
     CommentEditor *cb = (CommentEditor*)UI->get_element(0);
-    buffer = song->songmessage->songmessage;
-    cb->target = buffer;
-    cb->refresh_display();
+    // Defensive: a corrupt or partially loaded song could leave the
+    // songmessage chain incomplete. Bind target to NULL in that case
+    // rather than dereferencing through a missing link.
+    if (song && song->songmessage && song->songmessage->songmessage) {
+        buffer = song->songmessage->songmessage;
+    } else {
+        buffer = NULL;
+    }
+    if (cb) {
+        cb->target = buffer;
+        cb->refresh_display();
+    }
     zt_text_input_start();
 }
 
@@ -118,8 +127,20 @@ void CUI_SongMessage::draw(Drawable *S) {
     // Re-run the bottom-anchored sizing in case the window has been
     // resized since the page was constructed.
     CommentEditor *cb = (CommentEditor*)UI->get_element(0);
+    if (!cb) return;
     cb->xsize = TextBox::full_width_xsize();
     cb->ysize = (INTERNAL_RESOLUTION_Y/8) - cb->y - 8;
+    // Re-bind target every frame: a song load (Ctrl-L) deletes and
+    // re-creates song->songmessage, so any pointer cached in enter()
+    // would be left dangling. Re-fetching here keeps cb->target valid
+    // through page-resident song reloads.
+    CDataBuf *current = (song && song->songmessage)
+                        ? song->songmessage->songmessage
+                        : NULL;
+    if (cb->target != current) {
+        cb->target = current;
+        buffer = current;
+    }
     // Refresh the null-terminated display mirror so TextBox::draw has
     // a clean string to walk (CDataBuf is not null-terminated; reading
     // past the live byte count walks heap garbage).

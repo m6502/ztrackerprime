@@ -300,6 +300,15 @@ class ListBox : public UserInterfaceElement {
         int num_elements;
 //        int sorted;
         bool use_checks, use_key_select, is_sorted;
+        // When true (default), pressing Up at the first row or Down at
+        // the last row passes focus to the previous / next UI element
+        // (Sysconfig depends on this so the user can walk Skin Selector
+        // -> Key Wait -> MIDI Out without Tabbing). Set to false in
+        // contexts where the listbox should clamp at its edges and
+        // stay focused (file Load/Save dialogs — pressing past the end
+        // jumping into a different list confused users who navigate by
+        // arrow + Enter).
+        bool wrap_focus_at_edges;
         unsigned char check_on, check_off;
         const char *empty_message;
         LBNode *items;

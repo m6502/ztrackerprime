@@ -249,6 +249,11 @@ FileList::FileList()
     empty_message = (char *)"";
     is_sorted = true;
     use_checks = false;
+    // File Load/Save users navigate by arrow + Enter; the base
+    // ListBox behavior of jumping focus to a sibling list when Up/Down
+    // hits an edge sent them into the wrong list and lost their place.
+    // Clamp at edges instead — Tab still moves between lists.
+    wrap_focus_at_edges = false;
     updated = 1;
     OnChange();
     onEnter = NULL;
