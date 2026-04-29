@@ -330,6 +330,14 @@ typedef struct zt_coremidi_out_handle {
     MIDIClientRef client;
     MIDIPortRef out_port;
     MIDIEndpointRef endpoint;
+    // Display name captured at open() time, used to re-resolve a
+    // stale endpoint reference when MIDISend fails. Virtual MIDI
+    // ports (software synths, GBA emulators, IAC) commonly tear
+    // down and recreate their destination when the host process
+    // restarts or stops; without name-based recovery zTracker would
+    // keep firing into a dead endpoint and the user would perceive
+    // it as "MIDI Out lost connection".
+    char endpoint_name[256];
 } zt_coremidi_out_handle;
 
 typedef struct zt_coremidi_in_handle {
@@ -368,6 +376,28 @@ static inline int zt_coremidi_endpoint_name(MIDIEndpointRef endpoint, char *name
 
 static inline UINT midiOutGetNumDevs(void) {
     return (UINT)MIDIGetNumberOfDestinations();
+}
+
+// Walk the live destination list and return the endpoint whose
+// display name matches `target_name`. Used by midiOutShortMsg to
+// recover from a stale endpoint after a virtual-port restart or
+// USB re-plug. Returns 0 if no match (or empty target name).
+static inline MIDIEndpointRef zt_coremidi_find_destination_by_name(const char *target_name) {
+    if (!target_name || !target_name[0]) {
+        return 0;
+    }
+    ItemCount n = MIDIGetNumberOfDestinations();
+    char buf[256];
+    for (ItemCount i = 0; i < n; i++) {
+        MIDIEndpointRef ep = MIDIGetDestination(i);
+        if (ep == 0) continue;
+        buf[0] = '\0';
+        zt_coremidi_endpoint_name(ep, buf, sizeof(buf));
+        if (strncmp(buf, target_name, sizeof(buf)) == 0) {
+            return ep;
+        }
+    }
+    return 0;
 }
 
 static inline MMRESULT midiOutGetDevCaps(UINT dev, MIDIOUTCAPS *caps, UINT) {
@@ -412,6 +442,10 @@ static inline MMRESULT midiOutOpen(HMIDIOUT *h, UINT dev, DWORD_PTR, DWORD_PTR, 
     }
 
     ctx->endpoint = endpoint;
+    // Cache the display name so midiOutShortMsg can re-resolve the
+    // endpoint by name if the cached MIDIEndpointRef goes stale.
+    ctx->endpoint_name[0] = '\0';
+    zt_coremidi_endpoint_name(endpoint, ctx->endpoint_name, sizeof(ctx->endpoint_name));
     *h = (HMIDIOUT)ctx;
     return MMSYSERR_NOERROR;
 }
@@ -433,7 +467,7 @@ static inline MMRESULT midiOutClose(HMIDIOUT h) {
 
 static inline MMRESULT midiOutShortMsg(HMIDIOUT h, DWORD msg) {
     zt_coremidi_out_handle *ctx = (zt_coremidi_out_handle *)h;
-    if (!ctx || !ctx->out_port || !ctx->endpoint) {
+    if (!ctx || !ctx->out_port) {
         return MMSYSERR_ERROR;
     }
 
@@ -457,7 +491,35 @@ static inline MMRESULT midiOutShortMsg(HMIDIOUT h, DWORD msg) {
         return MMSYSERR_ERROR;
     }
 
-    return MIDISend(ctx->out_port, ctx->endpoint, &packet_list) == noErr ? MMSYSERR_NOERROR : MMSYSERR_ERROR;
+    // First attempt with the cached endpoint. Fast path -- a healthy
+    // device hits this and returns immediately.
+    OSStatus result = noErr;
+    if (ctx->endpoint != 0) {
+        result = MIDISend(ctx->out_port, ctx->endpoint, &packet_list);
+        if (result == noErr) {
+            return MMSYSERR_NOERROR;
+        }
+    }
+
+    // Recovery path: the endpoint either was 0 to begin with (the
+    // device disappeared between open and now) or MIDISend errored.
+    // Re-resolve by display name -- handles virtual-port restarts
+    // (software synth quit + relaunch, IAC bus reload), USB unplug
+    // and replug, and the macOS "MIDI device sleep" cycle. Caps the
+    // recovery cost at one MIDIGetNumberOfDestinations walk plus one
+    // retry per failing send.
+    if (ctx->endpoint_name[0] != '\0') {
+        MIDIEndpointRef fresh = zt_coremidi_find_destination_by_name(ctx->endpoint_name);
+        if (fresh != 0 && fresh != ctx->endpoint) {
+            ctx->endpoint = fresh;
+            result = MIDISend(ctx->out_port, ctx->endpoint, &packet_list);
+            if (result == noErr) {
+                return MMSYSERR_NOERROR;
+            }
+        }
+    }
+
+    return MMSYSERR_ERROR;
 }
 
 static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_NOERROR; }
