@@ -4,6 +4,27 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (MIDI Out resilience on macOS)
+--------------------------------------------
+
+        * macOS CoreMIDI: MIDI Out now survives a destination going
+          stale mid-session. Each output device caches its display
+          name at open(); if MIDISend errors against the cached
+          MIDIEndpointRef, midiOutShortMsg walks the live destination
+          list, re-resolves by name, updates the cached endpoint, and
+          retries the packet once. Handles software-synth restarts
+          (GBA emulators, soft synths quitting and relaunching), IAC
+          bus reloads, USB unplug-and-replug, and macOS device-sleep
+          cycles -- all of which previously left the cached endpoint
+          dangling and the user perceiving "MIDI Out lost connection".
+        ! Recovery is bounded: at most one MIDIGetNumberOfDestinations
+          walk plus one retry per failing send, so a permanently-gone
+          destination costs a small constant per message and never
+          blocks. Healthy devices hit the fast path unchanged.
+        ! Linux ALSA / Windows winmm output is unchanged in this
+          release; their backends use kernel-level routing that does
+          not need name re-resolution. If similar drops are observed
+          on those platforms a follow-up PR will add the equivalent.
 zt 2026_04_29 (Hotfix: F10 robustness + file dialog focus clamp)
 ----------------------------------------------------------------
 
