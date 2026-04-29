@@ -3311,6 +3311,7 @@ CommentEditor::CommentEditor() {
     bUseColors = FALSE;
     bWordWrap = true;
     target = NULL;
+    cursor = 0;
     _display = NULL;
     _display_alloc = 0;
     text = NULL;
@@ -3328,7 +3329,12 @@ void CommentEditor::refresh_display() {
     }
     int n = target->getsize();
     if (n < 0) n = 0;
-    int need = n + 1;
+    // Clamp the cursor to a valid insertion point. Any operation that
+    // shrinks the buffer (popc, erase_at, target swap on song reload)
+    // could otherwise leave cursor pointing past the end.
+    if ((int)cursor > n) cursor = (unsigned)n;
+    // +1 for the caret character, +1 for the terminating NUL.
+    int need = n + 2;
     if (need > _display_alloc) {
         int newalloc = _display_alloc ? _display_alloc : 64;
         while (newalloc < need) newalloc *= 2;
@@ -3342,17 +3348,146 @@ void CommentEditor::refresh_display() {
         _display = nb;
         _display_alloc = newalloc;
     }
-    if (n > 0) {
-        const char *src = target->getbuffer();
-        if (src) memcpy(_display, src, (size_t)n);
-        else n = 0;
+    const char *src = (n > 0) ? target->getbuffer() : NULL;
+    if (n > 0 && !src) n = 0;  // defensive: getsize > 0 but buffer NULL
+    // Caret is CP437 0xDB (full block). The zT font ships with the
+    // CP437 page, so this renders as a solid block on every skin.
+    //
+    // Two render modes:
+    //   * cursor sits on a printable char: REPLACE that byte with the
+    //     block in the display copy. Text does not shift when the
+    //     caret moves, matching DOS-era editors.
+    //   * cursor sits on '\n' OR at the end of the buffer: INSERT the
+    //     block (one byte longer than the source) so the line break
+    //     stays visible and end-of-buffer has somewhere to render.
+    const unsigned char CARET = 0xDB;
+    int pre = (int)cursor;
+    if (pre > n) pre = n;
+    char ch_at = (pre < n) ? src[pre] : '\0';
+    if (pre < n && ch_at != '\n') {
+        if (n > 0) memcpy(_display, src, (size_t)n);
+        _display[pre] = (char)CARET;
+        _display[n] = '\0';
+    } else {
+        if (pre > 0) memcpy(_display, src, (size_t)pre);
+        _display[pre] = (char)CARET;
+        int post = n - pre;
+        if (post > 0) memcpy(_display + pre + 1, src + pre, (size_t)post);
+        _display[pre + 1 + post] = '\0';
     }
-    _display[n] = '\0';
     text = _display;
 }
 
 
 
+
+// Walk the same layout as TextBox::draw to find the screen position
+// (cx, line) of the byte at offset `target_sc` in the display string.
+// Returns true if the byte falls inside the visible viewport, false
+// otherwise (off-screen above startline, off-screen below ysize, or
+// past EOF). The walk mirrors TextBox::draw's loop exactly so the
+// reported coordinates land in the same cell as the rendered char.
+//
+// Defensive against drift: if TextBox::draw's layout pass changes,
+// this helper must change with it. Intentionally inlined rather than
+// abstracted into TextBox so the dependency is visible.
+static bool zt_textbox_locate_offset(const char *text, bool bUseColors,
+                                     int xsize, int ysize, int soff,
+                                     int startline, int target_sc,
+                                     int *out_cx, int *out_line)
+{
+    if (!text) return false;
+    int line = 0, done = 0, sc = 0, d = 0, cx;
+
+    int l = 0;
+    while (l < startline) {
+        // Mirror nextline() walk -- skip until next visual line.
+        // TextBox uses a helper; here we just count '\n' since the
+        // word-wrap path is rarely active for Song Message and
+        // nextline isn't exposed. The caret will be off-screen if
+        // the user has scrolled past it; the helper returns false
+        // and the overlay is skipped.
+        while (text[sc] && text[sc] != '\n') sc++;
+        if (!text[sc]) return false;
+        sc++;
+        l++;
+    }
+
+    while (line <= ysize && !done && text[sc]) {
+        d = 0;
+        cx = 0;
+        int p = 0;
+        while (text[sc] && !d) {
+            if (text[sc] == '\n') {
+                if (sc == target_sc) {
+                    *out_cx = cx;
+                    *out_line = line;
+                    return (cx < xsize);
+                }
+                d = 1;
+            } else if (bUseColors && text[sc] == '|' && text[sc + 1] != '|') {
+                sc++;  // skip color code letter
+            } else if (text[sc] == '\r') {
+                // skip
+            } else if (text[sc] == '\t') {
+                p++;
+                if (p >= soff) cx += 2;
+            } else {
+                p++;
+                if (p >= soff) {
+                    if (sc == target_sc) {
+                        *out_cx = cx;
+                        *out_line = line;
+                        return (cx < xsize - 4);
+                    }
+                    if (cx < xsize - 4) {
+                        cx++;
+                    } else {
+                        // Wrap (matches TextBox::draw's bWordWrap branch).
+                        d = 1;
+                        if (sc > 0) sc--;
+                    }
+                }
+            }
+            sc++;
+        }
+        if (!text[sc]) done = 1;
+        line++;
+    }
+    return false;
+}
+
+void CommentEditor::draw(Drawable *S, int active) {
+    // Base render: paints the block at the cursor position via the
+    // 0xDB byte we placed in _display.
+    TextBox::draw(S, active);
+
+    // Layer the underlying character on top of the block in the
+    // background color so the user can read what they are about to
+    // edit. Skip when the caret is at end-of-buffer (no underlying
+    // char) or sitting on a '\n' (we drew the block as an inserted
+    // char, not a replacement).
+    if (!target) return;
+    int n = target->getsize();
+    if (n <= 0 || (int)cursor >= n) return;
+    const char *buf = target->getbuffer();
+    if (!buf) return;
+    char ch = buf[cursor];
+    if (ch == '\n' || ch == '\r' || ch == '\t') return;
+
+    int cx = 0, line = 0;
+    if (zt_textbox_locate_offset(text, bUseColors, xsize, ysize,
+                                 soff, startline, (int)cursor,
+                                 &cx, &line)) {
+        printchar(col(x + 1 + cx), row(y + line),
+                  (unsigned char)ch, COLORS.EditBG, S);
+        // Re-publish the cell so the screen manager flushes the
+        // overlay to the visible window.
+        screenmanager.Update(col(x + 1 + cx), row(y + line),
+                             col(x + 1 + cx) + col(1),
+                             row(y + line) + row(1));
+    }
+}
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -3363,24 +3498,107 @@ int CommentEditor::update() {
     key = Keys.checkkey();
     unsigned char ch = Keys.getactualchar();
     if (key) {
+        const unsigned int n =
+            target ? (unsigned int)(target->getsize() < 0 ? 0 : target->getsize())
+                   : 0u;
         switch(key) {
-        case SDLK_UP  : act++; startline--;  break;
-        case SDLK_DOWN: act++; if (!bEof) startline++;  break;
+        // Caret movement. Left / Right step a single byte in the
+        // backing buffer; Home / End jump to the very start / end of
+        // the message. The display scroll (startline / soff) is left
+        // alone here -- TextBox::draw does its own viewport
+        // management; we only reposition the insertion point.
+        case SDLK_LEFT:
+            if (cursor > 0) { cursor--; }
+            act++;
+            break;
+        case SDLK_RIGHT:
+            if (cursor < n) { cursor++; }
+            act++;
+            break;
+        case SDLK_HOME:
+            cursor = 0;
+            act++;
+            break;
+        case SDLK_END:
+            cursor = n;
+            act++;
+            break;
+        // Vertical caret nav. Operates on logical lines split by
+        // '\n' rather than the visual word-wrap grid (computing the
+        // wrap-aware row would require duplicating TextBox::draw's
+        // layout pass). Column is preserved across the jump and
+        // clamped to the destination line's length. PageUp / PageDn
+        // still move the viewport scroll for long messages.
+        case SDLK_UP:
+            if (target && n > 0) {
+                const char *buf = target->getbuffer();
+                if (buf) {
+                    unsigned int line_start = cursor;
+                    while (line_start > 0 && buf[line_start - 1] != '\n')
+                        line_start--;
+                    unsigned int col = cursor - line_start;
+                    if (line_start == 0) {
+                        cursor = 0;   // already on first line
+                    } else {
+                        unsigned int prev_end = line_start - 1; // the '\n'
+                        unsigned int prev_start = prev_end;
+                        while (prev_start > 0 && buf[prev_start - 1] != '\n')
+                            prev_start--;
+                        unsigned int prev_len = prev_end - prev_start;
+                        unsigned int new_col = (col < prev_len) ? col : prev_len;
+                        cursor = prev_start + new_col;
+                    }
+                }
+            }
+            act++;
+            break;
+        case SDLK_DOWN:
+            if (target && n > 0) {
+                const char *buf = target->getbuffer();
+                if (buf) {
+                    unsigned int line_start = cursor;
+                    while (line_start > 0 && buf[line_start - 1] != '\n')
+                        line_start--;
+                    unsigned int col = cursor - line_start;
+                    unsigned int line_end = cursor;
+                    while (line_end < n && buf[line_end] != '\n')
+                        line_end++;
+                    if (line_end >= n) {
+                        cursor = n;   // already on last line
+                    } else {
+                        unsigned int next_start = line_end + 1;
+                        unsigned int next_end = next_start;
+                        while (next_end < n && buf[next_end] != '\n')
+                            next_end++;
+                        unsigned int next_len = next_end - next_start;
+                        unsigned int new_col = (col < next_len) ? col : next_len;
+                        cursor = next_start + new_col;
+                    }
+                }
+            }
+            act++;
+            break;
         case SDLK_PAGEUP: act++; startline-=16;  break;
         case SDLK_PAGEDOWN: act++; if (!bEof) startline+=16;  break;
-        case SDLK_LEFT: act++; soff--; break;
-        case SDLK_RIGHT:act++; soff++; break;
-        case SDLK_HOME: if (soff>0) soff=0; else startline=0; act++; break;
         case SDLK_BACKSPACE:
-            if (target) {
-                target->popc();
+            if (target && cursor > 0) {
+                target->erase_at(cursor - 1);
+                cursor--;
+                refresh_display();
+                act++;
+            }
+            break;
+        case SDLK_DELETE:
+            if (target && cursor < n) {
+                target->erase_at(cursor);
                 refresh_display();
                 act++;
             }
             break;
         case SDLK_RETURN:
             if (target) {
-                target->pushc('\n');
+                target->insert_at(cursor, '\n');
+                cursor++;
                 refresh_display();
                 act++;
             }
@@ -3395,7 +3613,8 @@ int CommentEditor::update() {
             // above (Backspace, Return).
             if (key == SDLK_SPACE && ch != 0x0) {
                 if (target) {
-                    target->pushc(ch);
+                    target->insert_at(cursor, (char)ch);
+                    cursor++;
                     refresh_display();
                     act++;
                 }
@@ -3403,9 +3622,12 @@ int CommentEditor::update() {
         }
         if (act) {
             Keys.getkey();
-                need_refresh++;
+            // Always refresh the display copy after any handled key
+            // so the caret position is correct (pure caret moves do
+            // not call refresh_display in the case body).
+            refresh_display();
+            need_refresh++;
             need_redraw++;
-
         }
     }
     if (startline<0) startline = 0;

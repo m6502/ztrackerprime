@@ -33,6 +33,14 @@ class CDataBuf {
         void pushui(const unsigned int ui);
         void pushstr(const char *str);
         void popc(void);
+        // Cursor-position edits used by the F10 Song Message editor.
+        // insert_at clamps pos to [0, getsize()]; erase_at is a no-op
+        // outside [0, getsize()-1] so callers do not have to bounds
+        // check. Both keep the buffer null-terminator-free; the
+        // caller is responsible for adding one if it needs C-string
+        // semantics (CommentEditor maintains its own mirror).
+        void insert_at(unsigned int pos, char c);
+        void erase_at(unsigned int pos);
         void flush(void);
         char *getbuffer(void);
         int getsize(void);

@@ -4,6 +4,729 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (F10 Song Message: caret + cursor nav + crash logger)
+-------------------------------------------------------------------
+
+        + F10 Song Message editor now has a visible caret (CP437
+          full block, 0xDB) showing where the next keystroke will
+          land. When the caret sits on a printable character that
+          character is re-drawn in the background colour on top of
+          the block, so the user sees both the cursor location AND
+          the underlying letter (DOS-era inverted-cursor effect).
+        + F10 caret navigation: Left / Right step one byte, Home /
+          End jump to the start / end of the message, Up / Down
+          move between logical lines (split by \n) preserving the
+          column. Backspace removes the char before the caret;
+          Delete removes the char under the caret. Typed input and
+          Return now insert AT the caret instead of appending.
+        + CDataBuf: new insert_at(pos, c) and erase_at(pos) helpers
+          backing the cursor-position edits. Both bounds-check and
+          do nothing on out-of-range input so the editor never
+          touches freed memory.
+        + Crash logger: zt_install_crash_handler() runs as the very
+          first action in main() and traps SIGSEGV / SIGABRT /
+          SIGBUS / SIGFPE / SIGILL / SIGTRAP. Before the process
+          dies the handler dumps the signal name plus a backtrace
+          to stderr AND appends them to ./zt-crash.log so a Linux
+          / macOS user running from a desktop launcher still has
+          something to send back. Default handler is restored and
+          the signal re-raised so the OS can still drop a core if
+          ulimit allows. Linux build now links with -rdynamic so
+          backtrace_symbols can name application functions.
+
+zt 2026_04_29 (Hotfix: F10 robustness + file dialog focus clamp)
+----------------------------------------------------------------
+
+        * F10 Song Message: backspacing past empty no longer crashes.
+          CDataBuf::popc had two unsigned-arithmetic bugs that
+          (a) decremented buffsize past zero on an empty buffer and
+          (b) wrapped the shrink-realloc check so a single backspace
+          on a 1024-allocated, single-byte buffer drove allocsize
+          negative and called realloc with a near-4 GB size. Both
+          paths now hard-guard against the underflow and only shrink
+          when the buffer is genuinely under-occupied.
+        * F10 Song Message: surviving a song reload while the page
+          is open. CUI_SongMessage::enter cached
+          song->songmessage->songmessage in the editor's target field;
+          loading a different song deleted the underlying CDataBuf and
+          left target dangling. The page now re-binds target every
+          frame from the live song chain and null-guards each step
+          (song / songmsg / CDataBuf) so a partial chain prints empty
+          rather than crashing.
+        * UserInterface: CommentEditor::refresh_display handles a
+          failed realloc instead of dereferencing NULL.
+        * File Load / Save lists: pressing Up at the first row or
+          Down at the last row now clamps at the edge instead of
+          jumping focus into a sibling list. The base ListBox
+          behaviour (added for Sysconfig in #18) is preserved
+          everywhere else; FileList opts out via a new
+          wrap_focus_at_edges flag. Tab still moves between lists.
+
+zt 2026_04_25 (Minor tweaks: status messages, help nav, F4 binding)
+-------------------------------------------------------------------
+
+        * Pattern Editor: Alt-§ (set previous note's length to distance
+          to cursor) now posts a status message
+          "Changed Note (<note>, <inst>) length to <ticks>". Previously
+          if Alt-1..0 was pressed first to set the step value, the
+          "Step set to N" message stayed on screen and Alt-§ silently
+          changed the length with no visible feedback.
+        * Pattern Editor: Shift-§ (toggle drawmode) now posts the
+          correct status message in both directions — "Editing: Volume"
+          (or current md_mode) when entering drawmode, "Editing: Pattern"
+          when leaving. Previously the status bar lagged or stayed
+          stuck on the prior mode label.
+        * Global: Midimacro editor binding moved from Ctrl-F4 to
+          Shift-Ctrl-F4 (Shift-Cmd-F4 / Shift-Alt-F4 on macOS). Plain
+          Cmd-F4 collides with the macOS window-zoom shortcut and plain
+          Alt-F4 closes windows on Linux/Windows; the Shift gate avoids
+          all three OS-level handlers.
+        + Help (F1): Tab jumps to the next section header, Shift-Tab to
+          the previous. Section anchors are built once at load time by
+          scanning for the |L|%==|H|...|U| markers in help.txt.
+        * help.txt: aligned colon column for ALT-Q / ALT-A / ALT-S in
+          Block Functions and ALT-1 in Pattern Editing. Removed the
+          blank line between Q: and A: in Troubleshooting for tighter
+          readability.
+
+zt 2026_04_23 (MIDI Clock tempo chase)
+--------------------------------------
+
+        + MIDI In: optional tempo slave to incoming 0xF8 MIDI Clock.
+          Derives live BPM from the rolling average of 24 clock
+          intervals (one quarter note) and updates the player's tempo
+          without mutating song->bpm, so the song's authored tempo is
+          preserved on save.
+        + New zt.conf flag `midi_in_sync_chase_tempo` (default no).
+          Requires `midi_in_sync = yes` and a MIDI input device open.
+          Toggleable from Global Config (F12) — two new checkboxes
+          "MIDI In Sync" and "Chase MIDI Tempo" on page 2 alongside
+          the existing Record Velocity / Autoload toggles.
+        ! Transport sync (Start/Continue/Stop/Song Position Pointer)
+          was already handled — this adds the missing tempo-chase leg
+          so Logic/Cubase/Ableton can drive zTracker's speed live.
+
+zt 2026_04_18 (MIDI timer robustness — POSIX path)
+--------------------------------------------------
+
+        * POSIX timer now uses CLOCK_MONOTONIC, not CLOCK_REALTIME.
+          Wall-clock steps (NTP, DST, user-set time) no longer disturb
+          MIDI playback timing.
+        * Eliminated cumulative drift. Each tick is scheduled against an
+          absolute monotonic deadline, not "now + interval", so callback
+          runtime never bleeds into the tempo.
+        * Added catch-up that skips missed ticks on stall recovery
+          instead of firing a burst of backlogged callbacks.
+        * Fixed a use-after-free race in zt_timer_stop: teardown/free
+          moved out of the worker thread so pthread_join can safely read
+          timer->thread after the worker returns.
+        ! macOS uses pthread_cond_timedwait_relative_np (monotonic by
+          construction); Linux uses pthread_cond_timedwait with a
+          CLOCK_MONOTONIC-bound condvar.
+
+zt 2026_04_13 (PR-L .app bundle work — pending merge)
+-----------------------------------------------------
+
+ Additions/fixes (esaruoho + Claude Opus 4.6)
+
+        + Pattern Editor Options dialog (F2-F2): added DrawMode
+          checkbox row that toggles regular <-> effect-draw mode.
+          Alternative to Shift+~ which is awkward on non-US layouts.
+        + § key on Finnish/EU ISO keyboards (SCANCODE_NONUSBACKSLASH)
+          now maps to SDLK_GRAVE in keyhandler so the existing
+          GRAVE bindings work: plain § -> Note Off (===),
+          Shift+§ -> drawmode toggle.
+        + Ctrl+1..0 now sets the cursor edit step (alongside Alt+1..0).
+          Help text already documented this; binding was missing.
+        * Reverted F2-F2 to reopen the PEParms dialog (was briefly
+          changed to a direct keypress toggle).
+
+zt 0.98 - 15/06/2002
+--------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Added ALT-D selection
+        + Added sure to quit box on exit
+        * Fixed numpad enter key (bug #469286)
+        * Fixed order editor crash (bug #506202)
+        * Fixed TPB load bug in song config scren (bug #506208) 
+        * Fixed step edit when you hit the bottom of the pattern
+        * Fixed graphical bug on all are you sure boxes
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        * Centered sure to quit box
+
+zt 0.971 - 05/02/2002
+---------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        * Moral support@()*#()*@!(!!
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        * Fixed bug which causes zt to crash at startup and exit.
+        * Fixed cursor placement for MIDI-OUT alias text input.
+
+zt 0.97 - 15/04/2002
+--------------------
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        * Fixed crashes in some situations with saved latency and bank settings.
+        * Fixed current directory issues (running zt while not in its directory was disastrous).
+        + Added MIDI-in velocity recording toggle (in F2x2 pop-up).
+        + Added note and row "peek" keys (feature #538633)
+          press 4 to play the current note, 8 to play the current row.
+        + Added default_directory conf option for setting default song directory (feature #423892).
+        + Added "Humanizing" function, CTRL-A when a block is selected (feature #518329).
+        + Added MIDI output device nicknames (Device Alias input in System config).
+
+zt 0.96 - 15/03/2002
+--------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Added on-the-fly switching of fullscreen mode (alt-enter)
+        * Made played-volume work when auditioning via midi-in on the instrument editor screen
+        * Made ctrl-[ and ctrl-] only affect rows with notes in them (bug #497215)
+        * Made up and down arrows work if step is 0
+        * Made ctrl-p not destroy clipboard contents
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        * Latency and Bank preferences saved in and loaded from zt.conf.
+
+zt 0.95 - 12/10/2001
+--------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Added G on orderlist to go directly to the pattern (feature #483625)
+        + Added Ctrl-[ and Ctrl-] for decrease/increase volumes in block by 8 (feature #429886)
+        * Fixed some SERIOUS bugs in the playback engine.. CCs and other messages
+          could go to the wrong ports and some note-offs would never happen.  This
+          hopefully has all been fixed.  (bug #486794 and unlisted bugs)
+        * Fixed bug with shift-. erasing notes (bug #483622)
+        * Made slider-input textinput 5 chars long (feature #484310)
+        * Made orderlist the default-focus in the F11 screen (feature #486796)
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        * Value slider numeric input popup is now activated for "-" for negatives.
+        + Added a speedup function for pattern editor (hold ctrl while using arrows)
+          There is a F2x2 menu slider for setting the number of rows to skip.
+
+zt 0.94 - 11/01/2001
+--------------------
+
+ Additions/fixes by Daniel Kahlin (tlr)
+ 
+        + added internal support for song notes, i.e arbitrary text. (feature #453511)
+        * Compatibility mode for old pitch slides removed.  Old pitch slides are
+          converted automatically on loading a song.  (feature #453503)
+        ! Be sure to check your pitch slides!
+        * Lots of manual updates... (feature #422653)
+        * Corrections to help.txt.
+        + Skins pngcrushed.  No difference in appearance, but 20% less size.
+        * Only edited instruments are saved.
+        + Added player command 'R' (arpeggio) skeleton to playback code and added module
+          and load/save support for it. (feature #425273)
+        + Added player command 'Z' (midimacro) skeleton to playback code and added module
+          and load/save support for it. (feature #462001)
+ 
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Added time (min/sec) display to playback status
+        * Fixed crash on ctrl-tab near track 64 (bug #454764)
+        * Switched to libpng2.dll (zt no longer requires MMX)
+        * Fixed up IT loader to properly load midi channel, bank, and program and a small
+          fix to instrument title loading
+        * Fixed bug with ctrl-x and ctrl-c when no selection is active
+        * Fixed _major_ playback bug that made pattern running parameters (remembered things
+          like last note played, length, fx, etc) stored in each pattern.  This fixes the
+          note off not working in a different pattern and many other longstanding issues.
+        * Fixed a few redraw bugs in popup menus
+
+ Additions/fixes by Austin Luminais (lipid)
+
+        + Added ALT-T command on F3 screen to toggle tracker mode
+        * Made IT Import default instruments to tracker mode when the file uses sample mode
+        * Fixed IT importing instrument names bug
+        * Fixed bug which truncated IT orderlists on import
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        + now you can specify a .ZT to open at the command line
+        * Fixed bug which put a note-off and MIDI input in the pattern
+          editor when switching from MouseDraw(tm) mode.
+        * Resolution-adaptive window centering for many pop-up windows.
+        * Reverted Order Display to not follow order while playing (it makes no sense).
+
+zt 0.93 - 08/22/2001
+--------------------
+
+ Additions/fixes by Daniel Kahlin (tlr)
+ 
+        * Removed support for obsolete file format and cleaned up load/save code
+        * Fixed inst title len bug 
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Added mouse support to inst editor
+        + Added song duration (ALT-P)
+        + Added rewind (- in playback, CTRL-LEFT elsewhere)
+        + Added reverse bank select method for midi out devices (per-device basis)
+        * Redid MIDI out subsystem to allow for future expansion and additions
+        * Fixed focus problem with midi out device selector in insteditor
+        * Fixed help file loading (no more garbage at the bottom)
+        * Made ffwd/rwnd faster and better
+        * Made MIDI out reset more compatible
+        * Fixed tracker mode (channel bug)
+        * Fixed inst title len bug 
+        * Fixed few bugs with FX help messages
+        * Fixed inst editor selection on page enter (if inst # has changed)
+        * Made IT loader not allocate memory for/load samples for speed
+
+ Additions/fixes by Nicolas Soudee (zonaj)
+
+        + SHIFT-F11 to set current order to currently playing order
+          or when zt is not playing, to the (next) instance of the current pattern
+        * Centered scrolling is now togglable (F2x2)
+          (playback with scroll lock is still centered no matter what)
+        * Lowlight and highlight now get saved in zt.conf
+        * Step editing toggle added to F2x2
+        * Order indicator follows playback (but does not modify "current" order!)
+        
+zt 0.923 - 08/20/2001
+---------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Added tracker mode (ignores note length, auto-off on next note recieve)
+        * Fixed problem with midi-in
+        * Fixed mousefocus on midi out device selector box
+
+zt 0.922 - 08/19/2001
+---------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        * Fixed stupid pitch bug introduced in 0.921
+
+
+zt 0.921 - 08/19/2001
+---------------------
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        * Fixed path slider (cause of other bugs)
+        * Possibly fixed SYSEX recieves causing crashes on MIDI-IN
+        * Fixed textbox background color
+        * Fixed space on F5 screen (i swear i already fixed that..)
+        * Fixed ztconf
+        * Fixed reset/panic bug
+        * Fixed fullscreen focus bug (finally!)
+
+zt 0.92 - 08/17/2001
+--------------------
+
+ Additions/fixes by Nic Soudee (zonaj)
+
+        + Added FX view to pattern editor
+        + Saves/loads viewmode in zt.conf
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Context sensitive effect help messages
+        + CTRL-T - Set effect/effectdata in block to value of first row in 
+        + Added autoloading of a zt file (not in config yet, so you have to edit zt.conf)
+        + Added Step Edit flag - Off makes editing pattern/order editor not jump to next 
+          line when you edit parameters (exactly like IT does)
+          Holding down shift temporarily switches to other mode
+        * Extended keyboard top row to use [ and ] for auditioning / notes
+        * Fixed F7 on order editor
+        * Fixed order editor refresh when playing
+        * Fixed redraw when switching back to zt in fullscreen mode
+        * Made the windows system quit button (the X) work in windowed mode
+        * Increased maximum number of midi devices from 16 to 64
+        * Fixed skin selector on invalid skin (won't select bad skin in list)
+        * Fixed insteditor refresh problem
+
+zt 0.91 - 08/16/2001
+--------------------
+
+ Additions/fixes by Daniel Kahlin (tlr)
+ 
+        * Manual updates .. getting closer to release of PDF/HTML manual
+ 
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Made new Professional skin
+        * Improved skin handling w/ tiling toolbar (note: this breaks old skins!)
+        * Fixed conf button (doh)
+        * Fixed midi panic on stop option
+        * Fixed skin selector to be graceful on broken skins
+        * Fixed keys in F5 player
+
+zt 0.90 - 08/14/2001
+--------------------
+
+ ! It took alot of work to make this release.. hope you enjoy it
+   There are undoubtedly some bugs still around.  If you come 
+   across one, please send a report to ztracker-devel@lists.sourceforge.net
+   We will crush them asap!
+ 
+ Additions/fixes by Nic Soudee (zonaj)
+
+        + Cursor row highlight
+        + Scroll-lock playback centering in pattern editor
+        + Pattern editor centering on vertical navigation (up, dn, pgUp, pgDn)
+        * Order navigation fix: deleting orders before the current order marker now
+          assures that the marker is at the last order in the list. Also, deleting
+          the first order when it is the current edit order doesn't set the current
+          order to -1 (woops).
+        * squashed bug which caused highlight and lowlight increments
+          to change when BPM or TPB were modified.
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Converted zt codebase to used SDL instead of libCON (yes!!)
+        + Added CScreenManager class to speed up screen drawing
+        + Redid UI screen drawing logic for speed updates
+        + Added S for solo on F5 screen (feature 429697) and m for mute (feature 447390)
+        + Added MIDI-IN passthru for all other data (not just note on/off now)
+        + Status in windows titlebar
+        + Added MIDI-IN device open box under config
+        + Fixed up and added to the F12 config screen
+        + New listbox UI element, much more robust + mouse support
+        + Added device latency for syncing to softsynths (feature 449919)
+        + Added support for multiple resolutions
+        * Made mousedraw _much_ faster.. its very useable now
+        * Fixed the skin system so you don't have to draw the buttons twice
+        * Mousescroll support on TextBox (help/about)
+        * Fixes focus / screen update problems
+        * Increased bank slider maximum (temp fix until proper bank switching)
+        * Fixed panic/note off problem on stop (bug 424782)
+        * Fixed noteon/noteoff order bug in playback (bug 423101)
+        * Fixed 100% CPU problem w/ SDL (bug 423662)
+        * Fixed exit button crash in windowed mode (bug 423796)
+        * More work fixing IT import problems (bug 430645)
+        * Fixed various draw-problems (buttons, mousedraw, etc)
+        * Notes now play while entering in pattern editor during playback
+        * Updated logo
+        * Updated about screen and graphics
+
+ Additions/fixes by Daniel Kahlin (tlr)
+
+        + Added a libCON compatible skin (de)compiler (ztskin) using zlib instead
+          of libCON.
+        + Wrote new song load/save routines using zlib instead libCON
+          (feature 428450)   
+        * Fixed textinput boxes. The cursor can now move to the end of the line.
+          End of string is properly moved when using backspace. 
+
+zt 0.85 - 6/7/2001
+------------------
+
+ Additions/fixes by Austin Luminais (lipid)
+
+        * Fixed bug where midi export would end at any command Cxxxx
+        ! Thanks to Raptor for help with testing and bug-finding
+
+ Additions/fixes by Daniel Kahlin (tlr)
+        * Fixed the bug where the value beside the TPB slider in the song config page
+          wouldn't update. (bug 429161) 
+        + MIDI Song Position Pointer messages are now recognized.  This make ztracker
+          start at the correct position when slave-syncing to an external sequencer.
+          (feature 423570)  Note: In song tpb changes and pattern breaks are not
+          supported for this.
+        * (hopefully) fixed the audio lock out problem. (bug 423098)      
+
+zt 0.84 - 5/10/2001
+-------------------
+
+ Additions/fixes by Austin Luminais (lipid)
+
+        * Fixed crashing on midi export when instruments are not assigned midi devices
+
+ Additions/fixes by Daniel Kahlin (tlr)
+
+        + Slide on subtick option - performs pitch slides on subticks (higher resolution)
+          Look for this in the song config screen.  Saves in .zt file also
+        * Help.txt additions/fixes
+        * Fixes to the .mid writer for pitch slides
+        ! CVS is now up and running
+
+ Additions/fixes by Nic Soudee (zonaj)
+
+        + Default Highlight row increment in zt.conf (default_highlight_increment)
+          Default Lowlight row increment in zt.conf (default_lowlight_increment)
+          Default instrument global volume in zt.conf (default_instrument_global_volume)
+          Default pattern length setting in zt.conf (default_pattern_length)
+        + Right-click on sliders to select them, but not change value (yes!)
+        + Hold Shift and arrow/pgup/pgdn to select on pattern editor
+        + Shift-tab cycles backwards thru UI elements
+        + Shift +/- to navigate through orders (pattern editor, order editor)
+          Shift-F7 to play from the current order
+        * Fixed first slider zeroing bug
+
+ Additions/fixes by Christopher Micali (cmicali)
+
+        + Slaved away at that intense new splash screen
+        * Pattern editor fix - 32 row patterns work fine, also moving between different
+          sized patterns and resizing patterns all are accounted for now.
+        ! Exams exams exams!  SUMMER FINALLY
+
+
+zt 0.83 - 4/23/2001
+-------------------
+
+ Additions/fixes by Nic Soudee
+ 
+          * CTRL-J scale block volume from 1%-200%
+          * LowLight and HighLight row adjustments in the F2 x2 pattern edit screen
+
+ Additions/fixes by Daniel Kahlin
+
+          * Help.txt additions
+          * Save button now goes to save screen (less confusing)
+          * MIDI start/continue fix
+         
+ Additions/fixes by Christopher Micali (cmicali)
+        
+         * Midi-sync now starts song on midi START and CONTINUE automatically (no F5/F6 then sync)
+         * ztconfig now can create a zt.conf w/o a pre-existing one + some bugfixes
+         * Numpad numbers works now
+         * Increased bank value to be capable of 8192
+         * Textbox widget fixed and improved (help screen)
+* A lot of fixes I don't remember now (i forget to document alot .. )
+
+
+zt 0.82 - 4/12/2001
+-------------------
+
+          * CTRL-P Copy and paste to empty pattern is fixed to notice custom pattern sizes
+          * Player will play rows > 256 on long patterns now
+          * Instrument transpose fixed (note auditioning and slider)
+          * Save screen really fixed now :]
+          * .zt file bank load problem fixed
+          * Lots of little touches added and crashes fixed (especially load/save screen entering) 
+          
+          
+zt 0.81 - 04/10/2001
+--------------------
+
+          * Are you sure dialog now goes away correctly
+          * Instrument name at top status bar is correct length
+          * CCs, program changes, and pitchbends are now written to .mid files
+          * ztconfig program saves to proper place now
+          * Better help file
+          * More tiny bug fixes
+          
+          
+zt 0.80 - 04/06/2001
+--------------------
+
+ Additions/fixes by Austin Luminais (lipid)
+ 
+          * Fixes in the IT loader, removed memory leaks
+         
+ Additions/fixes by Christopher Micali (cmicali)
+        
+          + MIDI-In note thru in inst editor and note entry in pattern editor
+          + MIDI-In sync.. set to sync mode with ztconfig or in F12 screen, press F6 or F5, then it will
+            sync to incoming midi sync on any of the midi-in ports open
+          + Cute little configuration program (ztconfig)
+          + F1 is now a help screen (if someone would write a good help.txt :)
+          + .MID writer.. hook it up in save screen.  Saves MIDI Format 1 .mids, one track for each device, so all
+            you have to do is set the right device for each track and it will play back in your seq just like it does
+            in zt.  CCs, Pitch events, Channel Vol, etc may not be perfect.. email me if it writes something wrong.
+          * Fixed some UI bugs that cause things to disappear when they were not supposed to (F2 popup)
+          * Note auditioning now reflects the instrument transpose value
+          * Set speed effects no longer change the song speed, but just the playing speed.
+          * Many cleanups and general bug fixes, fixed some serious bugs in playback
+          * Fixed lots of memory leaks and fixed the .conf file loader
+
+
+zt 0.70 - 12/19/2000
+--------------------
+
+ ! Big thanks to Austin for the source contributions
+ ! Webpage changed, lots of new MP3s to give listens
+ ! Hope you guys enjoy this huge release :)
+ 
+ Additions by Austin Luminais (lipid)
+
+   + CTRL-P - copy pattern, paste to next empty pattern, and jump to empty pattern
+   + CTRL-` - Set all note's lengths in selection to distance between note and next note
+   +  ALT-` - Set previous note's length to distance between note and current cursor position
+   + IT import code
+   + Scroll-lock cursor following in the pattern editor
+   + Letter jump hotkeys in load/save file and dir lists
+
+ Additions by Christopher Micali (cmicali)
+
+    + Completely new .zt fileformat, _MUCH_ better than before (still loads old .zt files)
+    + SHIFT-`: Switch to mousedrawing mode in pattern editor, there you can 
+      draw parameters, TAB through modes (vol, fx, fx signed), right click erases, press SHIFT-`
+      again to return to regular patternedit
+    + ALT-S in pattern editor to set instrument of selected notes to current instrument
+    + ALT-1 thru ALT-0 on inst editor quick-selects midi device
+    + CTRL-1 thru CTRL-0 on inst editor quick-selects midi channel 
+    + Smart are you sure dialogs on load/save
+    + Instrument transpose/global volume parameters
+    + OFF setting for program/bank, so by default instruments will not send program change (finally eh?)
+    + FileList and DirList UI elements on the load/save screens are alpha-sorted now
+    + Drive selection box in load/save dialogs
+    + New command: Exxxx - pitch slide down, 0 uses last value
+    + New command: Fxxxx - pitch slide up,   0 uses last value
+    + New command: Wxxxx - absolute pitch set, between 0 and 3FFF, 2000 is no pitch change, 0 is max down, 3FFF is max up
+    + New command: X00xx - Set panning, 00=left, 40=center, 7F=right
+    * Instrument editor fixes, jumps to current instrument when you enter instrument editor
+    * Bugfixes the load/save screens to make sure nothing gets overwritten, 
+      smarter keyhandling, and general cleanup
+    * Fixed program change on Qxxxx retrig (doh :)  thanks quasimojo)
+    * Pattern lengths are now stored in the .zt files and bug fix in resize routine
+
+
+zt 0.60 - 11/17/2000
+--------------------
+
+ + GUI: Updated zt GUI system to allow real modal dialogs (popup windows on any screen)
+ + GUI: Graphical button widget, so now the buttons below work.. maybe a main menu will happen sometime
+ + Load/save now in threads, popup status window while loading/saving
+ + Pattern resize in F2x2 popup window, patterns can be 32-256 rows long
+ + FINNALY: ALT-N - New song! :)
+ + PGUP/PGDN/HOME/END on filelist/dirlist and new drivelist in load/save dialogs
+ * New playback routines.. no more memory hashing, faster, more robust - Almost no crashing now!!!
+ * Fixed bug with remembering past note lengths > 255 (finally!)
+ * Fixed many bugs in the page UI
+ * Finished the F5 PatternDisplay widget, left-right/space/alt-1 thru alt-0/alt-f9/alt-f10
+ * Real thread-sync code now (mutex locking) - should fix all edit/playback crashes
+ * Fixed song loader and a few playback bugs
+
+zt 0.50 - 10/9/2000
+-------------------
+
+ + SHIFT-F9 performs a hard driver-level panic, F9 is a soft note zt-level panic
+ + realtime pattern display on the F5 screen (beginnings)
+ + press a number-key when a value slider is highlighted to enter the number manually
+ + channel volume switch for instruments (volume col set to use channel volume instead of note/aftertouch)
+ * fixed some shitty bugs with the keyboard system
+ * fixed various crashes, from the interpolation to general editing
+ * added all notes off and chan vol reset to soft midi reset
+ * tons of bugfixes and some optimizing
+
+zt 0.40 - 9/21/2000
+-------------------
+ 
+ ! go listen to my new song distance @ mp3.com/cmicali - 100% zt produced
+ 
+ + beatlights
+ + button widget (one-shot and sticky)
+ + buttons to send prog changes for all instruments in the inst-screen
+ + kill notes on mute and option per-instrument to retrigger on unmute
+ * better timing?
+ * new keyboard routines to buffer shift keys so no more weirdness (almost complete, some parts active (like pat editor))
+ * no more crash on load/save dialogs (i hope)
+ * completely overhauled the screen ui system, much more flexible/organized
+ * new thread sync code to hopefully stop crashes while playing and editing
+ * bug fixes bug fixes bug fixes
+ * tons more you dont see
+ * still workin on that toolbar ;)
+
+zt 0.30 - 9/10/2000
+-------------------
+
+ ! new keys!
+   -  F1: will be help
+   - F10: song config
+   - F11: orderlist
+   - F12: system config (where you open midi devices)
+ ! song.zt format will not change anymore i really really hope ok? :)
+   - or at least from now on, ill make different loaders, so the old files will get opened
+ ! song.zt is not auto-saved anymore - !take note!
+ + CTRL-F9 load and CTRL-F10 save (also ctrl-s)
+ + skin/graphic files are now packed into a .skin file
+ + enter key on note in the pattern editor sets current instrument 
+ + orderlist highlights current order
+ + midi out devices are now auto-opened and remembered (you can turn this off in zt.conf)
+ * Copy & Paste now complete 
+   - CTRL-V: insert paste
+   - CTRL-O: overwrite paste
+   - CTRL-M: merge paste
+   - CTRL-C: copy
+   - CTRL-X: cut
+   - CTRL-Z: clear
+ * F7 now starts playing the orderlist if the current pattern is in the orderlist
+ * orderlist works properly now and F5 fixed
+ * audition works everywhere on instrument screen now
+
+zt 0.20 - 8/27/2000
+-------------------
+
+ ! NEW QUIT KEY:  CTRL-ALT-Q
+ + CTRL-F9 load and CTRL-F10 save (will work in 0.25! :)
+ + song.zt compression (erase the old song.zt)
+ + Mouse support for most UI widgets and new UI features (file list widget, button widget, linked widgets)
+ + CTRL-I Interpolate last 2 bytes of effect_data from selection start to end
+ + CTRL-K Interpolate volume from selection start to end
+ + CTRL-W remove unused volumes (do this to save memory, and vols w/o note dont do anything)
+ + CTRL-1 thru CTRL-0 change the step-value in the pattern editor
+ + player rewritten.. much more stable - change the prebuffer on the F10 screen to about 8
+ + Txxxx tempo change
+ + Axxxx bpm change (i wouldn't use this)
+ + Qxxxx retrig
+ + Dxxxx note delay
+ * alt-right works again
+ * more note-off fixing, timing jitter, and the usual cleanups
+
+zt 0.15 - 8/19/2000
+-------------------
+
+ + new toolbar (thanks in_tense), mouse skinable ui support soon 
+ + added INF length (no off is sent, you have to send) press I in length col to activate
+ + added CTRL-N, set length of note at start of select block to last for the length of the block
+ + added ALT-Q and ALT-A, transpose up/down
+ + added default volume and default length to inst editor and rearranged it some
+ + added new effect Sxxyy - Send CC xx with value yy on current channel 
+   (must be set by instrument!!) >=0x80 sends last value
+ + colors are now read from skin/colors.conf , use web-style #rrggbb hex codes
+ + orderlist! (F11) and F5 to play it
+ * no more flicker
+ * changed effect column to be 1 char and letters instead of hex and data column works now
+ * fixed bugs in note-off, length handling, stopping playback, small mode display
+ * bank select works now (banks 0-999, you dont need more than that I hope)
+ ! changed zt file format some, old song.zt will not load - erase the old song.zt file
+
+
+
+zt 0.11 - ??/??/2000
+--------------------
+
+ - Fixed crash on ^^^
+ - Copy & paste!  
+ - Fixed alot of bugs
+ - Program change (effect A0, this is temporary)
+ - More that i can't remember
+
+
+
+zt 0.10 - ??/??/2000
+-------------------- 
+ 
+ ! first release
+ 
+ 
+Legend
+
+   !  - Notice/information
+   +  - Feature add
+   *  - Fix/change
+
 zt 2026_04_29 (MIDI Out resilience on macOS)
 --------------------------------------------
 

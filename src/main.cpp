@@ -75,6 +75,7 @@
 #include "lua_engine.h"
 #include "keybindings.h"
 #include "save_key_dispatch.h"
+#include "zt_crash.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -3690,6 +3691,13 @@ static int zt_resolve_midi_in_port(const char *spec) {
 
 int main(int argc, char *argv[])
 {
+  // Install fatal-signal handlers as the very first thing so any
+  // crash during startup, song load, or playback drops a useful
+  // backtrace to stderr + ./zt-crash.log instead of the bare
+  //   "fish: Job 1, './zt' terminated by signal SIGABRT (Abort)"
+  // that gave no clue which code path crashed.
+  zt_install_crash_handler();
+
   ZtCliArgs cli_args;
   if (zt_parse_cli(argc, argv, &cli_args) != 0) {
       return 2;
