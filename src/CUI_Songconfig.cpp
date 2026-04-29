@@ -350,10 +350,11 @@ void CUI_Songconfig::draw(Drawable *S) {
         printchar(row(20 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
         print(row(4),col(base_y+11),"   MIDI In Sync",COLORS.Text,S);
         print(row(3),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
-        // 4 / 8 audition step mode label + inline legend explaining
-        // the three slider values (slider only renders the integer).
+        // 4 / 8 audition step mode label. The slider value is rendered
+        // wider than xsize so the legend goes on the row below to avoid
+        // colliding with the on-slider digits.
         print(row(2),col(base_y+13),"4/8 Audition Step",COLORS.Text,S);
-        print(row(25),col(base_y+13)," (0=stay  1=row  2=editstep)",COLORS.Text,S);
+        print(row(20),col(base_y+14),"0=stay  1=row  2=editstep",COLORS.Text,S);
         // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
         print(row(59),col(11),"Order List",COLORS.Text,S);
         printchar(row(20 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
