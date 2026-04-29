@@ -47,6 +47,7 @@
 
 #include "conf.h"
 #include "keybindings.h"
+#include "midi_mappings.h"
 
 #include "zt.h"
 
@@ -341,6 +342,42 @@ int ZTConf::load()
   window_icon[0] = '\0';
   if(Config->get("window_icon"))                      strncpy(window_icon, Config->get("window_icon"), MAX_PATH);
 
+  // MIDI mappings: keys named "midi_map_<action>" each hold up to
+  // ZT_MM_SLOTS_PER_ACTION space-separated tokens. Each token is
+  // "SS,DD" (status hex, data1 hex) or "-" for an empty slot.
+  {
+      char keybuf[64];
+      ZtMmMappings *mm = zt_mm_get_mappings();
+      for (int a = 0; a < ZT_MM_NUM_ACTIONS; a++) {
+          snprintf(keybuf, sizeof(keybuf), "midi_map_%s", zt_mm_action_conf_key(a));
+          char *raw = Config->get(keybuf);
+          if (!raw) continue;
+          // Reset to empty before parsing so a partial line doesn't
+          // leave stale slots from a previous load.
+          for (int s = 0; s < ZT_MM_SLOTS_PER_ACTION; s++) {
+              mm->bindings[a][s] = ZtMmBinding{0, 0, 0};
+          }
+          int slot = 0;
+          char *tok = raw;
+          while (*tok && slot < ZT_MM_SLOTS_PER_ACTION) {
+              while (*tok == ' ') tok++;
+              if (!*tok) break;
+              char *end = tok;
+              while (*end && *end != ' ') end++;
+              if (!(tok[0] == '-' && (end - tok) == 1)) {
+                  unsigned int s_byte = 0, d_byte = 0;
+                  if (sscanf(tok, "%2X,%2X", &s_byte, &d_byte) == 2) {
+                      mm->bindings[a][slot].valid  = 1;
+                      mm->bindings[a][slot].status = (unsigned char)s_byte;
+                      mm->bindings[a][slot].data1  = (unsigned char)d_byte;
+                  }
+              }
+              slot++;
+              tok = end;
+          }
+      }
+  }
+
   return(0) ;
 }
 
@@ -464,6 +501,29 @@ int ZTConf::save() {
 
     g_keybindings.save(Config);
 
+    // Save MIDI mappings (mirror of the load parser).
+    {
+        char keybuf[64];
+        char valbuf[64];
+        ZtMmMappings *mm = zt_mm_get_mappings();
+        for (int a = 0; a < ZT_MM_NUM_ACTIONS; a++) {
+            valbuf[0] = '\0';
+            for (int sl = 0; sl < ZT_MM_SLOTS_PER_ACTION; sl++) {
+                char tok[16];
+                const ZtMmBinding *b = &mm->bindings[a][sl];
+                if (b->valid) {
+                    snprintf(tok, sizeof(tok), "%02X,%02X",
+                             (unsigned)b->status, (unsigned)b->data1);
+                } else {
+                    snprintf(tok, sizeof(tok), "-");
+                }
+                if (sl > 0) strncat(valbuf, " ", sizeof(valbuf) - strlen(valbuf) - 1);
+                strncat(valbuf, tok, sizeof(valbuf) - strlen(valbuf) - 1);
+            }
+            snprintf(keybuf, sizeof(keybuf), "midi_map_%s", zt_mm_action_conf_key(a));
+            Config->set(keybuf, valbuf);
+        }
+    }
 
     return Config->save(conf_filename) ? 0 : -1;
 }

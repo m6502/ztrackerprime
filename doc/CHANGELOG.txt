@@ -4,6 +4,65 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (MIDI Mappings: bind 4 / 8 audition to MIDI input)
+----------------------------------------------------------------
+
+        + New MIDI Mappings page (Shift+F3). Bind incoming MIDI
+          messages to internal actions; first two actions wired up
+          are Note Audition (= keyboard "4") and Row Audition (=
+          keyboard "8"). Each action has 3 independent slots so a
+          foot switch AND a launchpad pad can fire the same audition.
+        + UI: Up/Down picks the action, Left/Right picks the slot.
+          Enter puts the focused slot into Learn mode -- the next
+          incoming MIDI message is captured into that slot. Backspace
+          / Delete clears a slot. ESC returns to Pattern Editor;
+          inside Learn mode ESC cancels the capture.
+        + Persistence: bindings round-trip through zt.conf as
+          midi_map_<action>: SS,DD SS,DD SS,DD with "-" for empty
+          slots. Out-of-range values clamp to a fresh empty binding.
+        + Threading: MIDI input thread captures the matched action
+          into a small mutex-guarded ring; the main loop drains the
+          ring once per frame and runs the handler on the main
+          thread, so song / cursor globals are never touched from a
+          callback context. A consumed mapping is suppressed from
+          the regular MIDI-In queue (so a bound C3 audition does not
+          also enter a note into the pattern).
+        ! Audition handlers honour zt_config_globals.note_audition_
+          step_mode (0 = stay, 1 = one row [default], 2 = EditStep)
+          and only fire while the Pattern Editor's note column is
+          the active context, matching the keyboard 4 / 8 path.
+
+zt 2026_04_29 (Note audition step is configurable)
+--------------------------------------------------
+
+        + Song Configuration (F11): new "4/8 Audition Step" slider
+          controls how far the cursor advances after the 4 (audition
+          note) and 8 (audition row) keys fire on the note column.
+          0 = stay on the current row, 1 = advance one row (default),
+          2 = advance by EditStep (the legacy behaviour).
+        + zt.conf: new key `note_audition_step_mode` with the same
+          0 / 1 / 2 values, persisted across sessions. Out-of-range
+          values are clamped to the default at load.
+        ! Default change: 4 / 8 now advance by 1 row. Users who
+          relied on EditStep-driven auditioning (set EditStep to 4
+          to step a quarter at a time, audition four notes per row
+          jump) can restore the prior behaviour by setting the
+          slider to 2 once.
+        ! Status line confirms each switch
+          ("Note audition (4/8): cursor advances 1 row" etc.).
+
+zt 2026_04_29 (Hotfix: Pattern Editor 4/8 note audition + step)
+---------------------------------------------------------------
+
+        * Pattern Editor: 4 (play current note + step) and 8 (play
+          current row + step) work again on the note column. The
+          2026-04-19 layout-independent-keys refactor switched the
+          T_NOTE dispatch from switch(key) to switch(scancode) and
+          converted the note-row letters to SDL_SCANCODE_*, but left
+          the editing-key cases (4, 8, 1, ., §) as SDLK_* — making
+          them dead code in a scancode switch. Restored: 1 (note
+          off), § (note cut), . (clear), 4 (audition note), 8
+          (audition row).
 zt 2026_04_29 (F10 Song Message: caret + cursor nav + crash logger)
 -------------------------------------------------------------------
 

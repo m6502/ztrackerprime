@@ -76,6 +76,7 @@
 #include "keybindings.h"
 #include "save_key_dispatch.h"
 #include "zt_crash.h"
+#include "midi_mappings.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -340,6 +341,7 @@ CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
 CUI_KeyBindings *UIP_KeyBindings = NULL;
+CUI_MidiMappings *UIP_MidiMappings = NULL;
 
 
 
@@ -1130,6 +1132,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_Config = new CUI_Config;
     UIP_KeyBindings = new CUI_KeyBindings;
+    UIP_MidiMappings = new CUI_MidiMappings;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1446,6 +1449,17 @@ void global_keys(Drawable *S)
                 }
                 break;
 
+            case SDLK_F3: // Shift+F3 = MIDI Mappings page
+                // Plain F3 (handled in the no-modifier block below)
+                // opens the Instrument editor. Shift+F3 sidesteps the
+                // F3 dispatch and lands on the MIDI Mappings page so
+                // the user can bind incoming MIDI to internal actions.
+                if (kstate & KS_SHIFT) {
+                    command = CMD_SWITCH_MIDI_MAPPINGS;
+                    key = Keys.getkey();
+                }
+                break;
+
 
             case SDLK_F4:
                 // Shift+F4 opens the Arpeggio editor. Plain F4 (handled
@@ -1479,12 +1493,14 @@ void global_keys(Drawable *S)
                 }
                 break;
 
+#ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
             case SDLK_F10:
 
                 if (kstate == KS_NO_SHIFT_KEYS) {
 
                     command = CMD_SWITCH_SONGMSG;
                 }
+#endif
 
               break ;
 
@@ -1755,6 +1771,11 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_KEYBINDINGS:
             switch_page(UIP_KeyBindings);
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_MIDI_MAPPINGS:
+            switch_page(UIP_MidiMappings);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
@@ -2376,6 +2397,7 @@ int postAction ()
     delete UIP_Midimacroeditor;
     delete UIP_LuaConsole;
     delete UIP_KeyBindings;
+    delete UIP_MidiMappings;
     g_lua.shutdown();
     delete ztPlayer;
     delete MidiIn;
@@ -3448,6 +3470,7 @@ int initSDL(void)
     UIP_SongDuration = new CUI_SongDuration;
     UIP_LuaConsole = new CUI_LuaConsole;
     UIP_KeyBindings = new CUI_KeyBindings;
+    UIP_MidiMappings = new CUI_MidiMappings;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_MainMenu = new CUI_MainMenu;
@@ -3918,6 +3941,12 @@ int main(int argc, char *argv[])
       }
 
       zt_apply_pending_window_title();
+
+      // Drain any MIDI mapping action posts captured by the MIDI
+      // input thread since the last frame. Action handlers run here,
+      // on the main thread, so they can safely touch song / cursor
+      // globals.
+      zt_mm_drain_actions();
 
       static int next_frame_redraw_all = 0;
       if(next_frame_redraw_all) {
