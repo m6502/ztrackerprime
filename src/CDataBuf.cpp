@@ -95,13 +95,30 @@ void CDataBuf::pushc(const char c) {
 }
 
 void CDataBuf::popc(void) {
-    if (this->buffsize-sizeof(char) < this->allocsize-DATABUF_CHUNK_SIZE-1) {
-        while(this->buffsize-sizeof(char) < this->allocsize-DATABUF_CHUNK_SIZE-1)
-            this->allocsize -= DATABUF_CHUNK_SIZE;
-        this->buffer = (char *)realloc(this->buffer, this->allocsize);
-    }
-    if (this->buffsize>0) {
-        --this->buffsize;
+    // Pop nothing on an empty buffer (otherwise --buffsize would
+    // underflow the unsigned counter, then a subsequent push would
+    // realloc to a near-4GB allocation and crash).
+    if (this->buffsize == 0)
+        return;
+    --this->buffsize;
+    // Shrink the allocation when the buffer is more than one full
+    // chunk smaller than the current allocation. The previous formula
+    // mixed unsigned arithmetic ((0u - 1) wraps to UINT_MAX) and
+    // could either skip the shrink entirely or, via the while loop,
+    // wrap allocsize negative and call realloc(buffer, ~4GB) — the
+    // F10 Song Message editor's Backspace path was crashing here.
+    if (this->allocsize >= 2 * DATABUF_CHUNK_SIZE &&
+        this->buffsize + DATABUF_CHUNK_SIZE < this->allocsize) {
+        unsigned int newalloc = this->allocsize;
+        while (newalloc >= 2 * DATABUF_CHUNK_SIZE &&
+               this->buffsize + DATABUF_CHUNK_SIZE < newalloc) {
+            newalloc -= DATABUF_CHUNK_SIZE;
+        }
+        char *nb = (char *)realloc(this->buffer, newalloc);
+        if (nb) {
+            this->buffer = nb;
+            this->allocsize = newalloc;
+        }
     }
 }
 

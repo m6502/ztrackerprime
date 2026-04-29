@@ -2042,6 +2042,7 @@ ListBox::ListBox()
   clear();
   is_sorted = false;
   use_key_select = true;
+  wrap_focus_at_edges = true;
   empty_message = NULL;
   use_checks = false;
   check_on = 251;
@@ -2564,7 +2565,7 @@ int ListBox::update() {
                 else
                 if (y_start>0)
                     y_start--;
-                else
+                else if (wrap_focus_at_edges)
                     ret = -1;  // At top of list, pass focus to previous element (#18)
                 act++;
                 break;
@@ -2574,7 +2575,7 @@ int ListBox::update() {
                         cur_sel++;
                     else
                         y_start++;
-                } else {
+                } else if (wrap_focus_at_edges) {
                     ret = 1;  // At bottom of list, pass focus to next element (#18)
                 }
                 act++;
@@ -3326,16 +3327,25 @@ void CommentEditor::refresh_display() {
         return;
     }
     int n = target->getsize();
+    if (n < 0) n = 0;
     int need = n + 1;
     if (need > _display_alloc) {
         int newalloc = _display_alloc ? _display_alloc : 64;
         while (newalloc < need) newalloc *= 2;
-        _display = (char*)realloc(_display, (size_t)newalloc);
+        char *nb = (char*)realloc(_display, (size_t)newalloc);
+        if (!nb) {
+            // realloc failed: keep the old buffer (may be too small),
+            // but never let TextBox::draw walk into garbage.
+            text = NULL;
+            return;
+        }
+        _display = nb;
         _display_alloc = newalloc;
     }
     if (n > 0) {
         const char *src = target->getbuffer();
         if (src) memcpy(_display, src, (size_t)n);
+        else n = 0;
     }
     _display[n] = '\0';
     text = _display;

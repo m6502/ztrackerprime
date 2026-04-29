@@ -4,6 +4,34 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (Hotfix: F10 robustness + file dialog focus clamp)
+----------------------------------------------------------------
+
+        * F10 Song Message: backspacing past empty no longer crashes.
+          CDataBuf::popc had two unsigned-arithmetic bugs that
+          (a) decremented buffsize past zero on an empty buffer and
+          (b) wrapped the shrink-realloc check so a single backspace
+          on a 1024-allocated, single-byte buffer drove allocsize
+          negative and called realloc with a near-4 GB size. Both
+          paths now hard-guard against the underflow and only shrink
+          when the buffer is genuinely under-occupied.
+        * F10 Song Message: surviving a song reload while the page
+          is open. CUI_SongMessage::enter cached
+          song->songmessage->songmessage in the editor's target field;
+          loading a different song deleted the underlying CDataBuf and
+          left target dangling. The page now re-binds target every
+          frame from the live song chain and null-guards each step
+          (song / songmsg / CDataBuf) so a partial chain prints empty
+          rather than crashing.
+        * UserInterface: CommentEditor::refresh_display handles a
+          failed realloc instead of dereferencing NULL.
+        * File Load / Save lists: pressing Up at the first row or
+          Down at the last row now clamps at the edge instead of
+          jumping focus into a sibling list. The base ListBox
+          behaviour (added for Sysconfig in #18) is preserved
+          everywhere else; FileList opts out via a new
+          wrap_focus_at_edges flag. Tab still moves between lists.
+
 zt 2026_04_29 (Note audition step is configurable)
 --------------------------------------------------
 
