@@ -38,6 +38,7 @@
  *
  ******/
 #include "zt.h"
+#include "midi_mappings.h"
 
 
 /*
@@ -363,7 +364,21 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
         case MIM_DATA:
           msg = (unsigned char)(dwParam1 & 0x000000FF);
 
-          switch(msg) {
+          {
+              // MIDI mappings have first dibs on short channel
+              // messages. If the incoming message matches a binding
+              // (or learn mode is capturing), the dispatcher
+              // consumes it and we skip the regular MIDI-In queue
+              // insertion -- otherwise an audition-bound C3 would
+              // also write a note into the pattern.
+              unsigned char mm_status = (unsigned char)(dwParam1 & 0xFF);
+              unsigned char mm_data1  = (unsigned char)((dwParam1 >> 8) & 0xFF);
+              unsigned char mm_data2  = (unsigned char)((dwParam1 >> 16) & 0xFF);
+              if (mm_status >= 0x80 && mm_status < 0xF0 &&
+                  zt_mm_dispatch(mm_status, mm_data1, mm_data2)) {
+                  // Consumed by mapping/learn -- do not enqueue.
+              } else
+              switch(msg) {
               case 0x80: // Note off
                   midiInQueue.insert(dwParam1);
                   break;
@@ -379,6 +394,7 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
                       midiInQueue.insert(dwParam1);
                   }
                   break;
+              }
           }
 
           if (zt_config_globals.midi_in_sync)

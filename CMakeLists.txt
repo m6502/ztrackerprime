@@ -132,6 +132,8 @@ set(ZT_SOURCES
   src/CUI_LuaConsole.cpp
   src/CUI_KeyBindings.cpp
   src/CUI_MainMenu.cpp
+  src/midi_mappings.cpp
+  src/CUI_MidiMappings.cpp
 )
 
 if(WIN32)

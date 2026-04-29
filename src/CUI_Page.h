@@ -518,4 +518,23 @@ class CUI_KeyBindings : public CUI_Page {
 
         int visible_rows(void) const;
 };
+
+// MIDI Mappings page -- bind incoming MIDI messages to internal
+// actions (Note Audition / Row Audition for now). Cursor walks a
+// 2-D grid: rows = actions, columns = the 3 mapping slots. Enter
+// puts the focused slot into Learn mode (next incoming MIDI
+// message captured); Backspace / Delete clears the focused slot.
+class CUI_MidiMappings : public CUI_Page {
+    public:
+        int cursor_y;     // 0..ZT_MM_NUM_ACTIONS-1
+        int cursor_x;     // 0..ZT_MM_SLOTS_PER_ACTION-1
+        char status_line[160];
+
+        CUI_MidiMappings();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+};
 #endif
