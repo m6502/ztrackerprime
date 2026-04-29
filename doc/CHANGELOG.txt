@@ -4,6 +4,25 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (Note audition step is configurable)
+--------------------------------------------------
+
+        + Song Configuration (F11): new "4/8 Audition Step" slider
+          controls how far the cursor advances after the 4 (audition
+          note) and 8 (audition row) keys fire on the note column.
+          0 = stay on the current row, 1 = advance one row (default),
+          2 = advance by EditStep (the legacy behaviour).
+        + zt.conf: new key `note_audition_step_mode` with the same
+          0 / 1 / 2 values, persisted across sessions. Out-of-range
+          values are clamped to the default at load.
+        ! Default change: 4 / 8 now advance by 1 row. Users who
+          relied on EditStep-driven auditioning (set EditStep to 4
+          to step a quarter at a time, audition four notes per row
+          jump) can restore the prior behaviour by setting the
+          slider to 2 once.
+        ! Status line confirms each switch
+          ("Note audition (4/8): cursor advances 1 row" etc.).
+
 zt 2026_04_29 (Hotfix: Pattern Editor 4/8 note audition + step)
 ---------------------------------------------------------------
 

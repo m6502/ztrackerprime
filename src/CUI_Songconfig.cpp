@@ -144,6 +144,21 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->xsize = 3;
         cb->value = &zt_config_globals.midi_in_sync_chase_tempo;
 
+        // 4 / 8 audition advance: 0 = stay, 1 = one row, 2 = use EditStep.
+        // Default 1 — the historical value-of-cur_step behaviour was
+        // surprising for users who set EditStep > 1 to lay coarse grids
+        // but still wanted single-row auditioning. Stored as a plain int
+        // so zt.conf round-trips it cleanly.
+        vs = new ValueSlider;
+        UI->add_element(vs, 10);
+        vs->frame = 0;
+        vs->x = 20;
+        vs->y = base_y + 13;
+        vs->xsize = 3;
+        vs->min = ZT_NAS_NONE;
+        vs->max = ZT_NAS_EDITSTEP;
+        vs->value = zt_config_globals.note_audition_step_mode;
+
         oe = new OrderEditor;
         UI->add_element(oe,9);
         oe->x = 59;
@@ -167,7 +182,13 @@ void CUI_Songconfig::enter(void) {
         zt_config_globals.highlight_increment = song->tpb;
     if(!zt_config_globals.lowlight_increment)
         zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
-    
+
+    // Reflect the live config value in the slider whenever this page
+    // is entered (config could have been changed elsewhere — e.g. by
+    // hand-editing zt.conf and reloading).
+    vs = (ValueSlider *)UI->get_element(10);
+    if (vs) vs->value = zt_config_globals.note_audition_step_mode;
+
     // F11 toggle: pressing F11 while already on Songconfig flips focus
     // between OrderEditor (id 9) and Title (id 0) on every press, so the
     // user can keep tapping F11 to alternate. Fresh entry from another
@@ -283,6 +304,27 @@ void CUI_Songconfig::update()
         if (cb && cb->changed)
             zt_config_globals.midi_in_sync_chase_tempo = *(cb->value);
     }
+    vs = (ValueSlider *)UI->get_element(10);
+    if (vs) {
+        if (vs->from_input) vs->from_input = 0;
+        if (vs->value < ZT_NAS_NONE)     vs->value = ZT_NAS_NONE;
+        if (vs->value > ZT_NAS_EDITSTEP) vs->value = ZT_NAS_EDITSTEP;
+        if (vs->value != zt_config_globals.note_audition_step_mode) {
+            zt_config_globals.note_audition_step_mode = vs->value;
+            switch (vs->value) {
+                case ZT_NAS_NONE:
+                    statusmsg = (char*)"Note audition (4/8): cursor stays on row";
+                    break;
+                case ZT_NAS_ONE:
+                    statusmsg = (char*)"Note audition (4/8): cursor advances 1 row";
+                    break;
+                case ZT_NAS_EDITSTEP:
+                    statusmsg = (char*)"Note audition (4/8): cursor advances by EditStep";
+                    break;
+            }
+            status_change = 1;
+        }
+    }
     if (Keys.size()) {
         Keys.getkey();
     }
@@ -308,6 +350,10 @@ void CUI_Songconfig::draw(Drawable *S) {
         printchar(row(20 + 27) + 1,col(base_y+9),0x84,COLORS.Highlight,S);
         print(row(4),col(base_y+11),"   MIDI In Sync",COLORS.Text,S);
         print(row(3),col(base_y+12),"Chase MIDI Tempo",COLORS.Text,S);
+        // 4 / 8 audition step mode label + inline legend explaining
+        // the three slider values (slider only renders the integer).
+        print(row(2),col(base_y+13),"4/8 Audition Step",COLORS.Text,S);
+        print(row(25),col(base_y+13)," (0=stay  1=row  2=editstep)",COLORS.Text,S);
         // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
         print(row(59),col(11),"Order List",COLORS.Text,S);
         printchar(row(20 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);

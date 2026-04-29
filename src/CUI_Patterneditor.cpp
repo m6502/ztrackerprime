@@ -2970,57 +2970,58 @@ case SDLK_DELETE:
                         }
                         break;
                         /* ROW/NOTE PEEK PLAY */
+                        // 4 / 8 advance distance is configurable via
+                        // zt_config_globals.note_audition_step_mode:
+                        //   ZT_NAS_NONE     -> stay on the same row
+                        //   ZT_NAS_ONE      -> always advance by 1 row (default)
+                        //   ZT_NAS_EDITSTEP -> advance by cur_step (legacy)
                       case SDL_SCANCODE_8:
-                        
+
                         ztPlayer->play_current_row();
-                        
-                        // <Manu> Hacemos avanzar el cursor [EN: advance the cursor]
-                        
-                        cur_edit_row+=cur_step;
-            
+
+                        {
+                          int advance =
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE)     ? 0 :
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_EDITSTEP) ? cur_step :
+                              1;
+                          cur_edit_row += advance;
+
                 // <MANU> 2 Feb 2005 - Arreglado el bug que impedia avanzar el scroll
                 //        mientras se tocaba la nota actual o la linea actual y llegabamos abajo
+                          if (advance > 0 &&
+                              (cur_edit_row-1 - cur_edit_row_disp) >= (PATTERN_EDIT_ROWS-1)) {
+                            if (cur_edit_row_disp <
+                                (song->patterns[cur_edit_pattern]->length - PATTERN_EDIT_ROWS)) {
+                              cur_edit_row_disp += advance;
+                            }
+                          }
+                        }
 
-                  if ((cur_edit_row-1 - cur_edit_row_disp) >= (PATTERN_EDIT_ROWS-1)) {
-                    
-                    if (cur_edit_row_disp<(song->patterns[cur_edit_pattern]->length - PATTERN_EDIT_ROWS)) {
-                      
-                      cur_edit_row_disp+=cur_step;
-                    }
-                  }
+                        need_refresh++;
 
-                        
-                        need_refresh++; 
-                        
-                        // ------------------
-                      
                         break;
-                      
+
                       case SDL_SCANCODE_4:
 
                         ztPlayer->play_current_note();
 
-                        // <Manu> Hacemos avanzar el cursor
-/*                        
-                        cur_edit_row++;
-                        cur_edit_row_disp++;
-*/
-                        cur_edit_row+=cur_step;
+                        {
+                          int advance =
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE)     ? 0 :
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_EDITSTEP) ? cur_step :
+                              1;
+                          cur_edit_row += advance;
 
-                // <MANU> 2 Feb 2005 - Arreglado el bug que impedia avanzar el scroll
-                //        mientras se tocaba la nota actual o la linea actual y llegabamos abajo
+                          if (advance > 0 &&
+                              (cur_edit_row-1 - cur_edit_row_disp) >= (PATTERN_EDIT_ROWS-1)) {
+                            if (cur_edit_row_disp <
+                                (song->patterns[cur_edit_pattern]->length - PATTERN_EDIT_ROWS)) {
+                              cur_edit_row_disp += advance;
+                            }
+                          }
+                        }
 
-                  if ((cur_edit_row-1 - cur_edit_row_disp) >= (PATTERN_EDIT_ROWS-1)) {
-                    
-                    if (cur_edit_row_disp<(song->patterns[cur_edit_pattern]->length - PATTERN_EDIT_ROWS)) {
-                      
-                      cur_edit_row_disp+=cur_step;
-                    }
-                  }
-
-                  need_refresh++; 
-                        
-                        // ------------------
+                        need_refresh++;
 
                         break;
                         /* EVERYTHING ELSE */

@@ -95,6 +95,19 @@ class ZTConf {
         int record_velocity;
         int post_load_page;        // E_post_load_page — page to switch to after a successful load
         char window_icon[MAX_PATH + 1];
+        // How far the cursor advances after the 4 / 8 audition keys
+        // fire on the note column. 0 = stay put, 1 = always step by
+        // one row, 2 = use the current EditStep value (legacy behaviour).
+        // Default is 1 -- the historical behaviour drove the cursor by
+        // EditStep, which surprised users who set EditStep > 1 to
+        // sequence at coarse intervals but still wanted single-row
+        // auditioning.
+        int note_audition_step_mode;
 };
+
+// Allowed values for zt_config_globals.note_audition_step_mode.
+#define ZT_NAS_NONE     0
+#define ZT_NAS_ONE      1
+#define ZT_NAS_EDITSTEP 2
 
 #endif
