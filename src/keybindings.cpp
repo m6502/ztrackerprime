@@ -76,6 +76,61 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "reverse_selection",    // ZT_ACTION_REVERSE_SELECTION
     "rotate_down",          // ZT_ACTION_ROTATE_DOWN
     "rotate_up",            // ZT_ACTION_ROTATE_UP
+    "note_audition",        // ZT_ACTION_NOTE_AUDITION
+    "row_audition",         // ZT_ACTION_ROW_AUDITION
+};
+
+// Same length as s_actionNames; rendered in the Shortcuts & MIDI
+// Mappings page so the user never sees snake_case keys. Keep both
+// arrays in lock-step with the enum -- adding an action means
+// appending here too. Kept short enough to fit a single column at
+// 640px (under ~38 chars).
+static const char* const s_actionDescriptions[ZT_ACTION_COUNT] = {
+    "(none)",                              // ZT_ACTION_NONE
+    "Quit zTracker",                       // ZT_ACTION_QUIT
+    "Play Song from start",                // ZT_ACTION_PLAY_SONG
+    "Play Pattern from start",             // ZT_ACTION_PLAY_PAT
+    "Play Pattern from current row",       // ZT_ACTION_PLAY_PAT_LINE
+    "Stop playback",                       // ZT_ACTION_STOP
+    "Panic (note-off all channels)",       // ZT_ACTION_PANIC
+    "Hard panic (controller reset)",       // ZT_ACTION_HARD_PANIC
+    "Switch to Help (F1)",                 // ZT_ACTION_SWITCH_HELP
+    "Switch to Pattern Editor (F2)",       // ZT_ACTION_SWITCH_PEDIT
+    "Switch to Instrument Editor (F3)",    // ZT_ACTION_SWITCH_IEDIT
+    "Switch to Song Configuration (F11)",  // ZT_ACTION_SWITCH_SONGCONF
+    "Switch to System Configuration (F12)",// ZT_ACTION_SWITCH_SYSCONF
+    "Switch to About (Alt+F12)",           // ZT_ACTION_SWITCH_ABOUT
+    "Open Load Song dialog",               // ZT_ACTION_LOAD
+    "Save Song",                           // ZT_ACTION_SAVE
+    "Save Song As...",                     // ZT_ACTION_SAVE_AS
+    "New Song",                            // ZT_ACTION_NEW_SONG
+    "Export to .mid file",                 // ZT_ACTION_MIDI_EXPORT
+    "Undo",                                // ZT_ACTION_UNDO
+    "Replicate selection at cursor",       // ZT_ACTION_REPLICATE_AT_CURSOR
+    "Double pattern length",               // ZT_ACTION_DOUBLE_PATTERN
+    "Clone pattern to next slot",          // ZT_ACTION_CLONE_PATTERN
+    "Octave down",                         // ZT_ACTION_OCTAVE_DOWN
+    "Octave up",                           // ZT_ACTION_OCTAVE_UP
+    "Edit step = 0",                       // ZT_ACTION_STEP_0
+    "Edit step = 1",                       // ZT_ACTION_STEP_1
+    "Edit step = 2",                       // ZT_ACTION_STEP_2
+    "Edit step = 3",                       // ZT_ACTION_STEP_3
+    "Edit step = 4",                       // ZT_ACTION_STEP_4
+    "Edit step = 5",                       // ZT_ACTION_STEP_5
+    "Edit step = 6",                       // ZT_ACTION_STEP_6
+    "Edit step = 7",                       // ZT_ACTION_STEP_7
+    "Edit step = 8",                       // ZT_ACTION_STEP_8
+    "Edit step = 9",                       // ZT_ACTION_STEP_9
+    "Switch to Lua Console",               // ZT_ACTION_SWITCH_LUA_CONSOLE
+    "Halve pattern length",                // ZT_ACTION_HALVE_PATTERN
+    "Interpolate selection",               // ZT_ACTION_INTERPOLATE_SELECTION
+    "Follow playback",                     // ZT_ACTION_FOLLOW_PLAYBACK
+    "Track solo",                          // ZT_ACTION_TRACK_SOLO
+    "Reverse selection",                   // ZT_ACTION_REVERSE_SELECTION
+    "Rotate selection down",               // ZT_ACTION_ROTATE_DOWN
+    "Rotate selection up",                 // ZT_ACTION_ROTATE_UP
+    "Audition current note (4)",           // ZT_ACTION_NOTE_AUDITION
+    "Audition current row (8)",            // ZT_ACTION_ROW_AUDITION
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -83,6 +138,13 @@ const char* KeyBindings::actionName(ZtAction action)
     if (action < 0 || action >= ZT_ACTION_COUNT)
         return "unknown";
     return s_actionNames[action];
+}
+
+const char* KeyBindings::actionDescription(ZtAction action)
+{
+    if (action < 0 || action >= ZT_ACTION_COUNT)
+        return "(unknown action)";
+    return s_actionDescriptions[action];
 }
 
 void KeyBindings::actionConfKey(ZtAction action, char* buf, int bufsize)
@@ -150,6 +212,15 @@ void KeyBindings::setDefaults()
     bindings[ZT_ACTION_REVERSE_SELECTION]    = { SDLK_R,           KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_ROTATE_DOWN]          = { SDLK_DOWN,        KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_ROTATE_UP]            = { SDLK_UP,          KS_CTRL | KS_SHIFT };
+    // Note column auditioning. The keyboard scancode path in
+    // CUI_Patterneditor.cpp still drives the 4 / 8 keys for layout
+    // independence, so the entries here are display-only -- they
+    // ensure the action shows up in the unified UI with a sensible
+    // default key. Manually rebinding here does not currently change
+    // the in-pattern behaviour; rebinding is meaningful only via the
+    // MIDI mapping column.
+    bindings[ZT_ACTION_NOTE_AUDITION]        = { SDLK_4,           0 };
+    bindings[ZT_ACTION_ROW_AUDITION]         = { SDLK_8,           0 };
 }
 
 // -----------------------------------------------------------------------

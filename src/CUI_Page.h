@@ -501,12 +501,17 @@ class CUI_LuaConsole : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// Unified Shortcuts & MIDI Mappings page. cursor_y picks an action;
+// cursor_x picks the column to edit:
+//   0 = keyboard binding
+//   1..ZT_MM_SLOTS_PER_ACTION = MIDI slot 0..N-1
 class CUI_KeyBindings : public CUI_Page {
     public:
         int cursor_y;        // currently selected ZtAction (0..ZT_ACTION_COUNT-1)
+        int cursor_x;        // currently selected column (see above)
         int list_start;      // first visible action
         int capturing;       // 0 = browsing, 1 = waiting for new key combo
-        int dirty;            // unsaved edits?
+        int dirty;           // unsaved edits?
         char status_line[160];
 
         CUI_KeyBindings();
@@ -519,22 +524,4 @@ class CUI_KeyBindings : public CUI_Page {
         int visible_rows(void) const;
 };
 
-// MIDI Mappings page -- bind incoming MIDI messages to internal
-// actions (Note Audition / Row Audition for now). Cursor walks a
-// 2-D grid: rows = actions, columns = the 3 mapping slots. Enter
-// puts the focused slot into Learn mode (next incoming MIDI
-// message captured); Backspace / Delete clears the focused slot.
-class CUI_MidiMappings : public CUI_Page {
-    public:
-        int cursor_y;     // 0..ZT_MM_NUM_ACTIONS-1
-        int cursor_x;     // 0..ZT_MM_SLOTS_PER_ACTION-1
-        char status_line[160];
-
-        CUI_MidiMappings();
-
-        void enter(void);
-        void leave(void);
-        void update(void);
-        void draw(Drawable *S);
-};
 #endif

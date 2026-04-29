@@ -4,6 +4,35 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (Unified Shortcuts & MIDI Mappings page)
+------------------------------------------------------
+
+        * Shift+F3 now opens a single page that lists every
+          remappable action with its keyboard binding AND its three
+          MIDI slots side by side. Replaces the separate Keybindings
+          / MIDI Mappings dialogs so the user can see "this 4 action
+          is bound to keyboard X and MIDI A / B / C" without
+          flipping pages. Up/Down picks an action, Left/Right picks
+          the column (Keyboard / MIDI 1 / MIDI 2 / MIDI 3), Enter
+          starts capture or Learn for that cell, Backspace / Delete
+          clears it, Ctrl+S saves the lot, Ctrl+R resets the row's
+          keyboard, Ctrl+Shift+R resets all keyboard defaults.
+        + Action descriptions are now plain English (e.g. "Quit
+          zTracker", "Audition current note (4)") instead of the
+          underlying snake_case conf keys.
+        + ZtAction registry gained ZT_ACTION_NOTE_AUDITION and
+          ZT_ACTION_ROW_AUDITION so 4 / 8 appear in the unified
+          page. The keyboard scancode path in CUI_Patterneditor.cpp
+          still owns in-pattern 4 / 8 dispatch (so layout-
+          independent typing keeps working); the MIDI mapping
+          column on those rows is fully live and routes through
+          the same audition handlers as before.
+        * MIDI Mappings table is now indexed by ZtAction so adding
+          a new action gives it a row in the UI and a midi_map_<name>
+          conf entry without further plumbing. The standalone
+          CUI_MidiMappings page is removed -- Shift+F3 lands on the
+          unified view, ESC menu entry renamed accordingly.
+
 zt 2026_04_29 (MIDI Mappings: bind 4 / 8 audition to MIDI input)
 ----------------------------------------------------------------
 

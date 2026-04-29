@@ -168,7 +168,7 @@ static const mm_entry MM_ENTRIES[] = {
 #ifndef DISABLE_PALETTE_EDITOR
     {MM_CMD,        "Palette Editor",           "Shift+Ctrl+F12",       CMD_SWITCH_PALETTE,         NULL},
 #endif
-    {MM_CMD,        "Keybindings Editor",       "Ctrl+Alt+K",           CMD_SWITCH_KEYBINDINGS,     NULL},
+    {MM_CMD,        "Shortcuts & MIDI Mappings","Shift+F3",             CMD_SWITCH_KEYBINDINGS,     NULL},
     {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
 
