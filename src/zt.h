@@ -610,9 +610,7 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
 
         CMD_SWITCH_LUA_CONSOLE,
 
-        CMD_SWITCH_KEYBINDINGS,
-
-        CMD_SWITCH_MIDI_MAPPINGS
+        CMD_SWITCH_KEYBINDINGS
 
     };
 
@@ -767,7 +765,6 @@ extern CUI_Arpeggioeditor *UIP_Arpeggioeditor;
 extern CUI_Midimacroeditor *UIP_Midimacroeditor;
 extern CUI_LuaConsole *UIP_LuaConsole;
 extern CUI_KeyBindings *UIP_KeyBindings;
-extern CUI_MidiMappings *UIP_MidiMappings;
 extern CUI_Help *UIP_Help;
 extern CUI_MainMenu *UIP_MainMenu;
 

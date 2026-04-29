@@ -59,6 +59,13 @@ enum ZtAction {
     ZT_ACTION_ROTATE_DOWN,
     ZT_ACTION_ROTATE_UP,
 
+    // Note column auditioning -- the keyboard path is hard-wired to
+    // SDL_SCANCODE_4 / _8 in CUI_Patterneditor.cpp, but listing the
+    // actions here lets them appear in the unified Shortcuts & MIDI
+    // page and gives the MIDI mapping system a stable index to fire.
+    ZT_ACTION_NOTE_AUDITION,
+    ZT_ACTION_ROW_AUDITION,
+
     ZT_ACTION_COUNT
 };
 
@@ -94,6 +101,12 @@ public:
 
     // Human-readable name used in zt.conf, e.g. "quit", "play_song".
     static const char* actionName(ZtAction action);
+
+    // English description shown in the Shortcuts & MIDI Mappings UI,
+    // e.g. "Quit zTracker", "Play song from start". The conf-key form
+    // is kept because zt.conf is hand-editable, but the UI never has
+    // to expose snake_case to the user.
+    static const char* actionDescription(ZtAction action);
 
     // Conf key for an action, e.g. "key_quit".
     static void actionConfKey(ZtAction action, char* buf, int bufsize);

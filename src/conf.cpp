@@ -345,11 +345,13 @@ int ZTConf::load()
   // MIDI mappings: keys named "midi_map_<action>" each hold up to
   // ZT_MM_SLOTS_PER_ACTION space-separated tokens. Each token is
   // "SS,DD" (status hex, data1 hex) or "-" for an empty slot.
+  // Action index is ZtAction (shared with the keybinding system).
   {
       char keybuf[64];
       ZtMmMappings *mm = zt_mm_get_mappings();
-      for (int a = 0; a < ZT_MM_NUM_ACTIONS; a++) {
-          snprintf(keybuf, sizeof(keybuf), "midi_map_%s", zt_mm_action_conf_key(a));
+      for (int a = ZT_ACTION_NONE + 1; a < ZT_ACTION_COUNT; a++) {
+          snprintf(keybuf, sizeof(keybuf), "midi_map_%s",
+                   KeyBindings::actionName((ZtAction)a));
           char *raw = Config->get(keybuf);
           if (!raw) continue;
           // Reset to empty before parsing so a partial line doesn't
@@ -501,12 +503,14 @@ int ZTConf::save() {
 
     g_keybindings.save(Config);
 
-    // Save MIDI mappings (mirror of the load parser).
+    // Save MIDI mappings (mirror of the load parser). Action index
+    // is ZtAction; conf key uses the same action name as the
+    // keybinding system so the two stay in sync.
     {
         char keybuf[64];
         char valbuf[64];
         ZtMmMappings *mm = zt_mm_get_mappings();
-        for (int a = 0; a < ZT_MM_NUM_ACTIONS; a++) {
+        for (int a = ZT_ACTION_NONE + 1; a < ZT_ACTION_COUNT; a++) {
             valbuf[0] = '\0';
             for (int sl = 0; sl < ZT_MM_SLOTS_PER_ACTION; sl++) {
                 char tok[16];
@@ -520,7 +524,8 @@ int ZTConf::save() {
                 if (sl > 0) strncat(valbuf, " ", sizeof(valbuf) - strlen(valbuf) - 1);
                 strncat(valbuf, tok, sizeof(valbuf) - strlen(valbuf) - 1);
             }
-            snprintf(keybuf, sizeof(keybuf), "midi_map_%s", zt_mm_action_conf_key(a));
+            snprintf(keybuf, sizeof(keybuf), "midi_map_%s",
+                     KeyBindings::actionName((ZtAction)a));
             Config->set(keybuf, valbuf);
         }
     }
