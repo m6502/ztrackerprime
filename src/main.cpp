@@ -3544,8 +3544,15 @@ struct ZtCliArgs {
     bool        show_help       = false;
     bool        list_midi_in    = false;
     const char *song_filename   = NULL;
-    const char *midi_in_port    = NULL;   // pure listening
-    const char *midi_clock_port = NULL;   // listen + clock chase
+    // --midi-in can repeat so users with multiple ports (or the
+    // ESC-menu "Copy relaunch command" feature that round-trips every
+    // currently-open port) can capture them all in one invocation.
+    static const int MAX_MIDI_IN_FLAGS = 16;
+    const char *midi_in_ports[MAX_MIDI_IN_FLAGS] = {NULL};
+    int         num_midi_in_ports = 0;
+    // --midi-clock is one source by definition; multiple master clocks
+    // would fight each other.
+    const char *midi_clock_port = NULL;
 };
 
 static void zt_print_cli_help(const char *progname) {
@@ -3562,7 +3569,8 @@ static void zt_print_cli_help(const char *progname) {
         "                              sensitive substring against the\n"
         "                              OS-reported device name; <index> is\n"
         "                              the 0-based number from\n"
-        "                              --list-midi-in.\n"
+        "                              --list-midi-in. May be repeated to\n"
+        "                              open multiple ports.\n"
         "      --midi-clock <name|index>\n"
         "                              Open the port AND enable MIDI clock\n"
         "                              chase: turns on midi_in_sync +\n"
@@ -3638,7 +3646,16 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         const char *value = NULL;
         int r = zt_cli_match_flag_with_value(argc, argv, &i, "midi-in", &value);
         if (r < 0) return -1;
-        if (r > 0) { out->midi_in_port = value; continue; }
+        if (r > 0) {
+            if (out->num_midi_in_ports < ZtCliArgs::MAX_MIDI_IN_FLAGS) {
+                out->midi_in_ports[out->num_midi_in_ports++] = value;
+            } else {
+                fprintf(stderr, "zt: too many --midi-in flags (max %d)\n",
+                        ZtCliArgs::MAX_MIDI_IN_FLAGS);
+                return -1;
+            }
+            continue;
+        }
         r = zt_cli_match_flag_with_value(argc, argv, &i, "midi-clock", &value);
         if (r < 0) return -1;
         if (r > 0) { out->midi_clock_port = value; continue; }
@@ -3773,15 +3790,15 @@ int main(int argc, char *argv[])
       }
       return 0;
   }
-  if (cli_args.midi_in_port) {
-      int idx = zt_resolve_midi_in_port(cli_args.midi_in_port);
+  for (int p = 0; p < cli_args.num_midi_in_ports; ++p) {
+      const char *spec = cli_args.midi_in_ports[p];
+      int idx = zt_resolve_midi_in_port(spec);
       if (idx >= 0) {
           MidiIn->AddDevice(idx);
           fprintf(stderr, "zt: opened MIDI in [%d] %s\n",
                   idx, MidiIn->midiInDev[idx]->szName);
       } else {
-          fprintf(stderr, "zt: --midi-in port not found: %s\n",
-                  cli_args.midi_in_port);
+          fprintf(stderr, "zt: --midi-in port not found: %s\n", spec);
       }
   }
   if (cli_args.midi_clock_port) {

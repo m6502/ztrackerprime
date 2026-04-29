@@ -187,7 +187,8 @@
                               indices) and exit.
        --midi-in <name|index> Open this MIDI input port at startup.
                               Match by case-sensitive substring of the
-                              device name OR by 0-based index.
+                              device name OR by 0-based index. May be
+                              repeated to open multiple ports.
        --midi-clock <name|index>
                               Open the port AND enable MIDI-clock chase
                               (sets midi_in_sync + midi_in_sync_chase_
