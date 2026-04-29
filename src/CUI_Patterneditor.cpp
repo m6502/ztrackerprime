@@ -2957,15 +2957,20 @@ case SDLK_DELETE:
                       case SDL_SCANCODE_J: set_note = (12*(base_octave-1))+10;break;
                       case SDL_SCANCODE_M: set_note = (12*(base_octave-1))+11;break;
                         /* EDITING KEYS */
-                      case SDLK_1: set_note = 0x81; break;      
-                      case SDLK_GRAVE: set_note = 0x82; break;  
-                      case SDLK_PERIOD: 
+                        // Switch is on scancode (see line 2920); use
+                        // SDL_SCANCODE_* here too. Mixing SDLK_* into a
+                        // scancode switch silently makes the cases
+                        // dead — that broke 4/8 audition + step in the
+                        // 2026-04-19 layout-independent-keys refactor.
+                      case SDL_SCANCODE_1: set_note = 0x81; break;
+                      case SDL_SCANCODE_GRAVE: set_note = 0x82; break;
+                      case SDL_SCANCODE_PERIOD:
                         if (kstate != KS_SHIFT) {
-                          set_note = 0x80; 
+                          set_note = 0x80;
                         }
                         break;
                         /* ROW/NOTE PEEK PLAY */
-                      case SDLK_8:
+                      case SDL_SCANCODE_8:
                         
                         ztPlayer->play_current_row();
                         
@@ -2991,8 +2996,8 @@ case SDLK_DELETE:
                       
                         break;
                       
-                      case SDLK_4:
-                        
+                      case SDL_SCANCODE_4:
+
                         ztPlayer->play_current_note();
 
                         // <Manu> Hacemos avanzar el cursor

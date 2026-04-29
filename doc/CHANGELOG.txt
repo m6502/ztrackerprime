@@ -4,6 +4,19 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_04_29 (Hotfix: Pattern Editor 4/8 note audition + step)
+---------------------------------------------------------------
+
+        * Pattern Editor: 4 (play current note + step) and 8 (play
+          current row + step) work again on the note column. The
+          2026-04-19 layout-independent-keys refactor switched the
+          T_NOTE dispatch from switch(key) to switch(scancode) and
+          converted the note-row letters to SDL_SCANCODE_*, but left
+          the editing-key cases (4, 8, 1, ., §) as SDLK_* — making
+          them dead code in a scancode switch. Restored: 1 (note
+          off), § (note cut), . (clear), 4 (audition note), 8
+          (audition row).
+
 zt 2026_04_25 (Minor tweaks: status messages, help nav, F4 binding)
 -------------------------------------------------------------------
 
