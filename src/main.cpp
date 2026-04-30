@@ -1345,6 +1345,7 @@ void global_keys(Drawable *S)
             && cur_state != STATE_ABOUT
             && cur_state != STATE_LUA_CONSOLE
             && cur_state != STATE_SONG_MESSAGE
+            && cur_state != STATE_KEYBINDINGS
             && UIP_MainMenu) {
             (void)Keys.getkey();
             popup_window(UIP_MainMenu);
