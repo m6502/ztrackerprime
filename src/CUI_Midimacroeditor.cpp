@@ -31,6 +31,7 @@
  ******/
 #include "zt.h"
 #include "sysex_macro.h"
+#include <sys/stat.h>
 
 #include "editor_layout.h"
 
@@ -597,10 +598,21 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
 
     // Hint: a macro whose name ends in `.syx` is dispatched as a SysEx
     // file send by the playback engine — the data grid below is ignored.
+    // Resolve the path and stat it so the user sees whether playback
+    // will actually find the file (audit L14).
     if (m && zt_sysex_macro_is_file(m->name)) {
-        print(row(36), col(BASE_Y + 2),
-              "(SysEx file mode: data grid is ignored)",
-              COLORS.Brighttext, S);
+        char path[1024];
+        struct stat st;
+        const char *hint = "(SysEx file mode: data grid is ignored)";
+        TColor hint_color = COLORS.Brighttext;
+        if (zt_sysex_macro_resolve_path(m->name, path, sizeof(path)) == 0 &&
+            stat(path, &st) == 0 && (st.st_mode & S_IFREG)) {
+            // File exists; default hint stands.
+        } else {
+            hint = "(SysEx file mode: FILE NOT FOUND -- playback no-op)";
+            hint_color = COLORS.LCDHigh;     // red, matches LCD highlight
+        }
+        print(row(36), col(BASE_Y + 2), hint, hint_color, S);
     }
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).

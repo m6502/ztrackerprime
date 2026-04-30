@@ -57,6 +57,40 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+
+#ifdef _WIN32
+#  include <direct.h>
+#  define cc_mkdir_p(p) _mkdir(p)
+#else
+#  include <unistd.h>
+#  define cc_mkdir_p(p) mkdir(p, 0755)
+#endif
+
+// Auto-create the resolved ccizer folder so a fresh install with no
+// `./ccizer` directory doesn't silently show "(empty folder)" with no
+// hint about why -- mirrors the SysEx Librarian's behavior for the
+// same UX consistency reason. Audit M8.
+static int cc_dir_exists(const char *path) {
+    if (!path || !*path) return 0;
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (st.st_mode & S_IFDIR) ? 1 : 0;
+}
+static void cc_make_dir_recursive(const char *path) {
+    if (!path || !*path || cc_dir_exists(path)) return;
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "%s", path);
+    for (char *p = buf + 1; *p; p++) {
+        if (*p == '/' || *p == '\\') {
+            char saved = *p;
+            *p = '\0';
+            if (!cc_dir_exists(buf)) cc_mkdir_p(buf);
+            *p = saved;
+        }
+    }
+    if (!cc_dir_exists(buf)) cc_mkdir_p(buf);
+}
 
 // ---------- Layout constants ----------
 #define CC_BASE_Y       (TRACKS_ROW_Y + 0)
@@ -88,7 +122,17 @@ static ZtCcizerFile g_loaded;
 // --------- Helpers ---------
 static void resolve_ccizer_folder(char *out, size_t out_sz) {
     out[0] = '\0';
-    zt_ccizer_resolve_folder(zt_config_globals.ccizer_folder, ".", out, out_sz);
+    if (zt_ccizer_resolve_folder(zt_config_globals.ccizer_folder, ".",
+                                 out, out_sz) != 0) {
+        // None of the cascade entries existed. Fall back to the user
+        // override path (or `./ccizer`) and create it so subsequent
+        // saves work and the user can see where files should go.
+        const char *fallback = (zt_config_globals.ccizer_folder[0])
+                                   ? zt_config_globals.ccizer_folder
+                                   : "./ccizer";
+        snprintf(out, out_sz, "%s", fallback);
+    }
+    cc_make_dir_recursive(out);
 }
 
 static void send_slot(const ZtCcizerSlot *s, int channel) {

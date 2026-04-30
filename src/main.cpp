@@ -344,6 +344,7 @@ CUI_KeyBindings *UIP_KeyBindings = NULL;
 CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
 int g_cc_drawmode = 0;
+int g_cc_draw_session_snapped = 0;
 
 
 

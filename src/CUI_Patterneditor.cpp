@@ -15,11 +15,9 @@ static PatternUndo g_undo;
 // Save undo snapshot before destructive pattern operations
 #define UNDO_SAVE() g_undo.save(song, cur_edit_pattern)
 
-// Reset by the Ctrl+Shift+§ toggle each time CC drawmode flips state,
-// then set on the first drawmode write so each ON->...->OFF session
-// produces exactly one UNDO_SAVE() snapshot. See the MIDI-in handler
-// further down.
-static int g_cc_draw_session_snapped = 0;
+// (g_cc_draw_session_snapped is now a true extern -- defined in
+// main.cpp, declared in zt.h -- so the ESC menu toggle can reset
+// it too. See audit H2.)
 
 #define LEFT_MARGIN                     40
 #define RIGHT_MARGIN                    2
@@ -1728,8 +1726,7 @@ void CUI_Patterneditor::update()
         // and Pitchbend (0xE0) messages and writes Sxxyy / Wxxxx effects
         // at the cursor row.
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
-          g_cc_drawmode = !g_cc_drawmode;
-          g_cc_draw_session_snapped = 0;  // start a fresh undo session each toggle
+          zt_toggle_cc_drawmode();        // shared with ESC menu (audit H2)
           midiInQueue.clear();
           sprintf(szStatmsg, "CC drawmode: %s", g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
           statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;

@@ -1253,20 +1253,36 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "ZTev")) { load_ZT_event_list(&buffer); recognized_chunks++; saw_event_list = 1; }
             if (cmp_hd(&header[0], "CCBN")) {
                 // Optional per-instrument CCizer bank chunk. Format:
-                //   uint32 count
-                //   repeat: uint8 inst_idx, uint16 length, bytes path
-                // Bounds-checked at every step so a corrupt or malicious
-                // chunk can't read past the buffer or scribble out of
-                // range. Failure stops processing this chunk; the rest of
-                // the song still loads.
+                //   short int count
+                //   repeat: uint8 inst_idx, short int length, bytes path
+                // Bounds-checked at every step so a corrupt chunk can't
+                // read past the buffer or scribble out of range. Failure
+                // stops processing this chunk; the rest of the song still
+                // loads. Truncation / oversized-length surfaces a
+                // status message so the user knows their song file is
+                // suspect (audit L12).
+                int chunk_truncated = 0;
                 short int count = buffer.getsi();
-                if (count >= 0 && count <= ZTM_MAX_INSTS) {
+                int payload_size = buffer.getsize();
+                if (count < 0 || count > ZTM_MAX_INSTS) {
+                    chunk_truncated = 1;
+                } else {
                     for (short int k = 0; k < count; k++) {
                         unsigned char inst_idx = buffer.getuch();
                         short int len          = buffer.getsi();
-                        if (len < 0) len = 0;
-                        if ((size_t)len >= sizeof(this->instruments[0]->ccizer_bank))
+                        if (len < 0) {
+                            chunk_truncated = 1;
+                            len = 0;
+                        }
+                        // Bound by both the destination buffer AND the
+                        // remaining bytes in the chunk -- a malicious
+                        // length value larger than payload would otherwise
+                        // make CDataBuf return zeros and pollute the
+                        // bank field with garbage.
+                        if ((size_t)len >= sizeof(this->instruments[0]->ccizer_bank)) {
+                            chunk_truncated = 1;
                             len = (short int)(sizeof(this->instruments[0]->ccizer_bank) - 1);
+                        }
                         char tmp[sizeof(this->instruments[0]->ccizer_bank)];
                         for (short int b = 0; b < len; b++)
                             tmp[b] = buffer.getch();
@@ -1279,6 +1295,11 @@ int zt_module::load(char *fn)
                                 sizeof(this->instruments[inst_idx]->ccizer_bank) - 1] = '\0';
                         }
                     }
+                }
+                if (chunk_truncated) {
+                    setstatusstr("Warning: CCBN chunk in %s looks truncated "
+                                 "(payload %d B); some per-instrument banks "
+                                 "may be missing.", fn, payload_size);
                 }
                 recognized_chunks++;
             }
