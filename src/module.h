@@ -272,6 +272,16 @@ class midimacro {
     public:
         char     name[ZTM_MIDIMACRONAME_MAXLEN];
         unsigned short data[ZTM_MIDIMACRO_MAXLEN];
+
+        // Runtime-only SysEx cache (audit H3). When `name` ends in
+        // `.syx`, zt_module::cache_sysex_macros() reads the file at
+        // song-load time and stashes the bytes here so the Z-effect
+        // dispatch in the playback thread never touches the disk on
+        // its critical path. NOT serialized in the MMAC chunk -- the
+        // bytes live on disk, the cache is just a per-load mirror.
+        unsigned char *syx_cache_bytes;
+        int            syx_cache_len;
+
         midimacro(void);
         ~midimacro(void);
 
@@ -345,6 +355,13 @@ class zt_module
         int load(char *fn=NULL);
         int save(char *fn=NULL,int compressed = 1);
         char *getstatusstr(void);
+
+        // Pre-load every `*.syx`-named midimacro's file content into
+        // its in-memory cache so the playback thread's Z-effect
+        // dispatch never hits the disk on the critical path. Called
+        // automatically from load() and from the SysEx Librarian's
+        // syx_folder change. Audit H3.
+        void cache_sysex_macros(void);
 
     private:
 

@@ -39,6 +39,7 @@
  ******/
 #include <stdarg.h>
 #include "zt.h"
+#include "sysex_macro.h"
 
 /* test flag, define to force uncompressed song files */
 //#define SAVE_UNCOMPRESSED
@@ -1318,8 +1319,48 @@ int zt_module::load(char *fn)
     file_changed = 0;
     UIP_InstEditor->reset = 1;
     ztPlayer->num_orders();
+
+    // Pre-load every SysEx-by-filename midimacro so the playback
+    // thread's Z-effect dispatch reads from RAM, not disk (audit H3).
+    cache_sysex_macros();
+
     unlock_mutex(this->hEditMutex);
     return 0;
+}
+
+// ------------------------------------------------------------------------------------------------
+//
+// Read all `*.syx`-named midimacros from disk into their in-memory
+// cache fields (`syx_cache_bytes` / `syx_cache_len`). Called at the
+// end of zt_module::load(); also safe to call mid-session if the
+// user changes `syx_folder` and wants to refresh.
+//
+// Per-macro cap: 1 MB (well above audit M10's old 64 KB cap; covers
+// real-world patch banks like Roland Integra-7 sets, Korg Kronos
+// state). A file that's missing or fails framing checks just leaves
+// the cache empty -- the playback dispatch silently no-ops on those.
+void zt_module::cache_sysex_macros(void) {
+#ifdef USE_MIDIMACROS
+    for (int i = 0; i < ZTM_MAX_MIDIMACROS; i++) {
+        midimacro *m = this->midimacros[i];
+        if (!m) continue;
+        // Free any prior cache (handles syx_folder switches).
+        if (m->syx_cache_bytes) {
+            free(m->syx_cache_bytes);
+            m->syx_cache_bytes = NULL;
+            m->syx_cache_len = 0;
+        }
+        if (!zt_sysex_macro_is_file(m->name)) continue;
+        char path[1280];
+        if (zt_sysex_macro_resolve_path(m->name, path, sizeof(path)) != 0) continue;
+        unsigned char *buf = NULL;
+        int len = 0;
+        if (zt_sysex_macro_read_file(path, &buf, &len, 1024 * 1024)) {
+            m->syx_cache_bytes = buf;
+            m->syx_cache_len = len;
+        }
+    }
+#endif
 }
 
 /*************************************************************************

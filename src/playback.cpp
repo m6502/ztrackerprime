@@ -1580,20 +1580,17 @@ void player::playback(midi_buf *buffer, int ticks)
                                            ? song->midimacros[macro_idx] : NULL;
                         // SysEx-by-filename convention: a macro whose name
                         // ends in `.syx` dispatches as a SysEx file send,
-                        // ignoring the data array. Lets the user fire patch
-                        // dumps from pattern rows without inflating the .zt
-                        // format (the macro's name field already round-trips
-                        // through the existing MMAC chunk; old zTracker
-                        // sees an empty data array and silently does
-                        // nothing — safe forward-compat).
+                        // ignoring the data array. Bytes are pre-loaded
+                        // by zt_module::cache_sysex_macros() at song-load
+                        // time so this code path NEVER touches the disk
+                        // -- critical for playback-thread timing (audit
+                        // H3). A missing / unreadable file leaves the
+                        // cache empty and we silently no-op.
                         if (m && zt_sysex_macro_is_file(m->name)) {
-                            char path[1280];
-                            unsigned char *buf = NULL;
-                            int len = 0;
-                            if (zt_sysex_macro_resolve_path(m->name, path, sizeof(path)) == 0 &&
-                                zt_sysex_macro_read_file(path, &buf, &len, 65536)) {
-                                MidiOut->sendSysEx(i->midi_device, buf, len);
-                                free(buf);
+                            if (m->syx_cache_bytes && m->syx_cache_len > 0) {
+                                MidiOut->sendSysEx(i->midi_device,
+                                                   m->syx_cache_bytes,
+                                                   m->syx_cache_len);
                             }
                             break;
                         }
