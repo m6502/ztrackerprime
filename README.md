@@ -23,7 +23,6 @@ The original developer ( @cmicali ) no longer maintains this project, and the so
 
 zTracker on SourceForge: http://ztracker.sourceforge.net
 zTracker prime on GitHub (maintained by @m6502): https://github.com/m6502/ztrackerprime
-zTracker for Mac on GitHub ("maintained" a.k.a. severely unfinished by @esaruoho): http://github.com/esaruoho/ztracker_mac/tree/master/skins
 
 ## Old building instructions by Daniel Kahlin
 
