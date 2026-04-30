@@ -700,7 +700,38 @@ int zt_module::save(char *fn, int compressed)
             writeblock("ZTin",&buffer,compressed,f,lpDS);
         }
     }
-    
+
+    // CCBN: optional chunk listing per-instrument CCizer bank filenames.
+    // Skipped by older zTracker versions (unrecognized chunk -> harmless).
+    // Format:
+    //   uint32 count
+    //   repeat count times:
+    //     uint8  inst_idx (0..ZTM_MAX_INSTS-1)
+    //     uint16 length    (path bytes, no null terminator)
+    //     bytes  path      (length bytes)
+    {
+        short int count = 0;
+        for (i = 0; i < ZTM_MAX_INSTS; i++) {
+            if (this->instruments[i] && this->instruments[i]->ccizer_bank[0])
+                count++;
+        }
+        if (count > 0) {
+            buffer.write((const char *)&count, sizeof(short int));
+            for (i = 0; i < ZTM_MAX_INSTS; i++) {
+                if (!this->instruments[i] || !this->instruments[i]->ccizer_bank[0])
+                    continue;
+                unsigned char inst_idx = (unsigned char)i;
+                const char *path = this->instruments[i]->ccizer_bank;
+                short int len = (short int)strlen(path);
+                buffer.write((const char *)&inst_idx, sizeof(unsigned char));
+                buffer.write((const char *)&len, sizeof(short int));
+                buffer.write(path, len);
+            }
+            writeblock("CCBN", &buffer, compressed, f, lpDS);
+        }
+    }
+
+
     for(i=0;i<ZTM_MAX_ARPEGGIOS;i++) {
         if (this->arpeggios[i] && !this->arpeggios[i]->isempty()) {
             build_arpeggio(&buffer,i);
@@ -1220,6 +1251,37 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "ZTpp")) { load_ZT_pattern_properties(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTin")) { load_ZT_instrument(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTev")) { load_ZT_event_list(&buffer); recognized_chunks++; saw_event_list = 1; }
+            if (cmp_hd(&header[0], "CCBN")) {
+                // Optional per-instrument CCizer bank chunk. Format:
+                //   uint32 count
+                //   repeat: uint8 inst_idx, uint16 length, bytes path
+                // Bounds-checked at every step so a corrupt or malicious
+                // chunk can't read past the buffer or scribble out of
+                // range. Failure stops processing this chunk; the rest of
+                // the song still loads.
+                short int count = buffer.getsi();
+                if (count >= 0 && count <= ZTM_MAX_INSTS) {
+                    for (short int k = 0; k < count; k++) {
+                        unsigned char inst_idx = buffer.getuch();
+                        short int len          = buffer.getsi();
+                        if (len < 0) len = 0;
+                        if ((size_t)len >= sizeof(this->instruments[0]->ccizer_bank))
+                            len = (short int)(sizeof(this->instruments[0]->ccizer_bank) - 1);
+                        char tmp[sizeof(this->instruments[0]->ccizer_bank)];
+                        for (short int b = 0; b < len; b++)
+                            tmp[b] = buffer.getch();
+                        tmp[len] = '\0';
+                        if (inst_idx < ZTM_MAX_INSTS && this->instruments[inst_idx]) {
+                            strncpy(this->instruments[inst_idx]->ccizer_bank,
+                                    tmp,
+                                    sizeof(this->instruments[inst_idx]->ccizer_bank) - 1);
+                            this->instruments[inst_idx]->ccizer_bank[
+                                sizeof(this->instruments[inst_idx]->ccizer_bank) - 1] = '\0';
+                        }
+                    }
+                }
+                recognized_chunks++;
+            }
         }
         SDL_Delay(1);
     }
