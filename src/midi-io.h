@@ -443,8 +443,16 @@ class midiInDevice {
         int opened;     
 
         MIDIHDR         midiHdr;              // The MIDIHDR structure defines the header used to identify a MIDI system-exclusive or stream buffer.
-        unsigned char SysXBuffer[256];
+        // 8 KB matches ZT_SYSEX_MAX_LEN in sysex_inq.h. The previous
+        // 256-byte buffer was way too small for real-world patch dumps
+        // (a Yamaha DX7 voice = 4096 bytes, Roland Integra-7 patches
+        // can hit several KB). With a tiny buffer the WinMM driver
+        // splits long SysEx into multiple MIM_LONGDATA chunks; the
+        // current handler doesn't reassemble them, so big dumps would
+        // have been truncated even when receive was wired up.
+        unsigned char SysXBuffer[8192];
         unsigned char SysXFlag;
+        int           SysXAccumLen;           // bytes accumulated across MIM_LONGDATA fragments
 
         midiInDevice(int i);
         ~midiInDevice(void);
