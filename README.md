@@ -22,6 +22,7 @@ The original developer ( @cmicali ) no longer maintains this project, and the so
 ## Links
 
 zTracker on SourceForge: http://ztracker.sourceforge.net
+
 zTracker prime on GitHub (maintained by @m6502): https://github.com/m6502/ztrackerprime
 
 ## Old building instructions by Daniel Kahlin
