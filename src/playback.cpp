@@ -38,6 +38,7 @@
  *
  ******/
 #include "zt.h"
+#include "sysex_macro.h"
 #include <algorithm>
 #include <stdint.h>
 
@@ -1577,6 +1578,25 @@ void player::playback(midi_buf *buffer, int ticks)
                         int param     = GET_LOW_BYTE(evento->effect_data);
                         midimacro *m = (macro_idx >= 0 && macro_idx < ZTM_MAX_MIDIMACROS)
                                            ? song->midimacros[macro_idx] : NULL;
+                        // SysEx-by-filename convention: a macro whose name
+                        // ends in `.syx` dispatches as a SysEx file send,
+                        // ignoring the data array. Lets the user fire patch
+                        // dumps from pattern rows without inflating the .zt
+                        // format (the macro's name field already round-trips
+                        // through the existing MMAC chunk; old zTracker
+                        // sees an empty data array and silently does
+                        // nothing — safe forward-compat).
+                        if (m && zt_sysex_macro_is_file(m->name)) {
+                            char path[1280];
+                            unsigned char *buf = NULL;
+                            int len = 0;
+                            if (zt_sysex_macro_resolve_path(m->name, path, sizeof(path)) == 0 &&
+                                zt_sysex_macro_read_file(path, &buf, &len, 65536)) {
+                                MidiOut->sendSysEx(i->midi_device, buf, len);
+                                free(buf);
+                            }
+                            break;
+                        }
                         if (m && !m->isempty()) {
                             // Walk macro data, packing 3-byte short MIDI msgs
                             // (status + up to 2 data bytes), substituting

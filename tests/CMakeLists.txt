@@ -84,3 +84,13 @@ add_executable(test_sysex_inq
 target_include_directories(test_sysex_inq PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_sysex_inq PRIVATE cxx_std_17)
 add_test(NAME sysex_inq COMMAND test_sysex_inq)
+
+# SysEx-by-filename macro helpers. Tests the predicate, path resolution,
+# and the .syx file reader. Stubs the ZTConf type locally to avoid
+# pulling the full conf.cpp into the test binary.
+add_executable(test_sysex_macro
+    test_sysex_macro.cpp
+)
+target_include_directories(test_sysex_macro PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_sysex_macro PRIVATE cxx_std_17)
+add_test(NAME sysex_macro COMMAND test_sysex_macro)
