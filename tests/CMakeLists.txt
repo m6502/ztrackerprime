@@ -94,3 +94,14 @@ add_executable(test_sysex_macro
 target_include_directories(test_sysex_macro PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_sysex_macro PRIVATE cxx_std_17)
 add_test(NAME sysex_macro COMMAND test_sysex_macro)
+
+# CCBN chunk roundtrip (audit P18). Verifies the per-instrument
+# CCizer-bank chunk format that zt_module::save / zt_module::load use.
+# SDL-free: uses a tiny in-test buffer instead of CDataBuf, mirrored
+# byte-for-byte from the real reader/writer.
+add_executable(test_ccbn_roundtrip
+    test_ccbn_roundtrip.cpp
+)
+target_include_directories(test_ccbn_roundtrip PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_ccbn_roundtrip PRIVATE cxx_std_17)
+add_test(NAME ccbn_roundtrip COMMAND test_ccbn_roundtrip)
