@@ -586,6 +586,8 @@ int songmsg::isempty() {
 midimacro::midimacro(void) {
     this->name[0]=0;
     this->data[0]=ZTM_MIDIMAC_END;
+    this->syx_cache_bytes = NULL;
+    this->syx_cache_len   = 0;
 }
 
 /*************************************************************************
@@ -610,6 +612,11 @@ midimacro::midimacro(void) {
  *
  ******/
 midimacro::~midimacro(void) {
+    if (this->syx_cache_bytes) {
+        free(this->syx_cache_bytes);
+        this->syx_cache_bytes = NULL;
+        this->syx_cache_len = 0;
+    }
 }
 
 /*************************************************************************
