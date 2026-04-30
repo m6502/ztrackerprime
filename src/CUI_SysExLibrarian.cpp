@@ -239,6 +239,88 @@ void CUI_SysExLibrarian::send_selected(void) {
     }
 }
 
+// Thread-safe localtime wrapper. Audit M9: standard `localtime` returns
+// a pointer to a shared static struct, technically a portability gotcha
+// even though zTracker only calls drain_recv from the UI thread today.
+// Falls back to UTC if the platform reentrant variant fails.
+static int zt_localtime(time_t t, struct tm *out) {
+    if (!out) return 0;
+#ifdef _WIN32
+    return localtime_s(out, &t) == 0 ? 1 : 0;
+#else
+    return localtime_r(&t, out) ? 1 : 0;
+#endif
+}
+
+// Audit L15: cap the number of `recv_*.syx` files in syx_folder.
+// Sorts by mtime, deletes oldest until count <= max. max=0 disables.
+// Called from drain_recv after each successful save so the folder
+// stays bounded regardless of session length.
+static void prune_recv_files(const char *folder, int max_files) {
+    if (max_files <= 0 || !folder || !*folder) return;
+    // Collect names + mtimes.
+    struct Entry {
+        char name[256];
+        time_t mtime;
+    };
+    Entry entries[1024];
+    int n = 0;
+#ifdef _WIN32
+    char pattern[1024];
+    snprintf(pattern, sizeof(pattern), "%s\\recv_*.syx", folder);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        if (n >= 1024) break;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        snprintf(entries[n].name, sizeof(entries[n].name), "%s", fd.cFileName);
+        ULARGE_INTEGER ull;
+        ull.LowPart  = fd.ftLastWriteTime.dwLowDateTime;
+        ull.HighPart = fd.ftLastWriteTime.dwHighDateTime;
+        entries[n].mtime = (time_t)((ull.QuadPart - 116444736000000000ULL) / 10000000ULL);
+        n++;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+#else
+    DIR *dp = opendir(folder);
+    if (!dp) return;
+    struct dirent *de;
+    while ((de = readdir(dp)) != NULL) {
+        if (n >= 1024) break;
+        const char *fn = de->d_name;
+        if (strncmp(fn, "recv_", 5) != 0) continue;
+        size_t flen = strlen(fn);
+        if (flen < 5 || strcmp(fn + flen - 4, ".syx") != 0) continue;
+        char path[1280];
+        snprintf(path, sizeof(path), "%s/%s", folder, fn);
+        struct stat st;
+        if (stat(path, &st) != 0) continue;
+        snprintf(entries[n].name, sizeof(entries[n].name), "%s", fn);
+        entries[n].mtime = st.st_mtime;
+        n++;
+    }
+    closedir(dp);
+#endif
+    if (n <= max_files) return;
+    // Sort by mtime ascending (oldest first).
+    for (int i = 1; i < n; i++) {
+        Entry e = entries[i];
+        int j = i - 1;
+        while (j >= 0 && entries[j].mtime > e.mtime) {
+            entries[j + 1] = entries[j];
+            j--;
+        }
+        entries[j + 1] = e;
+    }
+    int to_delete = n - max_files;
+    for (int i = 0; i < to_delete; i++) {
+        char path[1280];
+        snprintf(path, sizeof(path), "%s/%s", folder, entries[i].name);
+        unlink(path);
+    }
+}
+
 void CUI_SysExLibrarian::drain_recv(void) {
     while (zt_sysex_inq_size() > 0) {
         unsigned char buf[ZT_SYSEX_MAX_LEN];
@@ -247,10 +329,11 @@ void CUI_SysExLibrarian::drain_recv(void) {
 
         // Auto-save to disk.
         time_t now = time(NULL);
-        struct tm *tm = localtime(&now);
+        struct tm tmbuf;
+        int has_tm = zt_localtime(now, &tmbuf);
         char tsbuf[32];
-        if (tm) strftime(tsbuf, sizeof(tsbuf), "%Y%m%d_%H%M%S", tm);
-        else    snprintf(tsbuf, sizeof(tsbuf), "%ld", (long)now);
+        if (has_tm) strftime(tsbuf, sizeof(tsbuf), "%Y%m%d_%H%M%S", &tmbuf);
+        else        snprintf(tsbuf, sizeof(tsbuf), "%ld", (long)now);
         char fname[80];
         snprintf(fname, sizeof(fname), "recv_%s_%03d.syx", tsbuf, recv_seq++);
 
@@ -268,8 +351,8 @@ void CUI_SysExLibrarian::drain_recv(void) {
         }
         RecentLog *r = &recent[recent_count++];
         char tsdisp[16];
-        if (tm) strftime(tsdisp, sizeof(tsdisp), "%H:%M:%S", tm);
-        else    snprintf(tsdisp, sizeof(tsdisp), "?:?:?");
+        if (has_tm) strftime(tsdisp, sizeof(tsdisp), "%H:%M:%S", &tmbuf);
+        else        snprintf(tsdisp, sizeof(tsdisp), "?:?:?");
         snprintf(r->timestamp, sizeof(r->timestamp), "%s", tsdisp);
         r->length = n;
         int prev_n = n < (int)sizeof(r->preview) ? n : (int)sizeof(r->preview);
@@ -281,8 +364,13 @@ void CUI_SysExLibrarian::drain_recv(void) {
                  "Received %d bytes. %s -> %s.",
                  n, ok ? "Saved" : "Save FAILED", fname);
 
+        // Cap the recv_*.syx count so syx_folder doesn't grow without
+        // bound across long sessions. Audit L15.
+        prune_recv_files(folder, zt_config_globals.syx_recv_max_files);
+
         // Refresh the file list so the new file shows up immediately.
         rescan_folder();
+        need_refresh++;
     }
 }
 

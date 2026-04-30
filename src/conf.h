@@ -113,6 +113,11 @@ class ZTConf {
         // and auto-saves received SysEx as recv_<timestamp>.syx. Empty =
         // <ccizer_folder>/syx with that subdirectory auto-created.
         char syx_folder[MAX_PATH + 1];
+
+        // Maximum auto-saved `recv_*.syx` files to keep in syx_folder
+        // before the SysEx Librarian deletes the oldest. 0 disables
+        // rotation entirely (never delete; user manages by hand). Audit L15.
+        int syx_recv_max_files;
 };
 
 // Allowed values for zt_config_globals.note_audition_step_mode.

@@ -70,6 +70,20 @@ int  zt_ccizer_find_learn_match(const ZtCcizerFile *f,
 // writes to it when a file is loaded; the Pattern Editor reads it to
 // pretty-print learnt slot names in status messages while CC drawmode
 // is on. May be NULL if nothing has been loaded this session.
+//
+// LIFETIME INVARIANT (audit L16):
+//   The pointer is owned by CUI_CcConsole, which stores its loaded
+//   file as a file-static `g_loaded` in CUI_CcConsole.cpp. That static
+//   has whole-process lifetime, so the pointer is valid for the entire
+//   run -- there is no UAF risk today even though the pointer is never
+//   nulled when the page is left. zt_ccizer_set_current_file(NULL) is
+//   only called when a file fails to load.
+//
+//   If anyone ever moves CC Console state into a heap-allocated
+//   container (e.g. multiple CC console pages, or destroying the page
+//   on song-change), this invariant breaks: zt_ccizer_set_current_file
+//   would need to be called from the page destructor too. Document
+//   that here so the breakage isn't surprising.
 extern ZtCcizerFile *zt_ccizer_current_file();
 void zt_ccizer_set_current_file(ZtCcizerFile *f);
 
