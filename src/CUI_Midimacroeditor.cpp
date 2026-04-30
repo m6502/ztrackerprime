@@ -30,6 +30,7 @@
  *
  ******/
 #include "zt.h"
+#include "sysex_macro.h"
 
 #include "editor_layout.h"
 
@@ -593,6 +594,14 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     print(row(6),  col(BASE_Y),     "Slot",   COLORS.Text, S);
     print(row(6),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
     print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
+
+    // Hint: a macro whose name ends in `.syx` is dispatched as a SysEx
+    // file send by the playback engine — the data grid below is ignored.
+    if (m && zt_sysex_macro_is_file(m->name)) {
+        print(row(36), col(BASE_Y + 2),
+              "(SysEx file mode: data grid is ignored)",
+              COLORS.Brighttext, S);
+    }
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
     print(row(47), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
