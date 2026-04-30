@@ -1,0 +1,74 @@
+# Smoke script: visit each major page, dump a screenshot, exit.
+# Run with:  ./build/Program/zt --headless --script tests/scripts/smoke.txt
+# Output PNGs land in /tmp/zt-headless-shots/ -- create the dir first.
+#
+# Lines are: command [arg]
+#   key <chord>   inject a synthetic keystroke. Modifiers via `shift+`,
+#                 `ctrl+`, `alt+`, `meta+` (alias `cmd+`). Examples:
+#                   key F2
+#                   key shift+F3
+#                   key ctrl+s
+#                   key down
+#                   key tab
+#                   key space
+#                   key return
+#                   key esc
+#   wait <ms>     defer the next command for <ms> milliseconds. The main
+#                 loop keeps running so the page can render / process the
+#                 last batch of keys before the next one fires.
+#   shot <path>   dump the current screen surface to a PNG. The directory
+#                 must already exist.
+#   quit          set do_exit; the main loop tears down on its next pass.
+#
+# Comments (`#`) and blank lines are ignored.
+
+# Let the boot finish painting Pattern Editor.
+wait 200
+shot /tmp/zt-headless-shots/01-f2-pattern-editor.png
+
+# Help (F1).
+key f1
+wait 200
+shot /tmp/zt-headless-shots/02-f1-help.png
+
+# Pattern Editor (F2) -- back from Help.
+key f2
+wait 200
+shot /tmp/zt-headless-shots/03-f2-pattern-editor.png
+
+# MIDI Macro Editor (F4).
+key f4
+wait 200
+shot /tmp/zt-headless-shots/04-f4-midimacro.png
+
+# Arpeggio Editor (Shift+F4).
+key shift+f4
+wait 200
+shot /tmp/zt-headless-shots/05-shift-f4-arpeggio.png
+
+# Shortcuts & MIDI Mappings (Shift+F2).
+key shift+f2
+wait 200
+shot /tmp/zt-headless-shots/06-shift-f2-keybindings.png
+key esc
+wait 100
+
+# CC Console (Shift+F3).
+key shift+f3
+wait 200
+shot /tmp/zt-headless-shots/07-shift-f3-cc-console.png
+
+# SysEx Librarian (Shift+F5).
+key shift+f5
+wait 200
+shot /tmp/zt-headless-shots/08-shift-f5-sysex-librarian.png
+
+# Song Configuration (F11) and System Configuration (F12).
+key f11
+wait 200
+shot /tmp/zt-headless-shots/09-f11-songconfig.png
+key f12
+wait 200
+shot /tmp/zt-headless-shots/10-f12-sysconfig.png
+
+quit

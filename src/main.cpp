@@ -72,6 +72,7 @@
 #include <vector>
 
 #include "zt.h"
+#include "zt_headless.h"
 #include "lua_engine.h"
 #include "keybindings.h"
 #include "save_key_dispatch.h"
@@ -3256,12 +3257,16 @@ static int zt_backend_set_video_mode(char *errstr)
 #ifdef __APPLE__
     // Free Cmd-Q from the auto-created NSApp menu so the Pattern Editor can
     // use it as Transpose-Up (KS_HAS_ALT treats Cmd as Alt). Quit reachable
-    // via Ctrl-Q / Ctrl-Alt-Q.
-    zt_macos_disable_cmd_q();
-    // Free Cmd-W from the Window menu's Close item so it reaches our
-    // keyhandler instead of dismissing the SDL window. Pattern Editor
-    // treats Cmd-W as Ctrl-W (clear unused volumes in selection).
-    zt_macos_disable_cmd_w();
+    // via Ctrl-Q / Ctrl-Alt-Q. Skipped under --headless because the dummy
+    // video driver doesn't create an NSApp menu in the first place; the
+    // disable call would touch a NULL menu and crash.
+    if (!zt_headless_active()) {
+        zt_macos_disable_cmd_q();
+        // Free Cmd-W from the Window menu's Close item so it reaches our
+        // keyhandler instead of dismissing the SDL window. Pattern Editor
+        // treats Cmd-W as Ctrl-W (clear unused volumes in selection).
+        zt_macos_disable_cmd_w();
+    }
 #endif
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {
@@ -3613,6 +3618,12 @@ struct ZtCliArgs {
     // --midi-clock is one source by definition; multiple master clocks
     // would fight each other.
     const char *midi_clock_port = NULL;
+    // --headless suppresses the visible window: SDL's `dummy` video
+    // driver runs the renderer/texture pipeline against an in-memory
+    // surface, which the script driver dumps via libpng. Pairs with
+    // --script to drive the running app to a chosen state and exit.
+    bool        headless        = false;
+    const char *script_path     = NULL;
 };
 
 static void zt_print_cli_help(const char *progname) {
@@ -3636,12 +3647,25 @@ static void zt_print_cli_help(const char *progname) {
         "                              chase: turns on midi_in_sync +\n"
         "                              midi_in_sync_chase_tempo so the song\n"
         "                              tempo follows incoming F8 clock.\n"
+        "      --headless              Run without opening a window (SDL's\n"
+        "                              dummy video driver). The renderer\n"
+        "                              still produces frames into an\n"
+        "                              in-memory surface, which --script\n"
+        "                              can dump as PNG. Use for CI smoke\n"
+        "                              tests, headless layout regression,\n"
+        "                              or AI-driven page verification.\n"
+        "      --script <file>         Drive the running app from a script.\n"
+        "                              Lines: 'key <chord>', 'wait <ms>',\n"
+        "                              'shot <png-path>', 'quit'. See\n"
+        "                              docs/headless-script.md for the full\n"
+        "                              command set.\n"
         "\n"
         "Examples:\n"
         "  %s mysong.zt\n"
         "  %s --midi-in \"IAC Driver Bus 1\"\n"
-        "  %s --midi-clock 0 mysong.zt\n",
-        progname, progname, progname, progname);
+        "  %s --midi-clock 0 mysong.zt\n"
+        "  %s --headless --script tests/scripts/smoke.txt\n",
+        progname, progname, progname, progname, progname);
 }
 
 // Strip leading '-' or '--' so we accept "-midi-in" or "--midi-in" --
@@ -3720,6 +3744,11 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         if (r < 0) return -1;
         if (r > 0) { out->midi_clock_port = value; continue; }
 
+        if (zt_cli_match_flag(a, "headless")) { out->headless = true; continue; }
+        r = zt_cli_match_flag_with_value(argc, argv, &i, "script", &value);
+        if (r < 0) return -1;
+        if (r > 0) { out->script_path = value; continue; }
+
         if (a[0] == '-') {
             fprintf(stderr, "zt: unknown flag '%s' (try --help)\n", a);
             return -1;
@@ -3769,6 +3798,19 @@ int main(int argc, char *argv[])
       zt_print_cli_help(base ? base + 1 : prog);
       return 0;
   }
+
+  // Headless mode: tell SDL to use the dummy video driver BEFORE SDL_Init
+  // so no window opens. The renderer + texture pipeline still works
+  // against an in-memory surface; the script driver dumps PNGs from it.
+  // SDL_HINT_VIDEO_DRIVER must be set before SDL_Init -- once a driver
+  // is initialised the hint is ignored.
+  if (cli_args.headless) {
+      SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+      // Audio dummy too -- the desktop audio device is irrelevant in
+      // CI / headless self-test contexts and would just spam errors.
+      SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
+  }
+  zt_headless_init(cli_args.headless, cli_args.script_path);
 
   char *w;
   const char path_sep =
@@ -3925,6 +3967,12 @@ int main(int argc, char *argv[])
           zt_text_input_stop();
         }
       }
+
+      // Headless script driver runs once per frame BEFORE SDL_PollEvent.
+      // Injects synthetic keystrokes via Keys.insert(), times waits with
+      // SDL_GetTicks, dumps PNGs from `screen_buffer_surface`, and sets
+      // do_exit on `quit`. No-op when --headless / --script weren't set.
+      zt_headless_pump(screen_buffer_surface);
 
       SDL_Event e;
 
