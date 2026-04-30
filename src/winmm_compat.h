@@ -11,6 +11,25 @@
 #endif
 #include <windows.h>
 #include <mmsystem.h>
+
+// SysEx send (Windows / WinMM). bytes must include 0xF0 prefix and 0xF7
+// terminator. Wraps midiOutLongMsg with the required MIDIHDR prepare /
+// unprepare dance. Synchronous: blocks until WinMM accepts the buffer
+// (typical OS-level call; not "blocks until receiver consumed it").
+static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes, int len) {
+    if (!h || !bytes || len <= 0) return MMSYSERR_ERROR;
+    MIDIHDR hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.lpData = (LPSTR)bytes;
+    hdr.dwBufferLength = (DWORD)len;
+    hdr.dwBytesRecorded = (DWORD)len;
+    if (midiOutPrepareHeader(h, &hdr, sizeof(hdr)) != MMSYSERR_NOERROR) {
+        return MMSYSERR_ERROR;
+    }
+    MMRESULT r = midiOutLongMsg(h, &hdr, sizeof(hdr));
+    midiOutUnprepareHeader(h, &hdr, sizeof(hdr));
+    return r;
+}
 #else
 
 #include <stdint.h>
@@ -323,6 +342,22 @@ static inline MMRESULT midiOutShortMsg(HMIDIOUT h, DWORD msg) {
 }
 
 static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_NOERROR; }
+
+// SysEx send (Linux / ALSA). bytes must include 0xF0 prefix and 0xF7
+// terminator — the caller is responsible for framing. Length includes
+// both bytes. Returns MMSYSERR_NOERROR on success.
+static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes, int len) {
+    zt_alsa_midi_out_handle *ctx = (zt_alsa_midi_out_handle *)h;
+    if (!ctx || !ctx->seq || !bytes || len <= 0) return MMSYSERR_ERROR;
+    snd_seq_event_t ev;
+    snd_seq_ev_clear(&ev);
+    snd_seq_ev_set_source(&ev, ctx->src_port);
+    snd_seq_ev_set_subs(&ev);
+    snd_seq_ev_set_direct(&ev);
+    snd_seq_ev_set_sysex(&ev, (unsigned int)len, (void *)bytes);
+    if (snd_seq_event_output_direct(ctx->seq, &ev) < 0) return MMSYSERR_ERROR;
+    return MMSYSERR_NOERROR;
+}
 #elif defined(__APPLE__)
 typedef void (CALLBACK *zt_midi_in_callback_fn)(HMIDIIN, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 
@@ -348,6 +383,15 @@ typedef struct zt_coremidi_in_handle {
     DWORD_PTR instance;
     int started;
     unsigned char running_status;
+    // SysEx assembly. When sysex_active != 0, every incoming byte is
+    // appended to sysex_buf until 0xF7 closes the frame; then the whole
+    // buffer (including the 0xF0 / 0xF7 framing) is pushed via
+    // zt_sysex_inq_push. Cleared on overflow or when a new status byte
+    // (other than realtime 0xF8..0xFF) interrupts the dump -- a
+    // protocol violation we treat as "drop and resume."
+    int sysex_active;
+    int sysex_len;
+    unsigned char sysex_buf[8192];   // matches ZT_SYSEX_MAX_LEN
 } zt_coremidi_in_handle;
 
 static inline int zt_coremidi_endpoint_name(MIDIEndpointRef endpoint, char *name, size_t name_len) {
@@ -524,12 +568,68 @@ static inline MMRESULT midiOutShortMsg(HMIDIOUT h, DWORD msg) {
 
 static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_NOERROR; }
 
+// SysEx send (macOS / CoreMIDI). bytes must include 0xF0 prefix and
+// 0xF7 terminator. Length includes both bytes. CoreMIDI packets are
+// limited to 256 bytes per packet, but a single packet list can hold
+// multiple packets — for SysEx longer than 256 bytes we segment into
+// multiple packets within one packet list (timestamp 0 = "now"). The
+// receiver reassembles by spec since 0xF0..0xF7 framing is preserved.
+static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes, int len) {
+    zt_coremidi_out_handle *ctx = (zt_coremidi_out_handle *)h;
+    if (!ctx || !ctx->out_port || !bytes || len <= 0) return MMSYSERR_ERROR;
+
+    // Build the packet list with per-packet chunks of up to 256 bytes.
+    // sizeof storage: header + N * (packet hdr + 256 bytes) — pick a
+    // generous static buffer that handles patches up to ~16 KB; for
+    // larger dumps the caller can split.
+    enum { MAX_SYSEX = 16384, CHUNK = 256 };
+    if (len > MAX_SYSEX) return MMSYSERR_ERROR;
+    Byte buf[MAX_SYSEX + 1024];
+    MIDIPacketList *pl = (MIDIPacketList *)buf;
+    MIDIPacket *pkt = MIDIPacketListInit(pl);
+
+    int offset = 0;
+    while (offset < len) {
+        int chunk = len - offset;
+        if (chunk > CHUNK) chunk = CHUNK;
+        pkt = MIDIPacketListAdd(pl, sizeof(buf), pkt, 0,
+                                (UInt16)chunk, bytes + offset);
+        if (!pkt) return MMSYSERR_ERROR;
+        offset += chunk;
+    }
+
+    // First attempt with the cached endpoint.
+    if (ctx->endpoint != 0) {
+        if (MIDISend(ctx->out_port, ctx->endpoint, pl) == noErr) {
+            return MMSYSERR_NOERROR;
+        }
+    }
+    // Recovery: re-resolve endpoint by name (same pattern as the short
+    // message path) and retry once before giving up.
+    if (ctx->endpoint_name[0] != '\0') {
+        MIDIEndpointRef fresh = zt_coremidi_find_destination_by_name(ctx->endpoint_name);
+        if (fresh != 0 && fresh != ctx->endpoint) {
+            ctx->endpoint = fresh;
+            if (MIDISend(ctx->out_port, ctx->endpoint, pl) == noErr) {
+                return MMSYSERR_NOERROR;
+            }
+        }
+    }
+    return MMSYSERR_ERROR;
+}
+
 static inline void zt_coremidi_emit_data(zt_coremidi_in_handle *ctx, unsigned int packed_msg) {
     if (!ctx || !ctx->callback) {
         return;
     }
     ctx->callback((HMIDIIN)ctx, MIM_DATA, ctx->instance, (DWORD_PTR)packed_msg, 0);
 }
+
+// Forward declaration of the SysEx queue producer; defined in
+// src/sysex_inq.cpp. Declared inline here so the CoreMIDI callback
+// (which lives in this header) can push without dragging the queue
+// header into every translation unit that includes winmm_compat.h.
+extern "C" int zt_sysex_inq_push(const unsigned char *bytes, int len);
 
 static inline void zt_coremidi_read_proc(const MIDIPacketList *packet_list, void *read_proc_ref_con, void *) {
     zt_coremidi_in_handle *ctx = (zt_coremidi_in_handle *)read_proc_ref_con;
@@ -543,6 +643,46 @@ static inline void zt_coremidi_read_proc(const MIDIPacketList *packet_list, void
         UInt16 i = 0;
         while (i < packet->length) {
             unsigned char b = data[i];
+
+            // SysEx accumulator. F0 starts a frame; every byte (including
+            // realtime bytes 0xF8..0xFF, which the spec allows mid-SysEx
+            // -- we leave them in the buffer rather than splitting) is
+            // appended until F7 closes it. On overflow we drop the frame
+            // and reset; on a non-F7 status byte interrupting the dump
+            // we drop too (protocol violation).
+            if (ctx->sysex_active) {
+                if ((int)ctx->sysex_len < (int)sizeof(ctx->sysex_buf)) {
+                    ctx->sysex_buf[ctx->sysex_len++] = b;
+                }
+                if (b == 0xF7) {
+                    if ((int)ctx->sysex_len <= (int)sizeof(ctx->sysex_buf)) {
+                        zt_sysex_inq_push(ctx->sysex_buf, ctx->sysex_len);
+                    }
+                    ctx->sysex_active = 0;
+                    ctx->sysex_len = 0;
+                    i++;
+                    continue;
+                }
+                if ((b & 0x80U) != 0U && b < 0xF8) {
+                    // Non-realtime status byte mid-SysEx -- abort.
+                    ctx->sysex_active = 0;
+                    ctx->sysex_len = 0;
+                    // Fall through so this byte gets handled normally below.
+                } else {
+                    i++;
+                    continue;
+                }
+            }
+
+            if (b == 0xF0) {
+                ctx->sysex_active = 1;
+                ctx->sysex_len = 0;
+                ctx->sysex_buf[ctx->sysex_len++] = b;
+                ctx->running_status = 0;
+                i++;
+                continue;
+            }
+
             if ((b & 0x80U) != 0U) {
                 if (b < 0xF0) {
                     ctx->running_status = b;
@@ -738,6 +878,10 @@ static inline MMRESULT midiOutOpen(HMIDIOUT *h, UINT, DWORD_PTR, DWORD_PTR, DWOR
 static inline MMRESULT midiOutClose(HMIDIOUT) { return MMSYSERR_ERROR; }
 static inline MMRESULT midiOutShortMsg(HMIDIOUT, DWORD) { return MMSYSERR_ERROR; }
 static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_ERROR; }
+// SysEx send fallback (no-op on platforms without a real backend).
+static inline MMRESULT zt_midi_out_sysex(HMIDIOUT, const unsigned char *, int) {
+    return MMSYSERR_ERROR;
+}
 #endif
 
 #if !defined(__APPLE__)

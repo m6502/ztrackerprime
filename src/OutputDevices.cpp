@@ -178,6 +178,16 @@ void MidiOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned cha
 	midiOutMsg( 0xB0 + chan, cc, value);
 }
 
+int MidiOutputDevice::sendSysEx(const unsigned char *bytes, int len) {
+    if (!this->opened || !bytes || len <= 0) return 0;
+    // Caller passes the full SysEx including 0xF0..0xF7 framing. Defensive
+    // check: at minimum we want F0 ... F7. If the caller forgot to frame
+    // we refuse rather than spit out a malformed byte stream that some
+    // synths interpret as random short messages.
+    if (bytes[0] != 0xF0 || bytes[len - 1] != 0xF7) return 0;
+    return zt_midi_out_sysex(handle, bytes, len) == MMSYSERR_NOERROR ? 1 : 0;
+}
+
 
 
 #ifdef _ENABLE_AUDIO    
