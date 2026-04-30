@@ -703,6 +703,13 @@ extern int cur_edit_column;
 extern int base_octave ;
 extern int cur_step;
 
+// CC drawmode -- when non-zero, the Pattern Editor's MIDI-in handler
+// captures incoming CC (0xB0) and Pitchbend (0xE0) messages and writes
+// them as `Sxxyy` (CC) / `Wxxxx` (PB) effects at the cursor row in the
+// current edit track, advancing the cursor by EditStep. Toggle with
+// Ctrl+Shift+§ from the Pattern Editor or from the ESC main menu.
+extern int g_cc_drawmode;
+
 extern int keypress;
 extern int keywait;
 extern zt_timer_handle keytimer;

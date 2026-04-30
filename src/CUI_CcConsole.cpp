@@ -121,6 +121,7 @@ CUI_CcConsole::CUI_CcConsole() {
     slot_cur = slot_top = 0;
     channel = 1;
     loaded = 0;
+    learning = 0;
     status_line[0] = '\0';
     folder[0] = '\0';
     num_files = 0;
@@ -145,10 +146,12 @@ void CUI_CcConsole::load_selected(void) {
     if (zt_ccizer_load(path, &g_loaded) == 0) {
         loaded = 1;
         slot_cur = slot_top = 0;
+        zt_ccizer_set_current_file(&g_loaded);
         snprintf(status_line, sizeof(status_line),
                  "Loaded %s — %d slot(s).", g_loaded.basename, g_loaded.num_slots);
     } else {
         loaded = 0;
+        zt_ccizer_set_current_file(NULL);
         snprintf(status_line, sizeof(status_line),
                  "Failed to load %s.", files[file_cur]);
     }
@@ -159,7 +162,7 @@ void CUI_CcConsole::enter(void) {
     rescan_folder();
     if (!loaded && num_files > 0) load_selected();
     snprintf(status_line, sizeof(status_line),
-             "Tab: focus  Up/Dn: pick  Enter: load  Left/Right: value  V: slider/knob  [/]: ch  Ctrl+S: save  ESC: exit");
+             "Tab focus | Lt/Rt value | V slider/knob | L learn | U unbind | [/] ch | Ctrl+S save | ESC exit");
     Keys.flush();
 }
 
@@ -168,12 +171,56 @@ void CUI_CcConsole::leave(void) {
 
 // --------- Update ---------
 void CUI_CcConsole::update(void) {
+    // ----- MIDI-in pump -----
+    // Drain any incoming MIDI messages while on this page. In Learn mode
+    // we capture (status, data1) into the focused slot. Always: a CC/PB
+    // message that matches a learnt slot updates that slot's value (and
+    // moves the cursor to it for visual feedback).
+    while (midiInQueue.size() > 0) {
+        int dw = midiInQueue.pop();
+        unsigned char status = (unsigned char)(dw & 0xFF);
+        unsigned char d1     = (unsigned char)((dw >> 8)  & 0x7F);
+        unsigned char d2     = (unsigned char)((dw >> 16) & 0x7F);
+        unsigned char hi     = status & 0xF0;
+
+        if (learning && (hi == 0xB0 || hi == 0xE0) && loaded &&
+            slot_cur >= 0 && slot_cur < g_loaded.num_slots) {
+            g_loaded.slots[slot_cur].learn_status = status;
+            g_loaded.slots[slot_cur].learn_data1  = (hi == 0xE0) ? 0 : d1;
+            learning = 0;
+            snprintf(status_line, sizeof(status_line),
+                     "Learnt %s%s slot %d <- status %02X data1 %02X  (Ctrl+S to save)",
+                     g_loaded.basename, "",
+                     slot_cur + 1, status, d1);
+            continue;
+        }
+
+        if (loaded && (hi == 0xB0 || hi == 0xE0)) {
+            int match = zt_ccizer_find_learn_match(
+                &g_loaded, status, (hi == 0xE0) ? 0 : d1);
+            if (match >= 0) {
+                ZtCcizerSlot *m = &g_loaded.slots[match];
+                if (hi == 0xE0) m->value = (unsigned short)(d1 | (d2 << 7));
+                else            m->value = d2;
+                slot_cur = match;
+                snprintf(status_line, sizeof(status_line),
+                         "%s = %d  (learnt slot %d)",
+                         m->name, (int)m->value, match + 1);
+            }
+        }
+    }
+
     if (!Keys.size()) return;
 
     KBMod  kstate = Keys.getstate();
     KBKey  key    = Keys.getkey();
 
     if (key == SDLK_ESCAPE) {
+        if (learning) {
+            learning = 0;
+            snprintf(status_line, sizeof(status_line), "Learn cancelled.");
+            return;
+        }
         switch_page(UIP_Patterneditor);
         return;
     }
@@ -196,13 +243,15 @@ void CUI_CcConsole::update(void) {
 
     if ((kstate & KS_CTRL) && !(kstate & KS_SHIFT) && key == SDLK_S) {
         if (loaded) {
-            int rc = zt_ccizer_save_view_sidecar(&g_loaded);
-            if (rc == 0) {
+            int rc1 = zt_ccizer_save_view_sidecar(&g_loaded);
+            int rc2 = zt_ccizer_save_learn_sidecar(&g_loaded);
+            if (rc1 == 0 && rc2 == 0) {
                 snprintf(status_line, sizeof(status_line),
-                         "Saved %s.cc-view.", g_loaded.basename);
+                         "Saved %s.cc-view + %s.cc-midi.",
+                         g_loaded.basename, g_loaded.basename);
             } else {
                 snprintf(status_line, sizeof(status_line),
-                         "Failed to save sidecar (%d).", rc);
+                         "Failed to save sidecar (view=%d learn=%d).", rc1, rc2);
             }
         }
         return;
@@ -267,6 +316,29 @@ void CUI_CcConsole::update(void) {
                  "%s view = %s  (Ctrl+S to save)",
                  s->name,
                  s->view == ZT_CCIZER_VIEW_KNOB ? "knob" : "slider");
+        return;
+    }
+    if (key == SDLK_L) {
+        // Toggle MIDI Learn for the focused slot. While learning, the
+        // next incoming CC/PB binds to slot_cur (handled in the MIDI-in
+        // pump above).
+        learning = !learning;
+        if (learning) {
+            midiInQueue.clear();
+            snprintf(status_line, sizeof(status_line),
+                     "LEARN: send a knob/CC/pitchbend for slot %d (%s)  ESC/L cancel",
+                     slot_cur + 1, s->name);
+        } else {
+            snprintf(status_line, sizeof(status_line), "Learn cancelled.");
+        }
+        return;
+    }
+    if (key == SDLK_U && loaded && slot_cur < g_loaded.num_slots) {
+        // Unbind learn for focused slot.
+        s->learn_status = 0;
+        s->learn_data1  = 0;
+        snprintf(status_line, sizeof(status_line),
+                 "Unbound learn for slot %d  (Ctrl+S to save)", slot_cur + 1);
         return;
     }
     // SPACE re-fires the current value (useful for testing wiring).
@@ -336,7 +408,7 @@ void CUI_CcConsole::draw(Drawable *S) {
 
     // ----- Slot grid pane -----
     print(col(CC_GRID_X), row(CC_GRID_Y - 1),
-          "Slot CC#  Name              View  Value",
+          "Slot CC#  Name              View          Value  Learn",
           focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
 
     if (!loaded) {
@@ -372,11 +444,22 @@ void CUI_CcConsole::draw(Drawable *S) {
                 snprintf(view_str, sizeof(view_str), "%s", bar);
             }
 
-            char line[160];
+            char learn_str[16];
+            if (s->learn_status == 0) {
+                snprintf(learn_str, sizeof(learn_str), "----");
+            } else if ((s->learn_status & 0xF0) == 0xE0) {
+                snprintf(learn_str, sizeof(learn_str), "PB ch%d",
+                         (s->learn_status & 0x0F) + 1);
+            } else {
+                snprintf(learn_str, sizeof(learn_str), "%02X %02X",
+                         s->learn_status, s->learn_data1);
+            }
+            char line[200];
             snprintf(line, sizeof(line),
-                     "%c %3d  %-3s  %-16.16s %-15s %5d",
+                     "%c %3d  %-3s  %-16.16s %-13s %5d  %-6s",
                      (idx == slot_cur) ? '>' : ' ',
-                     idx + 1, cc_lbl, s->name, view_str, (int)s->value);
+                     idx + 1, cc_lbl, s->name, view_str, (int)s->value,
+                     learn_str);
 
             TColor fg = (idx == slot_cur)
                             ? (focus == 1 ? COLORS.Brighttext : COLORS.Text)

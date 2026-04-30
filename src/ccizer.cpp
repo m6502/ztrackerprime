@@ -8,6 +8,8 @@
 
 #ifdef _WIN32
 #  include <windows.h>
+#  include <io.h>
+#  define unlink _unlink
 #else
 #  include <dirent.h>
 #  include <unistd.h>
@@ -94,7 +96,7 @@ int zt_ccizer_load(const char *path, ZtCcizerFile *out) {
     }
     fclose(fp);
 
-    // Read sidecar if present.
+    // Read .cc-view sidecar if present.
     char sidecar[1280];
     path_swap_extension(path, ".cc-view", sidecar, sizeof(sidecar));
     FILE *vfp = fopen(sidecar, "r");
@@ -115,8 +117,70 @@ int zt_ccizer_load(const char *path, ZtCcizerFile *out) {
         fclose(vfp);
     }
 
+    // Read .cc-midi sidecar if present. Format per line:
+    //   <slot> <status hex> <data1 hex>
+    // e.g. "2 B0 4A"
+    path_swap_extension(path, ".cc-midi", sidecar, sizeof(sidecar));
+    FILE *mfp = fopen(sidecar, "r");
+    if (mfp) {
+        while (fgets(line, sizeof(line), mfp)) {
+            rstrip(line);
+            if (line[0] == '#' || line[0] == '\0') continue;
+            int slot_idx = 0;
+            unsigned int st = 0, d1 = 0;
+            if (sscanf(line, "%d %x %x", &slot_idx, &st, &d1) == 3 &&
+                slot_idx >= 1 && slot_idx <= out->num_slots) {
+                ZtCcizerSlot *s = &out->slots[slot_idx - 1];
+                s->learn_status = (unsigned char)(st & 0xFF);
+                s->learn_data1  = (unsigned char)(d1 & 0x7F);
+            }
+        }
+        fclose(mfp);
+    }
+
     return 0;
 }
+
+int zt_ccizer_save_learn_sidecar(const ZtCcizerFile *f) {
+    if (!f || !f->path[0]) return -1;
+    char sidecar[1280];
+    path_swap_extension(f->path, ".cc-midi", sidecar, sizeof(sidecar));
+    FILE *fp = fopen(sidecar, "w");
+    if (!fp) return -2;
+    fprintf(fp, "# zTracker CC Console MIDI Learn -- slot, status (hex), data1 (hex)\n");
+    int wrote = 0;
+    for (int i = 0; i < f->num_slots; i++) {
+        if (f->slots[i].learn_status == 0) continue;
+        fprintf(fp, "%d %02X %02X\n", i + 1,
+                f->slots[i].learn_status, f->slots[i].learn_data1);
+        wrote++;
+    }
+    fclose(fp);
+    if (wrote == 0) {
+        // No mappings -> remove the file entirely so the next load doesn't
+        // resurrect a stale sidecar.
+        unlink(sidecar);
+    }
+    return 0;
+}
+
+int zt_ccizer_find_learn_match(const ZtCcizerFile *f,
+                               unsigned char status,
+                               unsigned char data1) {
+    if (!f) return -1;
+    for (int i = 0; i < f->num_slots; i++) {
+        if (f->slots[i].learn_status == status &&
+            f->slots[i].learn_data1  == data1) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static ZtCcizerFile *g_ccizer_current = NULL;
+
+ZtCcizerFile *zt_ccizer_current_file() { return g_ccizer_current; }
+void zt_ccizer_set_current_file(ZtCcizerFile *f) { g_ccizer_current = f; }
 
 int zt_ccizer_save_view_sidecar(const ZtCcizerFile *f) {
     if (!f || !f->path[0]) return -1;

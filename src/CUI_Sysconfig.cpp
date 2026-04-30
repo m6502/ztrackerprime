@@ -448,6 +448,17 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ml->bscb = cb; // link midi out list to bank select checkbox
         ml->al = ti;
 
+        // CCizer folder picker. Appended at the END of tabindex so the
+        // earlier UI->get_element(N) literal indices in update() (1=Prebuffer,
+        // 5=Full Screen, etc.) keep working. Label drawn in draw() below.
+        ti = new TextInput;
+        UI->add_element(ti, tabindex++);
+        ti->frame  = 1;
+        ti->x      = 4 + 16;                          // matches left-column controls
+        ti->y      = base_y + 7;                      // gap row 6 between Record Velocity (+5) and this
+        ti->xsize  = 56;                              // ends ~col 76, matches MIDI Out list right edge
+        ti->length = MAX_PATH;
+        ti->str    = (unsigned char*)zt_config_globals.ccizer_folder;
 }
 
 void CUI_Sysconfig::enter(void) {
@@ -508,6 +519,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
 
         print(row(4),col(TRACKS_ROW_Y+7),"    Full Screen",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+10),"  CCizer Folder",COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
         print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);
