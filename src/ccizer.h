@@ -31,6 +31,11 @@ struct ZtCcizerSlot {
     char name[64];
     unsigned char view;        // ZT_CCIZER_VIEW_SLIDER | _KNOB
     unsigned short value;      // 0..127 normally, 0..16383 when cc==PB_MARKER
+
+    // MIDI Learn: incoming (status, data1) that maps to this slot.
+    // learn_status == 0 => unmapped. Persisted in the `.cc-midi` sidecar.
+    unsigned char learn_status;
+    unsigned char learn_data1;
 };
 
 struct ZtCcizerFile {
@@ -49,6 +54,17 @@ int  zt_ccizer_load(const char *path, ZtCcizerFile *out);
 // Path is `<f->path>` with the trailing ".txt" replaced by ".cc-view".
 // Returns 0 on success.
 int  zt_ccizer_save_view_sidecar(const ZtCcizerFile *f);
+
+// Write the .cc-midi sidecar for `f` based on each slot's learn_status
+// / learn_data1 fields. Slots with learn_status==0 are skipped. Path is
+// `<f->path>` with `.txt` replaced by `.cc-midi`.
+int  zt_ccizer_save_learn_sidecar(const ZtCcizerFile *f);
+
+// Match an incoming (status, data1) pair against any learnt slot. Returns
+// the matching slot index (0-based) or -1 on no match.
+int  zt_ccizer_find_learn_match(const ZtCcizerFile *f,
+                                unsigned char status,
+                                unsigned char data1);
 
 // Scan `dir` for files ending in ".txt". Returns sorted basenames in `out`,
 // up to `max_results`. Returns count.

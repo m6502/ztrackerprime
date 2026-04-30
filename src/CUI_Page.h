@@ -513,6 +513,7 @@ class CUI_CcConsole : public CUI_Page {
         int slot_top;       // scroll offset for slot grid
         int channel;        // 1..16
         int loaded;         // is `loaded_file` populated?
+        int learning;       // 0 = browsing, 1 = waiting for incoming MIDI to learn-bind to slot_cur
         char status_line[160];
         char folder[1024];
         int  num_files;
