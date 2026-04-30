@@ -66,6 +66,13 @@ int  zt_ccizer_find_learn_match(const ZtCcizerFile *f,
                                 unsigned char status,
                                 unsigned char data1);
 
+// Process-wide currently-loaded CC Console file pointer. The CC Console
+// writes to it when a file is loaded; the Pattern Editor reads it to
+// pretty-print learnt slot names in status messages while CC drawmode
+// is on. May be NULL if nothing has been loaded this session.
+extern ZtCcizerFile *zt_ccizer_current_file();
+void zt_ccizer_set_current_file(ZtCcizerFile *f);
+
 // Scan `dir` for files ending in ".txt". Returns sorted basenames in `out`,
 // up to `max_results`. Returns count.
 int  zt_ccizer_list_dir(const char *dir, char (*out)[256], int max_results);

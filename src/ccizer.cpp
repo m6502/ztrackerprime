@@ -177,6 +177,11 @@ int zt_ccizer_find_learn_match(const ZtCcizerFile *f,
     return -1;
 }
 
+static ZtCcizerFile *g_ccizer_current = NULL;
+
+ZtCcizerFile *zt_ccizer_current_file() { return g_ccizer_current; }
+void zt_ccizer_set_current_file(ZtCcizerFile *f) { g_ccizer_current = f; }
+
 int zt_ccizer_save_view_sidecar(const ZtCcizerFile *f) {
     if (!f || !f->path[0]) return -1;
     char sidecar[1280];

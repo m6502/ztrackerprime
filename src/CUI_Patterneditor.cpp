@@ -1,5 +1,6 @@
 #include "zt.h"
 #include "platform/undo.h"
+#include "ccizer.h"
 
 // KS_META stub for Cmd key support (SDL3 maps macOS Cmd to SDL_KMOD_GUI).
 // Currently keybuffer does not translate GUI -> KS_META, so KS_META is a
@@ -3113,22 +3114,42 @@ case SDLK_DELETE:
               if (g_cc_drawmode && (hi == 0xB0 || hi == 0xE0)) {
                 int data1 = (dw >> 8)  & 0x7F;
                 int data2 = (dw >> 16) & 0x7F;
+                // Look up the friendly slot name from the currently-loaded
+                // CCizer file (if any) — matches by learn binding so we
+                // get "Cutoff" instead of "CC 74" in the status line.
+                const char *slot_name = NULL;
+                ZtCcizerFile *cf = zt_ccizer_current_file();
+                if (cf) {
+                  int m = zt_ccizer_find_learn_match(
+                      cf, status, (hi == 0xE0) ? 0 : (unsigned char)data1);
+                  if (m >= 0) slot_name = cf->slots[m].name;
+                }
                 if (hi == 0xB0) {
                   // S<cc>:<val>  ->  effect 'S', effect_data = (cc<<8) | val
                   unsigned short eff_data = (unsigned short)((data1 << 8) | data2);
                   song->patterns[cur_edit_pattern]
                        ->tracks[cur_edit_track]
                        ->update_event(cur_edit_row, -1, -1, -1, -1, 'S', eff_data);
-                  sprintf(szStatmsg, "Drew S%02X%02X (CC %d = %d) at row %02X",
-                          data1, data2, data1, data2, cur_edit_row);
+                  if (slot_name) {
+                    sprintf(szStatmsg, "Drew S%02X%02X [%s = %d] at row %02X",
+                            data1, data2, slot_name, data2, cur_edit_row);
+                  } else {
+                    sprintf(szStatmsg, "Drew S%02X%02X (CC %d = %d) at row %02X",
+                            data1, data2, data1, data2, cur_edit_row);
+                  }
                 } else {
                   // W<14bit pitchbend>  ->  effect 'W', effect_data = lsb|(msb<<7)
                   unsigned short pb14 = (unsigned short)(data1 | (data2 << 7));
                   song->patterns[cur_edit_pattern]
                        ->tracks[cur_edit_track]
                        ->update_event(cur_edit_row, -1, -1, -1, -1, 'W', pb14);
-                  sprintf(szStatmsg, "Drew W%04X (PB %d) at row %02X",
-                          pb14, pb14, cur_edit_row);
+                  if (slot_name) {
+                    sprintf(szStatmsg, "Drew W%04X [%s = %d] at row %02X",
+                            pb14, slot_name, pb14, cur_edit_row);
+                  } else {
+                    sprintf(szStatmsg, "Drew W%04X (PB %d) at row %02X",
+                            pb14, pb14, cur_edit_row);
+                  }
                 }
                 statusmsg = szStatmsg; status_change = 1;
                 file_changed++;

@@ -146,10 +146,12 @@ void CUI_CcConsole::load_selected(void) {
     if (zt_ccizer_load(path, &g_loaded) == 0) {
         loaded = 1;
         slot_cur = slot_top = 0;
+        zt_ccizer_set_current_file(&g_loaded);
         snprintf(status_line, sizeof(status_line),
                  "Loaded %s — %d slot(s).", g_loaded.basename, g_loaded.num_slots);
     } else {
         loaded = 0;
+        zt_ccizer_set_current_file(NULL);
         snprintf(status_line, sizeof(status_line),
                  "Failed to load %s.", files[file_cur]);
     }
