@@ -283,6 +283,7 @@ void CUI_SysExLibrarian::drain_recv(void) {
 
         // Refresh the file list so the new file shows up immediately.
         rescan_folder();
+        need_refresh++;
     }
 }
 
@@ -292,6 +293,7 @@ void CUI_SysExLibrarian::enter(void) {
     snprintf(status_line, sizeof(status_line),
              "Up/Dn pick file | Enter or S send | R rescan | C clear log | ESC exit");
     Keys.flush();
+    need_refresh++;
 }
 
 void CUI_SysExLibrarian::leave(void) {
@@ -310,25 +312,30 @@ void CUI_SysExLibrarian::update(void) {
     }
     if (key == SDLK_UP) {
         if (file_cur > 0) file_cur--;
+        need_refresh++;
         return;
     }
     if (key == SDLK_DOWN) {
         if (file_cur + 1 < num_files) file_cur++;
+        need_refresh++;
         return;
     }
     if (key == SDLK_RETURN || key == SDLK_S) {
         send_selected();
+        need_refresh++;
         return;
     }
     if (key == SDLK_R) {
         rescan_folder();
         snprintf(status_line, sizeof(status_line),
                  "Rescanned: %d file(s) in %s", num_files, folder);
+        need_refresh++;
         return;
     }
     if (key == SDLK_C) {
         recent_count = 0;
         snprintf(status_line, sizeof(status_line), "Recent log cleared.");
+        need_refresh++;
         return;
     }
 }

@@ -136,6 +136,16 @@ Seven-PR feature stack landed end of April 2026 wiring Paketti-style CCizer bank
 - `tests/test_sysex_inq.cpp` — ~25 checks: empty / push-pop / FIFO / overflow / buffer-too-small / invalid input.
 - `tests/test_sysex_macro.cpp` — ~20 checks: predicate, path resolution, valid/malformed/oversized/missing file read.
 
+## INVARIANT: pages must bump `need_refresh` and use real widgets
+
+`main.cpp` gates `ActivePage->draw()` on `need_refresh != 0`. Two non-negotiable rules for any page added or modified:
+
+1. **Every key handler that mutates visible state ends with `need_refresh++;`** (and so does `enter()`, and any background pump that changes what should be on screen). Forget this and arrow keys silently mutate state without a redraw — the page looks frozen until some other path bumps the flag.
+
+2. **Interactive elements are real widgets, not ASCII art.** If the user is supposed to click a slider, the slider is a `ValueSlider` registered with `UI->add_element`, drawn by `UI->draw(S)`, mutated by `ValueSlider::mouseupdate`, and absorbed by the page's `update()` reading the `changed` flag. **Never** ship `printBG` text bars as a stand-in for "we'll iterate later" — they are visually identical in a screenshot but completely unclickable, and the user finds out by trying. The pool-of-N pattern (pre-allocate `N` widgets in the ctor, position the visible window per-frame, hide off-screen ones with `xsize=0`) is the idiom for variable-count slot grids; `CUI_CcConsole.cpp::position_sliders` is a worked example.
+
+Both rules were learnt the hard way during the CCizer / SysEx work — see PR #78 (text-bars regression) and the followup that wired real `ValueSlider`s + `need_refresh` bumps. Treat them as load-bearing for any new page.
+
 ## Deeper references (load on demand)
 
 - [`references/foot-guns.md`](references/foot-guns.md) — recurring bug classes: ListBox mousestate fragility, widget-upstream rule, user-reported-inputs-as-ground-truth.
