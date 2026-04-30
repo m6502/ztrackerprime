@@ -3,35 +3,53 @@
  * FILE  CUI_CcConsole.cpp
  *
  * DESCRIPTION
- *   CC Console (Shift+F3). Loads Paketti CCizer-format `.txt` files from
- *   the configured ccizer_folder and lets the user send MIDI Control
- *   Change (and Pitch Bend) messages out to the current MIDI Out device
- *   via on-screen sliders or knobs.
+ *   CC Console (Shift+F3). Real ValueSlider widgets per slot — mouse-
+ *   clickable, keyboard-adjustable. Tweak fires MIDI CC (or 14-bit
+ *   Pitchbend for `PB` slots) on the current channel out the current
+ *   MIDI Out device.
  *
- *   Layout:
- *     +-- Files ----------+  +-- <basename> -------------------------+
- *     | a.txt             |  |  Slot  CC   Name        View   Value |
- *     | b.txt             |  |   1    PB   Pitchbend   slider  64   |
- *     |▶c.txt             |  |   2    1    Mod         knob    23   |
- *     | ...               |  |   3    7    Volume      slider  100  |
- *     +-------------------+  +---------------------------------------+
+ *   Layout (one row per slot):
+ *
+ *     +-- Files ---------+   Slot CC#  Name              [slider]  val   Learn
+ *     | a.txt            |    > 1   PB  Pitchbend        [#####--]  8192 PB ch1
+ *     |>b.txt            |      2    1  Mod              [###----]    45 B0 4A
+ *     | ...              |      3    7  Volume           [######-]   100 ----
+ *     +------------------+    ...
+ *
+ *   Sliders are widgets in the page's UserInterface. Tab cycling
+ *   between them is disabled (no_tab_stop=1) so Tab still toggles
+ *   focus between Files pane / slot grid (page-level), and Up/Dn
+ *   walk through slot_cur (page-level). The slider widgets are pool-
+ *   allocated up to ZT_CCIZER_MAX_SLOTS (128) — positioned per-frame
+ *   based on slot_top so vertical scrolling reuses the same widgets.
+ *   Off-screen sliders get xsize=0 which disables their draw / mouse
+ *   / keyboard paths in ValueSlider::update().
+ *
+ *   Mouse interaction: click anywhere on a slider's bar to set its
+ *   value to that fractional position (ValueSlider's built-in
+ *   mouseupdate). Drag to scrub. The page's update() detects each
+ *   slider's `changed` flag after UI->update() and calls send_slot
+ *   so every motion sends MIDI in real time.
  *
  *   Keys:
- *     Tab          toggle focus (file list <-> slot grid)
- *     Up/Down      move selection
- *     Enter        load focused file
- *     Left/Right   adjust value (Shift = ×8, Ctrl = ×16)
- *     V            toggle slider <-> knob for focused slot
- *     [ / ]        decrement / increment MIDI channel
- *     Backspace    reset focused slot value to default
- *     Ctrl+S       save .cc-view sidecar
- *     ESC          back to Pattern Editor
+ *     Tab          toggle focus (Files <-> slot grid)
+ *     Up/Dn        move selection within focused pane
+ *     Enter        load focused file (Files pane only)
+ *     Lt/Rt        adjust focused slot's value (in slot grid)
+ *                    Shift = step×8, Ctrl = step×16
+ *     Backspace    reset focused slot's value
+ *     L            MIDI Learn for focused slot (next CC/PB binds)
+ *     U            unbind learn for focused slot
+ *     B            assign loaded file as current instrument's bank
+ *     Shift+B      clear current instrument's bank
+ *     [ / ]        adjust MIDI channel
+ *     Space        re-send focused slot's current value
+ *     Ctrl+S       save .cc-view + .cc-midi sidecars
+ *     ESC          back to Pattern Editor (cancels Learn first if active)
  *
- *   The .cc-view sidecar persists slider/knob choices next to the .txt
- *   so the Paketti file itself stays untouched.
- *
- *   Pattern-drawing, per-instrument bank assignment, and CC MIDI Learn
- *   are deferred -- see docs/plans/cc-followup-todo.md.
+ *   Every key handler bumps `need_refresh++` because the main loop
+ *   gates page draw() on it (see main.cpp `if (need_refresh)`). Forget
+ *   the bump and the screen freezes on input.
  *
  ******/
 #include "zt.h"
@@ -40,16 +58,30 @@
 #include <stdio.h>
 #include <string.h>
 
-// --------- Layout constants ---------
+// ---------- Layout constants ----------
 #define CC_BASE_Y       (TRACKS_ROW_Y + 0)
+
+// File list pane (left)
 #define CC_FILE_X       2
 #define CC_FILE_Y       (CC_BASE_Y + 2)
-#define CC_FILE_W       24
-#define CC_GRID_X       (CC_FILE_X + CC_FILE_W + 2)
+#define CC_FILE_W       26
+
+// Slot grid pane (right)
+#define CC_GRID_X       (CC_FILE_X + CC_FILE_W + 2)   // = 30
 #define CC_GRID_Y       (CC_BASE_Y + 2)
-#define CC_GRID_W_COLS  46
-#define CC_BAR_W        12
+#define CC_SLOT_COL     CC_GRID_X                      // "  1 " or "> 1 "
+#define CC_CC_COL       (CC_GRID_X + 5)                // "PB  " or "127 "
+#define CC_NAME_COL     (CC_GRID_X + 9)                // 17-char field
+#define CC_SLIDER_X     (CC_GRID_X + 27)               // ValueSlider widget x
+#define CC_SLIDER_W     10                             // ValueSlider xsize
+#define CC_LEARN_COL    (CC_SLIDER_X + CC_SLIDER_W + 5) // "B0 4A" or "PB ch3" or "----"
+
 #define CC_SPACE_BOTTOM 8
+
+// IDs for tagged UI elements. The slider pool starts at CC_SLIDER_ID_BASE
+// and runs for ZT_CCIZER_MAX_SLOTS — using a high base avoids collision
+// with the (currently empty) tab-stop pool.
+#define CC_SLIDER_ID_BASE 100
 
 static ZtCcizerFile g_loaded;
 
@@ -69,7 +101,6 @@ static void send_slot(const ZtCcizerSlot *s, int channel) {
         }
     }
     if (dev < 0) {
-        // Fall back to first opened device.
         for (int i = 0; i < (int)MidiOut->numOuputDevices; i++) {
             if (MidiOut->outputDevices[i] && MidiOut->outputDevices[i]->opened) {
                 dev = i; break;
@@ -87,30 +118,12 @@ static void send_slot(const ZtCcizerSlot *s, int channel) {
     }
 }
 
-// Build a textual slider bar, e.g. "[####------]"
-static void render_bar(char *buf, size_t bsz, int val, int maxv) {
-    if (maxv <= 0) maxv = 1;
-    int w = CC_BAR_W;
-    int filled = (val * w) / maxv;
-    if (filled < 0) filled = 0;
-    if (filled > w) filled = w;
-    if ((int)bsz < w + 3) { buf[0] = '\0'; return; }
-    buf[0] = '[';
-    for (int i = 0; i < w; i++) buf[1 + i] = (i < filled) ? '#' : '-';
-    buf[1 + w] = ']';
-    buf[2 + w] = '\0';
+static int slot_max(const ZtCcizerSlot *s) {
+    return (s->cc == ZT_CCIZER_PB_MARKER) ? 16383 : 127;
 }
 
-// Build a 2-char "knob" representation.  Eight detents drawn as one of
-// "<.", "<:", "<|", ":|", "|>", "|:", ":>", ".>".
-static void render_knob(char *buf, size_t bsz, int val, int maxv) {
-    static const char *frames[8] = {
-        "<.", "<:", "<|", ":|", "|>", "|:", ":>", ".>"
-    };
-    if (maxv <= 0) maxv = 1;
-    int idx = (val * 8) / (maxv + 1);
-    if (idx < 0) idx = 0; if (idx > 7) idx = 7;
-    snprintf(buf, bsz, "%s", frames[idx]);
+static int slot_default(const ZtCcizerSlot *s) {
+    return (s->cc == ZT_CCIZER_PB_MARKER) ? 8192 : 0;
 }
 
 // --------- Lifecycle ---------
@@ -125,7 +138,27 @@ CUI_CcConsole::CUI_CcConsole() {
     status_line[0] = '\0';
     folder[0] = '\0';
     num_files = 0;
+    last_visible_count = 0;
     memset(&g_loaded, 0, sizeof(g_loaded));
+    memset(last_values, 0, sizeof(last_values));
+
+    // Pre-allocate the slider pool. Each is hidden (xsize=0) until a
+    // file load + position_sliders() configures it. Tab-stops disabled
+    // so Tab/Up/Down keyboard nav stays page-owned.
+    for (int i = 0; i < ZT_CCIZER_MAX_SLOTS; i++) {
+        ValueSlider *vs = new ValueSlider(0);
+        vs->no_tab_stop = 1;
+        vs->frame = 0;
+        vs->x = CC_SLIDER_X;
+        vs->y = 0;
+        vs->xsize = 0;          // hidden by default
+        vs->ysize = 1;
+        vs->min = 0;
+        vs->max = 127;
+        vs->value = 0;
+        UI->add_element(vs, CC_SLIDER_ID_BASE + i);
+        sliders[i] = vs;
+    }
 }
 
 void CUI_CcConsole::rescan_folder(void) {
@@ -143,10 +176,7 @@ void CUI_CcConsole::load_by_basename(const char *bn) {
     if (!bn || !*bn) return;
     if (folder[0] == '\0') rescan_folder();
     if (folder[0] == '\0') return;
-    // Skip if it's already loaded — avoids re-reading on every
-    // cur_inst-change tick when the user stays on one instrument.
     if (loaded && strcmp(g_loaded.basename, bn) == 0) return;
-    // Find it in the current folder list.
     for (int i = 0; i < num_files; i++) {
         if (strcmp(files[i], bn) == 0) {
             file_cur = i;
@@ -154,8 +184,6 @@ void CUI_CcConsole::load_by_basename(const char *bn) {
             return;
         }
     }
-    // Not in the configured folder — don't try to follow an absolute path.
-    // Just leave whatever is currently loaded; the user can switch folders.
 }
 
 void CUI_CcConsole::load_selected(void) {
@@ -166,6 +194,11 @@ void CUI_CcConsole::load_selected(void) {
         loaded = 1;
         slot_cur = slot_top = 0;
         zt_ccizer_set_current_file(&g_loaded);
+        // Seed last_values so we don't false-trigger send_slot on the
+        // first absorb pass after load.
+        for (int i = 0; i < ZT_CCIZER_MAX_SLOTS; i++) {
+            last_values[i] = (i < g_loaded.num_slots) ? g_loaded.slots[i].value : 0;
+        }
         snprintf(status_line, sizeof(status_line),
                  "Loaded %s — %d slot(s).", g_loaded.basename, g_loaded.num_slots);
     } else {
@@ -174,27 +207,99 @@ void CUI_CcConsole::load_selected(void) {
         snprintf(status_line, sizeof(status_line),
                  "Failed to load %s.", files[file_cur]);
     }
+    need_refresh++;
+}
+
+void CUI_CcConsole::position_sliders(int grid_max_rows) {
+    // Hide all sliders by default; activate the visible window.
+    for (int i = 0; i < ZT_CCIZER_MAX_SLOTS; i++) {
+        sliders[i]->xsize = 0;
+    }
+    if (!loaded || g_loaded.num_slots == 0) {
+        last_visible_count = 0;
+        return;
+    }
+    int n = g_loaded.num_slots;
+    if (n > ZT_CCIZER_MAX_SLOTS) n = ZT_CCIZER_MAX_SLOTS;
+
+    // Clamp scroll so slot_cur stays in view.
+    if (slot_cur < slot_top) slot_top = slot_cur;
+    if (slot_cur >= slot_top + grid_max_rows)
+        slot_top = slot_cur - grid_max_rows + 1;
+    if (slot_top < 0) slot_top = 0;
+    if (slot_top + grid_max_rows > n) slot_top = n - grid_max_rows;
+    if (slot_top < 0) slot_top = 0;
+
+    int visible = 0;
+    for (int row = 0; row < grid_max_rows; row++) {
+        int idx = slot_top + row;
+        if (idx >= n) break;
+        ZtCcizerSlot *s = &g_loaded.slots[idx];
+        ValueSlider *vs = sliders[idx];
+        vs->x = CC_SLIDER_X;
+        vs->y = CC_GRID_Y + row;
+        vs->xsize = CC_SLIDER_W;
+        vs->min = 0;
+        vs->max = slot_max(s);
+        vs->value = s->value;
+        last_values[idx] = s->value;
+        visible++;
+    }
+    last_visible_count = visible;
+}
+
+void CUI_CcConsole::absorb_slider_changes(void) {
+    if (!loaded) return;
+    int n = g_loaded.num_slots;
+    if (n > ZT_CCIZER_MAX_SLOTS) n = ZT_CCIZER_MAX_SLOTS;
+    for (int i = 0; i < n; i++) {
+        ValueSlider *vs = sliders[i];
+        if (vs->xsize == 0) continue;       // off-screen, skip
+        if (vs->value == last_values[i]) continue;
+        // User moved this slider (mouse drag or keyboard inside the
+        // widget). Copy back to the slot and fire send.
+        ZtCcizerSlot *s = &g_loaded.slots[i];
+        int v = vs->value;
+        if (v < 0) v = 0;
+        if (v > slot_max(s)) v = slot_max(s);
+        s->value = (unsigned short)v;
+        last_values[i] = v;
+        slot_cur = i;
+        send_slot(s, channel);
+        snprintf(status_line, sizeof(status_line),
+                 "%s = %d  (ch %d)", s->name, v, channel);
+        need_refresh++;
+    }
 }
 
 void CUI_CcConsole::enter(void) {
     cur_state = STATE_CCCONSOLE;
+    learning = 0;          // never enter the page mid-learn
     rescan_folder();
     if (!loaded && num_files > 0) load_selected();
     snprintf(status_line, sizeof(status_line),
-             "Tab | Lt/Rt val | V slider/knob | L learn | U unbind | B bank-to-inst | Shift+B clear | [/] ch | Ctrl+S | ESC");
+             "Tab focus | Up/Dn pick | Click slider | Lt/Rt val | L learn | U unbind | B bank | [/] ch | Ctrl+S | ESC");
     Keys.flush();
+    need_refresh++;
+    UI->enter();
 }
 
 void CUI_CcConsole::leave(void) {
+    learning = 0;
 }
 
 // --------- Update ---------
 void CUI_CcConsole::update(void) {
+    int total_rows    = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
+    int grid_max_rows = total_rows - CC_GRID_Y - CC_SPACE_BOTTOM - 2;
+    if (grid_max_rows < 4) grid_max_rows = 4;
+
+    // Reposition the slider widget pool every frame so scrolling /
+    // file-load / window-resize stay correct without explicit
+    // invalidation calls from every key handler.
+    position_sliders(grid_max_rows);
+
     // ----- MIDI-in pump -----
-    // Drain any incoming MIDI messages while on this page. In Learn mode
-    // we capture (status, data1) into the focused slot. Always: a CC/PB
-    // message that matches a learnt slot updates that slot's value (and
-    // moves the cursor to it for visual feedback).
     while (midiInQueue.size() > 0) {
         int dw = midiInQueue.pop();
         unsigned char status = (unsigned char)(dw & 0xFF);
@@ -208,9 +313,9 @@ void CUI_CcConsole::update(void) {
             g_loaded.slots[slot_cur].learn_data1  = (hi == 0xE0) ? 0 : d1;
             learning = 0;
             snprintf(status_line, sizeof(status_line),
-                     "Learnt %s%s slot %d <- status %02X data1 %02X  (Ctrl+S to save)",
-                     g_loaded.basename, "",
-                     slot_cur + 1, status, d1);
+                     "Learnt %s slot %d <- status %02X data1 %02X  (Ctrl+S to save)",
+                     g_loaded.basename, slot_cur + 1, status, d1);
+            need_refresh++;
             continue;
         }
 
@@ -222,22 +327,32 @@ void CUI_CcConsole::update(void) {
                 if (hi == 0xE0) m->value = (unsigned short)(d1 | (d2 << 7));
                 else            m->value = d2;
                 slot_cur = match;
+                if (match < ZT_CCIZER_MAX_SLOTS) {
+                    sliders[match]->value = m->value;
+                    last_values[match] = m->value;
+                }
                 snprintf(status_line, sizeof(status_line),
                          "%s = %d  (learnt slot %d)",
                          m->name, (int)m->value, match + 1);
+                need_refresh++;
             }
         }
     }
 
+    // ----- Widget update (mouse drag / keyboard inside slider) -----
+    UI->update();
+    absorb_slider_changes();
+
     if (!Keys.size()) return;
 
-    KBMod  kstate = Keys.getstate();
-    KBKey  key    = Keys.getkey();
+    KBMod kstate = Keys.getstate();
+    KBKey key   = Keys.getkey();
 
     if (key == SDLK_ESCAPE) {
         if (learning) {
             learning = 0;
             snprintf(status_line, sizeof(status_line), "Learn cancelled.");
+            need_refresh++;
             return;
         }
         switch_page(UIP_Patterneditor);
@@ -246,17 +361,20 @@ void CUI_CcConsole::update(void) {
 
     if (key == SDLK_TAB) {
         focus = (focus == 0) ? 1 : 0;
+        need_refresh++;
         return;
     }
 
     if (key == SDLK_LEFTBRACKET) {
         if (channel > 1) channel--;
         snprintf(status_line, sizeof(status_line), "Channel: %d", channel);
+        need_refresh++;
         return;
     }
     if (key == SDLK_RIGHTBRACKET) {
         if (channel < 16) channel++;
         snprintf(status_line, sizeof(status_line), "Channel: %d", channel);
+        need_refresh++;
         return;
     }
 
@@ -266,13 +384,13 @@ void CUI_CcConsole::update(void) {
             int rc2 = zt_ccizer_save_learn_sidecar(&g_loaded);
             if (rc1 == 0 && rc2 == 0) {
                 snprintf(status_line, sizeof(status_line),
-                         "Saved %s.cc-view + %s.cc-midi.",
-                         g_loaded.basename, g_loaded.basename);
+                         "Saved %s.cc-view + .cc-midi.", g_loaded.basename);
             } else {
                 snprintf(status_line, sizeof(status_line),
                          "Failed to save sidecar (view=%d learn=%d).", rc1, rc2);
             }
         }
+        need_refresh++;
         return;
     }
 
@@ -280,15 +398,18 @@ void CUI_CcConsole::update(void) {
     if (focus == 0) {
         if (key == SDLK_UP) {
             if (file_cur > 0) file_cur--;
+            need_refresh++;
             return;
         }
         if (key == SDLK_DOWN) {
             if (file_cur + 1 < num_files) file_cur++;
+            need_refresh++;
             return;
         }
         if (key == SDLK_RETURN) {
             load_selected();
             focus = 1;
+            need_refresh++;
             return;
         }
         return;
@@ -300,64 +421,70 @@ void CUI_CcConsole::update(void) {
 
     if (key == SDLK_UP) {
         if (slot_cur > 0) slot_cur--;
+        need_refresh++;
         return;
     }
     if (key == SDLK_DOWN) {
         if (slot_cur + 1 < g_loaded.num_slots) slot_cur++;
+        need_refresh++;
         return;
     }
     if (key == SDLK_LEFT || key == SDLK_RIGHT) {
-        int sign  = (key == SDLK_LEFT) ? -1 : 1;
-        int step  = 1;
+        int sign = (key == SDLK_LEFT) ? -1 : 1;
+        int step = 1;
         if (kstate & KS_SHIFT) step = 8;
         if (kstate & KS_CTRL)  step = 16;
-        int maxv  = (s->cc == ZT_CCIZER_PB_MARKER) ? 16383 : 127;
-        int v     = (int)s->value + sign * step;
+        int maxv = slot_max(s);
+        int v = (int)s->value + sign * step;
         if (v < 0) v = 0; if (v > maxv) v = maxv;
         s->value = (unsigned short)v;
+        if (slot_cur < ZT_CCIZER_MAX_SLOTS) {
+            sliders[slot_cur]->value = v;
+            last_values[slot_cur] = v;
+        }
         send_slot(s, channel);
         snprintf(status_line, sizeof(status_line),
                  "%s = %d  (ch %d)", s->name, v, channel);
+        need_refresh++;
         return;
     }
     if (key == SDLK_BACKSPACE || key == SDLK_DELETE) {
-        s->value = (s->cc == ZT_CCIZER_PB_MARKER) ? 8192 : 0;
+        s->value = (unsigned short)slot_default(s);
+        if (slot_cur < ZT_CCIZER_MAX_SLOTS) {
+            sliders[slot_cur]->value = s->value;
+            last_values[slot_cur] = s->value;
+        }
         send_slot(s, channel);
         snprintf(status_line, sizeof(status_line),
                  "%s reset to %d", s->name, (int)s->value);
-        return;
-    }
-    if (key == SDLK_V) {
-        s->view = (s->view == ZT_CCIZER_VIEW_KNOB)
-                     ? ZT_CCIZER_VIEW_SLIDER
-                     : ZT_CCIZER_VIEW_KNOB;
-        snprintf(status_line, sizeof(status_line),
-                 "%s view = %s  (Ctrl+S to save)",
-                 s->name,
-                 s->view == ZT_CCIZER_VIEW_KNOB ? "knob" : "slider");
+        need_refresh++;
         return;
     }
     if (key == SDLK_L) {
-        // Toggle MIDI Learn for the focused slot. While learning, the
-        // next incoming CC/PB binds to slot_cur (handled in the MIDI-in
-        // pump above).
         learning = !learning;
         if (learning) {
             midiInQueue.clear();
             snprintf(status_line, sizeof(status_line),
-                     "LEARN: send a knob/CC/pitchbend for slot %d (%s)  ESC/L cancel",
+                     "LEARN: send a CC/PB for slot %d (%s)  ESC/L cancel",
                      slot_cur + 1, s->name);
         } else {
             snprintf(status_line, sizeof(status_line), "Learn cancelled.");
         }
+        need_refresh++;
+        return;
+    }
+    if (key == SDLK_U) {
+        s->learn_status = 0;
+        s->learn_data1  = 0;
+        snprintf(status_line, sizeof(status_line),
+                 "Unbound learn for slot %d  (Ctrl+S to save)", slot_cur + 1);
+        need_refresh++;
         return;
     }
     if (key == SDLK_B) {
-        // Assign the currently-loaded file as the bank for the current
-        // instrument (Shift+B clears it). Persisted in the .zt file via
-        // the CCBN chunk on next save.
         if (cur_inst < 0 || cur_inst >= MAX_INSTS || !song->instruments[cur_inst]) {
             snprintf(status_line, sizeof(status_line), "No current instrument.");
+            need_refresh++;
             return;
         }
         if (kstate & KS_SHIFT) {
@@ -365,6 +492,7 @@ void CUI_CcConsole::update(void) {
             file_changed++;
             snprintf(status_line, sizeof(status_line),
                      "Cleared CCizer bank for inst %d.", cur_inst);
+            need_refresh++;
             return;
         }
         if (loaded) {
@@ -381,21 +509,14 @@ void CUI_CcConsole::update(void) {
             snprintf(status_line, sizeof(status_line),
                      "Load a file first (Enter on Files pane).");
         }
+        need_refresh++;
         return;
     }
-    if (key == SDLK_U && loaded && slot_cur < g_loaded.num_slots) {
-        // Unbind learn for focused slot.
-        s->learn_status = 0;
-        s->learn_data1  = 0;
-        snprintf(status_line, sizeof(status_line),
-                 "Unbound learn for slot %d  (Ctrl+S to save)", slot_cur + 1);
-        return;
-    }
-    // SPACE re-fires the current value (useful for testing wiring).
     if (key == SDLK_SPACE) {
         send_slot(s, channel);
         snprintf(status_line, sizeof(status_line),
                  "Sent %s = %d (ch %d)", s->name, (int)s->value, channel);
+        need_refresh++;
         return;
     }
 }
@@ -404,41 +525,34 @@ void CUI_CcConsole::update(void) {
 void CUI_CcConsole::draw(Drawable *S) {
     if (S->lock() != 0) return;
 
-    int total_rows = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
+    int total_rows    = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
     int grid_max_rows = total_rows - CC_GRID_Y - CC_SPACE_BOTTOM - 2;
     if (grid_max_rows < 4) grid_max_rows = 4;
-    int file_max_rows = grid_max_rows;
 
     S->fillRect(col(1), row(CC_BASE_Y - 1),
                 INTERNAL_RESOLUTION_X - 2,
                 row(CC_GRID_Y + grid_max_rows + 2),
                 COLORS.Background);
 
-    char title[128];
+    char title[160];
     snprintf(title, sizeof(title),
              "CC Console (Shift+F3)  ch %d%s",
-             channel, loaded ? "" : " — no file loaded");
+             channel, learning ? "  [LEARN]" : "");
     printtitle(PAGE_TITLE_ROW_Y, title, COLORS.Text, COLORS.Background, S);
 
-    // ----- File list pane -----
+    // ----- File list pane (left) -----
     print(col(CC_FILE_X), row(CC_FILE_Y - 1),
           "Files", focus == 0 ? COLORS.Brighttext : COLORS.Text, S);
     if (folder[0]) {
         char fbuf[256];
         snprintf(fbuf, sizeof(fbuf), "(%s)", folder);
-        print(col(CC_FILE_X), row(CC_FILE_Y + file_max_rows),
+        print(col(CC_FILE_X), row(CC_FILE_Y + grid_max_rows),
               fbuf, COLORS.Lowlight, S);
-    } else {
-        print(col(CC_FILE_X), row(CC_FILE_Y + file_max_rows),
-              "(set ccizer_folder in zt.conf or place files in ./ccizer)",
-              COLORS.Lowlight, S);
     }
-
     if (file_cur < file_top) file_top = file_cur;
-    if (file_cur >= file_top + file_max_rows)
-        file_top = file_cur - file_max_rows + 1;
-
-    for (int i = 0; i < file_max_rows && file_top + i < num_files; i++) {
+    if (file_cur >= file_top + grid_max_rows)
+        file_top = file_cur - grid_max_rows + 1;
+    for (int i = 0; i < grid_max_rows && file_top + i < num_files; i++) {
         int idx = file_top + i;
         TColor fg = (idx == file_cur)
                         ? (focus == 0 ? COLORS.Brighttext : COLORS.Text)
@@ -447,7 +561,7 @@ void CUI_CcConsole::draw(Drawable *S) {
                         ? COLORS.SelectedBGLow
                         : COLORS.Background;
         char line[64];
-        snprintf(line, sizeof(line), "%c %-22.22s",
+        snprintf(line, sizeof(line), "%c %-24.24s",
                  (idx == file_cur) ? '>' : ' ', files[idx]);
         printBG(col(CC_FILE_X), row(CC_FILE_Y + i), line, fg, bg, S);
     }
@@ -456,10 +570,13 @@ void CUI_CcConsole::draw(Drawable *S) {
               "(empty folder)", COLORS.Lowlight, S);
     }
 
-    // ----- Slot grid pane -----
+    // ----- Slot grid pane (right) -----
     print(col(CC_GRID_X), row(CC_GRID_Y - 1),
-          "Slot CC#  Name              View          Value  Learn",
-          focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
+          "Slot CC#  Name", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
+    print(col(CC_SLIDER_X), row(CC_GRID_Y - 1),
+          "Slider           Val", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
+    print(col(CC_LEARN_COL), row(CC_GRID_Y - 1),
+          "Learn", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
 
     if (!loaded) {
         print(col(CC_GRID_X), row(CC_GRID_Y),
@@ -470,29 +587,13 @@ void CUI_CcConsole::draw(Drawable *S) {
               "No slots in this file.",
               COLORS.Lowlight, S);
     } else {
-        if (slot_cur < slot_top) slot_top = slot_cur;
-        if (slot_cur >= slot_top + grid_max_rows)
-            slot_top = slot_cur - grid_max_rows + 1;
-
-        for (int i = 0; i < grid_max_rows && slot_top + i < g_loaded.num_slots; i++) {
-            int idx = slot_top + i;
+        for (int row_i = 0; row_i < grid_max_rows && slot_top + row_i < g_loaded.num_slots; row_i++) {
+            int idx = slot_top + row_i;
             ZtCcizerSlot *s = &g_loaded.slots[idx];
 
             char cc_lbl[8];
             if (s->cc == ZT_CCIZER_PB_MARKER) snprintf(cc_lbl, sizeof(cc_lbl), "PB");
             else                              snprintf(cc_lbl, sizeof(cc_lbl), "%d", (int)s->cc);
-
-            char view_str[16];
-            int  maxv = (s->cc == ZT_CCIZER_PB_MARKER) ? 16383 : 127;
-            if (s->view == ZT_CCIZER_VIEW_KNOB) {
-                char knob[8];
-                render_knob(knob, sizeof(knob), s->value, maxv);
-                snprintf(view_str, sizeof(view_str), "knob %s", knob);
-            } else {
-                char bar[CC_BAR_W + 4];
-                render_bar(bar, sizeof(bar), s->value, maxv);
-                snprintf(view_str, sizeof(view_str), "%s", bar);
-            }
 
             char learn_str[16];
             if (s->learn_status == 0) {
@@ -504,12 +605,6 @@ void CUI_CcConsole::draw(Drawable *S) {
                 snprintf(learn_str, sizeof(learn_str), "%02X %02X",
                          s->learn_status, s->learn_data1);
             }
-            char line[200];
-            snprintf(line, sizeof(line),
-                     "%c %3d  %-3s  %-16.16s %-13s %5d  %-6s",
-                     (idx == slot_cur) ? '>' : ' ',
-                     idx + 1, cc_lbl, s->name, view_str, (int)s->value,
-                     learn_str);
 
             TColor fg = (idx == slot_cur)
                             ? (focus == 1 ? COLORS.Brighttext : COLORS.Text)
@@ -517,13 +612,28 @@ void CUI_CcConsole::draw(Drawable *S) {
             TColor bg = (idx == slot_cur && focus == 1)
                             ? COLORS.SelectedBGLow
                             : COLORS.Background;
-            printBG(col(CC_GRID_X), row(CC_GRID_Y + i), line, fg, bg, S);
+            char prefix[16];
+            snprintf(prefix, sizeof(prefix), "%c%4d  %-3s  ",
+                     (idx == slot_cur) ? '>' : ' ', idx + 1, cc_lbl);
+            printBG(col(CC_SLOT_COL), row(CC_GRID_Y + row_i), prefix, fg, bg, S);
+
+            char name_buf[20];
+            snprintf(name_buf, sizeof(name_buf), "%-17.17s", s->name);
+            printBG(col(CC_NAME_COL), row(CC_GRID_Y + row_i), name_buf, fg, bg, S);
+
+            // The ValueSlider widget itself is drawn by UI->draw(S).
+
+            print(col(CC_LEARN_COL), row(CC_GRID_Y + row_i),
+                  learn_str, COLORS.Text, S);
         }
     }
 
     // ----- Status line -----
     print(col(2), row(CC_GRID_Y + grid_max_rows + 1),
           status_line, COLORS.Lowlight, S);
+
+    // Slider widgets paint here.
+    UI->draw(S);
 
     S->unlock();
 }

@@ -162,6 +162,21 @@ When you fix a class of bug that has bitten more than once (preset apply, save-k
 
 ---
 
+## INVARIANT: every page key handler must `need_refresh++`
+
+`main.cpp`'s outer loop only calls `ActivePage->draw()` when `need_refresh != 0` (search `if (need_refresh)` near line 3184). A page that mutates state (cursor, scroll, focus, value, status line, learn flag) on a key without bumping `need_refresh` looks frozen to the user — the new state is computed but never drawn.
+
+**Rules:**
+1. Every `if (key == ...)` branch in a page's `update()` that changes any visible state ends with `need_refresh++;` before `return;`.
+2. `enter()` bumps `need_refresh++` so the first frame after page switch always paints.
+3. Background activity that mutates state (MIDI-in pump, file watch) bumps `need_refresh++` per change.
+4. Mouse-driven widget changes are handled by the widget itself (`ValueSlider::mouseupdate` already does `need_refresh++` and `need_redraw++`); the page doesn't need to bump again for those.
+5. **No "iterate later" placeholders for visible interactive elements.** If a page advertises clickable sliders, knobs, buttons — they must be real `UserInterfaceElement` widgets registered with `UI->add_element`, not `printBG` ASCII art. ASCII bars look the same as widgets in a screenshot and the user only finds out they can't click when they try. Widgets get drawn by `UI->draw(S)`; their min/max/value flow through `changed` flags the page absorbs after `UI->update()`.
+
+Failure mode if rule 1 is violated: arrow keys move the highlighted cursor in memory but the screen doesn't repaint until something else (mouse move, resize, MIDI in) bumps `need_refresh`. Looks like the page froze.
+
+Failure mode if rule 5 is violated: shipped pages with non-interactive ASCII "sliders" that the user discovers don't respond to mouse — embarrassment + rework. (Cf. PR #78 CC Console v1, fixed in a follow-up.)
+
 ## Recurring foot-guns
 
 ### ListBox subclass mousestate gotcha
