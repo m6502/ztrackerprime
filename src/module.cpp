@@ -82,6 +82,8 @@ instrument::instrument(int p)
   memset(title,' ',ZTM_INSTTITLE_MAXLEN);
   title[ZTM_INSTTITLE_MAXLEN-1]=0;
 
+  ccizer_bank[0] = '\0';
+
   // <Manu>
   MarkAsUnused() ;
 }

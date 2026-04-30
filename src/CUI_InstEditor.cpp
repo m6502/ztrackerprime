@@ -554,6 +554,20 @@ void CUI_InstEditor::draw(Drawable *S)
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Instrument Editor (F3)",COLORS.Text,COLORS.Background,S);
+        // CCizer bank attached to the focused instrument. Show the
+        // basename (or "(none)") so the user can see which CC layout
+        // was assigned via Shift+F3 -> B. Per-instrument data persists
+        // in the .zt CCBN chunk.
+        {
+            const char *bank = (cur_inst >= 0 && cur_inst < MAX_INSTS &&
+                                song->instruments[cur_inst] &&
+                                song->instruments[cur_inst]->ccizer_bank[0])
+                                   ? song->instruments[cur_inst]->ccizer_bank
+                                   : "(none)";
+            char ccline[72];
+            snprintf(ccline, sizeof(ccline), "CCizer Bank: %-50.50s", bank);
+            printBG(col(36), row(11), ccline, COLORS.Text, COLORS.Background, S);
+        }
         printBG(col(36),row(13),"Bank",COLORS.Text,COLORS.Background,S);
         printBG(col(58),row(13),"Patch",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(18),"Default Volume",COLORS.Text,COLORS.Background,S);

@@ -162,7 +162,7 @@ void CUI_CcConsole::enter(void) {
     rescan_folder();
     if (!loaded && num_files > 0) load_selected();
     snprintf(status_line, sizeof(status_line),
-             "Tab focus | Lt/Rt value | V slider/knob | L learn | U unbind | [/] ch | Ctrl+S save | ESC exit");
+             "Tab | Lt/Rt val | V slider/knob | L learn | U unbind | B bank-to-inst | Shift+B clear | [/] ch | Ctrl+S | ESC");
     Keys.flush();
 }
 
@@ -330,6 +330,37 @@ void CUI_CcConsole::update(void) {
                      slot_cur + 1, s->name);
         } else {
             snprintf(status_line, sizeof(status_line), "Learn cancelled.");
+        }
+        return;
+    }
+    if (key == SDLK_B) {
+        // Assign the currently-loaded file as the bank for the current
+        // instrument (Shift+B clears it). Persisted in the .zt file via
+        // the CCBN chunk on next save.
+        if (cur_inst < 0 || cur_inst >= MAX_INSTS || !song->instruments[cur_inst]) {
+            snprintf(status_line, sizeof(status_line), "No current instrument.");
+            return;
+        }
+        if (kstate & KS_SHIFT) {
+            song->instruments[cur_inst]->ccizer_bank[0] = '\0';
+            file_changed++;
+            snprintf(status_line, sizeof(status_line),
+                     "Cleared CCizer bank for inst %d.", cur_inst);
+            return;
+        }
+        if (loaded) {
+            strncpy(song->instruments[cur_inst]->ccizer_bank,
+                    g_loaded.basename,
+                    sizeof(song->instruments[cur_inst]->ccizer_bank) - 1);
+            song->instruments[cur_inst]->ccizer_bank[
+                sizeof(song->instruments[cur_inst]->ccizer_bank) - 1] = '\0';
+            file_changed++;
+            snprintf(status_line, sizeof(status_line),
+                     "Assigned %s as bank for inst %d.",
+                     g_loaded.basename, cur_inst);
+        } else {
+            snprintf(status_line, sizeof(status_line),
+                     "Load a file first (Enter on Files pane).");
         }
         return;
     }

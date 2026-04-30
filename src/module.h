@@ -145,6 +145,13 @@ public:
 
   unsigned short int default_length;
 
+  // CCizer bank attached to this instrument. Filename only (basename of a
+  // `.txt` in the configured ccizer_folder), e.g. "microfreak.txt". Empty
+  // string = no bank attached. Persisted in the .zt file via the optional
+  // CCBN chunk; the chunk is skipped by older zTracker versions, which
+  // load such files cleanly with this field empty (forward-compat).
+  char ccizer_bank[256];
+
 } ;
 
 
