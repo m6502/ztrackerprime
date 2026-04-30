@@ -17,6 +17,7 @@ class TextInput ;
 class UserInterface ;
 class UserInterfaceElement ;
 class ValueSlider ;
+class ListBox ;
 
 typedef void (*VFunc)();
 
@@ -572,6 +573,16 @@ class CUI_CcConsole : public CUI_Page {
         ValueSlider *sliders[128];          // ZT_CCIZER_MAX_SLOTS
         int          last_values[128];      // last seen value to detect changes
         int          last_visible_count;    // for repaint optimization
+
+        // Real ListBox for the Files pane (matches F11 SkinSelector and
+        // F4/Shift+F4 preset list — black-bar highlight, typeahead,
+        // mouse click). Owned by `UI`'s element pool. Items mirror
+        // `files[]`; rebuilt by rescan_folder() and load_by_basename().
+        ListBox                 *file_selector;
+        // 1x1 stub UIE that owns the "we are on the slot grid" tab
+        // focus state. Owned by `UI`.
+        UserInterfaceElement    *grid_focus;
+        void rebuild_file_list_items(void);
 
         CUI_CcConsole();
 

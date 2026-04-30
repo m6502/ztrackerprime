@@ -100,24 +100,89 @@ static void cc_make_dir_recursive(const char *path) {
 #define CC_FILE_Y       (CC_BASE_Y + 2)
 #define CC_FILE_W       26
 
-// Slot grid pane (right)
+// Slot grid pane (right). Each column owns a fixed character span and
+// is drawn with its own print() — never one packed sprintf — so a long
+// name can't bleed into the slider widget and a 3-digit CC# can't
+// crowd the name. The "marker+slot" field is 5 chars wide (" >123"),
+// the CC# field is 4 chars wide (cc_lbl + trailing space), the name
+// field is 18 chars (one extra over the 17-char strncpy so the trailing
+// space is always there even on the longest names).
 #define CC_GRID_X       (CC_FILE_X + CC_FILE_W + 2)   // = 30
 #define CC_GRID_Y       (CC_BASE_Y + 2)
-#define CC_SLOT_COL     CC_GRID_X                      // "  1 " or "> 1 "
-#define CC_CC_COL       (CC_GRID_X + 5)                // "PB  " or "127 "
-#define CC_NAME_COL     (CC_GRID_X + 9)                // 17-char field
-#define CC_SLIDER_X     (CC_GRID_X + 27)               // ValueSlider widget x
+#define CC_SLOT_COL     CC_GRID_X                      // " >123" — 5 chars
+#define CC_CC_COL       (CC_GRID_X + 5)                // "PB  " / "127 " — 4 chars
+#define CC_NAME_COL     (CC_GRID_X + 10)               // 18-char field
+#define CC_SLIDER_X     (CC_GRID_X + 28)               // ValueSlider widget x
 #define CC_SLIDER_W     10                             // ValueSlider xsize
 #define CC_LEARN_COL    (CC_SLIDER_X + CC_SLIDER_W + 5) // "B0 4A" or "PB ch3" or "----"
 
 #define CC_SPACE_BOTTOM 8
 
 // IDs for tagged UI elements. The slider pool starts at CC_SLIDER_ID_BASE
-// and runs for ZT_CCIZER_MAX_SLOTS — using a high base avoids collision
-// with the (currently empty) tab-stop pool.
+// and runs for ZT_CCIZER_MAX_SLOTS. Tab-stop pool occupies the lower IDs.
+#define CC_FILELIST_ID    50    // CcFileSelector ListBox (Files pane)
+#define CC_GRIDFOCUS_ID   51    // CcSlotGridFocus stub (slot grid pane)
 #define CC_SLIDER_ID_BASE 100
 
 static ZtCcizerFile g_loaded;
+static CUI_CcConsole *g_self_for_listbox = NULL;   // back-pointer for OnSelect
+
+// ---------------------------------------------------------------------------
+// CcFileSelector — real ListBox for the Files pane. Replaces the
+// previous hand-drawn `> filename` text marker with the same
+// black-highlight rendering, typeahead, and click-to-select behaviour
+// that the F11 SkinSelector and F4/Shift+F4 preset lists already use.
+
+namespace {
+class CcFileSelector : public ListBox {
+public:
+    CcFileSelector() {
+        empty_message       = "(empty folder)";
+        is_sorted           = true;           // alphabetical, matches F11
+        use_checks          = true;           // checkmark on the loaded file
+        use_key_select      = true;           // typeahead jump
+        wrap_focus_at_edges = false;          // clamp at edges
+        frame               = 1;
+    }
+    void OnChange() override {}
+    void OnSelectChange() override {}
+    int update() override {
+        // Mirror F4/Shift+F4 preset selectors: Space applies the
+        // current selection just like Enter. Base ListBox::update
+        // only treats Enter as a select trigger.
+        KBKey k = Keys.checkkey();
+        if (k == SDLK_SPACE) {
+            Keys.getkey();
+            LBNode *p = getNode(cur_sel + y_start);
+            if (p) OnSelect(p);
+            need_refresh++;
+            need_redraw++;
+            return 0;
+        }
+        return ListBox::update();
+    }
+    void OnSelect(LBNode *selected) override {
+        if (!selected || !g_self_for_listbox) return;
+        g_self_for_listbox->load_selected();
+        // Update checkmarks to follow the new selection.
+        selectNone();
+        selected->checked = true;
+        // NOT calling ListBox::OnSelect here -- it sets mousestate=0
+        // which clobbers the BUTTON_UP-LEFT path. See the recurring
+        // ListBox-subclass mousestate gotcha in CLAUDE.md.
+    }
+};
+
+// 1x1 tab-stop stub for the slot-grid pane -- same pattern as
+// MmGridFocus on F4. Lets Tab claim "we are on the grid" so the
+// page-level update() can route arrow / letter keys to slot logic.
+class CcSlotGridFocus : public UserInterfaceElement {
+public:
+    CcSlotGridFocus() { xsize = 1; ysize = 1; }
+    int update() override { return 0; }
+    void draw(Drawable *S, int active) override { (void)S; (void)active; }
+};
+} // namespace
 
 // --------- Helpers ---------
 static void resolve_ccizer_folder(char *out, size_t out_sz) {
@@ -173,6 +238,7 @@ static int slot_default(const ZtCcizerSlot *s) {
 // --------- Lifecycle ---------
 CUI_CcConsole::CUI_CcConsole() {
     UI = new UserInterface;
+    g_self_for_listbox = this;
     focus = 0;
     file_cur = file_top = 0;
     slot_cur = slot_top = 0;
@@ -186,9 +252,30 @@ CUI_CcConsole::CUI_CcConsole() {
     memset(&g_loaded, 0, sizeof(g_loaded));
     memset(last_values, 0, sizeof(last_values));
 
+    // File selector: the Files pane is a real ListBox tab-stop.
+    // ysize is the LAST visible row index (ListBox convention; total
+    // rows = ysize + 1). The page's update() resizes it per-frame to
+    // match the available pane height.
+    {
+        CcFileSelector *fs = new CcFileSelector;
+        fs->x = CC_FILE_X;
+        fs->y = CC_FILE_Y;
+        fs->xsize = CC_FILE_W;
+        fs->ysize = 16;
+        UI->add_element(fs, CC_FILELIST_ID);
+        file_selector = fs;
+    }
+    {
+        CcSlotGridFocus *gf = new CcSlotGridFocus;
+        gf->x = CC_GRID_X;
+        gf->y = CC_GRID_Y;
+        UI->add_element(gf, CC_GRIDFOCUS_ID);
+        grid_focus = gf;
+    }
+
     // Pre-allocate the slider pool. Each is hidden (xsize=0) until a
     // file load + position_sliders() configures it. Tab-stops disabled
-    // so Tab/Up/Down keyboard nav stays page-owned.
+    // so Tab cycles only between file_selector and grid_focus.
     for (int i = 0; i < ZT_CCIZER_MAX_SLOTS; i++) {
         ValueSlider *vs = new ValueSlider(0);
         vs->no_tab_stop = 1;
@@ -214,6 +301,27 @@ void CUI_CcConsole::rescan_folder(void) {
     }
     if (file_cur >= num_files) file_cur = num_files > 0 ? num_files - 1 : 0;
     if (file_top > file_cur) file_top = file_cur;
+    rebuild_file_list_items();
+}
+
+void CUI_CcConsole::rebuild_file_list_items(void) {
+    if (!file_selector) return;
+    file_selector->clear();
+    for (int i = 0; i < num_files; i++) {
+        LBNode *p = file_selector->insertItem(files[i]);
+        if (p && loaded && strcmp(g_loaded.basename, files[i]) == 0) {
+            p->checked = true;
+        }
+    }
+    // Land cursor on the loaded file if any, else top of list.
+    int target = 0;
+    if (loaded) {
+        for (int i = 0; i < num_files; i++) {
+            if (strcmp(files[i], g_loaded.basename) == 0) { target = i; break; }
+        }
+    }
+    file_selector->setCursor(target);
+    file_cur = target;
 }
 
 void CUI_CcConsole::load_by_basename(const char *bn) {
@@ -224,6 +332,7 @@ void CUI_CcConsole::load_by_basename(const char *bn) {
     for (int i = 0; i < num_files; i++) {
         if (strcmp(files[i], bn) == 0) {
             file_cur = i;
+            if (file_selector) file_selector->setCursor(i);
             load_selected();
             return;
         }
@@ -231,6 +340,19 @@ void CUI_CcConsole::load_by_basename(const char *bn) {
 }
 
 void CUI_CcConsole::load_selected(void) {
+    // file_selector is the source of truth when available -- the
+    // listbox sees Up/Down/Enter directly via UI->update().
+    if (file_selector) {
+        // ListBox stores items in insertion order; with is_sorted=true
+        // the visual order is alphabetical and we resolve back to
+        // files[] by name to find the actual filesystem index.
+        const char *cap = file_selector->getCurrentItem();
+        if (cap && *cap) {
+            for (int i = 0; i < num_files; i++) {
+                if (strcmp(files[i], cap) == 0) { file_cur = i; break; }
+            }
+        }
+    }
     if (file_cur < 0 || file_cur >= num_files || folder[0] == '\0') return;
     char path[1280];
     snprintf(path, sizeof(path), "%s/%s", folder, files[file_cur]);
@@ -286,6 +408,14 @@ void CUI_CcConsole::position_sliders(int grid_max_rows) {
         vs->min = 0;
         vs->max = slot_max(s);
         vs->value = s->value;
+        // Force a paint every frame: UserInterface::draw skips elements
+        // with need_redraw==0, but the page-level slot grid blanks the
+        // surrounding text on every frame and a sibling slider's drag
+        // can fire `needaclear` which clears row 12+ wholesale -- so a
+        // visible slider that didn't itself change would otherwise
+        // vanish until a value-change re-armed need_redraw. Same fix
+        // applies to file_selector below in update().
+        vs->need_redraw = 1;
         last_values[idx] = s->value;
         visible++;
     }
@@ -321,6 +451,10 @@ void CUI_CcConsole::enter(void) {
     learning = 0;          // never enter the page mid-learn
     rescan_folder();
     if (!loaded && num_files > 0) load_selected();
+    // Land on the file selector by default. Tab moves to the slot
+    // grid stub (CC_GRIDFOCUS_ID).
+    UI->cur_element = CC_FILELIST_ID;
+    focus = 0;
     snprintf(status_line, sizeof(status_line),
              "Tab focus | Up/Dn pick | Click slider | Lt/Rt val | L learn | U unbind | B bank | [/] ch | Ctrl+S | ESC");
     Keys.flush();
@@ -337,6 +471,20 @@ void CUI_CcConsole::update(void) {
     int total_rows    = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
     int grid_max_rows = total_rows - CC_GRID_Y - CC_SPACE_BOTTOM - 2;
     if (grid_max_rows < 4) grid_max_rows = 4;
+
+    // Resize the file_selector pane to the available height; one row
+    // reserved for the "(folder)" footer below the listbox.
+    if (file_selector) {
+        int rows_for_list = grid_max_rows - 1;
+        if (rows_for_list < 1) rows_for_list = 1;
+        file_selector->ysize = rows_for_list - 1;   // ListBox: ysize = LAST row index
+        file_selector->need_redraw = 1;             // see position_sliders rationale
+    }
+    if (grid_focus) grid_focus->need_redraw = 1;
+    // Page focus is derived from UI->cur_element. file_cur mirrors
+    // the listbox so existing references (status messages, draw-side
+    // guards) keep working without poking the listbox each line.
+    focus = (UI->cur_element == CC_FILELIST_ID) ? 0 : 1;
 
     // Reposition the slider widget pool every frame so scrolling /
     // file-load / window-resize stay correct without explicit
@@ -404,7 +552,10 @@ void CUI_CcConsole::update(void) {
     }
 
     if (key == SDLK_TAB) {
-        focus = (focus == 0) ? 1 : 0;
+        UI->cur_element = (UI->cur_element == CC_FILELIST_ID)
+                              ? CC_GRIDFOCUS_ID
+                              : CC_FILELIST_ID;
+        focus = (UI->cur_element == CC_FILELIST_ID) ? 0 : 1;
         need_refresh++;
         return;
     }
@@ -439,23 +590,10 @@ void CUI_CcConsole::update(void) {
     }
 
     // ----- File list focus -----
+    // Up/Down/Enter and typeahead are handled by ListBox::update()
+    // (called via UI->update() above). OnSelect on Enter calls
+    // load_selected() directly.
     if (focus == 0) {
-        if (key == SDLK_UP) {
-            if (file_cur > 0) file_cur--;
-            need_refresh++;
-            return;
-        }
-        if (key == SDLK_DOWN) {
-            if (file_cur + 1 < num_files) file_cur++;
-            need_refresh++;
-            return;
-        }
-        if (key == SDLK_RETURN) {
-            load_selected();
-            focus = 1;
-            need_refresh++;
-            return;
-        }
         return;
     }
 
@@ -585,42 +723,30 @@ void CUI_CcConsole::draw(Drawable *S) {
     printtitle(PAGE_TITLE_ROW_Y, title, COLORS.Text, COLORS.Background, S);
 
     // ----- File list pane (left) -----
+    // The ListBox widget paints its own rows (with the F11/F4-style
+    // black-bar highlight) via UI->draw(S) further below. Here we
+    // only paint the "Files" title above and the "(folder)" footer.
+    int focus_now = (UI->cur_element == CC_FILELIST_ID) ? 0 : 1;
     print(col(CC_FILE_X), row(CC_FILE_Y - 1),
-          "Files", focus == 0 ? COLORS.Brighttext : COLORS.Text, S);
+          "Files", focus_now == 0 ? COLORS.Brighttext : COLORS.Text, S);
     if (folder[0]) {
         char fbuf[256];
         snprintf(fbuf, sizeof(fbuf), "(%s)", folder);
         print(col(CC_FILE_X), row(CC_FILE_Y + grid_max_rows),
               fbuf, COLORS.Lowlight, S);
     }
-    if (file_cur < file_top) file_top = file_cur;
-    if (file_cur >= file_top + grid_max_rows)
-        file_top = file_cur - grid_max_rows + 1;
-    for (int i = 0; i < grid_max_rows && file_top + i < num_files; i++) {
-        int idx = file_top + i;
-        TColor fg = (idx == file_cur)
-                        ? (focus == 0 ? COLORS.Brighttext : COLORS.Text)
-                        : COLORS.Text;
-        TColor bg = (idx == file_cur && focus == 0)
-                        ? COLORS.SelectedBGLow
-                        : COLORS.Background;
-        char line[64];
-        snprintf(line, sizeof(line), "%c %-24.24s",
-                 (idx == file_cur) ? '>' : ' ', files[idx]);
-        printBG(col(CC_FILE_X), row(CC_FILE_Y + i), line, fg, bg, S);
-    }
-    if (num_files == 0) {
-        print(col(CC_FILE_X), row(CC_FILE_Y),
-              "(empty folder)", COLORS.Lowlight, S);
-    }
 
     // ----- Slot grid pane (right) -----
-    print(col(CC_GRID_X), row(CC_GRID_Y - 1),
-          "Slot CC#  Name", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
-    print(col(CC_SLIDER_X), row(CC_GRID_Y - 1),
-          "Slider           Val", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
-    print(col(CC_LEARN_COL), row(CC_GRID_Y - 1),
-          "Learn", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
+    // Column-aligned headers (one print per column) so they line up
+    // with the data rows below. The slider widget shows the live
+    // value itself, so the header column is just "Slider" with no
+    // trailing "Val" — that text used to bleed into the Learn column.
+    TColor hdr_fg = (focus_now == 1) ? COLORS.Brighttext : COLORS.Text;
+    print(col(CC_SLOT_COL), row(CC_GRID_Y - 1), "Slot", hdr_fg, S);
+    print(col(CC_CC_COL),   row(CC_GRID_Y - 1), "CC#",  hdr_fg, S);
+    print(col(CC_NAME_COL), row(CC_GRID_Y - 1), "Name", hdr_fg, S);
+    print(col(CC_SLIDER_X), row(CC_GRID_Y - 1), "Slider", hdr_fg, S);
+    print(col(CC_LEARN_COL), row(CC_GRID_Y - 1), "Learn", hdr_fg, S);
 
     if (!loaded) {
         print(col(CC_GRID_X), row(CC_GRID_Y),
@@ -651,19 +777,36 @@ void CUI_CcConsole::draw(Drawable *S) {
             }
 
             TColor fg = (idx == slot_cur)
-                            ? (focus == 1 ? COLORS.Brighttext : COLORS.Text)
+                            ? (focus_now == 1 ? COLORS.Brighttext : COLORS.Text)
                             : COLORS.Text;
-            TColor bg = (idx == slot_cur && focus == 1)
+            TColor bg = (idx == slot_cur && focus_now == 1)
                             ? COLORS.SelectedBGLow
                             : COLORS.Background;
-            char prefix[16];
-            snprintf(prefix, sizeof(prefix), "%c%4d  %-3s  ",
-                     (idx == slot_cur) ? '>' : ' ', idx + 1, cc_lbl);
-            printBG(col(CC_SLOT_COL), row(CC_GRID_Y + row_i), prefix, fg, bg, S);
+
+            // Each column rendered as its own printBG with a fixed
+            // width so adjacent columns can't run into each other.
+            // Slot field: " >123" — marker + 3-digit slot index +
+            // trailing space (5 chars total). CC field: "PB  " /
+            // "127 " — left-justified 3-char label + trailing space
+            // (4 chars total). Name field: 18 chars; the
+            // ZtCcizerSlot::name buffer is 17 long so a 17-char slot
+            // name still has one cell of breathing room before the
+            // slider widget at CC_SLIDER_X.
+            char slot_field[8];
+            snprintf(slot_field, sizeof(slot_field), "%c%3d ",
+                     (idx == slot_cur) ? '>' : ' ', idx + 1);
+            printBG(col(CC_SLOT_COL), row(CC_GRID_Y + row_i),
+                    slot_field, fg, bg, S);
+
+            char cc_field[8];
+            snprintf(cc_field, sizeof(cc_field), "%-3s ", cc_lbl);
+            printBG(col(CC_CC_COL), row(CC_GRID_Y + row_i),
+                    cc_field, fg, bg, S);
 
             char name_buf[20];
-            snprintf(name_buf, sizeof(name_buf), "%-17.17s", s->name);
-            printBG(col(CC_NAME_COL), row(CC_GRID_Y + row_i), name_buf, fg, bg, S);
+            snprintf(name_buf, sizeof(name_buf), "%-18.18s", s->name);
+            printBG(col(CC_NAME_COL), row(CC_GRID_Y + row_i),
+                    name_buf, fg, bg, S);
 
             // The ValueSlider widget itself is drawn by UI->draw(S).
 
