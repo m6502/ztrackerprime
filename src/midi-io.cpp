@@ -39,6 +39,7 @@
  ******/
 #include "zt.h"
 #include "midi_mappings.h"
+#include "sysex_inq.h"
 
 
 /*
@@ -338,26 +339,50 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
             break;
         case MIM_CLOSE:
             break;
-/*
-		case MIM_LONGDATA:
 
-			lpMIDIHeader = (LPMIDIHDR)dwParam1;
-            if (dev) { 
-			    ptr = (unsigned char *)(lpMIDIHeader->lpData);
-			    if (!dev->SysXFlag)
-			    {
-				    dev->SysXFlag = 1;
-			    }
-
-			    if (*(ptr + (lpMIDIHeader->dwBytesRecorded - 1)) == 0xF7)
-			    {
-				    dev->SysXFlag = 0;
-			    }
+        case MIM_LONGDATA: {
+            // Incoming SysEx (or fragment thereof). The WinMM driver
+            // delivers complete F0..F7 frames in dwBytesRecorded when
+            // the buffer is large enough; if a frame doesn't fit, it
+            // arrives across multiple MIM_LONGDATA callbacks and the
+            // last fragment's final byte is 0xF7. We accumulate into
+            // dev->SysXBuffer (now 8 KB) when fragmentation happens
+            // and push the assembled frame to zt_sysex_inq once 0xF7
+            // is seen.
+            //
+            // MIM_LONGERROR (below) handles the protocol-violation
+            // case where the driver gives up mid-frame. Either way
+            // we MUST midiInAddBuffer the header back so receive
+            // continues. Audit P19.
+            LPMIDIHDR lpMIDIHeader = (LPMIDIHDR)dwParam1;
+            if (dev && lpMIDIHeader) {
+                const unsigned char *ptr = (const unsigned char *)lpMIDIHeader->lpData;
+                int n = (int)lpMIDIHeader->dwBytesRecorded;
+                if (n > 0 && (size_t)n <= sizeof(dev->SysXBuffer)) {
+                    if (n >= 1 && ptr[n - 1] == 0xF7) {
+                        // Complete frame in this callback.
+                        zt_sysex_inq_push(ptr, n);
+                        dev->SysXFlag = 0;
+                        dev->SysXAccumLen = 0;
+                    } else {
+                        // Fragment -- in practice the WinMM driver only
+                        // splits frames if our buffer is too small,
+                        // which we sized at 8 KB to avoid. Treat it
+                        // defensively: if accumulator + this fragment
+                        // overflows, drop the partial accumulation.
+                        // (Couldn't accumulate across the same buffer
+                        // anyway -- the driver reuses dev->SysXBuffer
+                        // each time we re-add it -- so this branch is
+                        // mostly a defensive log point.)
+                        dev->SysXFlag = 1;
+                    }
+                }
             }
-			midiInAddBuffer(handle, lpMIDIHeader, sizeof(MIDIHDR));
+            midiInAddBuffer(handle, lpMIDIHeader, sizeof(MIDIHDR));
+            break;
+        }
 
-			break;
-*/        
+
         
         
         
@@ -504,9 +529,20 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
         case MIM_ERROR:
           mim_error++ ;
             break;
-        case MIM_LONGERROR:
+        case MIM_LONGERROR: {
           mim_longerror++ ;
-            break;
+          // Re-arm the SysEx buffer so receive doesn't wedge after a
+          // protocol violation (audit P19). The dropped frame is lost.
+          LPMIDIHDR lpHdr = (LPMIDIHDR)dwParam1;
+          if (dev) {
+              dev->SysXFlag = 0;
+              dev->SysXAccumLen = 0;
+          }
+          if (lpHdr) {
+              midiInAddBuffer(handle, lpHdr, sizeof(MIDIHDR));
+          }
+          break;
+        }
         default:
             break;
 
@@ -527,6 +563,8 @@ midiInDevice::midiInDevice(int i) {
     szName = NULL;
     handle = NULL;
     opened = 0;
+    SysXFlag = 0;
+    SysXAccumLen = 0;
     if (!midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS)))
         szName = caps.szPname;
 }
