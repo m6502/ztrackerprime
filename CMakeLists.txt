@@ -138,6 +138,7 @@ set(ZT_SOURCES
   src/sysex_inq.cpp
   src/CUI_SysExLibrarian.cpp
   src/sysex_macro.cpp
+  src/zt_headless.cpp
 )
 
 if(WIN32)
