@@ -257,6 +257,7 @@ ZTConf::ZTConf() {
     note_audition_step_mode = ZT_NAS_ONE;
     ccizer_folder[0] = '\0';
     syx_folder[0]    = '\0';
+    syx_recv_max_files = 100;   // ~50 MB at typical 500 KB / patch dump
 }
 
 ZTConf::~ZTConf() {
@@ -324,6 +325,10 @@ int ZTConf::load()
   if (temp) {
       strncpy(syx_folder, temp, MAX_PATH);
       syx_folder[MAX_PATH] = '\0';
+  }
+  if (Config->get("syx_recv_max_files")) {
+      syx_recv_max_files = atoi(Config->get("syx_recv_max_files"));
+      if (syx_recv_max_files < 0) syx_recv_max_files = 0;
   }
   
   ////////////////////////////////////////////////
@@ -462,6 +467,8 @@ int ZTConf::save() {
 
     Config->set("ccizer_folder", ccizer_folder);
     Config->set("syx_folder",    syx_folder);
+    sprintf(s, "%d", syx_recv_max_files);
+    Config->set("syx_recv_max_files", s);
 
     Config->set("skin", skin);
 
