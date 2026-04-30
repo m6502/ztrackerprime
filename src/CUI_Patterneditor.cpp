@@ -1697,6 +1697,19 @@ void CUI_Patterneditor::update()
           key = 0;
         }
 
+        // CC drawmode toggle: Ctrl+Shift+§ (GRAVE). Plain Shift+§ is the
+        // existing PEM_MOUSEDRAW toggle (handled above); we use the
+        // Ctrl-extended combo so both gestures coexist. While CC drawmode
+        // is on, the MIDI-in handler below intercepts incoming CC (0xB0)
+        // and Pitchbend (0xE0) messages and writes Sxxyy / Wxxxx effects
+        // at the cursor row.
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
+          g_cc_drawmode = !g_cc_drawmode;
+          midiInQueue.clear();
+          sprintf(szStatmsg, "CC drawmode: %s", g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
+          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+        }
+
         // Double Pattern: Ctrl+Shift+G
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
           UNDO_SAVE();
@@ -3089,21 +3102,64 @@ case SDLK_DELETE:
             if (midiInQueue.size()>0) {
               int dw;
               dw = midiInQueue.pop();
-              switch( dw&0xFF ) {
-              case 0x80: // Note off
-                key = (dw&0xFF00)>>8 ;
-                key+=0xFF;
-                if (jazz_note_is_active(key)) {
-                  const mbuf st = jazz_get_state(key);
-                  MidiOut->noteOff(song->instruments[cur_inst]->midi_device,st.note,st.chan,0x0,0);
-                  jazz_clear_state(key);
+              unsigned char status = (unsigned char)(dw & 0xFF);
+              unsigned char hi     = status & 0xF0;
+
+              // CC drawmode: capture CC (0xB0..0xBF) / PB (0xE0..0xEF) and
+              // write the matching effect (`Sxxyy` for CC, `Wxxxx` for PB)
+              // at the cursor row in the current edit track. Cursor advances
+              // by EditStep (step-follow). When drawmode is OFF the message
+              // falls through to the legacy 0x80/0x90 jazz-recording path.
+              if (g_cc_drawmode && (hi == 0xB0 || hi == 0xE0)) {
+                int data1 = (dw >> 8)  & 0x7F;
+                int data2 = (dw >> 16) & 0x7F;
+                if (hi == 0xB0) {
+                  // S<cc>:<val>  ->  effect 'S', effect_data = (cc<<8) | val
+                  unsigned short eff_data = (unsigned short)((data1 << 8) | data2);
+                  song->patterns[cur_edit_pattern]
+                       ->tracks[cur_edit_track]
+                       ->update_event(cur_edit_row, -1, -1, -1, -1, 'S', eff_data);
+                  sprintf(szStatmsg, "Drew S%02X%02X (CC %d = %d) at row %02X",
+                          data1, data2, data1, data2, cur_edit_row);
+                } else {
+                  // W<14bit pitchbend>  ->  effect 'W', effect_data = lsb|(msb<<7)
+                  unsigned short pb14 = (unsigned short)(data1 | (data2 << 7));
+                  song->patterns[cur_edit_pattern]
+                       ->tracks[cur_edit_track]
+                       ->update_event(cur_edit_row, -1, -1, -1, -1, 'W', pb14);
+                  sprintf(szStatmsg, "Drew W%04X (PB %d) at row %02X",
+                          pb14, pb14, cur_edit_row);
                 }
-                break;
-              case 0x90: // Note on
-                set_note = key = (dw&0xFF00)>>8 ;
-                key+=0xFF;
-                p1 = (dw&0xFF0000)>>16;
-                break;
+                statusmsg = szStatmsg; status_change = 1;
+                file_changed++;
+                // Step-follow: advance cursor by EditStep so the next CC
+                // message lands on the next row down.
+                int advance = cur_step;
+                if (advance < 1) advance = 1;
+                cur_edit_row += advance;
+                if (cur_edit_row >= song->patterns[cur_edit_pattern]->length)
+                  cur_edit_row = song->patterns[cur_edit_pattern]->length - 1;
+                need_refresh++;
+                // Don't fall through to note-jazz handling.
+                set_note = 0xFF;
+                p1 = -1;
+              } else {
+                switch( status ) {
+                case 0x80: // Note off (channel 0 — legacy)
+                  key = (dw&0xFF00)>>8 ;
+                  key+=0xFF;
+                  if (jazz_note_is_active(key)) {
+                    const mbuf st = jazz_get_state(key);
+                    MidiOut->noteOff(song->instruments[cur_inst]->midi_device,st.note,st.chan,0x0,0);
+                    jazz_clear_state(key);
+                  }
+                  break;
+                case 0x90: // Note on (channel 0 — legacy)
+                  set_note = key = (dw&0xFF00)>>8 ;
+                  key+=0xFF;
+                  p1 = (dw&0xFF0000)>>16;
+                  break;
+                }
               }
             }
             

@@ -77,6 +77,14 @@ static void mm_quit(void) {
     quit();
 }
 
+static void mm_toggle_cc_drawmode(void) {
+    g_cc_drawmode = !g_cc_drawmode;
+    snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: %s",
+             g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
+    statusmsg = szStatmsg;
+    status_change = 1;
+}
+
 // Build a CLI invocation string that re-launches zt with the same
 // state the user has now (open MIDI in ports, MIDI clock chase target,
 // loaded song file) and copy it to the system clipboard. Pairs with
@@ -170,6 +178,7 @@ static const mm_entry MM_ENTRIES[] = {
 #endif
     {MM_CMD,        "Shortcuts & MIDI Mappings","Shift+F2",             CMD_SWITCH_KEYBINDINGS,     NULL},
     {MM_CMD,        "CC Console",               "Shift+F3",             CMD_SWITCH_CCCONSOLE,       NULL},
+    {MM_FUNC,       "Toggle CC Drawmode",       "Ctrl+Shift+\xA7",      0,                          mm_toggle_cc_drawmode},
     {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
 
