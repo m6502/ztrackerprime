@@ -139,6 +139,25 @@ void CUI_CcConsole::rescan_folder(void) {
     if (file_top > file_cur) file_top = file_cur;
 }
 
+void CUI_CcConsole::load_by_basename(const char *bn) {
+    if (!bn || !*bn) return;
+    if (folder[0] == '\0') rescan_folder();
+    if (folder[0] == '\0') return;
+    // Skip if it's already loaded — avoids re-reading on every
+    // cur_inst-change tick when the user stays on one instrument.
+    if (loaded && strcmp(g_loaded.basename, bn) == 0) return;
+    // Find it in the current folder list.
+    for (int i = 0; i < num_files; i++) {
+        if (strcmp(files[i], bn) == 0) {
+            file_cur = i;
+            load_selected();
+            return;
+        }
+    }
+    // Not in the configured folder — don't try to follow an absolute path.
+    // Just leave whatever is currently loaded; the user can switch folders.
+}
+
 void CUI_CcConsole::load_selected(void) {
     if (file_cur < 0 || file_cur >= num_files || folder[0] == '\0') return;
     char path[1280];

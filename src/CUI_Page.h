@@ -528,6 +528,11 @@ class CUI_CcConsole : public CUI_Page {
 
         void rescan_folder(void);
         void load_selected(void);
+        // Look up `bn` (basename, e.g. "microfreak.txt") in the current
+        // ccizer folder and load it. Used by the Pattern Editor to
+        // auto-route the CC Console to the focused instrument's bank
+        // when cur_inst changes. No-op if `bn` is empty or not found.
+        void load_by_basename(const char *bn);
 };
 
 // Unified Shortcuts & MIDI Mappings page. cursor_y picks an action;
