@@ -289,9 +289,30 @@ void CUI_SysExLibrarian::drain_recv(void) {
 void CUI_SysExLibrarian::enter(void) {
     cur_state = STATE_SYSEX_LIB;
     rescan_folder();
+    // Seed recv_seq past any existing `recv_<TS>_NNN.syx` files so a
+    // capture in the same wall-clock second after a restart doesn't
+    // clobber a previous file. Scans the rescanned `files[]` array,
+    // parses the trailing _NNN, takes max+1. Audit M7.
+    int max_seq = -1;
+    for (int i = 0; i < num_files; i++) {
+        const char *fn = files[i];
+        if (strncmp(fn, "recv_", 5) != 0) continue;
+        // Find the LAST `_NNN.syx`. Walk backwards from the dot.
+        size_t flen = strlen(fn);
+        if (flen < 9) continue;
+        if (strcmp(fn + flen - 4, ".syx") != 0) continue;
+        // Locate the underscore before the NNN -- 7 chars before .syx
+        // ("_NNN.syx" = 8 chars, but NNN width is %03d so >= 3 digits).
+        const char *us = strrchr(fn, '_');
+        if (!us) continue;
+        int n = atoi(us + 1);
+        if (n > max_seq) max_seq = n;
+    }
+    if (max_seq + 1 > recv_seq) recv_seq = max_seq + 1;
     snprintf(status_line, sizeof(status_line),
              "Up/Dn pick file | Enter or S send | R rescan | C clear log | ESC exit");
     Keys.flush();
+    need_refresh++;
 }
 
 void CUI_SysExLibrarian::leave(void) {

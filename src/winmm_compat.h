@@ -574,17 +574,24 @@ static inline MMRESULT midiOutReset(HMIDIOUT) { return MMSYSERR_NOERROR; }
 // multiple packets — for SysEx longer than 256 bytes we segment into
 // multiple packets within one packet list (timestamp 0 = "now"). The
 // receiver reassembles by spec since 0xF0..0xF7 framing is preserved.
+//
+// The packet-list buffer is heap-allocated (audit M6). Previously it
+// was a 17 KB stack array which is fine on default-stack threads
+// (>= 512 KB) but risky on small-stack worker threads. Caller is
+// responsible for splitting > 256 KB dumps; we cap at 256 KB to bound
+// the malloc.
 static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes, int len) {
     zt_coremidi_out_handle *ctx = (zt_coremidi_out_handle *)h;
     if (!ctx || !ctx->out_port || !bytes || len <= 0) return MMSYSERR_ERROR;
 
-    // Build the packet list with per-packet chunks of up to 256 bytes.
-    // sizeof storage: header + N * (packet hdr + 256 bytes) — pick a
-    // generous static buffer that handles patches up to ~16 KB; for
-    // larger dumps the caller can split.
-    enum { MAX_SYSEX = 16384, CHUNK = 256 };
+    enum { MAX_SYSEX = 256 * 1024, CHUNK = 256 };
     if (len > MAX_SYSEX) return MMSYSERR_ERROR;
-    Byte buf[MAX_SYSEX + 1024];
+    // Storage: packet-list overhead is per-packet (header + payload).
+    // Reserve len + (len/CHUNK + 1)*32 for headers, plus base list
+    // header. 64 KB safety margin covers any version-skew metadata.
+    size_t buf_sz = (size_t)len + ((size_t)len / CHUNK + 1) * 64 + 1024;
+    Byte *buf = (Byte *)malloc(buf_sz);
+    if (!buf) return MMSYSERR_ERROR;
     MIDIPacketList *pl = (MIDIPacketList *)buf;
     MIDIPacket *pkt = MIDIPacketListInit(pl);
 
@@ -592,15 +599,16 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
     while (offset < len) {
         int chunk = len - offset;
         if (chunk > CHUNK) chunk = CHUNK;
-        pkt = MIDIPacketListAdd(pl, sizeof(buf), pkt, 0,
+        pkt = MIDIPacketListAdd(pl, buf_sz, pkt, 0,
                                 (UInt16)chunk, bytes + offset);
-        if (!pkt) return MMSYSERR_ERROR;
+        if (!pkt) { free(buf); return MMSYSERR_ERROR; }
         offset += chunk;
     }
 
     // First attempt with the cached endpoint.
     if (ctx->endpoint != 0) {
         if (MIDISend(ctx->out_port, ctx->endpoint, pl) == noErr) {
+            free(buf);
             return MMSYSERR_NOERROR;
         }
     }
@@ -611,10 +619,12 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
         if (fresh != 0 && fresh != ctx->endpoint) {
             ctx->endpoint = fresh;
             if (MIDISend(ctx->out_port, ctx->endpoint, pl) == noErr) {
+                free(buf);
                 return MMSYSERR_NOERROR;
             }
         }
     }
+    free(buf);
     return MMSYSERR_ERROR;
 }
 
