@@ -136,6 +136,7 @@ set(ZT_SOURCES
   src/ccizer.cpp
   src/CUI_CcConsole.cpp
   src/sysex_inq.cpp
+  src/CUI_SysExLibrarian.cpp
 )
 
 if(WIN32)
@@ -361,6 +362,9 @@ if(APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/assets/ccizer"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/ccizer"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_SOURCE_DIR}/assets/syx"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/syx"
     VERBATIM
   )
 else()
@@ -376,6 +380,8 @@ else()
           "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/assets/ccizer" "$<TARGET_FILE_DIR:zt>/ccizer"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/assets/syx" "$<TARGET_FILE_DIR:zt>/syx"
   )
 endif()
 

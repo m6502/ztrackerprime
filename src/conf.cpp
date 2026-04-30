@@ -256,6 +256,7 @@ ZTConf::ZTConf() {
     post_load_page = POST_LOAD_PATTERN_EDIT;
     note_audition_step_mode = ZT_NAS_ONE;
     ccizer_folder[0] = '\0';
+    syx_folder[0]    = '\0';
 }
 
 ZTConf::~ZTConf() {
@@ -318,6 +319,11 @@ int ZTConf::load()
   if (temp) {
       strncpy(ccizer_folder, temp, MAX_PATH);
       ccizer_folder[MAX_PATH] = '\0';
+  }
+  temp = Config->get("syx_folder");
+  if (temp) {
+      strncpy(syx_folder, temp, MAX_PATH);
+      syx_folder[MAX_PATH] = '\0';
   }
   
   ////////////////////////////////////////////////
@@ -455,6 +461,7 @@ int ZTConf::save() {
     Config->set("note_audition_step_mode", s);
 
     Config->set("ccizer_folder", ccizer_folder);
+    Config->set("syx_folder",    syx_folder);
 
     Config->set("skin", skin);
 

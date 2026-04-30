@@ -108,6 +108,11 @@ class ZTConf {
         // (Shift+F3). Empty = use the default-resolve order in
         // zt_ccizer_resolve_folder().
         char ccizer_folder[MAX_PATH + 1];
+
+        // Folder where the SysEx Librarian (Shift+F5) lists request dumps
+        // and auto-saves received SysEx as recv_<timestamp>.syx. Empty =
+        // <ccizer_folder>/syx with that subdirectory auto-created.
+        char syx_folder[MAX_PATH + 1];
 };
 
 // Allowed values for zt_config_globals.note_audition_step_mode.
