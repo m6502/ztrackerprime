@@ -36,22 +36,32 @@ CMake option `ZT_BUILD_TESTS` (default ON) controls whether the `tests/` subdire
 | File | Purpose |
 |---|---|
 | `src/main.cpp` | Entry, main loop, key dispatch, `switch_page`, CLI parser. |
-| `src/CUI_Patterneditor.cpp` | Pattern editor (F2). 10+ pattern operations. |
-| `src/CUI_Midimacroeditor.cpp` | MIDI Macro editor (F4). |
+| `src/CUI_Patterneditor.cpp` | Pattern editor (F2). 10+ pattern operations. **Ctrl+Shift+§ toggles `g_cc_drawmode`** — incoming CC writes `Sxxyy` / PB writes `Wxxxx` at the cursor row. |
+| `src/CUI_Midimacroeditor.cpp` | MIDI Macro editor (F4). A macro whose name ends in `.syx` dispatches as a SysEx file send (see `sysex_macro.h`); the data grid is ignored. |
 | `src/CUI_Arpeggioeditor.cpp` | Arpeggio editor (Shift+F4). |
+| `src/CUI_KeyBindings.cpp` | Unified Shortcuts & MIDI Mappings (**Shift+F2** — moved from Shift+F3 to free that slot for the CC Console). |
+| `src/CUI_CcConsole.cpp` | CC Console (**Shift+F3**) — Paketti CCizer file load + sliders/knobs send-out + per-slot MIDI Learn (`L` to learn, `U` to unbind, `B` to assign as current instrument's bank). |
+| `src/CUI_SysExLibrarian.cpp` | SysEx Librarian (**Shift+F5**) — `.syx` file send + auto-capture of incoming SysEx as `recv_<timestamp>.syx`. |
 | `src/CUI_*.cpp` | Other pages: Sysconfig, Songconfig, Help, About, InstEditor, MainMenu, etc. |
 | `src/UserInterface.{h,cpp}` | Widget classes — `CheckBox`, `ValueSlider`, `TextInput`, `Frame`, `Button`, `TextBox`, `ListBox`, `MidiOutDeviceOpener`, `SkinSelector`, `VUPlay`. **Fix rendering bugs in the widget class, not at every caller.** |
 | `src/keybuffer.{h,cpp}` | Key buffer + KS_ALT/KS_CTRL/KS_META/KS_SHIFT state. `KS_HAS_ALT(s)` macro accepts ALT or macOS Cmd. Header has a `ZT_TEST_NO_SDL` guard so it can be compiled into SDL-free unit tests via `tests/sdl_stub.h`. |
 | `src/font.cpp` | `print()` / `printtitle()` / `printBG()` drawing primitives. |
-| `src/zt.h` | Kitchen-sink: `STATE_*` enum, `CMD_*` enum, page globals, layout macros (`TRACKS_ROW_Y`, `CHARS_Y`, `SPACE_AT_BOTTOM`, etc.). |
-| `src/module.{h,cpp}` | Song data: patterns, tracks, events, instruments, arpeggios, midimacros. |
-| `src/playback.{h,cpp}` | MIDI output timing, playback state, R-effect arpeggio + Z-effect macro dispatch. |
+| `src/zt.h` | Kitchen-sink: `STATE_*` enum (incl. `STATE_CCCONSOLE`, `STATE_SYSEX_LIB`), `CMD_*` enum, page globals (`UIP_CcConsole`, `UIP_SysExLibrarian`), `g_cc_drawmode`, layout macros. |
+| `src/module.{h,cpp}` | Song data: patterns, tracks, events, instruments, arpeggios, midimacros. `instrument` carries `ccizer_bank[256]` (per-instrument Paketti file). |
+| `src/playback.{h,cpp}` | MIDI output timing, playback state, R-effect arpeggio + Z-effect macro dispatch. **Z on a `*.syx`-named midimacro** dispatches the file as SysEx via `MidiOut->sendSysEx`. |
+| `src/winmm_compat.h` | Cross-platform MIDI shim. `zt_midi_out_sysex` for SysEx send (CoreMIDI `MIDIPacketListAdd` / WinMM `midiOutLongMsg` / ALSA `snd_seq_ev_set_sysex`). macOS `zt_coremidi_read_proc` parses incoming `F0..F7` into `zt_sysex_inq_push`. |
+| `src/sysex_inq.{h,cpp}` | Process-wide receive queue for incoming SysEx (16 slots × 8 KB; `std::mutex` protected; overflow drops oldest). |
+| `src/sysex_macro.{h,cpp}` | Helpers for the `*.syx`-named-midimacro convention: predicate + `syx_folder` path resolution + framing-checked file reader. |
+| `src/ccizer.{h,cpp}` | CCizer parser, `.cc-view` slider/knob sidecar, `.cc-midi` MIDI Learn sidecar, folder scan, MIDI byte builder, `zt_ccizer_current_file()` (Pattern Editor reads it for friendly slot names in CC drawmode status). |
+| `src/conf.{h,cpp}` | zt.conf — adds `ccizer_folder` + `syx_folder` keys. |
 | `src/preset_data.h` | F4/Shift+F4 preset arrays + pure `*_apply_preset_to(struct*, idx)` apply functions. Header-only, SDL-free, exhaustively unit-tested. |
 | `src/preset_selector.h` | Pure decision logic for the preset listbox (click / arrow / Space / P-cycle). Unit-tested. |
 | `src/page_sync.h` | F4/Shift+F4 widget↔data sync helpers. Prevents the "preset reverts on next frame" class of bug. |
 | `src/save_key_dispatch.h` | Global Ctrl-S dispatch (open save dialog / pass through / let page handle). Unit-tested. |
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 editors. |
-| `tests/` | CTest unit-test executables. 5 suites, 285+ checks. Linux CI runs them. |
+| `assets/ccizer/` | Bundled CCizer banks (Paketti subset) + README. CMake POST_BUILD copies into `.app Resources/ccizer` and `<exe-dir>/ccizer`. |
+| `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` for first-test handshakes. |
+| `tests/` | CTest unit-test executables. **8 suites**: presets / selector / page_sync / save_key / keybuffer / ccizer / sysex_inq / sysex_macro. Linux CI runs them. |
 | `doc/help.txt` | In-app F1 help. **Update this when adding keybinds or CLI flags.** |
 | `doc/CHANGELOG.txt` | Release notes, chronological. |
 | `.github/workflows/build.yml` | CI: 5-platform build matrix + Linux ctest run. |
@@ -102,15 +112,49 @@ The ESC menu has a "Copy Relaunch Command" entry that captures current state (op
 
 ---
 
+## Page / shortcut map
+
+| Key | Page |
+|---|---|
+| F1 / F2 / F3 | Help / Pattern Editor / Instrument Editor |
+| F4 / Shift+F4 | MIDI Macro Editor / Arpeggio Editor |
+| **Shift+F2** | **Shortcuts & MIDI Mappings** (moved from Shift+F3 on 2026-04-30) |
+| **Shift+F3** | **CC Console** — Paketti CCizer file load + sliders/knobs send-out + MIDI Learn |
+| F5 / F6 / F7 / F8 / F9 | Play / Play Pattern / From Cursor / Stop / Panic |
+| **Shift+F5** | **SysEx Librarian** — `.syx` send + auto-capture as `recv_<TS>.syx` |
+| F10 / F11 / F12 | Song Message / Song Config / System Config (incl. CCizer Folder input) |
+| **Ctrl+Shift+§** | **CC drawmode toggle** — incoming CC writes `Sxxyy`, PB writes `Wxxxx` |
+
+---
+
+## CCizer + SysEx (PRs #78–#84, end of April 2026)
+
+Three feature areas wired in seven stacked PRs:
+
+1. **CC Console** (Shift+F3, `CUI_CcConsole.cpp`). Loads CCizer-format `.txt` files from `ccizer_folder`. Each slot is shown as a slider or knob; tweaking sends MIDI CC out. `V` toggles the widget choice (persists in a `<file>.cc-view` sidecar). `L` enters MIDI Learn — the next incoming `0xB0..0xBF` / `0xE0..0xEF` binds to the focused slot (persists in `<file>.cc-midi`). `B` assigns the loaded file as the current instrument's bank.
+
+2. **Per-instrument CCizer bank**. `instrument.ccizer_bank[256]` (in `module.h`) is the filename. Persisted via a NEW optional `CCBN` chunk in the `.zt` save format; old zTracker silently skips it via `readblock`'s built-in advance-past behavior, so format compatibility is bidirectional. Pattern Editor auto-loads the focused instrument's bank on `cur_inst` change so the user's "1st CC for instrument N" mental model maps directly to slot 1 of the right file.
+
+3. **SysEx**. Foundation in `winmm_compat.h` (`zt_midi_out_sysex`) + `OutputDevice::sendSysEx` + receive queue `sysex_inq.{h,cpp}`. macOS callback parses incoming `F0..F7` into the queue. **SysEx Librarian** (Shift+F5) lists `.syx` files in `syx_folder`, sends on Enter, auto-saves received messages as `recv_<timestamp>.syx`. **Pattern dispatch convention**: a midimacro whose `name` ends in `.syx` (case-insensitive, len > 4) is dispatched as a SysEx file send by the Z-effect handler — no `.zt` format change because the existing MMAC chunk already round-trips the name.
+
+Cross-platform status (2026-04-30): SysEx send works on all three platforms; receive parsing is macOS-only today (Linux/Windows on the followup TODO).
+
+Tests for all three: `test_ccizer` (51 checks), `test_sysex_inq` (~25), `test_sysex_macro` (~20). Bundled assets under `assets/ccizer/` (Paketti subset) and `assets/syx/` (universal device inquiry).
+
+---
+
 ## Test harness
 
-`tests/` builds five CTest executables:
+`tests/` builds eight CTest executables:
 
 - `test_presets` — preset arrays + apply functions.
 - `test_selector` — listbox click / arrow / Space / P-cycle decision logic.
 - `test_page_sync` — apply→refresh→sync per-frame cycle.
 - `test_save_key` — global Ctrl-S dispatch.
 - `test_keybuffer` — real `KeyBuffer` from `src/keybuffer.cpp`, compiled under `ZT_TEST_NO_SDL` against `tests/sdl_stub.h`.
+- `test_ccizer` — Paketti CCizer parser (`PB`/CC# tokens, comments, blanks, out-of-range), `.cc-view` view-hint sidecar round-trip, MIDI byte builder for CC + 14-bit Pitchbend, folder resolution, `.txt` directory scan.
+- `test_sysex_inq` — process-wide SysEx receive queue: empty / push-pop round-trip / FIFO ordering / overflow drops oldest / undersized pop buffer (message stays queued) / invalid input rejection.
+- `test_sysex_macro` — `*.syx`-named-midimacro convention helpers: predicate (case-insensitive, rejects bare `.syx`), path resolution against `syx_folder`, and the framing-checked file reader (rejects missing `F0`/`F7`, oversized, missing).
 
 Run all: `ctest --test-dir build --output-on-failure`. CI runs them on the Linux job after every push.
 
