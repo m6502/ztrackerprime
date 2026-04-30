@@ -136,19 +136,32 @@ Seven-PR feature stack landed end of April 2026 wiring Paketti-style CCizer bank
 - `tests/test_sysex_inq.cpp` — ~25 checks: empty / push-pop / FIFO / overflow / buffer-too-small / invalid input.
 - `tests/test_sysex_macro.cpp` — ~20 checks: predicate, path resolution, valid/malformed/oversized/missing file read.
 
-## INVARIANT: pages must bump `need_refresh` and use real widgets
+## INVARIANTS for any new or modified page
 
-`main.cpp` gates `ActivePage->draw()` on `need_refresh != 0`. Two non-negotiable rules for any page added or modified:
+These rules are non-negotiable. Every one of them was learned the hard way during the CCizer + SysEx + CC-Console work (PRs #78–#84, #95, #96). Don't re-learn them.
 
-1. **Every key handler that mutates visible state ends with `need_refresh++;`** (and so does `enter()`, and any background pump that changes what should be on screen). Forget this and arrow keys silently mutate state without a redraw — the page looks frozen until some other path bumps the flag.
+1. **Every key handler that mutates visible state ends with `need_refresh++;`** — including `enter()` and any background pump that changes what should be on screen. Forget this and arrow keys silently mutate state without a redraw; the page looks frozen until some other path bumps the flag. `main.cpp` gates `ActivePage->draw()` on `need_refresh != 0`.
 
-2. **Interactive elements are real widgets, not ASCII art.** If the user is supposed to click a slider, the slider is a `ValueSlider` registered with `UI->add_element`, drawn by `UI->draw(S)`, mutated by `ValueSlider::mouseupdate`, and absorbed by the page's `update()` reading the `changed` flag. **Never** ship `printBG` text bars as a stand-in for "we'll iterate later" — they are visually identical in a screenshot but completely unclickable, and the user finds out by trying. The pool-of-N pattern (pre-allocate `N` widgets in the ctor, position the visible window per-frame, hide off-screen ones with `xsize=0`) is the idiom for variable-count slot grids; `CUI_CcConsole.cpp::position_sliders` is a worked example.
+2. **Interactive elements are real widgets, not ASCII art.** A slider is a `ValueSlider` registered with `UI->add_element`, drawn by `UI->draw(S)`, mutated by `ValueSlider::mouseupdate`, and absorbed by the page's `update()` reading the `changed` flag. **Never** ship `printBG` text bars as a stand-in for "we'll iterate later" — visually identical in one screenshot, completely unclickable to the user. The pool-of-N pattern (pre-allocate `N` widgets in the ctor, position the visible window per-frame, hide off-screen ones with `xsize=0`) is the idiom for variable-count grids; `CUI_CcConsole.cpp::position_sliders` is the canonical worked example.
 
-Both rules were learnt the hard way during the CCizer / SysEx work — see PR #78 (text-bars regression) and the followup that wired real `ValueSlider`s + `need_refresh` bumps. Treat them as load-bearing for any new page.
+3. **Any list pane uses a real `ListBox` subclass.** Never hand-draw `> filename` with a custom highlight. F11 SkinSelector / F4 / Shift+F4 / Shift+F3 all share one pattern, documented in [`references/list-pane-idiom.md`](references/list-pane-idiom.md). New list-driven pages copy that pattern verbatim — anonymous-namespace `: ListBox` subclass, `is_sorted=true`, `use_checks=true`, `use_key_select=true`, Space-applies override on `update()`, never call `ListBox::OnSelect` from the subclass.
+
+4. **Per-frame `need_redraw = 1` on always-visible widgets.** `UserInterface::draw` skips elements with `need_redraw == 0`. If any sibling fires `needaclear++` the whole element area is cleared and stale-need_redraw widgets vanish. The page's `update()` (or `position_sliders()`) stamps `need_redraw = 1` on the listbox, the grid-focus stub, and every visible pool widget, every frame. Worked example: PR #96.
+
+5. **Each visual column is its own `print` / `printBG`** anchored to its own `col(CC_*_COL)` constant. Never pack adjacent columns into one packed `snprintf` — adjacent fields will smash into each other (`PBPitchbend`, `LeUani`) the first time a string is longer than expected. Headers and data rows reference the *same constants* so they stay aligned.
+
+6. **Tab cycles `UI->cur_element` between IDs.** Page-level "focus" is *derived* from `cur_element` each frame, not stored. Use a 1x1 `UserInterfaceElement` stub (e.g. `MmGridFocus`, `CcSlotGridFocus`) for non-list panes that need Tab focus.
+
+7. **Pages whose own ESC handler matters add their `STATE_*` to the global ESC exclusion list** in `main.cpp::global_keys` (the list with `STATE_HELP / ABOUT / LUA_CONSOLE / SONG_MESSAGE / KEYBINDINGS`). Otherwise the global handler eats ESC first and the page's "ESC cancels capture" hint is a lie. PR #95 was a one-line fix for `STATE_KEYBINDINGS`.
+
+8. **Visual verification before claiming done.** Build green + ctest green ≠ "the page works." Launch the binary, send the F-key, capture the window, drive each user-visible key (arrow, Tab, Space, Enter, Esc, click), diff the screenshots. If you cannot do that step, say so explicitly — don't ship hope.
+
+The full list-pane construction pattern (with code) lives in [`references/list-pane-idiom.md`](references/list-pane-idiom.md). Read it before adding any new page that has a list, a grid, or both.
 
 ## Deeper references (load on demand)
 
-- [`references/foot-guns.md`](references/foot-guns.md) — recurring bug classes: ListBox mousestate fragility, widget-upstream rule, user-reported-inputs-as-ground-truth.
+- [`references/list-pane-idiom.md`](references/list-pane-idiom.md) — **REQUIRED READING before adding any list / grid page.** The full pattern: `ListBox` subclass + grid-focus stub + Tab cycling + per-frame `need_redraw=1` + column-per-print + global-ESC exclusion + visual-verification gate.
+- [`references/foot-guns.md`](references/foot-guns.md) — recurring bug classes: ListBox mousestate fragility, widget-upstream rule, vanishing-sibling on `needaclear`, user-reported-inputs-as-ground-truth.
 - [`references/keyjazz-slot.md`](references/keyjazz-slot.md) — Shift+F4 keyjazz UIE pattern.
 - [`references/test-harness.md`](references/test-harness.md) — sdl_stub / module_stub / `ZT_TEST_NO_SDL`.
 - [`references/cli-flags.md`](references/cli-flags.md) — `zt_parse_cli` + Copy Relaunch Command.
