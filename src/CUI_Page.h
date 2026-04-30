@@ -501,6 +501,49 @@ class CUI_LuaConsole : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// SysEx Librarian (Shift+F5). Lists `.syx` files in the configured
+// syx_folder so the user can:
+//   1. Send a request-dump SysEx to a synth (e.g. Universal Device
+//      Inquiry) by hitting Enter on the file.
+//   2. Watch incoming SysEx auto-save as `recv_<timestamp>.syx` in
+//      the same folder so the captured patches appear in the file
+//      list immediately.
+//   3. Re-send a previously captured `.syx` to dump the patch back
+//      to the synth.
+class CUI_SysExLibrarian : public CUI_Page {
+    public:
+        int  file_cur;                  // selected file
+        int  file_top;                  // scroll offset
+        int  num_files;
+        char folder[1024];
+        char files[256][256];
+        // Most recent received messages: (timestamp, length, first 8
+        // bytes preview). Auto-pruned to RECENT_LOG_MAX entries.
+        static const int RECENT_LOG_MAX = 8;
+        struct RecentLog {
+            char timestamp[16];
+            int  length;
+            unsigned char preview[8];
+            char saved_as[64];
+        };
+        RecentLog recent[RECENT_LOG_MAX];
+        int       recent_count;
+        int       recv_seq;             // monotonic counter for filenames
+        char      status_line[160];
+
+        CUI_SysExLibrarian();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+
+        void rescan_folder(void);
+        void resolve_folder(void);
+        void send_selected(void);
+        void drain_recv(void);          // pop sysex_inq, save, push to recent[]
+};
+
 // CC Console (Shift+F3). Loads CCizer-format `.txt` files from the
 // configured ccizer_folder; each slot is shown as a slider or knob and
 // sends MIDI CC out to the current MIDI Out device when tweaked.

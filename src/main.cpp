@@ -342,6 +342,7 @@ CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
 CUI_KeyBindings *UIP_KeyBindings = NULL;
 CUI_CcConsole *UIP_CcConsole = NULL;
+CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
 int g_cc_drawmode = 0;
 
 
@@ -1134,6 +1135,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_Config = new CUI_Config;
     UIP_KeyBindings = new CUI_KeyBindings;
     UIP_CcConsole = new CUI_CcConsole;
+    UIP_SysExLibrarian = new CUI_SysExLibrarian;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1447,6 +1449,16 @@ void global_keys(Drawable *S)
             case SDLK_F7: // Play from Order
                 if (kstate & KS_SHIFT) {
                     command = CMD_PLAY_ORDER;
+                }
+                break;
+
+            case SDLK_F5: // Shift+F5 = SysEx Librarian
+                // Plain F5 starts playback. Shift+F5 lands on the
+                // SysEx Librarian (request synth dumps, capture
+                // responses to .syx, replay later).
+                if (kstate & KS_SHIFT) {
+                    command = CMD_SWITCH_SYSEX_LIB;
+                    key = Keys.getkey();
                 }
                 break;
 
@@ -1791,6 +1803,11 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_CCCONSOLE:
             switch_page(UIP_CcConsole);
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_SYSEX_LIB:
+            switch_page(UIP_SysExLibrarian);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
@@ -2413,6 +2430,7 @@ int postAction ()
     delete UIP_LuaConsole;
     delete UIP_KeyBindings;
     delete UIP_CcConsole;
+    delete UIP_SysExLibrarian;
     g_lua.shutdown();
     delete ztPlayer;
     delete MidiIn;
@@ -3486,6 +3504,7 @@ int initSDL(void)
     UIP_LuaConsole = new CUI_LuaConsole;
     UIP_KeyBindings = new CUI_KeyBindings;
     UIP_CcConsole = new CUI_CcConsole;
+    UIP_SysExLibrarian = new CUI_SysExLibrarian;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_MainMenu = new CUI_MainMenu;

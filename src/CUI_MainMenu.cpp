@@ -178,6 +178,7 @@ static const mm_entry MM_ENTRIES[] = {
 #endif
     {MM_CMD,        "Shortcuts & MIDI Mappings","Shift+F2",             CMD_SWITCH_KEYBINDINGS,     NULL},
     {MM_CMD,        "CC Console",               "Shift+F3",             CMD_SWITCH_CCCONSOLE,       NULL},
+    {MM_CMD,        "SysEx Librarian",          "Shift+F5",             CMD_SWITCH_SYSEX_LIB,       NULL},
     {MM_FUNC,       "Toggle CC Drawmode",       "Ctrl+Shift+\xA7",      0,                          mm_toggle_cc_drawmode},
     {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
