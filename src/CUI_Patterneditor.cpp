@@ -15,6 +15,12 @@ static PatternUndo g_undo;
 // Save undo snapshot before destructive pattern operations
 #define UNDO_SAVE() g_undo.save(song, cur_edit_pattern)
 
+// Reset by the Ctrl+Shift+§ toggle each time CC drawmode flips state,
+// then set on the first drawmode write so each ON->...->OFF session
+// produces exactly one UNDO_SAVE() snapshot. See the MIDI-in handler
+// further down.
+static int g_cc_draw_session_snapped = 0;
+
 #define LEFT_MARGIN                     40
 #define RIGHT_MARGIN                    2
 
@@ -999,6 +1005,23 @@ void CUI_Patterneditor::update()
     need_refresh++;
     clear++;
   }
+
+  // Auto-route the CC Console to the focused instrument's CCizer bank
+  // whenever cur_inst changes. The user picks an instrument here and the
+  // Shift+F3 page silently follows so "1st CC for instrument N" maps to
+  // slot 1 of *that* instrument's bank without having to flip pages.
+  // Tracked across frames via a static; on the first frame after a
+  // bank-bearing instrument becomes focused, load_by_basename() pulls
+  // the file in (no-op if it's already loaded).
+  static int s_last_cur_inst = -1;
+  if (cur_inst != s_last_cur_inst) {
+    s_last_cur_inst = cur_inst;
+    if (UIP_CcConsole && cur_inst >= 0 && cur_inst < MAX_INSTS &&
+        song->instruments[cur_inst] &&
+        song->instruments[cur_inst]->ccizer_bank[0]) {
+      UIP_CcConsole->load_by_basename(song->instruments[cur_inst]->ccizer_bank);
+    }
+  }
   //memset(note,0,4);
 
 //  int pattern_visible ;
@@ -1706,6 +1729,7 @@ void CUI_Patterneditor::update()
         // at the cursor row.
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
           g_cc_drawmode = !g_cc_drawmode;
+          g_cc_draw_session_snapped = 0;  // start a fresh undo session each toggle
           midiInQueue.clear();
           sprintf(szStatmsg, "CC drawmode: %s", g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
           statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
@@ -3114,6 +3138,16 @@ case SDLK_DELETE:
               if (g_cc_drawmode && (hi == 0xB0 || hi == 0xE0)) {
                 int data1 = (dw >> 8)  & 0x7F;
                 int data2 = (dw >> 16) & 0x7F;
+                // Snapshot the pattern before the first write of this
+                // drawmode session so the user can undo a knob run with
+                // a single Ctrl+Z. The session marker is reset by the
+                // Ctrl+Shift+§ toggler itself (above) whenever drawmode
+                // flips on/off, so each ON->...->OFF span generates one
+                // undo step.
+                if (!g_cc_draw_session_snapped) {
+                    UNDO_SAVE();
+                    g_cc_draw_session_snapped = 1;
+                }
                 // Look up the friendly slot name from the currently-loaded
                 // CCizer file (if any) — matches by learn binding so we
                 // get "Cutoff" instead of "CC 74" in the status line.
@@ -3662,7 +3696,19 @@ void CUI_Patterneditor::draw(Drawable *S)
     draw_status_vars(S);
 
     printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
-    
+
+    // Persistent CC drawmode badge — easy to forget the toggle is on
+    // since the toggle's status message scrolls past. Right-aligned on
+    // the title row so it doesn't fight with the pattern data area.
+    if (g_cc_drawmode) {
+      const char *badge = "[CC DRAW] (Ctrl+Shift+\xA7 toggles)";
+      int badge_len = (int)strlen(badge);
+      int x_col = CHARS_X - badge_len - 2;
+      if (x_col < 2) x_col = 2;
+      print(col(x_col), row(PAGE_TITLE_ROW_Y), badge,
+            COLORS.Brighttext, S);
+    }
+
     switch(mode) {
       
     case PEM_MOUSEDRAW: 
