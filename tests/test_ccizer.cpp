@@ -7,8 +7,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#  include <direct.h>
+#  include <io.h>
+#  define unlink _unlink
+#  define rmdir  _rmdir
+static int test_mkdir(const char *p) { return _mkdir(p); }
+#else
+#  include <unistd.h>
+static int test_mkdir(const char *p) { return mkdir(p, 0755); }
+#endif
 
 static int failures = 0;
 static int checks   = 0;
@@ -168,7 +178,7 @@ static void test_resolve_folder_override() {
 
     // Override that exists -> picks it.
     snprintf(buf, sizeof(buf), "/tmp/zt_ccizer_resolve_dir");
-    mkdir(buf, 0755);
+    test_mkdir(buf);
     r = zt_ccizer_resolve_folder(buf, "", out, sizeof(out));
     CHECK(r == 0);
     CHECK_STR(out, buf);
@@ -177,7 +187,7 @@ static void test_resolve_folder_override() {
 
 static void test_list_dir() {
     const char *dir = "/tmp/zt_ccizer_listdir";
-    mkdir(dir, 0755);
+    test_mkdir(dir);
     char buf[1024];
     snprintf(buf, sizeof(buf), "%s/a.txt", dir); write_tmp(buf, "1 A\n");
     snprintf(buf, sizeof(buf), "%s/b.txt", dir); write_tmp(buf, "2 B\n");
