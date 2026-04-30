@@ -14,8 +14,18 @@
 
 // SysEx send (Windows / WinMM). bytes must include 0xF0 prefix and 0xF7
 // terminator. Wraps midiOutLongMsg with the required MIDIHDR prepare /
-// unprepare dance. Synchronous: blocks until WinMM accepts the buffer
-// (typical OS-level call; not "blocks until receiver consumed it").
+// unprepare dance.
+//
+// The driver returns from midiOutLongMsg as soon as it queues the buffer
+// for transmission, NOT after the bytes are actually on the wire. Calling
+// midiOutUnprepareHeader before MHDR_DONE is set returns
+// MIDIERR_STILLPLAYING and leaves the driver still owning the buffer --
+// subsequent midiOutLongMsg calls then error with the same code because
+// the previous "in flight" buffer is still on the queue. We poll
+// MHDR_DONE with a short Sleep loop before unprepare so the call is
+// genuinely synchronous from the caller's perspective. Cap the poll loop
+// at ~5 seconds (a 4 KB SysEx at MIDI's 31250 baud takes ~1 second; 5 s
+// covers patch banks up to ~16 KB with margin).
 static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes, int len) {
     if (!h || !bytes || len <= 0) return MMSYSERR_ERROR;
     MIDIHDR hdr;
@@ -27,6 +37,20 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
         return MMSYSERR_ERROR;
     }
     MMRESULT r = midiOutLongMsg(h, &hdr, sizeof(hdr));
+    if (r == MMSYSERR_NOERROR) {
+        DWORD waited_ms = 0;
+        while ((hdr.dwFlags & MHDR_DONE) == 0 && waited_ms < 5000) {
+            Sleep(1);
+            waited_ms++;
+        }
+        if ((hdr.dwFlags & MHDR_DONE) == 0) {
+            // Driver never marked it done. Reset the device to free the
+            // buffer rather than leak it. Unprepare may still fail; that's
+            // fine -- the buffer is the caller's stack frame, freed when
+            // we return.
+            midiOutReset(h);
+        }
+    }
     midiOutUnprepareHeader(h, &hdr, sizeof(hdr));
     return r;
 }
