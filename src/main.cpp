@@ -341,6 +341,7 @@ CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
 CUI_KeyBindings *UIP_KeyBindings = NULL;
+CUI_CcConsole *UIP_CcConsole = NULL;
 
 
 
@@ -1131,6 +1132,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_Config = new CUI_Config;
     UIP_KeyBindings = new CUI_KeyBindings;
+    UIP_CcConsole = new CUI_CcConsole;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1447,15 +1449,27 @@ void global_keys(Drawable *S)
                 }
                 break;
 
-            case SDLK_F3: // Shift+F3 = Shortcuts & MIDI Mappings page
-                // Plain F3 opens the Instrument editor (handled in
-                // the no-modifier block below). Shift+F3 lands on
-                // the unified Shortcuts & MIDI Mappings page so the
+            case SDLK_F2: // Shift+F2 = Shortcuts & MIDI Mappings page
+                // Plain F2 opens the Pattern Editor (handled in the
+                // no-modifier block below). Shift+F2 lands on the
+                // unified Shortcuts & MIDI Mappings page so the
                 // user can see and edit BOTH the keyboard binding
                 // and the MIDI bindings for every action in one
-                // place.
+                // place. (Moved from Shift+F3 to free that slot for
+                // the CC Console page.)
                 if (kstate & KS_SHIFT) {
                     command = CMD_SWITCH_KEYBINDINGS;
+                    key = Keys.getkey();
+                }
+                break;
+
+            case SDLK_F3: // Shift+F3 = CC Console page
+                // Plain F3 opens the Instrument editor (handled in
+                // the no-modifier block below). Shift+F3 opens the
+                // CC Console — load CCizer-format files and send
+                // MIDI CCs out via on-screen sliders / knobs.
+                if (kstate & KS_SHIFT) {
+                    command = CMD_SWITCH_CCCONSOLE;
                     key = Keys.getkey();
                 }
                 break;
@@ -1771,6 +1785,11 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_KEYBINDINGS:
             switch_page(UIP_KeyBindings);
+            doredraw++; clear++;
+            break;
+        // ------------------------------------------------------------------------
+        case CMD_SWITCH_CCCONSOLE:
+            switch_page(UIP_CcConsole);
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
@@ -2392,6 +2411,7 @@ int postAction ()
     delete UIP_Midimacroeditor;
     delete UIP_LuaConsole;
     delete UIP_KeyBindings;
+    delete UIP_CcConsole;
     g_lua.shutdown();
     delete ztPlayer;
     delete MidiIn;
@@ -3464,6 +3484,7 @@ int initSDL(void)
     UIP_SongDuration = new CUI_SongDuration;
     UIP_LuaConsole = new CUI_LuaConsole;
     UIP_KeyBindings = new CUI_KeyBindings;
+    UIP_CcConsole = new CUI_CcConsole;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_MainMenu = new CUI_MainMenu;

@@ -1,0 +1,10 @@
+104 Tuning
+74 Cutoff
+71 Resonance
+12 EnvMod
+75 Decay
+16 AccentLevel
+17 Overdrive
+18 DelayTime
+19 DelayFeedback
+102 SlideStatus

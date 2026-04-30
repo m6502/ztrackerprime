@@ -133,6 +133,8 @@ set(ZT_SOURCES
   src/CUI_KeyBindings.cpp
   src/CUI_MainMenu.cpp
   src/midi_mappings.cpp
+  src/ccizer.cpp
+  src/CUI_CcConsole.cpp
 )
 
 if(WIN32)
@@ -355,6 +357,9 @@ if(APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy
       "${CMAKE_SOURCE_DIR}/zt_icon.png"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt_icon.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_SOURCE_DIR}/assets/ccizer"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/ccizer"
     VERBATIM
   )
 else()
@@ -368,6 +373,8 @@ else()
           "${CMAKE_SOURCE_DIR}/palettes" "$<TARGET_FILE_DIR:zt>/palettes"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/doc" "$<TARGET_FILE_DIR:zt>/doc"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/assets/ccizer" "$<TARGET_FILE_DIR:zt>/ccizer"
   )
 endif()
 

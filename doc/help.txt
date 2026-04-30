@@ -106,6 +106,17 @@
  F2             : Pattern editor - Pressing F2 again while in the pattern
                   editing screen brings up the pattern settings.
  F3             : Instrument editor
+ SHIFT-F2       : Shortcuts & MIDI Mappings (unified per-action grid:
+                  Keyboard | MIDI1 | MIDI2 | MIDI3). Up/Dn/Lt/Rt move,
+                  Enter edits, Backspace clears, Ctrl+S saves both
+                  tables to zt.conf.
+ SHIFT-F3       : CC Console — load Paketti CCizer-format `.txt` files
+                  and send MIDI CC / Pitch Bend out via on-screen
+                  sliders or knobs. Tab focus, Enter loads, Lt/Rt
+                  adjusts (Shift x8, Ctrl x16), V toggles slider/knob,
+                  [ / ] picks channel, Ctrl+S saves the .cc-view
+                  sidecar. Folder defaults to `./ccizer` next to the
+                  binary; override with `ccizer_folder=` in zt.conf.
  F4             : MIDI Macro editor (toggles to Arpeggio editor when
                   already on it)
  SHIFT-F4       : Arpeggio editor
