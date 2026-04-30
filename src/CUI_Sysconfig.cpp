@@ -459,6 +459,19 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti->xsize  = 56;                              // ends ~col 76, matches MIDI Out list right edge
         ti->length = MAX_PATH;
         ti->str    = (unsigned char*)zt_config_globals.ccizer_folder;
+
+        // SysEx folder picker (audit L13). Same row layout, one row
+        // below the CCizer folder so the two paths sit together as a
+        // "MIDI data folders" group. Empty value falls back through
+        // CUI_SysExLibrarian::resolve_folder()'s default cascade.
+        ti = new TextInput;
+        UI->add_element(ti, tabindex++);
+        ti->frame  = 1;
+        ti->x      = 4 + 16;
+        ti->y      = base_y + 8;
+        ti->xsize  = 56;
+        ti->length = MAX_PATH;
+        ti->str    = (unsigned char*)zt_config_globals.syx_folder;
 }
 
 void CUI_Sysconfig::enter(void) {
@@ -520,6 +533,7 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(TRACKS_ROW_Y+7),"    Full Screen",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+10),"  CCizer Folder",COLORS.Text,S);
+        print(row(4),col(TRACKS_ROW_Y+11),"  SysEx Folder", COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
         print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);

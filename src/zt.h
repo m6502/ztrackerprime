@@ -712,6 +712,23 @@ extern int cur_step;
 // Ctrl+Shift+§ from the Pattern Editor or from the ESC main menu.
 extern int g_cc_drawmode;
 
+// Reset to 0 every time CC drawmode flips state, then set to 1 by the
+// first drawmode write so each ON->...->OFF span generates exactly one
+// UNDO_SAVE() snapshot. Lifted out of CUI_Patterneditor.cpp file-static
+// scope so the ESC menu's mm_toggle_cc_drawmode can reset it too --
+// otherwise toggling drawmode via the menu instead of the keypath
+// leaves the marker stale and the next session's first knob tweak is
+// unsnapped (no Ctrl+Z recovery). See audit H2.
+extern int g_cc_draw_session_snapped;
+
+// Single toggler called from both the Pattern Editor keypath
+// (Ctrl+Shift+§) and the ESC menu entry (mm_toggle_cc_drawmode), so
+// session-marker reset can't drift between the two callers.
+static inline void zt_toggle_cc_drawmode(void) {
+    g_cc_drawmode = !g_cc_drawmode;
+    g_cc_draw_session_snapped = 0;
+}
+
 extern int keypress;
 extern int keywait;
 extern zt_timer_handle keytimer;

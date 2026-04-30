@@ -78,7 +78,10 @@ static void mm_quit(void) {
 }
 
 static void mm_toggle_cc_drawmode(void) {
-    g_cc_drawmode = !g_cc_drawmode;
+    // Use the shared toggler in zt.h so the undo-session marker resets
+    // too -- a bare g_cc_drawmode = !g_cc_drawmode would skip the reset
+    // and leave the next drawmode-on session unsnapped (audit H2).
+    zt_toggle_cc_drawmode();
     snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: %s",
              g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
     statusmsg = szStatmsg;
