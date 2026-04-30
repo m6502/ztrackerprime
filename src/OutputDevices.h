@@ -23,6 +23,7 @@ class MidiOutputDevice : public OutputDevice {
         virtual void pitchWheel(unsigned char chan, unsigned short int value);
         virtual void progChange(int program, int bank, unsigned char chan);
         virtual void sendCC(unsigned char cc, unsigned char value,unsigned char chan);
+        virtual int  sendSysEx(const unsigned char *bytes, int len);
 
 
 	private:

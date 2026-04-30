@@ -94,6 +94,12 @@ class OutputDevice {
         virtual void progChange(int program, int bank, unsigned char chan)=0;
         virtual void sendCC(unsigned char cc, unsigned char value,unsigned char chan)=0;
 
+        // SysEx send. `bytes` must include the leading 0xF0 status and
+        // trailing 0xF7 EOX; `len` includes both. Default impl is a no-op
+        // so AudioOutputDevice subclasses (TestTone, Noise) don't have to
+        // implement it. Returns 1 on success, 0 on error/unsupported.
+        virtual int sendSysEx(const unsigned char * /*bytes*/, int /*len*/) { return 0; }
+
 };
 
 class AudioOutputDevice : public OutputDevice {
@@ -207,6 +213,10 @@ class midiOut {
         inline void sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
             if (dev>=numOuputDevices) return;
             outputDevices[dev]->sendCC(cc,value,chan);
+        }
+        inline int sendSysEx(unsigned int dev, const unsigned char *bytes, int len) {
+            if (dev >= numOuputDevices) return 0;
+            return outputDevices[dev]->sendSysEx(bytes, len);
         }
         inline void clock(void) {
             sendGlobal(0xF8);

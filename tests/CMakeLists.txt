@@ -76,3 +76,11 @@ add_executable(test_ccizer
 target_include_directories(test_ccizer PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_ccizer PRIVATE cxx_std_17)
 add_test(NAME ccizer COMMAND test_ccizer)
+
+# SysEx receive queue. Pure C++ (std::mutex), no platform MIDI deps.
+add_executable(test_sysex_inq
+    test_sysex_inq.cpp
+)
+target_include_directories(test_sysex_inq PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_sysex_inq PRIVATE cxx_std_17)
+add_test(NAME sysex_inq COMMAND test_sysex_inq)

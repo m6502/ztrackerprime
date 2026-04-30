@@ -135,6 +135,7 @@ set(ZT_SOURCES
   src/midi_mappings.cpp
   src/ccizer.cpp
   src/CUI_CcConsole.cpp
+  src/sysex_inq.cpp
 )
 
 if(WIN32)
