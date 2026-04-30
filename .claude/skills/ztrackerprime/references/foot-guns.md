@@ -50,6 +50,26 @@ When the user reports a specific input ("I pressed Ctrl-S"), that IS what they p
 
 Generalisation of the ListBox case. Resetting state at the *top* of an event handler — before the switch dispatches the current event — clobbers the very state the dispatch is supposed to see. If a state field gates downstream behavior (`act++`, `dirty=1`, an event-consumed flag), reset it AFTER the switch, not before. When in doubt: trace one event end-to-end, note which fields it depends on at each step, and only clear those fields *after* the last reader.
 
+## Vanishing sibling widgets on `needaclear`
+
+`UserInterface::draw` skips elements whose `need_redraw == 0`. Most widgets self-arm `need_redraw=1` only on internal change — value tweak, mouse drag, focus change. So once a widget has rendered, it sits dormant.
+
+The trap: when *any* sibling fires `needaclear++` (the numeric-input popup return path in `ValueSlider::update` is one example), `UI::draw` clears row 12+ wholesale and only `need_redraw==1` elements repaint that frame. Every dormant widget silently disappears until *its* next state change.
+
+Symptoms:
+
+- Drag one slider → all the others vanish.
+- Click into a list → the slot grid disappears.
+- Tab into a different pane → the previously-active pane vanishes.
+
+**Fix idiom:** any page with always-visible widgets stamps `need_redraw = 1` on each one *every frame* in the page's `update()` (or `position_sliders()` for pool widgets). Cheap (an int write) and eliminates the bug class. Worked example: `CUI_CcConsole::position_sliders` + `update()` after PR #96.
+
+## Global ESC handler shadows page ESC
+
+`main.cpp::global_keys` intercepts ESC and pops up the Main Menu when `cur_state` isn't in an exclusion list (`STATE_HELP`, `STATE_ABOUT`, `STATE_LUA_CONSOLE`, `STATE_SONG_MESSAGE`, `STATE_KEYBINDINGS`, ...). It runs *before* the active page's `update()`, so any page whose own ESC handler does something user-visible — "Capture cancelled.", "Learn cancelled.", "Discard unsaved?" — is shadowed by default. The page's ESC code only fires when ESC happens to be in a context the global handler doesn't claim.
+
+When you add a new page whose ESC has dedicated meaning, **add its `STATE_*` to that exclusion list in the same PR**. PR #95 was a one-line fix for `STATE_KEYBINDINGS` after the user reported pressing ESC and getting the menu instead of "Capture cancelled."
+
 ## Saturated ring buffer with `head == tail`
 
 `KeyBuffer` originally checked `head != tail` to gate read/peek. Fails when the buffer is exactly full (head wraps back to tail). Fix: gate on `cursize > 0`. If you write a fixed-capacity ring with two pointers, also keep a count.
