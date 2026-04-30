@@ -100,13 +100,19 @@ static void cc_make_dir_recursive(const char *path) {
 #define CC_FILE_Y       (CC_BASE_Y + 2)
 #define CC_FILE_W       26
 
-// Slot grid pane (right)
+// Slot grid pane (right). Each column owns a fixed character span and
+// is drawn with its own print() — never one packed sprintf — so a long
+// name can't bleed into the slider widget and a 3-digit CC# can't
+// crowd the name. The "marker+slot" field is 5 chars wide (" >123"),
+// the CC# field is 4 chars wide (cc_lbl + trailing space), the name
+// field is 18 chars (one extra over the 17-char strncpy so the trailing
+// space is always there even on the longest names).
 #define CC_GRID_X       (CC_FILE_X + CC_FILE_W + 2)   // = 30
 #define CC_GRID_Y       (CC_BASE_Y + 2)
-#define CC_SLOT_COL     CC_GRID_X                      // "  1 " or "> 1 "
-#define CC_CC_COL       (CC_GRID_X + 5)                // "PB  " or "127 "
-#define CC_NAME_COL     (CC_GRID_X + 9)                // 17-char field
-#define CC_SLIDER_X     (CC_GRID_X + 27)               // ValueSlider widget x
+#define CC_SLOT_COL     CC_GRID_X                      // " >123" — 5 chars
+#define CC_CC_COL       (CC_GRID_X + 5)                // "PB  " / "127 " — 4 chars
+#define CC_NAME_COL     (CC_GRID_X + 10)               // 18-char field
+#define CC_SLIDER_X     (CC_GRID_X + 28)               // ValueSlider widget x
 #define CC_SLIDER_W     10                             // ValueSlider xsize
 #define CC_LEARN_COL    (CC_SLIDER_X + CC_SLIDER_W + 5) // "B0 4A" or "PB ch3" or "----"
 
@@ -615,12 +621,16 @@ void CUI_CcConsole::draw(Drawable *S) {
     }
 
     // ----- Slot grid pane (right) -----
-    print(col(CC_GRID_X), row(CC_GRID_Y - 1),
-          "Slot CC#  Name", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
-    print(col(CC_SLIDER_X), row(CC_GRID_Y - 1),
-          "Slider           Val", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
-    print(col(CC_LEARN_COL), row(CC_GRID_Y - 1),
-          "Learn", focus == 1 ? COLORS.Brighttext : COLORS.Text, S);
+    // Column-aligned headers (one print per column) so they line up
+    // with the data rows below. The slider widget shows the live
+    // value itself, so the header column is just "Slider" with no
+    // trailing "Val" — that text used to bleed into the Learn column.
+    TColor hdr_fg = (focus == 1) ? COLORS.Brighttext : COLORS.Text;
+    print(col(CC_SLOT_COL), row(CC_GRID_Y - 1), "Slot", hdr_fg, S);
+    print(col(CC_CC_COL),   row(CC_GRID_Y - 1), "CC#",  hdr_fg, S);
+    print(col(CC_NAME_COL), row(CC_GRID_Y - 1), "Name", hdr_fg, S);
+    print(col(CC_SLIDER_X), row(CC_GRID_Y - 1), "Slider", hdr_fg, S);
+    print(col(CC_LEARN_COL), row(CC_GRID_Y - 1), "Learn", hdr_fg, S);
 
     if (!loaded) {
         print(col(CC_GRID_X), row(CC_GRID_Y),
@@ -656,14 +666,31 @@ void CUI_CcConsole::draw(Drawable *S) {
             TColor bg = (idx == slot_cur && focus == 1)
                             ? COLORS.SelectedBGLow
                             : COLORS.Background;
-            char prefix[16];
-            snprintf(prefix, sizeof(prefix), "%c%4d  %-3s  ",
-                     (idx == slot_cur) ? '>' : ' ', idx + 1, cc_lbl);
-            printBG(col(CC_SLOT_COL), row(CC_GRID_Y + row_i), prefix, fg, bg, S);
+
+            // Each column rendered as its own printBG with a fixed
+            // width so adjacent columns can't run into each other.
+            // Slot field: " >123" — marker + 3-digit slot index +
+            // trailing space (5 chars total). CC field: "PB  " /
+            // "127 " — left-justified 3-char label + trailing space
+            // (4 chars total). Name field: 18 chars; the
+            // ZtCcizerSlot::name buffer is 17 long so a 17-char slot
+            // name still has one cell of breathing room before the
+            // slider widget at CC_SLIDER_X.
+            char slot_field[8];
+            snprintf(slot_field, sizeof(slot_field), "%c%3d ",
+                     (idx == slot_cur) ? '>' : ' ', idx + 1);
+            printBG(col(CC_SLOT_COL), row(CC_GRID_Y + row_i),
+                    slot_field, fg, bg, S);
+
+            char cc_field[8];
+            snprintf(cc_field, sizeof(cc_field), "%-3s ", cc_lbl);
+            printBG(col(CC_CC_COL), row(CC_GRID_Y + row_i),
+                    cc_field, fg, bg, S);
 
             char name_buf[20];
-            snprintf(name_buf, sizeof(name_buf), "%-17.17s", s->name);
-            printBG(col(CC_NAME_COL), row(CC_GRID_Y + row_i), name_buf, fg, bg, S);
+            snprintf(name_buf, sizeof(name_buf), "%-18.18s", s->name);
+            printBG(col(CC_NAME_COL), row(CC_GRID_Y + row_i),
+                    name_buf, fg, bg, S);
 
             // The ValueSlider widget itself is drawn by UI->draw(S).
 
