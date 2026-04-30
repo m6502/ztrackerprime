@@ -545,8 +545,13 @@ class CUI_SysExLibrarian : public CUI_Page {
 };
 
 // CC Console (Shift+F3). Loads CCizer-format `.txt` files from the
-// configured ccizer_folder; each slot is shown as a slider or knob and
-// sends MIDI CC out to the current MIDI Out device when tweaked.
+// configured ccizer_folder. Each slot has a real ValueSlider widget
+// that's mouse-clickable AND keyboard-adjustable; tweaking fires MIDI
+// CC (or 14-bit Pitchbend for "PB" slots) out to the current MIDI Out
+// device. Up/Dn navigate slot_cur through the slot list, scrolling the
+// visible window; the slider widgets are repositioned per-frame to
+// match scroll state, and off-screen sliders get xsize=0 which
+// disables their mouse / keyboard / draw paths.
 class CUI_CcConsole : public CUI_Page {
     public:
         int focus;          // 0 = file list, 1 = slot grid
@@ -562,6 +567,12 @@ class CUI_CcConsole : public CUI_Page {
         int  num_files;
         char files[256][256];
 
+        // One ValueSlider per max-slot; positioned per-frame based on
+        // slot_top + visible window. Off-screen sliders get xsize=0.
+        ValueSlider *sliders[128];          // ZT_CCIZER_MAX_SLOTS
+        int          last_values[128];      // last seen value to detect changes
+        int          last_visible_count;    // for repaint optimization
+
         CUI_CcConsole();
 
         void enter(void);
@@ -572,10 +583,15 @@ class CUI_CcConsole : public CUI_Page {
         void rescan_folder(void);
         void load_selected(void);
         // Look up `bn` (basename, e.g. "microfreak.txt") in the current
-        // ccizer folder and load it. Used by the Pattern Editor to
-        // auto-route the CC Console to the focused instrument's bank
-        // when cur_inst changes. No-op if `bn` is empty or not found.
+        // ccizer folder and load it.
         void load_by_basename(const char *bn);
+
+        // Reposition the slider widget pool: visible slots get x/y/xsize/
+        // min/max/value, off-screen slots get xsize=0.
+        void position_sliders(int grid_max_rows);
+        // After UI->update() reports widget activity, copy any user-driven
+        // value changes back to slots and fire send_slot for each.
+        void absorb_slider_changes(void);
 };
 
 // Unified Shortcuts & MIDI Mappings page. cursor_y picks an action;
