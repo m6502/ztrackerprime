@@ -1308,8 +1308,15 @@ void doquit() {
 //
 //
 void quit() {
-  UIP_RUSure->str = " Sure to quit?";
+  UIP_RUSure->str = " Exit zTracker?";
   UIP_RUSure->OnYes = (VFunc)doquit;
+  // The user initiated the quit explicitly (Ctrl-Q / ESC menu Quit), so
+  // default focus to OK -- a second Enter commits. Other RUSure callers
+  // (file-overwrite, discard-changes) keep the default No-focused
+  // behaviour so an accidental Enter doesn't destroy work.
+  UIP_RUSure->default_button = 0;
+  UIP_RUSure->yes_caption    = "  OK";
+  UIP_RUSure->no_caption     = " Cancel";
   popup_window(UIP_RUSure);
 }
 
