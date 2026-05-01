@@ -51,10 +51,62 @@
 #define SX_BASE_Y       (TRACKS_ROW_Y + 0)
 #define SX_FILE_X       2
 #define SX_FILE_Y       (SX_BASE_Y + 3)
-#define SX_FILE_W       28
+#define SX_FILE_W       38
 #define SX_RECV_X       (SX_FILE_X + SX_FILE_W + 2)
 #define SX_RECV_Y       (SX_BASE_Y + 3)
 #define SX_SPACE_BOTTOM 8
+
+// IDs for the page's UI element pool. Only one tab-stop today (the
+// file selector) so the layout is simple, but it leaves room to grow.
+#define SX_FILELIST_ID  50
+
+static CUI_SysExLibrarian *g_self_for_listbox = NULL;   // OnSelect back-pointer
+
+// ---------------------------------------------------------------------------
+// SxFileSelector — real ListBox for the Files pane. Matches the F11
+// SkinSelector / Shift+F3 CC Console / F4 / Shift+F4 idiom: anonymous-
+// namespace subclass, frame=1, Space-applies override on update(), no
+// ListBox::OnSelect call from the subclass (the recurring foot-gun in
+// references/foot-guns.md).
+//
+// Typeahead is intentionally disabled (use_key_select = false) because
+// the page already binds letter keys for global commands -- S = send,
+// R = rescan, C = clear log. With typeahead on, those keystrokes would
+// jump the listbox cursor instead of firing the command.
+
+namespace {
+class SxFileSelector : public ListBox {
+public:
+    SxFileSelector() {
+        empty_message       = "(no .syx files yet -- send/recv will populate)";
+        is_sorted           = true;
+        use_checks          = false;
+        use_key_select      = false;
+        wrap_focus_at_edges = false;
+        frame               = 1;
+    }
+    void OnChange()       override {}
+    void OnSelectChange() override {}
+    int update() override {
+        // Mirror F4/Shift+F4/Shift+F3: Space and Enter both apply.
+        KBKey k = Keys.checkkey();
+        if (k == SDLK_SPACE) {
+            Keys.getkey();
+            LBNode *p = getNode(cur_sel + y_start);
+            if (p) OnSelect(p);
+            need_refresh++;
+            need_redraw++;
+            return 0;
+        }
+        return ListBox::update();
+    }
+    void OnSelect(LBNode *selected) override {
+        if (!selected || !g_self_for_listbox) return;
+        g_self_for_listbox->send_selected();
+        // NEVER call ListBox::OnSelect from a subclass.
+    }
+};
+} // namespace
 
 // --------- Helpers ---------
 static int dir_exists(const char *path) {
@@ -171,12 +223,33 @@ static int write_file(const char *path, const unsigned char *bytes, int len) {
 // --------- Lifecycle ---------
 CUI_SysExLibrarian::CUI_SysExLibrarian() {
     UI = new UserInterface;
+    g_self_for_listbox = this;
     file_cur = file_top = 0;
     num_files = 0;
     folder[0] = '\0';
     recent_count = 0;
     recv_seq = 0;
     status_line[0] = '\0';
+
+    // File selector tab-stop. ysize = LAST visible row index; the page's
+    // update() resizes it per-frame to match the available pane height.
+    SxFileSelector *fs = new SxFileSelector;
+    fs->x = SX_FILE_X;
+    fs->y = SX_FILE_Y;
+    fs->xsize = SX_FILE_W;
+    fs->ysize = 16;
+    UI->add_element(fs, SX_FILELIST_ID);
+    file_selector = fs;
+}
+
+void CUI_SysExLibrarian::rebuild_file_list_items(void) {
+    if (!file_selector) return;
+    file_selector->clear();
+    for (int i = 0; i < num_files; i++) {
+        file_selector->insertItem(files[i]);
+    }
+    int cursor = (file_cur >= 0 && file_cur < num_files) ? file_cur : 0;
+    file_selector->setCursor(cursor);
 }
 
 void CUI_SysExLibrarian::resolve_folder(void) {
@@ -214,9 +287,15 @@ void CUI_SysExLibrarian::rescan_folder(void) {
     }
     if (file_cur >= num_files) file_cur = num_files > 0 ? num_files - 1 : 0;
     if (file_top > file_cur)   file_top = file_cur;
+    rebuild_file_list_items();
 }
 
 void CUI_SysExLibrarian::send_selected(void) {
+    // Sync from listbox first so OnSelect / S-key paths agree on what's
+    // selected.
+    if (file_selector) {
+        file_cur = file_selector->cur_sel + file_selector->y_start;
+    }
     if (file_cur < 0 || file_cur >= num_files) return;
     char path[1280];
     snprintf(path, sizeof(path), "%s/%s", folder, files[file_cur]);
@@ -377,6 +456,7 @@ void CUI_SysExLibrarian::drain_recv(void) {
 void CUI_SysExLibrarian::enter(void) {
     cur_state = STATE_SYSEX_LIB;
     rescan_folder();
+    UI->cur_element = SX_FILELIST_ID;
     // Seed recv_seq past any existing `recv_<TS>_NNN.syx` files so a
     // capture in the same wall-clock second after a restart doesn't
     // clobber a previous file. Scans the rescanned `files[]` array,
@@ -398,16 +478,40 @@ void CUI_SysExLibrarian::enter(void) {
     }
     if (max_seq + 1 > recv_seq) recv_seq = max_seq + 1;
     snprintf(status_line, sizeof(status_line),
-             "Up/Dn pick file | Enter or S send | R rescan | C clear log | ESC exit");
+             "Up/Dn pick file | Enter or Space or S send | R rescan | C clear log | ESC exit");
     Keys.flush();
     need_refresh++;
+    UI->enter();
 }
 
 void CUI_SysExLibrarian::leave(void) {
 }
 
 void CUI_SysExLibrarian::update(void) {
+    int total_rows    = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
+    int file_max_rows = total_rows - SX_FILE_Y - SX_SPACE_BOTTOM - 3;
+    if (file_max_rows < 4) file_max_rows = 4;
+
+    // Resize the listbox per frame so window-resize stays correct, and
+    // stamp need_redraw=1 so a sibling fill (drain_recv -> recent log
+    // repaint) can't blank it. See references/foot-guns.md
+    // "Vanishing sibling widgets on `needaclear`".
+    if (file_selector) {
+        file_selector->ysize = file_max_rows - 1;
+        file_selector->need_redraw = 1;
+    }
+
+    // Mirror the listbox cursor into file_cur so existing callers
+    // (status messages, send_selected) keep working.
+    if (file_selector) {
+        file_cur = file_selector->cur_sel + file_selector->y_start;
+        file_top = file_selector->y_start;
+    }
+
     drain_recv();
+
+    // Up / Down / Enter / Space are routed to the listbox via UI->update().
+    UI->update();
 
     if (!Keys.size()) return;
 
@@ -417,17 +521,7 @@ void CUI_SysExLibrarian::update(void) {
         switch_page(UIP_Patterneditor);
         return;
     }
-    if (key == SDLK_UP) {
-        if (file_cur > 0) file_cur--;
-        need_refresh++;
-        return;
-    }
-    if (key == SDLK_DOWN) {
-        if (file_cur + 1 < num_files) file_cur++;
-        need_refresh++;
-        return;
-    }
-    if (key == SDLK_RETURN || key == SDLK_S) {
+    if (key == SDLK_S) {
         send_selected();
         need_refresh++;
         return;
@@ -493,30 +587,11 @@ void CUI_SysExLibrarian::draw(Drawable *S) {
     }
 
     // ----- File list pane -----
+    // The ListBox widget paints its own rows (with the F11/F4-style
+    // black-bar highlight) via UI->draw(S) further below. Here we
+    // only paint the "Files (.syx)" title above it.
     print(col(SX_FILE_X), row(SX_FILE_Y - 1), "Files (.syx)",
           COLORS.Brighttext, S);
-    if (file_cur < file_top) file_top = file_cur;
-    if (file_cur >= file_top + file_max_rows)
-        file_top = file_cur - file_max_rows + 1;
-
-    if (num_files == 0) {
-        print(col(SX_FILE_X), row(SX_FILE_Y),
-              "(no .syx files yet -- send/recv will populate)",
-              COLORS.Lowlight, S);
-    } else {
-        for (int i = 0; i < file_max_rows && file_top + i < num_files; i++) {
-            int idx = file_top + i;
-            char path[1280];
-            snprintf(path, sizeof(path), "%s/%s", folder, files[idx]);
-            long sz = file_size_of(path);
-            char line[128];
-            snprintf(line, sizeof(line), "%c %-22.22s  %6ld B",
-                     (idx == file_cur) ? '>' : ' ', files[idx], sz);
-            TColor fg = (idx == file_cur) ? COLORS.Brighttext : COLORS.Text;
-            TColor bg = (idx == file_cur) ? COLORS.SelectedBGLow : COLORS.Background;
-            printBG(col(SX_FILE_X), row(SX_FILE_Y + i), line, fg, bg, S);
-        }
-    }
 
     // ----- Recent receive pane -----
     print(col(SX_RECV_X), row(SX_RECV_Y - 1), "Recent receive",
@@ -550,6 +625,10 @@ void CUI_SysExLibrarian::draw(Drawable *S) {
     // ----- Status line -----
     print(col(2), row(total_rows - SX_SPACE_BOTTOM - 1),
           status_line, COLORS.Lowlight, S);
+
+    // Paint the listbox + any other UI elements last so they sit on top
+    // of the page-level fillRect/title prints.
+    UI->draw(S);
 
     S->unlock();
 }

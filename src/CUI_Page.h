@@ -513,6 +513,10 @@ class CUI_LuaConsole : public CUI_Page {
 //      to the synth.
 class CUI_SysExLibrarian : public CUI_Page {
     public:
+        // file_cur / file_top mirror the file_selector ListBox; they are
+        // refreshed at the top of update() so existing callers
+        // (send_selected, status messages) keep working without poking
+        // the listbox internals.
         int  file_cur;                  // selected file
         int  file_top;                  // scroll offset
         int  num_files;
@@ -532,6 +536,11 @@ class CUI_SysExLibrarian : public CUI_Page {
         int       recv_seq;             // monotonic counter for filenames
         char      status_line[160];
 
+        // Real ListBox for the .syx file pane (matches F11 SkinSelector
+        // and Shift+F3 CC Console — black-bar highlight, mouse click).
+        // Items mirror `files[]`; rebuilt by rescan_folder().
+        ListBox  *file_selector;
+
         CUI_SysExLibrarian();
 
         void enter(void);
@@ -543,6 +552,7 @@ class CUI_SysExLibrarian : public CUI_Page {
         void resolve_folder(void);
         void send_selected(void);
         void drain_recv(void);          // pop sysex_inq, save, push to recent[]
+        void rebuild_file_list_items(void);
 };
 
 // CC Console (Shift+F3). Loads CCizer-format `.txt` files from the
