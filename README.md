@@ -126,9 +126,60 @@ Interactive Lua REPL with tab completion and a full API listing on open. Lets yo
 
 A Schism Tracker-style overlay listing every page and common action with its keyboard shortcut. Cursor up/down to navigate, Enter to fire, ESC to close. You don't have to memorise the F-key map — every page is one ESC + arrows + Enter away.
 
+The menu also includes a **"Window Size & Zoom"** section with six presets that change the on-screen window size, the zoom factor, and the internal canvas resolution in one keystroke — see the section below.
+
 ![Main Menu](docs/screenshots/18-main-menu.png)
 
 The screenshots above are checked in; CI doesn't currently regenerate them, so a UI change should be paired with a re-run of the smoke script + a re-commit of the affected PNGs. The headless harness (`--headless --script`) makes that ~30 seconds of work.
+
+
+Window size & zoom presets
+--------------------------
+
+The ESC menu's **"Window Size & Zoom"** section lets you pick a window dimension + zoom factor without leaving the keyboard. Each preset sets three things at once:
+
+- **Window pixel size** — the SDL window's dimensions on your monitor.
+- **Zoom factor** — how big each 8×8 character cell appears physically (`8 × zoom` screen pixels per char).
+- **Internal canvas** — `window / zoom`. This is the logical pixel grid the pages lay out into; bigger internal = more pattern rows, more tracks visible side-by-side, more slot rows in the CCizer / SysEx Librarian / palette editor.
+
+The six presets sweep from a compact tiling-WM-friendly 1024×640 to a HiDPI 2560×1440 with 24-pixel chars. Each is rendered headlessly via the harness from PR #98:
+
+| Preset | Window | Zoom | Internal | Char on screen |
+|---|---|---|---|---|
+| Compact   | 1024×640  | 1.0× | 1024×640  |  8 px |
+| Default   | 1280×800  | 1.0× | 1280×800  |  8 px |
+| Medium    | 1440×900  | 1.5× |  960×600  | 12 px |
+| Large     | 1920×1080 | 2.0× |  960×540  | 16 px |
+| Huge      | 2560×1440 | 2.0× | 1280×720  | 16 px |
+| Massive   | 2560×1440 | 3.0× |  853×480  | 24 px |
+
+(The Massive preset's internal resolution clamps to `MINIMUM_SCREEN_WIDTH × MINIMUM_SCREEN_HEIGHT = 840×480` because `2560 / 3 ≈ 853 < 840` width-wise. The character cell is still 24 screen pixels tall — the clamp only affects the logical grid size, not the on-screen char size.)
+
+The change is applied *after* the current frame finishes (deferred via a one-shot pump in `main.cpp`'s render loop) so the popup's `update()` doesn't pull the rug out from under the active `Drawable*` mid-frame. The new size persists into `zt.conf` so the next launch starts at your chosen preset.
+
+#### Compact 1024×640 (1.0×)
+
+![Compact](docs/screenshots/resolutions/00-compact-1024x640.png)
+
+#### Default 1280×800 (1.0×)
+
+![Default](docs/screenshots/resolutions/01-default-1280x800.png)
+
+#### Medium 1440×900 (1.5×)
+
+![Medium](docs/screenshots/resolutions/02-medium-1440x900.png)
+
+#### Large 1920×1080 (2.0×)
+
+![Large](docs/screenshots/resolutions/03-large-1920x1080.png)
+
+#### Huge 2560×1440 (2.0×)
+
+![Huge](docs/screenshots/resolutions/04-huge-2560x1440.png)
+
+#### Massive 2560×1440 (3.0×)
+
+![Massive](docs/screenshots/resolutions/05-massive-2560x1440-3x.png)
 
 
 Builds and downloads

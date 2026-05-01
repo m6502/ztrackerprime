@@ -40,6 +40,99 @@ struct mm_entry {
 extern bool bScrollLock;
 extern int  attempt_fullscreen_toggle(void);
 extern void quit(void);
+extern int  set_video_mode(int w, int h, char *errstr);
+extern char errstr[2048];   // shared error buffer in main.cpp
+
+// ----------------------------------------------------------------------
+// Window-size + zoom presets. Each entry sets BOTH the pixel window
+// dimensions AND the zoom factor, so the user gets:
+//   * a different on-screen window size (the W x H fields)
+//   * a different effective character cell on screen (8 * zoom px)
+//   * a different INTERNAL canvas size (W / zoom -- this is what
+//     determines how much actually fits on each page; the headless
+//     screenshot tooling captures THIS surface)
+//
+// Internal canvas = window / zoom. MINIMUM_SCREEN_WIDTH/HEIGHT is 840x480,
+// enforced inside set_video_mode, so internal can never go smaller.
+struct ResPreset {
+    const char *label;
+    int   w;
+    int   h;
+    float zoom;
+};
+static const ResPreset MM_RES_PRESETS[] = {
+    // label                              W     H    zoom    internal    chars cell on-screen
+    { "Compact    1024x640  1.0x",     1024,  640, 1.0f }, //  1024x640    8 px
+    { "Default    1280x800  1.0x",     1280,  800, 1.0f }, //  1280x800    8 px
+    { "Medium     1440x900  1.5x",     1440,  900, 1.5f }, //   960x600   12 px
+    { "Large      1920x1080 2.0x",     1920, 1080, 2.0f }, //   960x540   16 px
+    { "Huge       2560x1440 2.0x",     2560, 1440, 2.0f }, //  1280x720   16 px
+    { "Massive    2560x1440 3.0x",     2560, 1440, 3.0f }, //   853x480 (clamped) 24 px
+};
+static const int MM_RES_PRESET_COUNT =
+    (int)(sizeof(MM_RES_PRESETS) / sizeof(MM_RES_PRESETS[0]));
+
+// Pending resolution change. Calling set_video_mode from inside a
+// popup's update() crashes because action()'s cached `S = screen_buffer`
+// (from the top of the frame) gets dangling when set_video_mode deletes
+// + recreates screen_buffer mid-frame -- the next S->lock() in action()
+// hits freed memory. Defer to the start of the NEXT frame instead.
+struct PendingResChange {
+    bool  armed;
+    int   w;
+    int   h;
+    float zoom;
+};
+static PendingResChange g_pending_res = { false, 0, 0, 0.0f };
+
+void zt_pump_pending_resolution_change(void) {
+    if (!g_pending_res.armed) return;
+    g_pending_res.armed = false;
+    int w = g_pending_res.w;
+    int h = g_pending_res.h;
+    float zoom = g_pending_res.zoom;
+
+    zt_config_globals.zoom          = zoom;
+    zt_config_globals.screen_width  = w;
+    zt_config_globals.screen_height = h;
+    if (!set_video_mode(w, h, errstr)) {
+        snprintf(szStatmsg, sizeof(szStatmsg),
+                 "Resolution change failed: %s", errstr);
+        statusmsg = szStatmsg;
+        status_change = 1;
+        return;
+    }
+    if (UI) UI->full_refresh();
+    doredraw++;
+    need_refresh++;
+    screenmanager.UpdateAll();
+    snprintf(szStatmsg, sizeof(szStatmsg),
+             "Window: %dx%d at %.1fx zoom (~%dpx chars)",
+             w, h, zoom, (int)(8 * zoom));
+    statusmsg = szStatmsg;
+    status_change = 1;
+}
+
+static void mm_apply_resolution(int idx) {
+    if (idx < 0 || idx >= MM_RES_PRESET_COUNT) return;
+    const ResPreset &p = MM_RES_PRESETS[idx];
+    g_pending_res.armed = true;
+    g_pending_res.w     = p.w;
+    g_pending_res.h     = p.h;
+    g_pending_res.zoom  = p.zoom;
+    snprintf(szStatmsg, sizeof(szStatmsg),
+             "Switching to %dx%d at %.1fx zoom...", p.w, p.h, p.zoom);
+    statusmsg = szStatmsg;
+    status_change = 1;
+    need_refresh++;
+}
+
+static void mm_res_0(void) { mm_apply_resolution(0); }
+static void mm_res_1(void) { mm_apply_resolution(1); }
+static void mm_res_2(void) { mm_apply_resolution(2); }
+static void mm_res_3(void) { mm_apply_resolution(3); }
+static void mm_res_4(void) { mm_apply_resolution(4); }
+static void mm_res_5(void) { mm_apply_resolution(5); }
 
 // ----------------------------------------------------------------------
 // Functions that don't have a dedicated CMD_* enum. Implemented inline
@@ -185,6 +278,15 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_FUNC,       "Toggle CC Drawmode",       "Ctrl+Shift+\xA7",      0,                          mm_toggle_cc_drawmode},
     {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
+
+    {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
+    {MM_SUBHEADING, "Window Size & Zoom",       NULL,                   0,                          NULL},
+    {MM_FUNC,       MM_RES_PRESETS[0].label,    NULL,                   0,                          mm_res_0},
+    {MM_FUNC,       MM_RES_PRESETS[1].label,    NULL,                   0,                          mm_res_1},
+    {MM_FUNC,       MM_RES_PRESETS[2].label,    NULL,                   0,                          mm_res_2},
+    {MM_FUNC,       MM_RES_PRESETS[3].label,    NULL,                   0,                          mm_res_3},
+    {MM_FUNC,       MM_RES_PRESETS[4].label,    NULL,                   0,                          mm_res_4},
+    {MM_FUNC,       MM_RES_PRESETS[5].label,    NULL,                   0,                          mm_res_5},
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_FUNC,       "Quit",                     "Ctrl+Q",               0,                          mm_quit},

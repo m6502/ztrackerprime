@@ -3974,6 +3974,14 @@ int main(int argc, char *argv[])
       // do_exit on `quit`. No-op when --headless / --script weren't set.
       zt_headless_pump(screen_buffer_surface);
 
+      // Apply any deferred window-size / zoom change from the ESC menu's
+      // resolution picker. Has to run BEFORE the next frame's action()
+      // caches its `S = screen_buffer` pointer; doing it inside the
+      // popup's update() (one frame earlier) leaves action() with a
+      // dangling Drawable* and crashes on lock(). See CUI_MainMenu.cpp.
+      extern void zt_pump_pending_resolution_change(void);
+      zt_pump_pending_resolution_change();
+
       SDL_Event e;
 
       while (SDL_PollEvent(&e)) {
