@@ -115,6 +115,7 @@ struct StaticPreset {
 };
 
 static const StaticPreset g_palette_presets[] = {
+    // Hand-tuned palettes that have shipped since the early forks.
     { "Light Blue",        "light_blue.conf" },
     { "Gold",              "gold.conf" },
     { "Camouflage",        "camouflage.conf" },
@@ -122,6 +123,18 @@ static const StaticPreset g_palette_presets[] = {
     { "Pine Colours",      "pine_colours.conf" },
     { "Soundtracker",      "soundtracker.conf" },
     { "Volcanic",          "volcanic.conf" },
+    // Imported from Schism Tracker via scripts/import-schism-palettes.py.
+    // The first 7 above are already-shipping zT' versions; these 9 are
+    // the additional Schism palettes that didn't have a zT counterpart.
+    { "Industrial",        "industrial.conf" },
+    { "Purple Motion",     "purple_motion.conf" },
+    { "Why Colors?",       "why_colors.conf" },
+    { "Kawaii",            "kawaii.conf" },
+    { "Gold (Vintage)",    "gold_vintage.conf" },
+    { "FX 2.0",            "fx_2_0.conf" },
+    { "Atlantic",          "atlantic.conf" },
+    { "Acid Gas",          "acid_gas.conf" },
+    { "Hotdog Stand",      "hotdog_stand.conf" },
 };
 static const int NUM_STATIC_PRESETS =
     (int)(sizeof(g_palette_presets) / sizeof(g_palette_presets[0]));
