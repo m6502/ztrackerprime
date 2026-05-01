@@ -1,0 +1,102 @@
+# Render every visitable page of zTracker headlessly.
+# Run with:
+#   mkdir -p docs/screenshots
+#   ./build/Program/zt --headless --script tests/scripts/all-pages.txt
+#
+# Output PNGs are written into docs/screenshots/ (relative to where you
+# launch zt -- for the macOS .app bundle that's the bundle's
+# Contents/Resources directory). The smoke script in this directory
+# (smoke.txt) writes to /tmp/zt-headless-shots.
+
+wait 250
+shot docs/screenshots/01-pattern-editor.png
+
+key f1
+wait 200
+shot docs/screenshots/02-help.png
+
+key f2
+wait 200
+shot docs/screenshots/03-pattern-editor.png
+
+key f3
+wait 200
+shot docs/screenshots/04-instrument-editor.png
+
+key f4
+wait 200
+shot docs/screenshots/05-midi-macro-editor.png
+
+key shift+f4
+wait 200
+shot docs/screenshots/06-arpeggio-editor.png
+
+key shift+f2
+wait 200
+shot docs/screenshots/07-shortcuts-and-midi-mappings.png
+key esc
+wait 100
+
+key shift+f3
+wait 200
+shot docs/screenshots/08-cc-console.png
+
+key shift+f5
+wait 200
+shot docs/screenshots/09-sysex-librarian.png
+
+key f10
+wait 200
+shot docs/screenshots/10-song-message.png
+key esc
+wait 100
+
+key f11
+wait 200
+shot docs/screenshots/11-song-configuration.png
+
+key f12
+wait 200
+shot docs/screenshots/12-system-configuration.png
+
+key ctrl+f12
+wait 200
+shot docs/screenshots/13-global-configuration.png
+
+key ctrl+shift+f12
+wait 250
+shot docs/screenshots/14-palette-editor.png
+key esc
+wait 100
+
+key alt+f12
+wait 200
+shot docs/screenshots/15-about.png
+key esc
+wait 100
+
+key f2
+wait 100
+key ctrl+l
+wait 250
+shot docs/screenshots/16-load-dialog.png
+key esc
+wait 100
+
+key f2
+wait 100
+key ctrl+alt+l
+wait 250
+shot docs/screenshots/17-lua-console.png
+key esc
+wait 100
+
+key f2
+wait 200
+key esc
+wait 250
+shot docs/screenshots/18-main-menu.png
+key esc
+wait 100
+
+quit

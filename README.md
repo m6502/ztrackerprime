@@ -16,6 +16,121 @@ Everyone does have his own tastes, routines and circumstances. zTracker' behaves
 There's also the possibility that I misunderstood how something worked and "fixing" it I broke it, or that I have changed the way something works that could have been activated by just pressing a key. Who knows?
 
 
+Pages and views
+---------------
+
+A tour of every page zTracker' currently has, in the order you'll typically meet them. All screenshots below were rendered headlessly by `zt --headless --script tests/scripts/all-pages.txt` (see `docs/headless-script.md` and PR #98). To regenerate them after a UI change:
+
+```sh
+mkdir -p docs/screenshots
+./build/Program/zt --headless --script tests/scripts/all-pages.txt
+```
+
+### Pattern Editor — `F2`
+
+The home base. Every track is a vertical column of `note · instrument · volume · effect` events; horizontal motion picks the column, vertical motion picks the row. Multi-channel MIDI out, real-time BPM/TPB changes, the row-highlighting + lowlighting that lets you stay oriented in non-4/4 patterns, the Replicate / Clone / Humanize / Interpolate operations ported from Paketti, the `Ctrl+Shift+§` CC drawmode that records incoming MIDI CC into pattern rows as `Sxxyy` effects.
+
+![Pattern Editor](docs/screenshots/01-pattern-editor.png)
+
+### Help — `F1`
+
+Section-aware help text covering every shortcut. F1 toggles in/out of Help; Tab / Shift+Tab jump between section headers. On macOS, every `CTRL-X` line in the source `doc/help.txt` is rewritten on the fly to the uniform `CMD-X/ALT-X` form so users see the macOS-natural and the cross-platform-portable modifiers in the same line.
+
+![Help](docs/screenshots/02-help.png)
+
+### Instrument Editor — `F3`
+
+Per-instrument MIDI device, channel, program, bank-select, transpose, and the per-instrument CCizer Bank assignment that ties an instrument to a specific Paketti `.txt` (so the CC Console at Shift+F3 auto-loads the right slider set when you change instruments).
+
+![Instrument Editor](docs/screenshots/04-instrument-editor.png)
+
+### MIDI Macro Editor — `F4`
+
+Edit the 16 user-defined macros that the pattern `Z` effect dispatches. Bundled presets (CC #1 Modulation, CC #74 Filter Cutoff, Program Change, Pitch Bend Coarse, All Notes Off, …) load via the inline preset list — Tab to focus, arrows + Enter / Space, P to cycle. A macro whose name ends in `.syx` is dispatched as a SysEx file send instead — the data grid is ignored.
+
+![MIDI Macro Editor](docs/screenshots/05-midi-macro-editor.png)
+
+### Arpeggio Editor — `Shift+F4`
+
+The 16 arpeggio slots that the pattern `R` effect plays back. Slot / Name / Length / Speed / Repeat / NumCC + the per-step pitch grid. Bundled presets (Major Triad Up, Octave Bounce, Trill, Chord, scales, …). The Keyjazz panel below the grid lets you audition steps directly via QWERTY note row.
+
+![Arpeggio Editor](docs/screenshots/06-arpeggio-editor.png)
+
+### Shortcuts & MIDI Mappings — `Shift+F2`
+
+The unified keybindings + MIDI-mappings page. Each action shows its bound key and up to three MIDI Learn slots side by side. UP/DN/L/R move the cursor; Enter on a Keyboard cell starts a key-capture session; Enter on a MIDI cell starts a MIDI Learn session; DEL clears the focused cell; Ctrl+S writes everything (keyboard + MIDI) to `zt.conf`.
+
+![Shortcuts & MIDI Mappings](docs/screenshots/07-shortcuts-and-midi-mappings.png)
+
+### CC Console — `Shift+F3`
+
+Paketti CCizer file picker on the left, slider/knob grid on the right. Loading a `.txt` parses the slot definitions; each slot becomes a real ValueSlider widget (mouse-clickable, keyboard-adjustable). Tweaking a slider sends its CC (or 14-bit Pitch Bend, for `PB` slots) on the current channel. `L` enters MIDI Learn for the focused slot; `B` assigns the loaded file as the current instrument's CCizer Bank.
+
+![CC Console](docs/screenshots/08-cc-console.png)
+
+### SysEx Librarian — `Shift+F5`
+
+Pick a `.syx` file with Up/Dn, press Enter (or Space, or S) to send it out the current MIDI Out. Synth responses are auto-captured: every received SysEx is written to `recv_<TS>.syx` in the same folder and the on-screen "Recent receive" pane shows time / length / a hex preview of each. R rescans the folder; C clears the receive log.
+
+![SysEx Librarian](docs/screenshots/09-sysex-librarian.png)
+
+### Song Message — `F10`
+
+Free-form notes attached to the song. Saved into the `.zt` file, useful for chord charts, arrangement notes, or just liner notes for the future-you who opens the file three years later.
+
+![Song Message](docs/screenshots/10-song-message.png)
+
+### Song Configuration — `F11`
+
+Per-song settings: title, BPM, TPB, Send MIDI Clock, Send MIDI Stop/Start, MIDI In Sync (slave to incoming Start/Stop/Continue), Chase MIDI Tempo (slave BPM to incoming `0xF8` MIDI Clock), row Highlight / Lowlight increments. The right column is the Order List — the song's playback sequence of pattern indices.
+
+![Song Configuration](docs/screenshots/11-song-configuration.png)
+
+### System Configuration — `F12`
+
+zTracker'-wide settings: Prebuffer, Panic on Stop, Auto-open MIDI, Full Screen, Record Velocity, the CCizer / SysEx folder paths, Skin Selection, MIDI In + MIDI Out Device Selection, per-device Latency / Reverse Bank Select / Device Alias. "Go to page 2" jumps to the second config page.
+
+![System Configuration](docs/screenshots/12-system-configuration.png)
+
+### Global Configuration — `Ctrl+F12`
+
+The page-2 config: Auto-open MIDI ports, Autoload song, Default Directory, Record Velocity, Autosave interval, View Mode, row Highlight / Lowlight increments, Default Pattern Length, MIDI In Sync, Chase MIDI Tempo, and Post-Load Page (which page you land on after a successful load).
+
+![Global Configuration](docs/screenshots/13-global-configuration.png)
+
+### Palette Editor — `Ctrl+Shift+F12`
+
+Live colour editing of the active skin. Pick a swatch, edit R/G/B with arrow keys, see the change apply across every page in real time. Seven preset palettes ship plus the per-skin `colors.conf`. Global Brightness / Contrast / Tint sliders compose on top of the snapshot so they're reversible.
+
+![Palette Editor](docs/screenshots/14-palette-editor.png)
+
+### About — `Alt+F12`
+
+Credits, project links, version string. The version string includes the build date so you can tell at a glance which binary you're running.
+
+![About](docs/screenshots/15-about.png)
+
+### Load — `Ctrl+L`
+
+The file picker. Shows `.zt` and `.mid` files side by side, full-height list, double-click or Enter to load. Pressing Up at the first row cycles focus to the previous control; the cursor never lands outside the visible region.
+
+![Load](docs/screenshots/16-load-dialog.png)
+
+### Lua Console — `Ctrl+Alt+L`
+
+Interactive Lua REPL with tab completion and a full API listing on open. Lets you script zTracker's internals — pattern operations, batch MIDI ops, automation around the file format. Output scrolls; the prompt accepts multi-line statements.
+
+![Lua Console](docs/screenshots/17-lua-console.png)
+
+### Main Menu — `ESC`
+
+A Schism Tracker-style overlay listing every page and common action with its keyboard shortcut. Cursor up/down to navigate, Enter to fire, ESC to close. You don't have to memorise the F-key map — every page is one ESC + arrows + Enter away.
+
+![Main Menu](docs/screenshots/18-main-menu.png)
+
+The screenshots above are checked in; CI doesn't currently regenerate them, so a UI change should be paired with a re-run of the smoke script + a re-commit of the affected PNGs. The headless harness (`--headless --script`) makes that ~30 seconds of work.
+
+
 Builds and downloads
 --------------------
 
