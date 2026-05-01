@@ -66,13 +66,18 @@ shot docs/screenshots/13-global-configuration.png
 key ctrl+shift+f12
 wait 250
 shot docs/screenshots/14-palette-editor.png
-key esc
-wait 100
+
+# Transit through F2 instead of ESC: STATE_PALETTE_EDITOR isn't in the
+# global ESC exclusion list (main.cpp::global_keys), so ESC there pops
+# up the Main Menu and the next Alt+F12 fires while the menu is open
+# instead of opening About. Going F2 -> Alt+F12 sidesteps the menu.
+key f2
+wait 150
 
 key alt+f12
-wait 200
+wait 250
 shot docs/screenshots/15-about.png
-key esc
+key f2
 wait 100
 
 key f2
