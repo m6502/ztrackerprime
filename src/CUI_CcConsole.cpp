@@ -716,10 +716,55 @@ void CUI_CcConsole::draw(Drawable *S) {
                 row(CC_GRID_Y + grid_max_rows + 2),
                 COLORS.Background);
 
-    char title[160];
+    // Title shows the destination of every CC the page sends out:
+    //   inst <NN: name>   port <alias-or-name>   ch <N>
+    // Routing rules mirror send_slot(): use cur_inst's midi_device
+    // (and channel) when set, otherwise the first opened MIDI Out
+    // device. The title text is the source of truth for "where am I
+    // sending right now" -- previously it was just "ch N" with no
+    // way to tell which port or which instrument was active.
+    char inst_field[80];
+    if (cur_inst >= 0 && cur_inst < MAX_INSTS && song->instruments[cur_inst]) {
+        const char *iname = (const char *)song->instruments[cur_inst]->title;
+        if (iname && *iname) {
+            snprintf(inst_field, sizeof(inst_field),
+                     "inst %02d:%s", cur_inst, iname);
+        } else {
+            snprintf(inst_field, sizeof(inst_field), "inst %02d", cur_inst);
+        }
+    } else {
+        snprintf(inst_field, sizeof(inst_field), "inst --");
+    }
+
+    int dev = -1;
+    if (cur_inst >= 0 && cur_inst < MAX_INSTS && song->instruments[cur_inst]
+        && song->instruments[cur_inst]->midi_device != 0xff) {
+        dev = song->instruments[cur_inst]->midi_device;
+    }
+    if (dev < 0) {
+        for (int i = 0; i < (int)MidiOut->numOuputDevices; i++) {
+            if (MidiOut->outputDevices[i] && MidiOut->outputDevices[i]->opened) {
+                dev = i; break;
+            }
+        }
+    }
+    char port_field[80];
+    if (dev >= 0 && MidiOut->outputDevices[dev]) {
+        const char *al = MidiOut->get_alias((unsigned int)dev);
+        if (al && *al) {
+            snprintf(port_field, sizeof(port_field), "port %s", al);
+        } else {
+            snprintf(port_field, sizeof(port_field), "port %d", dev);
+        }
+    } else {
+        snprintf(port_field, sizeof(port_field), "port (none)");
+    }
+
+    char title[200];
     snprintf(title, sizeof(title),
-             "CC Console (Shift+F3)  ch %d%s",
-             channel, learning ? "  [LEARN]" : "");
+             "Paketti CCizer (Shift+F3)   %s   %s   ch %d%s",
+             inst_field, port_field, channel,
+             learning ? "   [LEARN]" : "");
     printtitle(PAGE_TITLE_ROW_Y, title, COLORS.Text, COLORS.Background, S);
 
     // ----- File list pane (left) -----

@@ -110,7 +110,7 @@
                   Keyboard | MIDI1 | MIDI2 | MIDI3). Up/Dn/Lt/Rt move,
                   Enter edits, Backspace clears, Ctrl+S saves both
                   tables to zt.conf.
- SHIFT-F3       : CC Console — load Paketti CCizer-format `.txt` files
+ SHIFT-F3       : Paketti CCizer — load Paketti CCizer-format `.txt` files
                   and send MIDI CC / Pitch Bend out via on-screen
                   sliders or knobs. Tab focus, Enter loads, Lt/Rt
                   adjusts (Shift x8, Ctrl x16), V toggles slider/knob,
