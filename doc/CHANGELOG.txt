@@ -4,6 +4,27 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (CC Console: fix file-switch slider value leak)
+-------------------------------------------------------------
+
+        * CC Console (Shift+F3): switching between Paketti CCizer
+          files no longer leaks slider values from the previous file
+          into the new one. The page reuses a fixed pool of
+          ValueSlider widgets across files; previously load_selected()
+          re-seeded the in-memory values + last_values[] for the new
+          file but never reset sliders[]->value for slots outside the
+          visible window. As a result every off-screen slot the user
+          had dragged in file1 carried its old value into file2 ---
+          absorb_slider_changes() (which iterates ALL loaded slots,
+          not just visible ones) saw the stale-vs-fresh mismatch,
+          wrote file1's values into file2's in-memory state AND
+          fired a MIDI message for every previously-tweaked slot.
+          Scrolling to a hidden slot in file2 then displayed the
+          leaked value as if it were file2's own. Fix: reset the
+          entire widget pool's values to match the freshly-loaded
+          file in load_selected(), in lockstep with the existing
+          last_values[] seed.
+
 zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
 --------------------------------------------------
 
