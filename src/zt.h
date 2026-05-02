@@ -782,6 +782,7 @@ extern CUI_Patterneditor *UIP_Patterneditor;
 extern CUI_PEParms *UIP_PEParms;
 extern CUI_PEVol   *UIP_PEVol;
 extern CUI_PENature   *UIP_PENature;
+extern CUI_PEFindReplace *UIP_PEFindReplace;
 extern CUI_SliderInput *UIP_SliderInput;
 extern CUI_LoadMsg *UIP_LoadMsg;
 extern CUI_SaveMsg *UIP_SaveMsg;

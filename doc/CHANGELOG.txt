@@ -4,6 +4,36 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (Pattern Editor: Find/Replace Note popup)
+-------------------------------------------------------
+
+        + Pattern Editor: Ctrl+H opens a new Find/Replace Note
+          popup. Two ValueSliders (Find / With, MIDI 0-127) with
+          Find pre-filled to the note at the cursor row of the
+          cursor track -- so the natural workflow is "park cursor
+          on the note you want to find, hit Ctrl+H, slide the
+          With slider to the target note, Enter."
+
+          Scope: operates on the current selection if one is
+          active; otherwise on the entire current track of the
+          current pattern. Replaces every event whose .note ==
+          Find with .note = Replace; instrument / vol / length /
+          effect columns are left untouched. Status line reports
+          the count: "Replaced N notes (60 -> 67)".
+
+          ! No UNDO_SAVE() integration in this MVP -- same
+            convention as the existing Naturalize / Scale Volume
+            popups, since g_undo is a CUI_Patterneditor.cpp
+            file-static. Promoting g_undo to a global so popup
+            ops can stack into ALT+Z is a separate refactor.
+          ! Listed on the Paketti-port wishlist as
+            "Find/Replace note."
+
+          New file: src/CUI_PEFindReplace.cpp.
+
+zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
+--------------------------------------------------
+
 zt 2026_05_02 (test: SysEx receive queue stress + concurrency suite)
 --------------------------------------------------------------------
 
@@ -157,7 +187,6 @@ zt 2026_05_02 (CC Console: fix file-switch slider value leak)
           entire widget pool's values to match the freshly-loaded
           file in load_selected(), in lockstep with the existing
           last_values[] seed.zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)--------------------------------------------------
-
         + Shift+F3 is now the CC Console. It loads Paketti
           CCizer-format `.txt` files (one slot per line:
           `<CC# 0..127 | "PB"> <name>`, `#` comments, blank lines OK)

@@ -330,6 +330,7 @@ CUI_Patterneditor *UIP_Patterneditor = NULL;
 CUI_PEParms *UIP_PEParms = NULL;
 CUI_PEVol *UIP_PEVol = NULL;
 CUI_PENature *UIP_PENature = NULL;
+CUI_PEFindReplace *UIP_PEFindReplace = NULL;
 CUI_SliderInput *UIP_SliderInput = NULL;
 CUI_LoadMsg *UIP_LoadMsg = NULL;
 CUI_SaveMsg *UIP_SaveMsg = NULL;
@@ -3500,6 +3501,7 @@ int initSDL(void)
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
     UIP_PENature = new CUI_PENature;
+    UIP_PEFindReplace = new CUI_PEFindReplace;
     UIP_SliderInput = new CUI_SliderInput;
     UIP_NewSong = new CUI_NewSong;
     UIP_SongMessage = new CUI_SongMessage;

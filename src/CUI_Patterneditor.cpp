@@ -2307,6 +2307,19 @@ void CUI_Patterneditor::update()
             break;
             
             
+          case SDLK_H:
+            // Find/Replace Note (Ctrl+H). Opens a popup with two
+            // ValueSliders (Find / With) pre-filled with the cursor
+            // row's note. Walks the selection (or current track if no
+            // selection) and replaces every event whose .note matches
+            // Find with With. See src/CUI_PEFindReplace.cpp.
+            popup_window(UIP_PEFindReplace);
+            Keys.flush();
+            key = Keys.checkkey();
+            kstate = Keys.getstate();
+            need_refresh++;
+            break;
+
           case SDLK_J:
             if(selected) {
               // display the fader menu

@@ -106,6 +106,7 @@ set(ZT_SOURCES
   src/CUI_Ordereditor.cpp
   src/CUI_Page.cpp
   src/CUI_Patterneditor.cpp
+  src/CUI_PEFindReplace.cpp
   src/CUI_PENature.cpp
   src/CUI_PEParms.cpp
   src/CUI_PEVol.cpp
