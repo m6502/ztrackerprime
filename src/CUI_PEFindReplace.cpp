@@ -91,6 +91,18 @@ void CUI_PEFindReplace::leave(void) {
 void CUI_PEFindReplace::update(void) {
     int key = 0;
     UI->update();
+    // The friendly note name is drawn OUTSIDE the slider widget's bbox,
+    // so a value change inside the slider repaints the slider itself
+    // (need_redraw) but not the label below it. Bump need_refresh
+    // whenever a slider's `changed` flag fires so the whole popup
+    // redraws and the note name tracks the slider value live.
+    ValueSlider *vsf = (ValueSlider *)UI->get_element(0);
+    ValueSlider *vsr = (ValueSlider *)UI->get_element(1);
+    if ((vsf && vsf->changed) || (vsr && vsr->changed)) {
+        if (vsf) vsf->changed = 0;
+        if (vsr) vsr->changed = 0;
+        need_refresh++;
+    }
     if (Keys.size()) {
         key = Keys.getkey();
         if (key == SDLK_ESCAPE ||
@@ -193,6 +205,33 @@ void CUI_PEFindReplace::draw(Drawable *S) {
           "ESC cancels",                  COLORS.Text, S);
 
     UI->draw(S);
+
+    // Friendly note names next to each slider's numeric readout.
+    // ValueSlider prints " NNN" (4 chars) starting at col(x+xsize); the
+    // note label lands one space after that so the row reads e.g.
+    //
+    //   Find note (0-127): [#####-----] 060  (C-5)
+    //
+    // hex2note writes 3 raw chars (no NUL); we sprintf into a 5-char
+    // buffer with parens so the parens nul-terminate cleanly.
+    {
+        char nbuf[8];
+        ValueSlider *vsf = (ValueSlider *)UI->get_element(0);
+        ValueSlider *vsr = (ValueSlider *)UI->get_element(1);
+        if (vsf) {
+            char raw[4] = {0};
+            hex2note(raw, (unsigned char)(vsf->value & 0x7F));
+            snprintf(nbuf, sizeof(nbuf), "(%c%c%c)", raw[0], raw[1], raw[2]);
+            print(col(vsf->x + vsf->xsize + 5), row(vsf->y), nbuf, COLORS.Text, S);
+        }
+        if (vsr) {
+            char raw[4] = {0};
+            hex2note(raw, (unsigned char)(vsr->value & 0x7F));
+            snprintf(nbuf, sizeof(nbuf), "(%c%c%c)", raw[0], raw[1], raw[2]);
+            print(col(vsr->x + vsr->xsize + 5), row(vsr->y), nbuf, COLORS.Text, S);
+        }
+    }
+
     S->unlock();
     need_refresh = need_popup_refresh = 0;
     updated++;
