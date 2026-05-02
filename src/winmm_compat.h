@@ -602,12 +602,17 @@ static inline void zt_alsa_input_thread_proc(zt_alsa_in_handle *ctx) {
         while (snd_seq_event_input(ctx->seq, &ev) >= 0 && ev != NULL) {
         switch (ev->type) {
             case SND_SEQ_EVENT_NOTEON: {
-                unsigned char vel = ev->data.note.velocity;
-                // Match the WinMM/midi-io.cpp normalisation: NoteOn vel=0
-                // is rewritten as NoteOff. Done in midi-io.cpp's MIM_DATA
-                // path on Windows; we replicate it here for parity.
-                unsigned char status = (unsigned char)(vel == 0 ? 0x80 : 0x90) | (ev->data.note.channel & 0x0F);
-                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status, ev->data.note.note, vel));
+                // Pass NoteOn through raw, even if velocity == 0.
+                // midi-io.cpp's MIM_DATA case (~line 410) already
+                // normalises NoteOn-vel=0 -> NoteOff before insertion
+                // into midiInQueue, so doing it here would double-
+                // dispatch the conversion. macOS CoreMIDI takes the
+                // same approach: emit what the wire said, let the
+                // shared midi-io callback normalise. Keeps Linux /
+                // macOS / Windows paths shaped identically.
+                unsigned char status = 0x90 | (ev->data.note.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status,
+                    ev->data.note.note, ev->data.note.velocity));
                 break;
             }
             case SND_SEQ_EVENT_NOTEOFF: {
