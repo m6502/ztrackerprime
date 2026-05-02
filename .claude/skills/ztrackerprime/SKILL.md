@@ -13,6 +13,10 @@ triggers:
 
 # zTracker Prime Development Skill
 
+> **Last verified: 2026-05-02.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
+>
+> **What lives elsewhere on purpose:** the open-PR list and merged landmarks are NOT in this skill — they go stale fast. For current state run `gh pr list --repo m6502/ztrackerprime` (open) or `gh pr list --repo m6502/ztrackerprime --state merged --limit 30` (recent landings). The skill stays timeless: architecture, invariants, foot-guns, conventions.
+
 ## What this is
 
 **zTracker Prime** (m6502/ztrackerprime) is Manuel Montoto's maintained fork of zTracker — an Impulse-Tracker-inspired MIDI tracker originally by Christopher Micali (2000–2001) with contributions from Daniel Kahlin. SDL 3, cross-platform (Windows XP through 11, macOS, Linux). C++17, CMake.
@@ -127,9 +131,10 @@ Seven-PR feature stack landed end of April 2026 wiring Paketti-style CCizer bank
 
 **SysEx-by-filename convention** (`sysex_macro.h`): a midimacro whose `name` ends in `.syx` (case insensitive, requires len > 4) is dispatched by the playback engine's `Z` effect handler as a file send. The macro's data array is ignored. **No `.zt` format change** — the existing MMAC chunk already round-trips the name. Old zTracker sees an empty data array and silently does nothing — safe forward-compat.
 
-**Cross-platform status** (as of 2026-04-30):
-- SysEx send: works on macOS (CoreMIDI), Windows (WinMM), Linux (ALSA).
-- SysEx receive: macOS only. Linux ALSA-in is itself stubbed in the platform layer; Windows WinMM-in receive parsing is on the followup TODO.
+**Cross-platform status** (verified 2026-05-02):
+- SysEx send: works on macOS (CoreMIDI `MIDIPacketListAdd`), Windows (WinMM `midiOutLongMsg` + MHDR_DONE poll, PR #87), Linux (ALSA `snd_seq_ev_set_sysex`).
+- SysEx receive: works on macOS (CoreMIDI read_proc parsing F0..F7) and Windows (`MIM_LONGDATA` accumulator, PR #90). Linux ALSA-in is still stubbed at the platform layer — receive on Linux is the remaining gap.
+- Audit cluster (PRs #87–#93) hardened the foundation: Windows MHDR_DONE polling, macOS heap-alloc on receive, recv_seq survives restart, recv rotation, *.syx macro caching at load, lifetime docs, CCBN roundtrip test.
 
 **Test suites added**:
 - `tests/test_ccizer.cpp` — 51 checks: parser, comments/blanks, out-of-range, view sidecar round-trip, MIDI byte builder, folder resolution, dir scan.
