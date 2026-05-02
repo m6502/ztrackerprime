@@ -62,8 +62,8 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
 #include <stdlib.h>
 #if defined(__linux__)
 #include <alsa/asoundlib.h>
+#include <poll.h>
 #include <atomic>
-#include <chrono>
 #include <thread>
 #elif defined(__APPLE__)
 #include <CoreMIDI/CoreMIDI.h>
@@ -570,20 +570,36 @@ static inline void zt_alsa_handle_sysex_event(zt_alsa_in_handle *ctx, snd_seq_ev
 
 static inline void zt_alsa_input_thread_proc(zt_alsa_in_handle *ctx) {
     if (!ctx || !ctx->seq || !ctx->running) return;
-    // ALSA's blocking input means we can't trivially break out without
-    // either nonblocking mode + sleep loop, or pushing a sentinel from
-    // the main thread. We use nonblocking + a small sleep (200us); CPU
-    // overhead is negligible for typical MIDI rates and shutdown is
-    // responsive (<1ms typical).
+    // Production-quality ALSA input: pull the seq's poll FDs once at
+    // startup, then poll() with a 100 ms timeout in a loop. Wakes the
+    // moment any event arrives (no sleep-poll CPU waste, no fixed-
+    // interval latency); the timeout is just for the running-flag
+    // shutdown check, so worst-case shutdown latency is ~100 ms.
     snd_seq_nonblock(ctx->seq, 1);
+    int nfds = snd_seq_poll_descriptors_count(ctx->seq, POLLIN);
+    if (nfds <= 0) return;
+    struct pollfd *pfds = (struct pollfd *)calloc((size_t)nfds, sizeof(*pfds));
+    if (!pfds) return;
+    if (snd_seq_poll_descriptors(ctx->seq, pfds, (unsigned int)nfds, POLLIN) <= 0) {
+        free(pfds);
+        return;
+    }
+
     while (ctx->running->load(std::memory_order_acquire)) {
-        snd_seq_event_t *ev = NULL;
-        int r = snd_seq_event_input(ctx->seq, &ev);
-        if (r < 0 || !ev) {
-            // -EAGAIN = no events ready; brief sleep to yield.
-            std::this_thread::sleep_for(std::chrono::microseconds(200));
+        int pr = poll(pfds, (nfds_t)nfds, 100);
+        if (pr < 0) {
+            // EINTR or transient error -- keep looping, the running
+            // flag check above is the shutdown gate.
             continue;
         }
+        if (pr == 0) continue;   // timeout; loop and re-check running
+
+        // Drain every event that's currently queued before going back
+        // to poll. Without this loop we'd return to poll after the
+        // first event of a burst (e.g. a chord = 6+ noteons in <1 ms),
+        // which still works but adds a syscall per event.
+        snd_seq_event_t *ev = NULL;
+        while (snd_seq_event_input(ctx->seq, &ev) >= 0 && ev != NULL) {
         switch (ev->type) {
             case SND_SEQ_EVENT_NOTEON: {
                 unsigned char vel = ev->data.note.velocity;
@@ -646,7 +662,9 @@ static inline void zt_alsa_input_thread_proc(zt_alsa_in_handle *ctx) {
                 // as the macOS path's policy.
                 break;
         }
+        }   // inner while: drain all queued events before re-polling
     }
+    free(pfds);
 }
 
 static inline MMRESULT midiInOpen(HMIDIIN *h, UINT dev, DWORD_PTR callback, DWORD_PTR instance, DWORD) {
@@ -654,24 +672,36 @@ static inline MMRESULT midiInOpen(HMIDIIN *h, UINT dev, DWORD_PTR callback, DWOR
     int src_client = -1, src_port = -1;
     char name_buf[128] = {0};
     if (!zt_alsa_find_input_port_by_index(dev, &src_client, &src_port, name_buf, sizeof(name_buf))) {
+        fprintf(stderr, "[zt-midi-in] midiInOpen: device index %u not found\n", (unsigned)dev);
         return MIDIERR_NODEVICE;
     }
     zt_alsa_in_handle *ctx = (zt_alsa_in_handle *)calloc(1, sizeof(zt_alsa_in_handle));
     if (!ctx) return MMSYSERR_NOMEM;
-    if (snd_seq_open(&ctx->seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+    // SND_SEQ_OPEN_INPUT (not DUPLEX) -- we never produce events from
+    // this client, only consume them. INPUT is the correct flag and
+    // is documented as the input-only mode in the ALSA docs.
+    int oerr = snd_seq_open(&ctx->seq, "default", SND_SEQ_OPEN_INPUT, 0);
+    if (oerr < 0) {
+        fprintf(stderr, "[zt-midi-in] snd_seq_open failed for '%s': %s\n",
+                name_buf, snd_strerror(oerr));
         free(ctx);
         return MMSYSERR_ERROR;
     }
-    snd_seq_set_client_name(ctx->seq, "zTracker In");
+    snd_seq_set_client_name(ctx->seq, "zTracker");
     ctx->in_port = snd_seq_create_simple_port(ctx->seq, "zTracker In",
         SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
         SND_SEQ_PORT_TYPE_APPLICATION);
     if (ctx->in_port < 0) {
+        fprintf(stderr, "[zt-midi-in] create_simple_port failed: %s\n",
+                snd_strerror(ctx->in_port));
         snd_seq_close(ctx->seq);
         free(ctx);
         return MMSYSERR_ERROR;
     }
-    if (snd_seq_connect_from(ctx->seq, ctx->in_port, src_client, src_port) < 0) {
+    int cerr = snd_seq_connect_from(ctx->seq, ctx->in_port, src_client, src_port);
+    if (cerr < 0) {
+        fprintf(stderr, "[zt-midi-in] connect_from(%d:%d) failed: %s (port '%s')\n",
+                src_client, src_port, snd_strerror(cerr), name_buf);
         snd_seq_close(ctx->seq);
         free(ctx);
         return MMSYSERR_ERROR;
