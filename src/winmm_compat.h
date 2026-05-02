@@ -62,6 +62,9 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
 #include <stdlib.h>
 #if defined(__linux__)
 #include <alsa/asoundlib.h>
+#include <atomic>
+#include <chrono>
+#include <thread>
 #elif defined(__APPLE__)
 #include <CoreMIDI/CoreMIDI.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -382,6 +385,358 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
     if (snd_seq_event_output_direct(ctx->seq, &ev) < 0) return MMSYSERR_ERROR;
     return MMSYSERR_NOERROR;
 }
+
+// =================================================================
+// Linux ALSA — MIDI Input
+// =================================================================
+//
+// Mirrors the macOS CoreMIDI input path: enumerate readable ALSA
+// sequencer ports, open one, spawn a polling thread that turns
+// snd_seq_event_input() into the WinMM-style midiInProc callback that
+// midi-io.cpp already expects (status<<0 | data1<<8 | data2<<16 packed
+// into dwParam1, with MIM_DATA flag). SysEx events bypass the callback
+// and push directly into zt_sysex_inq, mirroring the CoreMIDI handler.
+//
+// **STATUS as of 2026-05-02:** Compiles on Linux CI but the runtime
+// path has only been smoke-traced on paper. Real hardware verification
+// is needed (USB MIDI controller / virtual port via aconnect / etc.).
+// Known unknowns:
+//   * Whether snd_seq_event_input blocks acceptably for the polling
+//     loop; the cancel path uses snd_seq_event_input_pending +
+//     stop flag with a small sleep, which should be responsive.
+//   * Whether SND_SEQ_EVENT_SYSEX delivers the full F0..F7 payload
+//     in one event (single-block) or fragmented (continuation).
+//     The implementation handles both via the SysExAccum buffer.
+//   * Active sensing (0xFE) is dropped, matching the macOS path.
+typedef void (CALLBACK *zt_midi_in_callback_fn)(HMIDIIN, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
+
+#define ZT_ALSA_SYSEX_ACCUM_MAX 8192    // matches ZT_SYSEX_MAX_LEN
+
+typedef struct zt_alsa_in_handle {
+    snd_seq_t *seq;
+    int in_port;
+    int src_client;
+    int src_port;
+    char port_name[128];
+    zt_midi_in_callback_fn callback;
+    DWORD_PTR instance;
+    std::atomic<bool> *running;     // set false to wake & end the thread
+    std::thread *poll_thread;
+    int started;
+    // SysEx assembly across SND_SEQ_EVENT_SYSEX continuations.
+    int sysex_len;
+    unsigned char sysex_buf[ZT_ALSA_SYSEX_ACCUM_MAX];
+} zt_alsa_in_handle;
+
+// Forward decl: defined in src/sysex_inq.cpp.
+extern "C" int zt_sysex_inq_push(const unsigned char *bytes, int len);
+
+static inline int zt_alsa_find_input_port_by_index(UINT index, int *client, int *port, char *name, size_t name_len) {
+    snd_seq_t *seq = NULL;
+    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+        return 0;
+    }
+    snd_seq_client_info_t *cinfo = NULL;
+    snd_seq_port_info_t *pinfo = NULL;
+    snd_seq_client_info_malloc(&cinfo);
+    snd_seq_port_info_malloc(&pinfo);
+    if (!cinfo || !pinfo) {
+        if (cinfo) snd_seq_client_info_free(cinfo);
+        if (pinfo) snd_seq_port_info_free(pinfo);
+        snd_seq_close(seq);
+        return 0;
+    }
+
+    UINT count = 0;
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        const int cl = snd_seq_client_info_get_client(cinfo);
+        snd_seq_port_info_set_client(pinfo, cl);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            // Mirror of the output path but for READ caps: a port we
+            // can subscribe to in order to RECEIVE its messages.
+            if ((caps & SND_SEQ_PORT_CAP_READ) == 0 || (caps & SND_SEQ_PORT_CAP_SUBS_READ) == 0) {
+                continue;
+            }
+            if (count == index) {
+                if (client) *client = cl;
+                if (port) *port = snd_seq_port_info_get_port(pinfo);
+                if (name && name_len > 0) {
+                    const char *cn = snd_seq_client_info_get_name(cinfo);
+                    const char *pn = snd_seq_port_info_get_name(pinfo);
+                    snprintf(name, name_len, "%s:%s", cn ? cn : "ALSA", pn ? pn : "MIDI");
+                    name[name_len - 1] = '\0';
+                }
+                snd_seq_client_info_free(cinfo);
+                snd_seq_port_info_free(pinfo);
+                snd_seq_close(seq);
+                return 1;
+            }
+            count++;
+        }
+    }
+    snd_seq_client_info_free(cinfo);
+    snd_seq_port_info_free(pinfo);
+    snd_seq_close(seq);
+    return 0;
+}
+
+static inline UINT midiInGetNumDevs(void) {
+    UINT count = 0;
+    snd_seq_t *seq = NULL;
+    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) return 0;
+    snd_seq_client_info_t *cinfo = NULL;
+    snd_seq_port_info_t *pinfo = NULL;
+    snd_seq_client_info_malloc(&cinfo);
+    snd_seq_port_info_malloc(&pinfo);
+    if (!cinfo || !pinfo) {
+        if (cinfo) snd_seq_client_info_free(cinfo);
+        if (pinfo) snd_seq_port_info_free(pinfo);
+        snd_seq_close(seq);
+        return 0;
+    }
+    snd_seq_client_info_set_client(cinfo, -1);
+    while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        const int cl = snd_seq_client_info_get_client(cinfo);
+        snd_seq_port_info_set_client(pinfo, cl);
+        snd_seq_port_info_set_port(pinfo, -1);
+        while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+            const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if ((caps & SND_SEQ_PORT_CAP_READ) && (caps & SND_SEQ_PORT_CAP_SUBS_READ)) {
+                count++;
+            }
+        }
+    }
+    snd_seq_client_info_free(cinfo);
+    snd_seq_port_info_free(pinfo);
+    snd_seq_close(seq);
+    return count;
+}
+
+static inline MMRESULT midiInGetDevCaps(UINT dev, MIDIINCAPS *caps, UINT) {
+    if (!caps) return MMSYSERR_ERROR;
+    int client = -1, port = -1;
+    if (!zt_alsa_find_input_port_by_index(dev, &client, &port, caps->szPname, sizeof(caps->szPname))) {
+        caps->szPname[0] = '\0';
+        return MMSYSERR_ERROR;
+    }
+    return MMSYSERR_NOERROR;
+}
+
+// Pack short-message bytes into the WinMM dwParam1 layout the existing
+// midiInCallback expects: status in low 8 bits, data1 in next 8, data2
+// in next 8, top 8 zero. midi-io.cpp masks data1 with 0x7F so we mirror
+// that here.
+static inline DWORD zt_alsa_pack_short_msg(unsigned char status, unsigned char d1, unsigned char d2) {
+    return ((DWORD)status) | ((DWORD)(d1 & 0x7F) << 8) | ((DWORD)(d2 & 0x7F) << 16);
+}
+
+static inline void zt_alsa_emit_short(zt_alsa_in_handle *ctx, DWORD packed) {
+    if (!ctx || !ctx->callback) return;
+    // mirror the macOS path: signal MIM_DATA so existing midi-io.cpp
+    // dispatch code routes the message identically across platforms.
+    ctx->callback((HMIDIIN)ctx, MIM_DATA, ctx->instance, (DWORD_PTR)packed, 0);
+}
+
+static inline void zt_alsa_handle_sysex_event(zt_alsa_in_handle *ctx, snd_seq_event_t *ev) {
+    if (!ctx || !ev) return;
+    const unsigned char *bytes = (const unsigned char *)ev->data.ext.ptr;
+    const int len = (int)ev->data.ext.len;
+    if (!bytes || len <= 0) return;
+
+    // ALSA delivers SysEx as one or more SND_SEQ_EVENT_SYSEX events; if
+    // the dump is larger than the kernel's per-event buffer it fragments
+    // and each fragment carries the next chunk of bytes (NOT prefixed
+    // with F0 except the first one). Accumulate until we see the F7
+    // terminator, then push the assembled message in one piece into
+    // zt_sysex_inq -- the consumer expects complete F0..F7 frames.
+    for (int i = 0; i < len; i++) {
+        if (ctx->sysex_len < ZT_ALSA_SYSEX_ACCUM_MAX) {
+            ctx->sysex_buf[ctx->sysex_len++] = bytes[i];
+        } else {
+            // Overflow: drop and resume on the next F0. Same policy as
+            // the macOS CoreMIDI parser.
+            ctx->sysex_len = 0;
+            return;
+        }
+        if (bytes[i] == 0xF7) {
+            zt_sysex_inq_push(ctx->sysex_buf, ctx->sysex_len);
+            ctx->sysex_len = 0;
+        }
+    }
+}
+
+static inline void zt_alsa_input_thread_proc(zt_alsa_in_handle *ctx) {
+    if (!ctx || !ctx->seq || !ctx->running) return;
+    // ALSA's blocking input means we can't trivially break out without
+    // either nonblocking mode + sleep loop, or pushing a sentinel from
+    // the main thread. We use nonblocking + a small sleep (200us); CPU
+    // overhead is negligible for typical MIDI rates and shutdown is
+    // responsive (<1ms typical).
+    snd_seq_nonblock(ctx->seq, 1);
+    while (ctx->running->load(std::memory_order_acquire)) {
+        snd_seq_event_t *ev = NULL;
+        int r = snd_seq_event_input(ctx->seq, &ev);
+        if (r < 0 || !ev) {
+            // -EAGAIN = no events ready; brief sleep to yield.
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
+            continue;
+        }
+        switch (ev->type) {
+            case SND_SEQ_EVENT_NOTEON: {
+                unsigned char vel = ev->data.note.velocity;
+                // Match the WinMM/midi-io.cpp normalisation: NoteOn vel=0
+                // is rewritten as NoteOff. Done in midi-io.cpp's MIM_DATA
+                // path on Windows; we replicate it here for parity.
+                unsigned char status = (unsigned char)(vel == 0 ? 0x80 : 0x90) | (ev->data.note.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status, ev->data.note.note, vel));
+                break;
+            }
+            case SND_SEQ_EVENT_NOTEOFF: {
+                unsigned char status = 0x80 | (ev->data.note.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status, ev->data.note.note, ev->data.note.velocity));
+                break;
+            }
+            case SND_SEQ_EVENT_KEYPRESS: {
+                unsigned char status = 0xA0 | (ev->data.note.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status, ev->data.note.note, ev->data.note.velocity));
+                break;
+            }
+            case SND_SEQ_EVENT_CONTROLLER: {
+                unsigned char status = 0xB0 | (ev->data.control.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status,
+                    (unsigned char)(ev->data.control.param & 0x7F),
+                    (unsigned char)(ev->data.control.value & 0x7F)));
+                break;
+            }
+            case SND_SEQ_EVENT_PGMCHANGE: {
+                unsigned char status = 0xC0 | (ev->data.control.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status,
+                    (unsigned char)(ev->data.control.value & 0x7F), 0));
+                break;
+            }
+            case SND_SEQ_EVENT_CHANPRESS: {
+                unsigned char status = 0xD0 | (ev->data.control.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status,
+                    (unsigned char)(ev->data.control.value & 0x7F), 0));
+                break;
+            }
+            case SND_SEQ_EVENT_PITCHBEND: {
+                // ALSA value is a signed int centered at 0; MIDI wants
+                // unsigned 14-bit centered at 8192.
+                int v = ev->data.control.value + 8192;
+                if (v < 0) v = 0;
+                if (v > 16383) v = 16383;
+                unsigned char status = 0xE0 | (ev->data.control.channel & 0x0F);
+                zt_alsa_emit_short(ctx, zt_alsa_pack_short_msg(status,
+                    (unsigned char)(v & 0x7F),
+                    (unsigned char)((v >> 7) & 0x7F)));
+                break;
+            }
+            case SND_SEQ_EVENT_CLOCK:    zt_alsa_emit_short(ctx, 0xF8); break;
+            case SND_SEQ_EVENT_START:    zt_alsa_emit_short(ctx, 0xFA); break;
+            case SND_SEQ_EVENT_CONTINUE: zt_alsa_emit_short(ctx, 0xFB); break;
+            case SND_SEQ_EVENT_STOP:     zt_alsa_emit_short(ctx, 0xFC); break;
+            case SND_SEQ_EVENT_SYSEX:    zt_alsa_handle_sysex_event(ctx, ev); break;
+            default:
+                // Active sensing (0xFE), reset (0xFF), MTC, song
+                // position, song select, tune request etc.: drop, same
+                // as the macOS path's policy.
+                break;
+        }
+    }
+}
+
+static inline MMRESULT midiInOpen(HMIDIIN *h, UINT dev, DWORD_PTR callback, DWORD_PTR instance, DWORD) {
+    if (h) *h = 0;
+    int src_client = -1, src_port = -1;
+    char name_buf[128] = {0};
+    if (!zt_alsa_find_input_port_by_index(dev, &src_client, &src_port, name_buf, sizeof(name_buf))) {
+        return MIDIERR_NODEVICE;
+    }
+    zt_alsa_in_handle *ctx = (zt_alsa_in_handle *)calloc(1, sizeof(zt_alsa_in_handle));
+    if (!ctx) return MMSYSERR_NOMEM;
+    if (snd_seq_open(&ctx->seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    snd_seq_set_client_name(ctx->seq, "zTracker In");
+    ctx->in_port = snd_seq_create_simple_port(ctx->seq, "zTracker In",
+        SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
+        SND_SEQ_PORT_TYPE_APPLICATION);
+    if (ctx->in_port < 0) {
+        snd_seq_close(ctx->seq);
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    if (snd_seq_connect_from(ctx->seq, ctx->in_port, src_client, src_port) < 0) {
+        snd_seq_close(ctx->seq);
+        free(ctx);
+        return MMSYSERR_ERROR;
+    }
+    ctx->src_client = src_client;
+    ctx->src_port   = src_port;
+    snprintf(ctx->port_name, sizeof(ctx->port_name), "%s", name_buf);
+    ctx->callback = (zt_midi_in_callback_fn)callback;
+    ctx->instance = instance;
+    ctx->started  = 0;
+    ctx->running  = NULL;
+    ctx->poll_thread = NULL;
+    ctx->sysex_len = 0;
+    *h = (HMIDIIN)ctx;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInStart(HMIDIIN h) {
+    zt_alsa_in_handle *ctx = (zt_alsa_in_handle *)h;
+    if (!ctx || ctx->started) return MMSYSERR_ERROR;
+    ctx->running = new std::atomic<bool>(true);
+    ctx->poll_thread = new std::thread(zt_alsa_input_thread_proc, ctx);
+    ctx->started = 1;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInStop(HMIDIIN h) {
+    zt_alsa_in_handle *ctx = (zt_alsa_in_handle *)h;
+    if (!ctx || !ctx->started) return MMSYSERR_ERROR;
+    if (ctx->running) ctx->running->store(false, std::memory_order_release);
+    if (ctx->poll_thread && ctx->poll_thread->joinable()) {
+        ctx->poll_thread->join();
+    }
+    delete ctx->poll_thread;
+    delete ctx->running;
+    ctx->poll_thread = NULL;
+    ctx->running = NULL;
+    ctx->started = 0;
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInClose(HMIDIIN h) {
+    zt_alsa_in_handle *ctx = (zt_alsa_in_handle *)h;
+    if (!ctx) return MMSYSERR_ERROR;
+    if (ctx->started) midiInStop(h);
+    if (ctx->seq) {
+        snd_seq_disconnect_from(ctx->seq, ctx->in_port, ctx->src_client, ctx->src_port);
+        snd_seq_close(ctx->seq);
+    }
+    free(ctx);
+    return MMSYSERR_NOERROR;
+}
+
+static inline MMRESULT midiInReset(HMIDIIN) { return MMSYSERR_NOERROR; }
+static inline MMRESULT midiInPrepareHeader(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_NOERROR; }
+static inline MMRESULT midiInUnprepareHeader(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_NOERROR; }
+static inline MMRESULT midiInAddBuffer(HMIDIIN, MIDIHDR *, UINT) { return MMSYSERR_NOERROR; }
+static inline MMRESULT midiInGetErrorText(MMRESULT, char *buffer, UINT size) {
+    if (buffer && size > 0) {
+        snprintf(buffer, size, "ALSA MIDI input error");
+        buffer[size - 1] = '\0';
+    }
+    return MMSYSERR_NOERROR;
+}
+
 #elif defined(__APPLE__)
 typedef void (CALLBACK *zt_midi_in_callback_fn)(HMIDIIN, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR);
 
@@ -918,7 +1273,11 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT, const unsigned char *, int) {
 }
 #endif
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(__linux__)
+// Fallback stubs for platforms without a real MIDI input backend.
+// Linux uses the real ALSA implementation in the __linux__ block above;
+// macOS uses the CoreMIDI implementation; Windows uses the real WinMM
+// directly via mmsystem.h.
 static inline UINT midiInGetNumDevs(void) { return 0; }
 static inline MMRESULT midiInGetDevCaps(UINT, MIDIINCAPS *caps, UINT) {
     if (caps) {

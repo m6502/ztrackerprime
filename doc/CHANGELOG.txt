@@ -4,6 +4,48 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (Linux ALSA MIDI input — initial implementation)
+--------------------------------------------------------------
+
+        + Linux: real MIDI input via ALSA sequencer. Previously
+          midiInOpen / midiInStart / etc. all returned
+          MMSYSERR_ERROR -- Linux had no MIDI in at all. This wires
+          a working implementation that mirrors the macOS CoreMIDI
+          path so existing midi-io.cpp / page MIDI-in pumps work
+          unchanged on Linux.
+
+          New in src/winmm_compat.h:
+          ! zt_alsa_in_handle struct with seq + in_port + dest
+            + std::thread polling loop + std::atomic stop flag.
+          ! zt_alsa_find_input_port_by_index walks readable
+            ALSA sequencer ports (PORT_CAP_READ + SUBS_READ).
+          ! Polling thread (zt_alsa_input_thread_proc) translates
+            ALSA events to WinMM-style packed dwParam1 messages
+            and invokes the existing midiInProc callback for short
+            messages: NoteOn/Off (with NoteOn vel=0 -> NoteOff
+            normalisation), KeyPress, Controller, ProgramChange,
+            ChannelPressure, PitchBend (signed center -> unsigned
+            14-bit), MIDI Clock / Start / Stop / Continue.
+          ! SysEx (SND_SEQ_EVENT_SYSEX) accumulates bytes across
+            ALSA fragmentation and pushes complete F0..F7 frames
+            to zt_sysex_inq via zt_sysex_inq_push -- same queue
+            and consumer path as the macOS CoreMIDI SysEx receive.
+          ! Active sensing / MTC / song select / tune request:
+            dropped, matching the macOS handler's policy.
+          ! Polling cadence: 200us yield via std::this_thread::sleep_for
+            when no events pending; CPU overhead is negligible at
+            typical MIDI rates and shutdown is responsive (<1ms).
+          ! Catch-all stub block at the end of the header is now
+            gated #if !defined(__APPLE__) && !defined(__linux__)
+            so Linux uses the real implementation; macOS uses
+            CoreMIDI; Windows uses real WinMM directly.
+
+          ! NEEDS HARDWARE VERIFICATION: this compiles on the Linux
+            CI job but the runtime path has only been smoke-traced
+            on paper -- macOS author has no Linux test box. First
+            Linux user to plug in a USB MIDI controller (or
+            aconnect a virtual port) is the verification.
+
 zt 2026_05_02 (ListBox: defuse the OnSelect mousestate-clobber foot-gun)
 -----------------------------------------------------------------------
 
@@ -26,7 +68,6 @@ zt 2026_05_02 (ListBox: defuse the OnSelect mousestate-clobber foot-gun)
           of "active foot-gun." The forward rule is: never write
           mousestate=0 inside any OnSelect override; the BUTTON_UP_LEFT
           case is the only place.
-
 zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
 
 zt 2026_05_02 (Pattern Editor: Fill Selection with Note at Cursor)
