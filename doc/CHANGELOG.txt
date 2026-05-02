@@ -4,6 +4,21 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (Pattern Editor: drop stale MIDI-in on enter())
+-------------------------------------------------------------
+
+        * Pattern Editor (F2): clear the global MIDI-in queue on
+          enter() so messages that arrived while the user was on
+          F11/F12/Help/etc. don't burst-replay at the cursor on the
+          first update() tick. The queue is global but only PE /
+          InstEditor / PEParms / CcConsole drain it, so accumulation
+          is real. Previously the burst was especially harmful with
+          CC drawmode ON: every accumulated CC/PB was written as a
+          single Sxxyy/Wxxxx run at the cursor, with drawmode's
+          per-session UNDO_SAVE already consumed -- a pattern stomp
+          the user couldn't easily undo. Behaviour is now consistent
+          with returning to a fresh state.
+
 zt 2026_05_02 (CC Console: fix file-switch slider value leak)
 -------------------------------------------------------------
 
