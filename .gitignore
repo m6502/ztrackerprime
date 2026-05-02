@@ -4,3 +4,5 @@
 /build-linux/
 /build-win32/
 /build-windows/
+__pycache__/
+*.pyc
