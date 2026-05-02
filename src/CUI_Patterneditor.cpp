@@ -943,10 +943,25 @@ void CUI_Patterneditor::enter(void)
   cur_state = STATE_PEDIT;
   mousedrawing=0;
   //PATTERN_EDIT_ROWS = 32 + 4 + (INTERNAL_RESOLUTION_Y - 480) / 8;
-  
+
   // Dynamic row count based on current window height - see issue #15.
 
   PATTERN_EDIT_ROWS = CHARS_Y - TRACKS_ROW_Y - 1 - SPACE_AT_BOTTOM ;
+
+  // CC drawmode + page-switch: drop any MIDI-in messages that arrived
+  // while the user was off-page. The queue is global but only Pattern
+  // Editor / InstEditor / PEParms / CcConsole drain it; F11, F12, Help,
+  // MainMenu, etc. do not. With drawmode ON, returning to PE would
+  // otherwise burst-write every accumulated CC/PB at the current
+  // cursor as a single tick of update() drained the backlog -- a
+  // surprise pattern stomp the user can't easily undo (drawmode's
+  // session UNDO_SAVE only fires once per ON->OFF span). Clear on
+  // enter so drawmode only captures messages received after the user
+  // is actually back on Pattern Editor. With drawmode OFF the queue's
+  // legacy jazz-record path handles 0x80/0x90 directly, but stale
+  // notes from minutes ago aren't useful either, so clear unconditionally
+  // when entering -- cheap and behaviour-consistent.
+  midiInQueue.clear();
 
   //  this->mode = PEM_REGULARKEYS;
 }
