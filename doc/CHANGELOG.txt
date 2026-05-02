@@ -4,6 +4,29 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (midiInQueue: thread safety via std::mutex)
+---------------------------------------------------------
+
+        * src/midi-io.{cpp,h} miq class now serialises insert /
+          pop / check / size / clear with a std::mutex. The class
+          is the producer/consumer queue between the platform MIDI
+          thread (CoreMIDI client thread on macOS, WinMM driver
+          thread on Windows, ALSA poll thread on Linux) and the
+          main UI thread that drains it. Previously: plain int
+          qhead/qtail/qelems with no synchronisation -- a latent
+          race that was producing occasional missed / duplicated /
+          torn-int reads on every platform, especially under heavy
+          CC streams or when clear() raced the producer.
+          ! Lock-guard is intentionally coarse. Each critical
+            section is a few pointer increments + a single store;
+            std::mutex on contended lock is ~50 ns. MIDI rates
+            (hundreds of msgs/sec at clock + a knob stream) are
+            nowhere near contended. If contention ever shows up
+            in profiling, the move is a lock-free SPSC ring --
+            but premature for now.
+          ! Pre-existing latent foot-gun documented in CLAUDE.md
+            "Recurring foot-guns" as defused.
+
 zt 2026_05_02 (Pattern Editor: Find/Replace Note popup)
 -------------------------------------------------------
 
@@ -30,7 +53,6 @@ zt 2026_05_02 (Pattern Editor: Find/Replace Note popup)
             "Find/Replace note."
 
           New file: src/CUI_PEFindReplace.cpp.
-
 zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
 --------------------------------------------------
 

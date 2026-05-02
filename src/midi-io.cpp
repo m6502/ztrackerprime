@@ -252,7 +252,7 @@ int midiOut::GetDevID(int which) {
 
 miq midiInQueue;;
 
-miq::miq() { 
+miq::miq() {
     qsize = 1024;
     q = new unsigned int[qsize];
     qhead = qtail = 0;
@@ -263,41 +263,69 @@ miq::~miq() {
     delete[] q;
 }
 
+// Producer side -- called from the platform MIDI thread:
+//   * macOS: zt_coremidi_read_proc -> midiInCallback
+//   * Windows: WinMM midiInProc
+//   * Linux: zt_alsa_input_thread_proc -> midiInCallback
+// Lock m for the queue head pointer + count update.
 void miq::insert(unsigned int msg) {
-    if (qelems<qsize) {
-        if (qhead>=qsize)
+    std::lock_guard<std::mutex> lk(m);
+    if (qelems < qsize) {
+        if (qhead >= qsize)
             qhead = 0;
         q[qhead] = msg;
         qhead++;
         qelems++;
     }
+    // Else: queue full -- drop. Same policy as the original
+    // implementation. A 1024-slot queue at typical MIDI rates is
+    // ~10 seconds of buffering before a non-draining UI loses
+    // messages; the only way to fill it is to leave the app
+    // unattended on a page that doesn't drain (Songconfig,
+    // Sysconfig, etc.) while a controller streams.
 }
 
+// Consumer side -- called from the main UI thread by whichever page
+// drain loop (Pattern Editor / InstEditor / PEParms / CcConsole) is
+// currently running. Lock m for the queue tail pointer + count
+// update.
 unsigned int miq::pop(void) {
-    unsigned int a=0;
-    if (qhead!=qtail) {
+    std::lock_guard<std::mutex> lk(m);
+    unsigned int a = 0;
+    if (qhead != qtail) {
         a = q[qtail];
         qtail++;
-        if (qtail>=qsize)
-            qtail=0;
+        if (qtail >= qsize)
+            qtail = 0;
         qelems--;
     }
     return a;
 }
 
+// Peek at the front message without consuming. Same race exposure
+// as pop() so it gets the same lock.
 unsigned int miq::check(void) {
-    unsigned int a=0;
-    if (qhead!=qtail) {
+    std::lock_guard<std::mutex> lk(m);
+    unsigned int a = 0;
+    if (qhead != qtail) {
         a = q[qtail];
     }
     return a;
 }
 
+// Reads `qelems` -- with no mutex this was a torn-int read on
+// 32-bit platforms (well-defined on x86-64 / arm64 but not
+// portably). Cheap to lock anyway.
 int miq::size(void) {
+    std::lock_guard<std::mutex> lk(m);
     return qelems;
 }
 
+// Reset is rare (page transitions, fullscreen toggle, redraw events
+// in main.cpp) but it WAS racing the producer thread before this
+// change. Now it's serialised.
 void miq::clear(void) {
+    std::lock_guard<std::mutex> lk(m);
     qhead = qtail = 0;
     qelems = 0;
 }
