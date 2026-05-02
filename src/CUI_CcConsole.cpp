@@ -360,10 +360,20 @@ void CUI_CcConsole::load_selected(void) {
         loaded = 1;
         slot_cur = slot_top = 0;
         zt_ccizer_set_current_file(&g_loaded);
-        // Seed last_values so we don't false-trigger send_slot on the
-        // first absorb pass after load.
+        // Seed last_values AND reset the entire ValueSlider widget pool
+        // to match the freshly-loaded file. The widget pool is fixed
+        // (ZT_CCIZER_MAX_SLOTS) and reused across files; without this
+        // reset, sliders[] still hold the previous file's user-dragged
+        // values for any slot outside the visible window. position_sliders()
+        // only refreshes vs->value for visible rows, so absorb_slider_changes()
+        // would then see stale-vs-fresh mismatches on hidden slots, write
+        // file1's values into g_loaded and squirt out a MIDI flood for
+        // every off-screen slot the user had touched. Reset all slots up
+        // front so the very next absorb sees vs->value == last_values[i].
         for (int i = 0; i < ZT_CCIZER_MAX_SLOTS; i++) {
-            last_values[i] = (i < g_loaded.num_slots) ? g_loaded.slots[i].value : 0;
+            unsigned short v = (i < g_loaded.num_slots) ? g_loaded.slots[i].value : 0;
+            last_values[i] = v;
+            sliders[i]->value = v;
         }
         snprintf(status_line, sizeof(status_line),
                  "Loaded %s — %d slot(s).", g_loaded.basename, g_loaded.num_slots);
