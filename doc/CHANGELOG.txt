@@ -4,6 +4,31 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (ListBox: defuse the OnSelect mousestate-clobber foot-gun)
+-----------------------------------------------------------------------
+
+        * src/UserInterface.cpp ListBox::OnSelect is now a documented
+          no-op (base class). Previously it cleared mousestate=0,
+          which was the source of a recurring "click-on-listbox
+          freezes UI; Cmd-Tab unfreezes" bug whenever a subclass
+          override called ListBox::OnSelect from inside its own
+          handler (the natural "call super" pattern). The
+          mousestate clear belongs to ListBox::mouseupdate's
+          BUTTON_UP_LEFT case (which already does it) and the
+          post-switch defensive (also already does it). Removing
+          the third copy from OnSelect makes "calling super" safe
+          for any current or future ListBox subclass.
+        * SkinSelector::OnSelect: dropped its own redundant
+          this->mousestate = 0; same reasoning. The SkinSelector
+          freeze case (clicking the already-selected skin) is
+          fixed by this change.
+        ! CLAUDE.md updated: the gotcha now reads "defused" instead
+          of "active foot-gun." The forward rule is: never write
+          mousestate=0 inside any OnSelect override; the BUTTON_UP_LEFT
+          case is the only place.
+
+zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
+
 zt 2026_05_02 (Pattern Editor: Fill Selection with Note at Cursor)
 ------------------------------------------------------------------
 
@@ -64,8 +89,7 @@ zt 2026_05_02 (CC Console: fix file-switch slider value leak)
           leaked value as if it were file2's own. Fix: reset the
           entire widget pool's values to match the freshly-loaded
           file in load_selected(), in lockstep with the existing
-          last_values[] seed.zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
---------------------------------------------------
+          last_values[] seed.zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)--------------------------------------------------
 
         + Shift+F3 is now the CC Console. It loads Paketti
           CCizer-format `.txt` files (one slot per line:

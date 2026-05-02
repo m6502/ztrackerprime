@@ -2658,9 +2658,23 @@ int ListBox::getCurrentItemIndex(void) {
 
 // ------------------------------------------------------------------------------------------------
 //
+// ListBox::OnSelect — base default. Intentionally a no-op.
 //
+// Subclasses override this to react to "user activated an item." Do
+// NOT set `mousestate = 0` here, and do NOT do it in subclass overrides
+// either: ListBox::mouseupdate already clears mousestate in the
+// BUTTON_UP_LEFT case (and again in the post-switch defensive). Clearing
+// it in OnSelect runs DURING BUTTON_DOWN_LEFT (line ~2142, where
+// OnSelect is called when the user re-clicks the focused item) — which
+// means the BUTTON_UP_LEFT branch then sees mousestate==0, `act++` is
+// gated off, the button-up event sits unconsumed in the Keys queue,
+// and every subsequent input freezes until SDL_EVENT_WINDOW_FOCUS_GAINED
+// triggers Keys.flush(). Cmd-Tab "unfreezing" the UI is the smoking-
+// gun signature.
+//
+// Subclasses that need to call into base from their own override can
+// safely write `ListBox::OnSelect(p);` -- this no-op is the contract.
 void ListBox::OnSelect(LBNode*) {
-    mousestate = 0;
 }
 
 
@@ -2818,8 +2832,11 @@ void SkinSelector::OnSelect(LBNode *selected)
         selected->checked = true;
         ListBox::OnSelect(selected);
     }
-    delete todel;    
-    this->mousestate = 0;
+    delete todel;
+    // Do NOT clear mousestate here -- ListBox::mouseupdate's
+    // BUTTON_UP_LEFT case clears it at the right moment. Clearing
+    // during BUTTON_DOWN-fired OnSelect freezes the UI. See the
+    // ListBox::OnSelect comment in this file.
 }
 void SkinSelector::OnSelectChange() {
 }
