@@ -185,9 +185,9 @@ Failure mode if rule 5 is violated: shipped pages with non-interactive ASCII "sl
 
 1. **Pre-switch reset.** `if (!bMouseIsDown) mousestate = 0;` at the **top** of `mouseupdate` clears mousestate BEFORE the switch sees BUTTON_UP. Result: the up event never increments `act`, `Keys.getkey()` is never called, the up event sits forever in the FIFO blocking every subsequent input. **The reset must run AFTER the switch.**
 
-2. **Premature `ListBox::OnSelect(selected)` in a subclass override.** Base `ListBox::OnSelect` sets `mousestate = 0`. If a subclass override calls it during click handling (between BUTTON_DOWN and BUTTON_UP), mousestate gets cleared early — same freeze. **Don't call `ListBox::OnSelect` from a subclass; the BUTTON_UP_LEFT case clears mousestate itself.**
+2. **Premature `ListBox::OnSelect(selected)` in a subclass override.** Historically, base `ListBox::OnSelect` set `mousestate = 0`, and a subclass override calling it during click handling (between BUTTON_DOWN and BUTTON_UP) cleared mousestate early — same freeze pattern. **Defused as of PR #112: base `ListBox::OnSelect` is now a documented no-op**, so subclasses can safely call `ListBox::OnSelect(p)` from inside their override without freezing. The rule that survives: **never write `mousestate = 0` inside any `OnSelect` override either**; the BUTTON_UP_LEFT case in `mouseupdate` is the only place that should clear it.
 
-Symptom for the user: "click on widget freezes the UI; Cmd-Tab unfreezes it." The Cmd-Tab unfreeze is `SDL_EVENT_WINDOW_FOCUS_GAINED → Keys.flush()` (see `main.cpp::zt_handle_platform_window_event`).
+Symptom for the user (the historic version): "click on listbox freezes the UI; Cmd-Tab unfreezes it." The Cmd-Tab unfreeze is `SDL_EVENT_WINDOW_FOCUS_GAINED → Keys.flush()` (see `main.cpp::zt_handle_platform_window_event`).
 
 ### Widget-class fixes belong upstream
 
