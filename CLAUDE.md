@@ -216,6 +216,19 @@ If the trace doesn't show how the reported input produces the symptom, the model
 - Don't duplicate content across PRs.
 - Push branches directly to `origin` (no fork needed; Esa has write access).
 
+### Bug reports = branch + PR + push, no asking
+
+When Esa reports a bug, the **default response is**: investigate → fix → branch → commit → push → open PR. Do not ask "want me to fix?" or "should I open a PR?" — that's the implicit ask. Just do it.
+
+The only acceptable preamble is one or two sentences naming the root cause and the fix, then go.
+
+- Branch name: `esa/<short-descriptive>` (e.g. `esa/cc-console-file-switch-leak`).
+- Build clean + run `ctest` before pushing.
+- PR body: summary, root cause, fix, test plan checklist. Include the user's verbatim quote of the symptom if they gave one.
+- Push to `origin`; Esa has write access.
+
+Ask for clarification only if the bug **report itself** is ambiguous about the symptom — never about whether to fix it.
+
 ---
 
 ## Common user behaviour (learned)

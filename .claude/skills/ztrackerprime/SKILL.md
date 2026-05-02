@@ -179,6 +179,19 @@ The full list-pane construction pattern (with code) lives in [`references/list-p
 - Tag AI-assisted commits: `Co-Authored-By: Claude <noreply@anthropic.com>` (or current model identifier).
 - Don't duplicate content across PRs.
 
+### Bug reports = branch + PR + push, no asking
+
+When Esa reports a bug, the **default response is**: investigate → fix → branch → commit → push → open PR. Do not ask "want me to fix?" or "should I open a PR?" — that's the implicit ask. Just do it.
+
+The only acceptable preamble is one or two sentences naming the root cause and the fix, then go.
+
+- Branch: `esa/<short-descriptive>` (e.g. `esa/cc-console-file-switch-leak`).
+- Build clean + run `ctest` before pushing.
+- PR body: summary, root cause, fix, test plan checklist. Quote the user's own description of the symptom verbatim if they gave one — that anchors the PR to the report.
+- Push to `origin`; Esa has write access.
+
+Ask for clarification only if the bug **report itself** is ambiguous about the symptom — never about whether to fix it. Reference: PR #106 (CC Console file-switch slider value leak, 2026-05-02).
+
 ## Paketti as a feature reference
 
 Paketti (a Renoise tool) is a reference for tracker quality-of-life features ported / portable to zTracker. Already landed: Replicate at Cursor, Clone Pattern, Humanize Velocities, MIDI Macro + Arpeggio editors. Future candidates: Fill-with-note-at-cursor, Find/Replace note, Transpose selection, Groove templates, Chord memory. zTracker is MIDI-only, so sample-editor features are N/A.
