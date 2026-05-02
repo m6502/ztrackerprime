@@ -4,6 +4,16 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (Pattern Editor: octave transpose for selections)
+---------------------------------------------------------------
+
+        + Pattern Editor: ALT+SHIFT+Q / ALT+SHIFT+A transpose the
+          current selection up / down by one octave (12 semitones).
+          ALT+Q / ALT+A continue to do single semitone steps. Notes
+          clamp at 0x00 / 0x7F so an octave shift past either end
+          saturates rather than wrapping. Cmd+Shift+Q / Cmd+Shift+A
+          on macOS land in the same path via KS_META→KS_ALT mapping.
+
 zt 2026_05_02 (Pattern Editor: drop stale MIDI-in on enter())
 -------------------------------------------------------------
 
@@ -39,7 +49,6 @@ zt 2026_05_02 (CC Console: fix file-switch slider value leak)
           entire widget pool's values to match the freshly-loaded
           file in load_selected(), in lockstep with the existing
           last_values[] seed.
-
 zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
 --------------------------------------------------
 
