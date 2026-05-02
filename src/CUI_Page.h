@@ -407,6 +407,19 @@ public:
     void draw(Drawable *S);
 };
 
+class CUI_PEFindReplace : public CUI_Page {
+public:
+    ValueSlider *vs_find;
+    ValueSlider *vs_replace;
+
+    CUI_PEFindReplace();
+
+    void enter(void);
+    void leave(void);
+    void update(void);
+    void draw(Drawable *S);
+};
+
 class CUI_SliderInput : public CUI_Page {
     public:
 

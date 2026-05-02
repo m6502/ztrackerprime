@@ -76,11 +76,17 @@
  CTRL-T : Set all effect and effect data fields of block to same
           value as first row in block
  CTRL-K : Interpolate volume (block)
+ ALT-Q  : Transpose block up
+ ALT-A  : Transpose block down
+ CTRL-H : Find / Replace Note popup. Two sliders (Find / With,
+          MIDI 0-127). Find pre-fills with the cursor row's note.
+          Tab cycles, Enter applies, ESC cancels. Operates on the
+          current selection if present, otherwise the entire current
+          track of the current pattern. Status reports the count.
  ALT-Q        : Transpose block up   (1 semitone)
  ALT-A        : Transpose block down (1 semitone)
  ALT-SHIFT-Q  : Transpose block up   (1 octave)
- ALT-SHIFT-A  : Transpose block down (1 octave)
- CTRL-J : Popup scale volume window (10-200%)
+ ALT-SHIFT-A  : Transpose block down (1 octave) CTRL-J : Popup scale volume window (10-200%)
  CTRL-A : Popup Naturalizing window (1-100%)
  CTRL-[ : Decrease all volumes in block by 8
  CTRL-] : Increase all volumes in block by 8
