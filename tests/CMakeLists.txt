@@ -85,6 +85,23 @@ target_include_directories(test_sysex_inq PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_sysex_inq PRIVATE cxx_std_17)
 add_test(NAME sysex_inq COMMAND test_sysex_inq)
 
+# SysEx receive queue STRESS tests. Goes deeper than test_sysex_inq:
+# max-size message round-trip, realistic synth dump shapes (DX7, JV,
+# 1/2/4/8 KB), high-throughput sequential, concurrent producers
+# (4 threads + main consumer), overflow-keeps-newest, and malformed-
+# framing transport pass-through. Catches data-race / corruption
+# regressions we couldn't smoke-test against real hardware.
+add_executable(test_sysex_stress
+    test_sysex_stress.cpp
+)
+target_include_directories(test_sysex_stress PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_sysex_stress PRIVATE cxx_std_17)
+# std::thread on Linux requires the pthread library; macOS handles it
+# transparently but linking with Threads::Threads is the portable form.
+find_package(Threads REQUIRED)
+target_link_libraries(test_sysex_stress PRIVATE Threads::Threads)
+add_test(NAME sysex_stress COMMAND test_sysex_stress)
+
 # SysEx-by-filename macro helpers. Tests the predicate, path resolution,
 # and the .syx file reader. Stubs the ZTConf type locally to avoid
 # pulling the full conf.cpp into the test binary.

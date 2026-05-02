@@ -4,6 +4,33 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (test: SysEx receive queue stress + concurrency suite)
+--------------------------------------------------------------------
+
+        ! tests/test_sysex_stress.cpp -- new 10th test executable.
+          Goes deeper than the existing test_sysex_inq:
+          - Maximum-size message round-trip (ZT_SYSEX_MAX_LEN exact)
+          - Realistic synth dump shapes (DX7 voice 4104B, JV-style
+            4 KB, 1/2/4/8 KB generic, near-cap 8000B, max-cap)
+          - High-throughput sequential push/pop, 5000 rounds,
+            varying 16-143 byte messages
+          - Concurrent producers: 4 threads + main consumer, stress
+            the std::mutex protecting the queue. Verifies F0/F7
+            framing integrity on every popped message and counts
+            push attempts via std::atomic.
+          - Overflow keeps newest in unique-content terms (FIFO
+            semantics with drop-oldest, surviving N are exactly the
+            LAST N pushed).
+          - Malformed framing passes through (queue is transport-
+            only, no F0/F7 parser; messages without proper framing
+            should round-trip intact).
+          15265 checks total. CI runs alongside the other 9 suites.
+          ! Pure C++ (std::thread / std::mutex / std::atomic), no
+            SDL or MIDI dependency. Linked with Threads::Threads
+            for portability across Linux/macOS/Windows pthread
+            requirements.
+
+
 zt 2026_05_02 (Linux ALSA MIDI input — initial implementation)
 --------------------------------------------------------------
 
@@ -67,8 +94,7 @@ zt 2026_05_02 (ListBox: defuse the OnSelect mousestate-clobber foot-gun)
         ! CLAUDE.md updated: the gotcha now reads "defused" instead
           of "active foot-gun." The forward rule is: never write
           mousestate=0 inside any OnSelect override; the BUTTON_UP_LEFT
-          case is the only place.
-zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
+          case is the only place.zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
 
 zt 2026_05_02 (Pattern Editor: Fill Selection with Note at Cursor)
 ------------------------------------------------------------------
