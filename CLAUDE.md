@@ -179,6 +179,12 @@ Failure mode if rule 5 is violated: shipped pages with non-interactive ASCII "sl
 
 ## Recurring foot-guns
 
+### `midiInQueue` thread safety (was: latent race; defused as of PR #116)
+
+The process-wide `miq` instance (`src/midi-io.cpp:255`, `extern miq midiInQueue` in `midi-io.h`) is the bridge between **the platform MIDI thread** (CoreMIDI client thread / WinMM driver thread / ALSA poll thread, depending) and **the main UI thread** (Pattern Editor / InstEditor / PEParms / CcConsole drain loops). Before PR #116 every member function — `insert` from the producer thread, `pop` / `check` / `size` / `clear` from the consumer thread — was unsynchronised: plain `int qhead, qtail, qelems` with no mutex, no atomics. Symptoms were subtle: occasional missed messages, occasional duplicates, occasional torn `dwParam1` reads under heavy CC streams or `clear()` racing the producer.
+
+PR #116 added a `std::mutex` to `miq` and lock-guards every member. Forward rule for any new producer or consumer of `midiInQueue`: just use the public methods — they're thread-safe. **Never** access `qhead/qtail/qelems` directly from outside the class.
+
 ### ListBox subclass mousestate gotcha
 
 `ListBox::mouseupdate` relies on `mousestate` being non-zero when `BUTTON_UP_LEFT` arrives, because `act++` is gated on it. Two ways this gets clobbered:

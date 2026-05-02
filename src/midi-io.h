@@ -1,6 +1,8 @@
 #ifndef _MIDI_DEVICE_H
 #define _MIDI_DEVICE_H
 
+#include <mutex>
+
 #include "winmm_compat.h"
 
 #define NB_OFF    0x000000
@@ -12,6 +14,22 @@
 
 extern int g_midi_in_clocks_received;
 
+// Process-wide MIDI input message queue.
+//
+// Thread safety: producer is the platform MIDI thread (CoreMIDI client
+// thread on macOS, WinMM driver thread on Windows, ALSA poll thread on
+// Linux). Consumer is the main UI thread, drained by whichever Pattern
+// Editor / InstEditor / PEParms / CcConsole update() loop is currently
+// running. Every member function takes `m` so insert/pop/check/size/
+// clear are race-free across that producer/consumer boundary.
+//
+// Locking is intentionally coarse — a 1024-slot ring + 4-byte values
+// means the critical section is a few pointer increments and a single
+// store. std::mutex on contended lock is ~50 ns; the queue's natural
+// rate is hundreds of messages/sec at MIDI clock + a knob stream. Lock
+// contention is not a real concern at MIDI rates. If it ever becomes
+// one, the move is to a lock-free SPSC ring (single producer; consumer
+// pages already serialise on the UI thread).
 class miq {
     public:
         miq();
@@ -24,6 +42,7 @@ class miq {
     private:
         unsigned int *q;
         int qsize, qhead, qtail, qelems;
+        mutable std::mutex m;
 };
 
 extern miq midiInQueue;
