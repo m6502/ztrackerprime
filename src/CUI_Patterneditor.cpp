@@ -1927,6 +1927,38 @@ void CUI_Patterneditor::update()
           status_change = 1; need_refresh++; key = 0;
         }
 
+        // Fill Selection with Note at Cursor: Ctrl+Shift+F
+        // Take the (note, instrument, length) of the event at the cursor
+        // row in the cursor track, replicate across every cell in the
+        // selection. Volume / effect / effect_data are left untouched
+        // (per-row creative decisions stay yours). If the cursor row has
+        // no note, error out without modifying anything. Single
+        // UNDO_SAVE makes the whole fill one Ctrl+Z.
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_F) {
+          if (!selected) {
+            statusmsg = "Fill: no selection";
+          } else {
+            event *src = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row);
+            if (!src || src->note >= 0x80 || src->note == 0) {
+              statusmsg = "Fill: cursor row has no note";
+            } else {
+              UNDO_SAVE();
+              int src_note   = src->note;
+              int src_inst   = src->inst;
+              int src_length = src->length;
+              for (int t = select_track_start; t <= select_track_end; t++) {
+                track *trk = song->patterns[cur_edit_pattern]->tracks[t];
+                if (!trk) continue;
+                for (int j = select_row_start; j <= select_row_end; j++) {
+                  trk->update_event(j, src_note, src_inst, -1, src_length, -1, -1);
+                }
+              }
+              statusmsg = "Selection filled with note at cursor";
+            }
+          }
+          status_change = 1; need_refresh++; key = 0;
+        }
+
         // Reverse Selection: Ctrl+Shift+R
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_R) {
           if (selected) {
