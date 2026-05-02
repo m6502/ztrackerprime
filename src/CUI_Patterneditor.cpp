@@ -2562,7 +2562,7 @@ void CUI_Patterneditor::update()
           }
           break;
 
-          case SDLK_Q: /* Transpose up */
+          case SDLK_Q: /* Transpose selection up by 1 semitone */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++) {
@@ -2575,7 +2575,7 @@ void CUI_Patterneditor::update()
               need_refresh++;
             }
             break;
-          case SDLK_A: /* Transpose down */
+          case SDLK_A: /* Transpose selection down by 1 semitone */
             if (selected) {
               for(i=select_track_start;i<=select_track_end;i++) {
                 for(j=select_row_start;j<=select_row_end;j++) {
@@ -2712,11 +2712,48 @@ case SDLK_DELETE:
               song->patterns[cur_edit_pattern]->tracks[need_refresh]->ins_row(cur_edit_row);
           } else {
             song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->ins_row(cur_edit_row);
-          }           
+          }
           need_refresh++;
           break;
         }
-        
+
+        // Alt+Shift+Q / Alt+Shift+A : Transpose selection by an OCTAVE.
+        // KS_HAS_ALT excludes Shift, so the +1/-1 semitone block above
+        // never sees Shift+Alt; this is a sibling gate. Cmd+Shift+Q/A
+        // also lands here on macOS via the KS_META→KS_ALT mapping.
+        if ((kstate & (KS_ALT | KS_META)) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
+          if (key == SDLK_Q && selected) {
+            for (i = select_track_start; i <= select_track_end; i++) {
+              for (j = select_row_start; j <= select_row_end; j++) {
+                if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
+                  if (e->note < 0x80) {
+                    int nn = (int)e->note + 12;
+                    if (nn > 0x7F) nn = 0x7F;
+                    e->note = (unsigned char)nn;
+                  }
+                }
+              }
+            }
+            need_refresh++;
+            break;
+          }
+          if (key == SDLK_A && selected) {
+            for (i = select_track_start; i <= select_track_end; i++) {
+              for (j = select_row_start; j <= select_row_end; j++) {
+                if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
+                  if (e->note > 0 && e->note < 0x80) {
+                    int nn = (int)e->note - 12;
+                    if (nn < 0) nn = 0;
+                    e->note = (unsigned char)nn;
+                  }
+                }
+              }
+            }
+            need_refresh++;
+            break;
+          }
+        }
+
         /* END SPECIAL KEYS */
         
         if ((kstate == KS_CTRL && ( key == SDLK_LEFT || key == SDLK_RIGHT || key == SDLK_UP || key == SDLK_DOWN )) || kstate == KS_NO_SHIFT_KEYS || kstate == KS_SHIFT || midiInQueue.size()>0) {
