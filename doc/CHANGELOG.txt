@@ -4,6 +4,22 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_02 (Pattern Editor: Fill Selection with Note at Cursor)
+------------------------------------------------------------------
+
+        + Pattern Editor: Ctrl+Shift+F replicates the (note,
+          instrument, length) of the event at the cursor row across
+          every cell in the current selection. Volume / effect /
+          effect_data in each row are left alone -- per-row creative
+          decisions stay intact, and only the note identity is
+          stamped. Single UNDO_SAVE makes the whole fill one
+          Ctrl+Z. If the cursor row has no note, fill is a no-op
+          with a status message.
+          ! Listed on the Paketti-port wishlist as
+            "Fill-with-note-at-cursor"; matches Paketti's behavior
+            of replicating the source note across a selection.
+
+
 zt 2026_05_02 (Pattern Editor: octave transpose for selections)
 ---------------------------------------------------------------
 
@@ -48,8 +64,7 @@ zt 2026_05_02 (CC Console: fix file-switch slider value leak)
           leaked value as if it were file2's own. Fix: reset the
           entire widget pool's values to match the freshly-loaded
           file in load_selected(), in lockstep with the existing
-          last_values[] seed.
-zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
+          last_values[] seed.zt 2026_04_30 (CC Console + Shift+F2/F3 reshuffle)
 --------------------------------------------------
 
         + Shift+F3 is now the CC Console. It loads Paketti

@@ -41,6 +41,8 @@
  CTRL-SHIFT-G    : Double Pattern (duplicate rows, max 256)
  CTRL-SHIFT-H    : Halve Pattern (keep every other row, min 32)
  CTRL-SHIFT-D    : Clone Pattern (copy to next empty slot and jump to it)
+ CTRL-SHIFT-F    : Fill Selection with Note at Cursor (note + inst + length;
+                   leaves volume / effects in each row untouched)
  CTRL-SHIFT-R    : Reverse Selection (reverse row order in selected block)
  CTRL-SHIFT-Down : Rotate Track Down (last row wraps to first)
  CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
