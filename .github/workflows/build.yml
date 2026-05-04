@@ -414,6 +414,12 @@ jobs:
           set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
           # XP target: 0x0501 == Windows XP
           add_compile_definitions(_WIN32_WINNT=0x0501 WINVER=0x0501)
+          # Static-link the MinGW C++/pthread runtime so the released zt.exe
+          # does not depend on libwinpthread-1.dll / libgcc_s_dw2-1.dll /
+          # libstdc++-6.dll being present next to it on the target machine.
+          # The -posix gcc variant otherwise pulls all three as side-by-side
+          # DLLs and XP fails with "Unable to Locate Component" on launch.
+          add_link_options(-static -static-libgcc -static-libstdc++)
           EOF
 
       - name: Configure (MinGW i686, XP target)

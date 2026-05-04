@@ -4,6 +4,94 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+<<<<<<< HEAD
+zt 2026_05_04 (MIDI device-open errors: in-your-face status + decode)
+---------------------------------------------------------------------
+
+        * src/main.cpp + src/zt.h -- new statusmsg_error_until_ms
+          timestamp + set_error_status(msg) helper. The status row
+          renderer paints itself inverted (Background fg on Highlight
+          bg) for ~8 seconds after set_error_status() is called, so a
+          failure-path message is visually distinct from the routine
+          green-text "Opened[out]: <name>" / "Closed[out]: <name>"
+          traffic that flows through the same row.
+        * src/UserInterface.cpp -- midi_out_sel / midi_in_sel error
+          paths now route through set_error_status(), prefix the
+          message with "*** ERROR:", and decode several WinMM error
+          codes the previous switch was missing. Code 1 (the
+          MMSYSERR_ERROR returned by midiOutOpen on a device handle
+          that is not actually a MIDI port -- e.g. a USB Audio
+          endpoint Windows enumerated alongside the real MIDI ports)
+          previously fell through to "Unknown error", giving the user
+          no actionable information. Now reads as "device error (not
+          a MIDI device?)". Codes added: 1, 2, 3, 5, 6, 11.
+        * src/UserInterface.cpp -- midi_out_sel / midi_in_sel success
+          paths (Closed[out]: / Opened[out]: / Closed[in]: /
+          Opened[in]:) now actually publish their status string
+          instead of writing into the buffer and never pointing
+          statusmsg at it. Previously, opening a working MIDI device
+          via Space/Enter on the Sysconfig listbox produced no
+          visible confirmation -- the buffer was rewritten but
+          statusmsg still pointed at whatever the previous frame had
+          set, so the user saw the row toggle silently.
+        * src/winmm_compat.h -- defines MMSYSERR_BADDEVICEID,
+          MMSYSERR_NOTENABLED, MMSYSERR_INVALHANDLE,
+          MMSYSERR_NODRIVER, MMSYSERR_INVALPARAM (matching the
+          Windows SDK numeric values) so the cross-platform shim
+          covers the codes the new decoder switches on.
+
+zt 2026_05_04 (Sysconfig Refresh: preserve open MIDI devices)
+-------------------------------------------------------------
+
+        * src/CUI_Sysconfig.cpp -- BTNCLK_RefreshMidiOutDeviceList /
+          BTNCLK_RefreshMidiInDeviceList now snapshot the names of
+          currently-open devices before destroying the MidiOut /
+          MidiIn singletons, then re-open each name on the new
+          instance. Previously, pressing Refresh closed every open
+          device (delete MidiOut → all handles freed; the new
+          midiOut() constructor opens nothing) and the user had to
+          manually re-open each one. Names are matched (not indices)
+          because re-enumeration after a hardware add/remove can
+          shift the device index. Status line reports
+          "MIDI-OUT refreshed; reopened N/M devices" when at least
+          one device was open before; falls back to the original
+          "device list refreshed" message otherwise.
+
+zt 2026_05_04 (Windows XP: GetTickCount64 polyfill for libwinpthread)
+---------------------------------------------------------------------
+
+        * src/xp_compat.c (new) -- polyfills GetTickCount64 on top of
+          XP-safe GetTickCount and overrides kernel32's import slot
+          (__imp__GetTickCount64@0) so the linker resolves the slot
+          from us instead of pulling kernel32's import. Needed because
+          the static libwinpthread shipped with Ubuntu's mingw-w64
+          (pulled in by std::mutex / std::thread after the prior
+          -static fix) calls GetTickCount64 internally for timed
+          waits, and XP's KERNEL32.dll does not export it. Without
+          the polyfill XP fails on launch with "The procedure entry
+          point GetTickCount64 could not be located in the dynamic
+          link library KERNEL32.dll." The shim is gated to
+          defined(_WIN32) && !defined(_WIN64) and CMake only adds it
+          to ZT_SOURCES on WIN32, so non-Windows and 64-bit Windows
+          builds are unaffected.
+
+zt 2026_05_04 (Windows XP MinGW: static-link C++/pthread runtime)
+-----------------------------------------------------------------
+
+        * .github/workflows/build.yml -- the windows-x86-xp job's
+          MinGW i686 toolchain file now passes
+          -static -static-libgcc -static-libstdc++ via
+          add_link_options(). The -posix gcc/g++ variant we use
+          (required for std::mutex / std::thread) otherwise
+          dynamically links libwinpthread-1.dll, libgcc_s_dw2-1.dll
+          and libstdc++-6.dll, none of which were copied into the
+          release zip. On Windows XP this surfaces immediately as
+          "zt.exe Unable to Locate Component -- libwinpthread-1.dll
+          was not found" before the app even draws a window. With
+          the runtime statically linked the shipped zt.exe is
+          self-contained and SDL3.dll remains the sole side-by-side
+          DLL.
+
 zt 2026_05_02 (midiInQueue: thread safety via std::mutex)
 ---------------------------------------------------------
 

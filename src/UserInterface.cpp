@@ -93,34 +93,47 @@ void dev_sel(int dev, MidiOutDeviceSelector *mds )
 // ------------------------------------------------------------------------------------------------
 //
 //
+// Translate a WinMM-style error code from midiOutOpen / midiInOpen (or the
+// CoreMIDI / ALSA shims that imitate it) into a human-readable phrase.
+// Code 1 (MMSYSERR_ERROR, the "unspecified error" returned by
+// midiOutOpen when given a device handle that isn't actually a MIDI
+// device, e.g. a USB Audio endpoint Windows enumerated alongside the
+// real MIDI ports) used to fall through to "Unknown error" — which the
+// user reasonably could not act on. Spell it out instead.
+static const char *zt_decode_midi_error(int code) {
+    switch (code) {
+    case MMSYSERR_ERROR:        return "device error (not a MIDI device?)";
+    case MMSYSERR_BADDEVICEID:  return "bad device ID";
+    case MMSYSERR_NOTENABLED:   return "driver not enabled";
+    case MMSYSERR_ALLOCATED:    return "device busy";
+    case MMSYSERR_INVALHANDLE:  return "invalid handle";
+    case MMSYSERR_NODRIVER:     return "no driver installed";
+    case MMSYSERR_NOMEM:        return "out of memory (reboot)";
+    case MMSYSERR_INVALPARAM:   return "invalid parameter";
+    case MIDIERR_NODEVICE:      return "no device (mapper open?)";
+    default:                    return "unknown error";
+    }
+}
+
 void midi_out_sel(int dev) {
     int a;
-    const char *errmsg;
     if ((unsigned int)dev < MidiOut->numOuputDevices) {
         if (MidiOut->QueryDevice(dev)) {
             MidiOut->RemDevice(dev);
             sprintf(szStatmsg,"Closed[out]: %s",(MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName);
+            statusmsg = szStatmsg;
+            status_change = 1;
         } else {
             if ((a = MidiOut->AddDevice(dev))) {
-                switch(a) {
-                case MIDIERR_NODEVICE:
-                    errmsg = "No device (mapper open?)";
-                    break;
-                case MMSYSERR_NOMEM:
-                    errmsg = "Out of memory (reboot)";
-                    break;
-                case MMSYSERR_ALLOCATED:
-                    errmsg = "Device busy";
-                    break;
-                default:
-                    errmsg = "Unknown error";
-                    break;
-                }
-                sprintf(szStatmsg,"Could not open %s (%d: %s)",(MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName,a,errmsg);
-                statusmsg = szStatmsg;
-                status_change = 1;
+                char buf[1024];
+                snprintf(buf, sizeof(buf), "*** ERROR: Could not open %s (%d: %s)",
+                    (MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName,
+                    a, zt_decode_midi_error(a));
+                set_error_status(buf);
             } else {
                 sprintf(szStatmsg,"Opened[out]: %s",(MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName);
+                statusmsg = szStatmsg;
+                status_change = 1;
             }
         }
     }
@@ -134,32 +147,22 @@ void midi_out_sel(int dev) {
 //
 void midi_in_sel(int dev) {
     int a;
-    const char *errmsg;
     if ((unsigned int)dev < MidiIn->numMidiDevs) {
         if (MidiIn->QueryDevice(dev)) {
             MidiIn->RemDevice(dev);
             sprintf(szStatmsg,"Closed[in]: %s",MidiIn->midiInDev[dev]->szName);
+            statusmsg = szStatmsg;
+            status_change = 1;
         } else {
             if ((a = MidiIn->AddDevice(dev))) {
-                switch(a) {
-                case MIDIERR_NODEVICE:
-                    errmsg = "No device (mapper open?)";
-                    break;
-                case MMSYSERR_NOMEM:
-                    errmsg = "Out of memory (reboot)";
-                    break;
-                case MMSYSERR_ALLOCATED:
-                    errmsg = "Device busy";
-                    break;
-                default:
-                    errmsg = "Unknown error";
-                    break;
-                }
-                sprintf(szStatmsg,"Could not open %s (%d: %s)",MidiIn->midiInDev[dev]->szName,a,errmsg);
-                statusmsg = szStatmsg;
-                status_change = 1;
+                char buf[1024];
+                snprintf(buf, sizeof(buf), "*** ERROR: Could not open %s (%d: %s)",
+                    MidiIn->midiInDev[dev]->szName, a, zt_decode_midi_error(a));
+                set_error_status(buf);
             } else {
                 sprintf(szStatmsg,"Opened[in]: %s",MidiIn->midiInDev[dev]->szName);
+                statusmsg = szStatmsg;
+                status_change = 1;
             }
         }
     }
