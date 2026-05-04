@@ -672,6 +672,8 @@ extern bool bDontKeyRepeat;
 
 extern const char *statusmsg;
 extern char szStatmsg[1024];
+extern Uint64 statusmsg_error_until_ms;
+void set_error_status(const char *msg);
 
 #define COLORS CurrentSkin->Colors
 
