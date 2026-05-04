@@ -4,6 +4,23 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_04 (Sysconfig Refresh: preserve open MIDI devices)
+-------------------------------------------------------------
+
+        * src/CUI_Sysconfig.cpp -- BTNCLK_RefreshMidiOutDeviceList /
+          BTNCLK_RefreshMidiInDeviceList now snapshot the names of
+          currently-open devices before destroying the MidiOut /
+          MidiIn singletons, then re-open each name on the new
+          instance. Previously, pressing Refresh closed every open
+          device (delete MidiOut → all handles freed; the new
+          midiOut() constructor opens nothing) and the user had to
+          manually re-open each one. Names are matched (not indices)
+          because re-enumeration after a hardware add/remove can
+          shift the device index. Status line reports
+          "MIDI-OUT refreshed; reopened N/M devices" when at least
+          one device was open before; falls back to the original
+          "device list refreshed" message otherwise.
+
 zt 2026_05_02 (midiInQueue: thread safety via std::mutex)
 ---------------------------------------------------------
 
