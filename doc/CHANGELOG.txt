@@ -56,6 +56,23 @@ zt 2026_05_04 (Sysconfig Refresh: preserve open MIDI devices)
           one device was open before; falls back to the original
           "device list refreshed" message otherwise.
 
+zt 2026_05_04 (Windows XP MinGW: static-link C++/pthread runtime)
+-----------------------------------------------------------------
+
+        * .github/workflows/build.yml -- the windows-x86-xp job's
+          MinGW i686 toolchain file now passes
+          -static -static-libgcc -static-libstdc++ via
+          add_link_options(). The -posix gcc/g++ variant we use
+          (required for std::mutex / std::thread) otherwise
+          dynamically links libwinpthread-1.dll, libgcc_s_dw2-1.dll
+          and libstdc++-6.dll, none of which were copied into the
+          release zip. On Windows XP this surfaces immediately as
+          "zt.exe Unable to Locate Component -- libwinpthread-1.dll
+          was not found" before the app even draws a window. With
+          the runtime statically linked the shipped zt.exe is
+          self-contained and SDL3.dll remains the sole side-by-side
+          DLL.
+
 zt 2026_05_02 (midiInQueue: thread safety via std::mutex)
 ---------------------------------------------------------
 
