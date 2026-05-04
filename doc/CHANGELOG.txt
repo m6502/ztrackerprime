@@ -4,6 +4,41 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_04 (Windows XP: GetTickCount64 polyfill for libwinpthread)
+---------------------------------------------------------------------
+
+        * src/xp_compat.c (new) -- polyfills GetTickCount64 on top of
+          XP-safe GetTickCount and overrides kernel32's import slot
+          (__imp__GetTickCount64@0) so the linker resolves the slot
+          from us instead of pulling kernel32's import. Needed because
+          the static libwinpthread shipped with Ubuntu's mingw-w64
+          (pulled in by std::mutex / std::thread after the prior
+          -static fix) calls GetTickCount64 internally for timed
+          waits, and XP's KERNEL32.dll does not export it. Without
+          the polyfill XP fails on launch with "The procedure entry
+          point GetTickCount64 could not be located in the dynamic
+          link library KERNEL32.dll." The shim is gated to
+          defined(_WIN32) && !defined(_WIN64) and CMake only adds it
+          to ZT_SOURCES on WIN32, so non-Windows and 64-bit Windows
+          builds are unaffected.
+
+zt 2026_05_04 (Windows XP MinGW: static-link C++/pthread runtime)
+-----------------------------------------------------------------
+
+        * .github/workflows/build.yml -- the windows-x86-xp job's
+          MinGW i686 toolchain file now passes
+          -static -static-libgcc -static-libstdc++ via
+          add_link_options(). The -posix gcc/g++ variant we use
+          (required for std::mutex / std::thread) otherwise
+          dynamically links libwinpthread-1.dll, libgcc_s_dw2-1.dll
+          and libstdc++-6.dll, none of which were copied into the
+          release zip. On Windows XP this surfaces immediately as
+          "zt.exe Unable to Locate Component -- libwinpthread-1.dll
+          was not found" before the app even draws a window. With
+          the runtime statically linked the shipped zt.exe is
+          self-contained and SDL3.dll remains the sole side-by-side
+          DLL.
+
 zt 2026_05_02 (midiInQueue: thread safety via std::mutex)
 ---------------------------------------------------------
 
