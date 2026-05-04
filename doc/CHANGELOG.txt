@@ -4,6 +4,24 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_04 (Windows XP: GetTickCount64 polyfill for libwinpthread)
+---------------------------------------------------------------------
+
+        * src/xp_compat.c (new) -- polyfills GetTickCount64 on top of
+          XP-safe GetTickCount and overrides kernel32's import slot
+          (__imp__GetTickCount64@0) so the linker resolves the slot
+          from us instead of pulling kernel32's import. Needed because
+          the static libwinpthread shipped with Ubuntu's mingw-w64
+          (pulled in by std::mutex / std::thread after the prior
+          -static fix) calls GetTickCount64 internally for timed
+          waits, and XP's KERNEL32.dll does not export it. Without
+          the polyfill XP fails on launch with "The procedure entry
+          point GetTickCount64 could not be located in the dynamic
+          link library KERNEL32.dll." The shim is gated to
+          defined(_WIN32) && !defined(_WIN64) and CMake only adds it
+          to ZT_SOURCES on WIN32, so non-Windows and 64-bit Windows
+          builds are unaffected.
+
 zt 2026_05_04 (Windows XP MinGW: static-link C++/pthread runtime)
 -----------------------------------------------------------------
 
