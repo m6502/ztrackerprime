@@ -144,6 +144,10 @@ set(ZT_SOURCES
 
 if(WIN32)
   list(APPEND ZT_SOURCES zt.rc)
+  # XP-compat shims (GetTickCount64 polyfill etc.) -- only needed on the
+  # 32-bit Windows XP target; harmless to include on other Windows builds
+  # because the file is fully #if'd to defined(_WIN32) && !defined(_WIN64).
+  list(APPEND ZT_SOURCES src/xp_compat.c)
 endif()
 
 if(APPLE)
