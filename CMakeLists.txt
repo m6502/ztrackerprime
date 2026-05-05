@@ -48,6 +48,28 @@ if(UNIX)
 endif()
 # ------------------------------------------------------------------------------
 
+# --- zlib static library (shared by zt and the ztskin tool) ------------------
+add_library(zt_zlib_static STATIC
+  extlibs/zlib/adler32.c
+  extlibs/zlib/compress.c
+  extlibs/zlib/crc32.c
+  extlibs/zlib/deflate.c
+  extlibs/zlib/infback.c
+  extlibs/zlib/inffast.c
+  extlibs/zlib/inflate.c
+  extlibs/zlib/inftrees.c
+  extlibs/zlib/trees.c
+  extlibs/zlib/zutil.c
+)
+target_include_directories(zt_zlib_static PUBLIC "${CMAKE_SOURCE_DIR}/extlibs/zlib")
+target_compile_definitions(zt_zlib_static PRIVATE _CRT_SECURE_NO_WARNINGS)
+# zlib's own sources trip a few -Wpedantic / sign-conversion warnings; quiet
+# them on GCC/Clang so the rest of the project keeps -Wall -Wextra -Wpedantic.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(zt_zlib_static PRIVATE -w)
+endif()
+# ------------------------------------------------------------------------------
+
 set(ZT_SOURCES
   extlibs/libpng/png.c
   extlibs/libpng/pngerror.c
@@ -64,16 +86,6 @@ set(ZT_SOURCES
   extlibs/libpng/pngwrite.c
   extlibs/libpng/pngwtran.c
   extlibs/libpng/pngwutil.c
-  extlibs/zlib/adler32.c
-  extlibs/zlib/compress.c
-  extlibs/zlib/crc32.c
-  extlibs/zlib/deflate.c
-  extlibs/zlib/infback.c
-  extlibs/zlib/inffast.c
-  extlibs/zlib/inflate.c
-  extlibs/zlib/inftrees.c
-  extlibs/zlib/trees.c
-  extlibs/zlib/zutil.c
   src/CDataBuf.cpp
   src/zt_crash.cpp
   src/conf.cpp
@@ -169,7 +181,7 @@ else()
   add_executable(zt ${ZT_SOURCES})
 endif()
 target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib extlibs/lua)
-target_link_libraries(zt PRIVATE lua_static)
+target_link_libraries(zt PRIVATE lua_static zt_zlib_static)
 
 if(MSVC)
   target_compile_options(zt PRIVATE /W3 /MP /wd4103)
@@ -392,6 +404,21 @@ else()
   )
 endif()
 
+
+# --- ztskin (skin compiler/decompiler CLI) -------------------------------
+option(ZT_BUILD_ZTSKIN "Build the ztskin skin compiler/decompiler CLI tool" ON)
+if(ZT_BUILD_ZTSKIN)
+    add_executable(ztskin tools/ztskin/ztskin.c)
+    target_link_libraries(ztskin PRIVATE zt_zlib_static)
+    target_compile_definitions(ztskin PRIVATE _CRT_SECURE_NO_WARNINGS)
+    set_target_properties(ztskin PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/Program")
+    if(MSVC)
+        target_compile_options(ztskin PRIVATE /W3)
+    else()
+        target_compile_options(ztskin PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endif()
 
 # --- Tests ---------------------------------------------------------------
 option(ZT_BUILD_TESTS "Build the standalone unit-test harness (run with ctest)" ON)

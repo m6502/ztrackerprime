@@ -4,6 +4,32 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_05 (ztskin: multiplatform skin compiler/decompiler CLI)
+------------------------------------------------------------------
+
+        + tools/ztskin/ztskin.c -- ported Daniel Kahlin's 2001-era
+          ztskin skin packer/exploder from the original archived
+          zTracker tree. Now multiplatform (CMake), C99, builds clean
+          under -Wall -Wextra -Wpedantic on GCC/Clang and /W3 on MSVC.
+          Drops the Win32-only ZLIB_DLL/_WINDOWS macros (we statically
+          link the bundled extlibs/zlib instead). Lets users build
+          custom zT skin archives offline; pairs with the existing 8
+          bundled skins in skins/.
+
+        * CMakeLists.txt -- factored the bundled extlibs/zlib sources
+          into a new zt_zlib_static STATIC library shared by both `zt`
+          and the new `ztskin` target. Behaviour-preserving for the
+          main binary; only structural change is that zlib's own
+          warnings are now silenced on its own target instead of
+          contaminating the global compile-options for zt.
+
+        + tools/ztskin/README.md -- usage, build instructions, and
+          a documented file-format table for the .zts archive layout.
+
+        ! New CMake option ZT_BUILD_ZTSKIN (default ON) toggles the
+          tool target. CI builds it on every push since it lives
+          inside the existing extlibs/zlib fetch path.
+
 <<<<<<< HEAD
 zt 2026_05_04 (MIDI device-open errors: in-your-face status + decode)
 ---------------------------------------------------------------------
