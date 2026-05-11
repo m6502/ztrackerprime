@@ -203,37 +203,24 @@ static void zt_timespec_add_ns(struct timespec *ts, long ns)
     }
 }
 
-static bool zt_timespec_lt(const struct timespec *a, const struct timespec *b)
-{
-    if (a->tv_sec != b->tv_sec) return a->tv_sec < b->tv_sec;
-    return a->tv_nsec < b->tv_nsec;
-}
-
 static void *zt_posix_timer_main(void *arg)
 {
     zt_posix_timer *timer = (zt_posix_timer *)arg;
     const long interval_ns = (long)timer->interval_ms * 1000000L;
-
-    // Absolute next-tick deadline on CLOCK_MONOTONIC. Each iteration advances
-    // this by exactly interval_ns so callback runtime never leaks into the
-    // tempo. If we fall badly behind (debugger pause, OS stall), the catch-up
-    // loop skips missed ticks rather than firing a burst — preferable for MIDI.
     struct timespec next_deadline;
     clock_gettime(CLOCK_MONOTONIC, &next_deadline);
+    zt_timespec_add_ns(&next_deadline, interval_ns);
 
     while (timer->running.load()) {
-        zt_timespec_add_ns(&next_deadline, interval_ns);
-
         pthread_mutex_lock(&timer->wake_mutex);
         int wait_result = 0;
         while (timer->running.load() && wait_result != ETIMEDOUT) {
 #if defined(__APPLE__)
-            // macOS pthread_condattr_setclock doesn't honor CLOCK_MONOTONIC on
-            // older SDKs, so use the relative-wait extension and recompute the
-            // remaining time each loop — immune to wall-clock jumps.
             struct timespec now, rel;
             clock_gettime(CLOCK_MONOTONIC, &now);
-            if (!zt_timespec_lt(&now, &next_deadline)) {
+            if (now.tv_sec > next_deadline.tv_sec ||
+                (now.tv_sec == next_deadline.tv_sec &&
+                 now.tv_nsec >= next_deadline.tv_nsec)) {
                 wait_result = ETIMEDOUT;
                 break;
             }
@@ -243,7 +230,6 @@ static void *zt_posix_timer_main(void *arg)
             wait_result = pthread_cond_timedwait_relative_np(
                 &timer->wake_cond, &timer->wake_mutex, &rel);
 #else
-            // Condvar was initialized with CLOCK_MONOTONIC in zt_timer_start.
             wait_result = pthread_cond_timedwait(
                 &timer->wake_cond, &timer->wake_mutex, &next_deadline);
 #endif
@@ -255,15 +241,8 @@ static void *zt_posix_timer_main(void *arg)
             timer->callback();
         }
 
-        // If a stall pushed 'now' past the deadline by more than one interval,
-        // skip the missed ticks so we resume on cadence rather than firing a
-        // backlog of callbacks all at once.
         if (should_callback) {
-            struct timespec now;
-            clock_gettime(CLOCK_MONOTONIC, &now);
-            while (zt_timespec_lt(&next_deadline, &now)) {
-                zt_timespec_add_ns(&next_deadline, interval_ns);
-            }
+            zt_timespec_add_ns(&next_deadline, interval_ns);
         }
     }
 
