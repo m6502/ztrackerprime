@@ -4,6 +4,38 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_13 (CC Drawmode: ghost bars + Overwrite Previous Drawbars toggle)
+----------------------------------------------------------------------------
+
+        + src/CUI_Patterneditor.cpp -- MD_CC_DRAW now renders OTHER
+          slots' drawbars on every row as dim "ghost" bars (flat
+          Lowlight fill, no highlight border) while the armed slot's
+          bar continues to render bright (LCDHigh/Mid/Low). Lets the
+          user see existing drawbars for parameters they haven't
+          armed and avoid overdraw without leaving the page.
+
+        + src/draw_bar_ghost() (new) -- parallel to draw_bar() but
+          uses COLORS.Lowlight for fill and skips the highlight /
+          lowlight borders. Lighter weight so the armed bar stays
+          visually dominant.
+
+        + zt_config_globals.cc_draw_overwrite (new conf key
+          "cc_draw_overwrite") -- protects drawbars across slot
+          cycles. Default OFF: MD_CC_DRAW mouse-drag only writes to
+          rows whose effect column is empty (or already holds the
+          same CC). Rows with a *different* S/W effect are skipped,
+          so dragging CC2 across rows already holding CC1 leaves
+          the CC1 drawbar untouched. Toggle in F2 F2 (Pattern Editor
+          Options) -> "CCOver:" next to DrawMode.
+
+        * src/CUI_PEParms.cpp + src/CUI_Page.h -- the F2 F2 Parms
+          popup gains the cb_cc_draw_overwrite checkbox at column 23
+          on row 18, mirroring the StepEdit / RecVeloc pattern.
+
+        * src/conf.{h,cpp} -- cc_draw_overwrite added to ZTConf,
+          default 0 in resetToDefaults, parsed via getFlag("cc_draw_overwrite")
+          in loadConf and written back on save.
+
 zt 2026_05_12 (CC Drawmode: one-key arm-and-draw + visual cleanup)
 ------------------------------------------------------------------
 

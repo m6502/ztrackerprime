@@ -355,24 +355,39 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S) 
+void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S)
 {
   int howfar;
 
   howfar = value*(xsize-1)/maxval;
-  
+
   for (int cy=y;cy<y+ysize;cy++) {
 
     S->drawHLine(cy,x,x+xsize,bg);
     if (value>0) S->drawHLine(cy,x,x+howfar,COLORS.LCDMid);
   }
-  
+
   if (value>0) {
 
     S->drawHLine(y,x,x+howfar,COLORS.LCDHigh);
     S->drawVLine(x,y,y+ysize-1,COLORS.LCDHigh);
     S->drawHLine(y+ysize-1,x,x+howfar,COLORS.LCDLow);
     S->drawVLine(x+howfar,y,y+ysize-1,COLORS.LCDLow);
+  }
+}
+
+// Dim "ghost" variant of draw_bar -- shows the value with a subdued
+// flat fill and no highlight/lowlight borders. Used by MD_CC_DRAW to
+// render OTHER CC slots' drawbars on the same row: the armed slot
+// gets the full draw_bar treatment, every other slot's effect on
+// that row appears as a ghost so the user can see existing drawbars
+// for parameters they haven't selected (and avoid overwriting them).
+void draw_bar_ghost(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S)
+{
+  int howfar = value*(xsize-1)/maxval;
+  for (int cy=y;cy<y+ysize;cy++) {
+    S->drawHLine(cy,x,x+xsize,bg);
+    if (value>0) S->drawHLine(cy,x,x+howfar,COLORS.Lowlight);
   }
 }
 
@@ -447,6 +462,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 {
   int num_displayed_tracks,num_displayed_rows,data,datamax;
   TColor bg;
+  bool cc_draw_ghost = false;
   event *e;
   char str[64];
 
@@ -528,33 +544,40 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
         break;
 
       case MD_CC_DRAW:
-        // Drawbar bar shows the S/W effect's value for the armed CC
-        // slot. Render nothing (0) when the row's event isn't tied
-        // to the armed CC -- otherwise stale bars from other CCs
-        // would create a misleading "I drew that" impression.
+        // Drawbar bar shows the S/W effect's value. The armed CC slot
+        // renders as a bright bar (draw_bar). Any OTHER S/W effect on
+        // the same row renders as a ghost bar (draw_bar_ghost) -- dim
+        // flat fill, no highlight border -- so the user can see
+        // existing drawbars for CCs they haven't armed yet and avoid
+        // overwriting them on the next pass.
+        //
+        // We can't decide the bar style here (this switch only
+        // populates `data`); we record the choice via cc_draw_ghost
+        // and let the second switch dispatch the right draw call.
         {
           ZtCcizerFile *cf_disp = zt_ccizer_current_file();
           int si = UIP_Patterneditor && UIP_Patterneditor->md_mode == MD_CC_DRAW
                        ? (g_cc_drawmode - 1) : -1;
-          if (si >= 0 && cf_disp && si < cf_disp->num_slots) {
-            const ZtCcizerSlot *as = &cf_disp->slots[si];
-            if (as->cc == ZT_CCIZER_PB_MARKER) {
-              if (e->effect == 'W') {
-                // Compress 14-bit PB back to 0..0x7F for the bar.
-                data = (e->effect_data >> 7) & 0x7F;
-              } else {
-                data = 0;
-              }
-            } else {
-              if (e->effect == 'S'
-                  && (unsigned char)((e->effect_data >> 8) & 0xFF) == as->cc) {
-                data = e->effect_data & 0x7F;
-              } else {
-                data = 0;
-              }
-            }
+          const ZtCcizerSlot *as = (si >= 0 && cf_disp && si < cf_disp->num_slots)
+                                       ? &cf_disp->slots[si] : NULL;
+          bool armed_match = false;
+          if (as) {
+            if (as->cc == ZT_CCIZER_PB_MARKER) armed_match = (e->effect == 'W');
+            else armed_match = (e->effect == 'S'
+                                && (unsigned char)((e->effect_data >> 8) & 0xFF) == as->cc);
+          }
+          if (armed_match) {
+            data = (e->effect == 'W') ? ((e->effect_data >> 7) & 0x7F)
+                                      : (e->effect_data & 0x7F);
+            cc_draw_ghost = false;
+          } else if (e->effect == 'S' || e->effect == 'W') {
+            // Some other CC/PB lives on this row. Render it as a ghost.
+            data = (e->effect == 'W') ? ((e->effect_data >> 7) & 0x7F)
+                                      : (e->effect_data & 0x7F);
+            cc_draw_ghost = true;
           } else {
             data = 0;
+            cc_draw_ghost = false;
           }
           datamax = 0x7F;
         }
@@ -566,15 +589,24 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       {
 
       case MD_FX_SIGNED:
-        
+
         draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
-        
+
+        break;
+
+      case MD_CC_DRAW:
+
+        if (cc_draw_ghost) {
+          draw_bar_ghost(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        } else {
+          draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        }
         break;
 
       default:
-        
+
         draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
-        
+
         break;
       } ;
       
@@ -3895,6 +3927,20 @@ wrap:;
             }
             if (e->effect == eff_type && e->effect_data == eff_data && mousedrawing==1)
               goto nevermind;
+            // Protect existing drawbars when Overwrite Previous Drawbars
+            // is OFF (the default). Skip the write if the row already
+            // holds a *different* S/W effect -- i.e. a drawbar from
+            // another armed slot. Empty effect cells and same-CC writes
+            // still go through. The Parms (F2 F2) toggle flips this.
+            if (!zt_config_globals.cc_draw_overwrite) {
+              bool already_drawn_by_other =
+                  (e->effect == 'S' || e->effect == 'W') &&
+                  !(e->effect == eff_type
+                    && ((eff_type == 'W')
+                        || (unsigned char)((e->effect_data >> 8) & 0xFF)
+                            == (unsigned char)((eff_data >> 8) & 0xFF)));
+              if (already_drawn_by_other) goto nevermind;
+            }
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,eff_type,eff_data);
             break;
           }

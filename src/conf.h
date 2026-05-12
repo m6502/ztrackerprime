@@ -93,6 +93,13 @@ class ZTConf {
         int control_navigation_amount;
         char default_directory[MAX_PATH + 1];
         int record_velocity;
+        // When 0 (default), MD_CC_DRAW mouse-drag only writes the armed
+        // CC slot into rows whose effect column is empty. Rows already
+        // holding a *different* CC (or any other effect) are skipped,
+        // protecting drawbars you drew for another slot from being
+        // accidentally overwritten when you cycle to a new CC. When 1,
+        // mouse-drag overwrites any prior effect on the row.
+        int cc_draw_overwrite;
         int post_load_page;        // E_post_load_page — page to switch to after a successful load
         char window_icon[MAX_PATH + 1];
         // How far the cursor advances after the 4 / 8 audition keys
