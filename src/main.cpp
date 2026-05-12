@@ -287,6 +287,12 @@ Bitmap *VS = NULL;
 
 const char *statusmsg = " ";
 char szStatmsg[1024];
+// Error escalation: when a failure-path call site sets the status line via
+// set_error_status(), this timestamp marks how long the renderer should
+// paint the status row in inverted (highlight) colors so the user actually
+// notices. The original "(1: unknown error)" status looked indistinguishable
+// from routine "Opened[out]: ..." messages and got missed.
+Uint64 statusmsg_error_until_ms = 0;
 
 //unsigned long numMidiDevs;
 
@@ -928,9 +934,29 @@ void status(const char *msg,Drawable *S)
     if (n > (int)sizeof(wipe) - 1) n = sizeof(wipe) - 1;
     memset(wipe, ' ', n);
     wipe[n] = '\0';
-    printBG(col(3),row(INITIAL_ROW + 6),wipe,COLORS.Text,COLORS.Background,S);
-    printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);
+    // Within the error window, paint the status row inverted (Background fg
+    // on Highlight bg) so a failed device-open / similar error is impossible
+    // to confuse with the routine "Opened[out]: <name>" green-text traffic.
+    const bool error_active = (SDL_GetTicks() < statusmsg_error_until_ms);
+    const TColor fg = error_active ? COLORS.Background : COLORS.Text;
+    const TColor bg = error_active ? COLORS.Highlight  : COLORS.Background;
+    printBG(col(3),row(INITIAL_ROW + 6),wipe,fg,bg,S);
+    printBGCC(col(3),row(INITIAL_ROW + 6),msg,fg,bg,S);
     screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(max_cols)-1,row(10));
+}
+
+// set_error_status — copy `msg` into the status buffer and arm the
+// inverted-color highlight for ~8 seconds. Use this instead of plain
+// `statusmsg = ...` whenever a code path is reporting a failure the user
+// must notice (failed MIDI device open, file save error, etc).
+void set_error_status(const char *msg)
+{
+    if (!msg) msg = "";
+    snprintf(szStatmsg, sizeof(szStatmsg), "%s", msg);
+    statusmsg = szStatmsg;
+    statusmsg_error_until_ms = SDL_GetTicks() + 8000;
+    status_change = 1;
+    need_refresh++;
 }
 
 
