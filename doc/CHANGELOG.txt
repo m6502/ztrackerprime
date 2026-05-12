@@ -4,7 +4,6 @@ Legend
    +  - Feature add
    *  - Fix/change
 
-<<<<<<< HEAD
 zt 2026_05_04 (MIDI device-open errors: in-your-face status + decode)
 ---------------------------------------------------------------------
 

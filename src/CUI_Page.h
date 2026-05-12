@@ -464,6 +464,20 @@ class CUI_RUSure : public CUI_Page {
 
         const char *str;
         VFunc OnYes;
+        // Which button is initially focused: 0 = Yes, 1 = No.
+        // Default is 1 (No) so destructive confirmations (overwrite,
+        // discard) require an explicit Yes -- pressing Enter at the
+        // prompt cancels. Callers that prompt for a clear-cut user
+        // action they already initiated (Ctrl-Q "Exit zTracker?")
+        // can set 0 so a second Enter commits.
+        int default_button;
+        // Per-popup button captions. Defaults are "  Yes" / "  No"
+        // for Y/N-style prompts. Callers wanting OK/Cancel framing
+        // (e.g. quit) can override before popup_window. Both reset
+        // to the defaults at the end of enter() so a one-shot
+        // override doesn't leak into the next popup.
+        const char *yes_caption;
+        const char *no_caption;
 
         CUI_RUSure();
 
