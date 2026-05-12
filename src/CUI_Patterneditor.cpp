@@ -355,24 +355,39 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S) 
+void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S)
 {
   int howfar;
 
   howfar = value*(xsize-1)/maxval;
-  
+
   for (int cy=y;cy<y+ysize;cy++) {
 
     S->drawHLine(cy,x,x+xsize,bg);
     if (value>0) S->drawHLine(cy,x,x+howfar,COLORS.LCDMid);
   }
-  
+
   if (value>0) {
 
     S->drawHLine(y,x,x+howfar,COLORS.LCDHigh);
     S->drawVLine(x,y,y+ysize-1,COLORS.LCDHigh);
     S->drawHLine(y+ysize-1,x,x+howfar,COLORS.LCDLow);
     S->drawVLine(x+howfar,y,y+ysize-1,COLORS.LCDLow);
+  }
+}
+
+// Dim "ghost" variant of draw_bar -- shows the value with a subdued
+// flat fill and no highlight/lowlight borders. Used by MD_CC_DRAW to
+// render OTHER CC slots' drawbars on the same row: the armed slot
+// gets the full draw_bar treatment, every other slot's effect on
+// that row appears as a ghost so the user can see existing drawbars
+// for parameters they haven't selected (and avoid overwriting them).
+void draw_bar_ghost(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S)
+{
+  int howfar = value*(xsize-1)/maxval;
+  for (int cy=y;cy<y+ysize;cy++) {
+    S->drawHLine(cy,x,x+xsize,bg);
+    if (value>0) S->drawHLine(cy,x,x+howfar,COLORS.Lowlight);
   }
 }
 
@@ -447,6 +462,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 {
   int num_displayed_tracks,num_displayed_rows,data,datamax;
   TColor bg;
+  bool cc_draw_ghost = false;
   event *e;
   char str[64];
 
@@ -528,33 +544,40 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
         break;
 
       case MD_CC_DRAW:
-        // Drawbar bar shows the S/W effect's value for the armed CC
-        // slot. Render nothing (0) when the row's event isn't tied
-        // to the armed CC -- otherwise stale bars from other CCs
-        // would create a misleading "I drew that" impression.
+        // Drawbar bar shows the S/W effect's value. The armed CC slot
+        // renders as a bright bar (draw_bar). Any OTHER S/W effect on
+        // the same row renders as a ghost bar (draw_bar_ghost) -- dim
+        // flat fill, no highlight border -- so the user can see
+        // existing drawbars for CCs they haven't armed yet and avoid
+        // overwriting them on the next pass.
+        //
+        // We can't decide the bar style here (this switch only
+        // populates `data`); we record the choice via cc_draw_ghost
+        // and let the second switch dispatch the right draw call.
         {
           ZtCcizerFile *cf_disp = zt_ccizer_current_file();
           int si = UIP_Patterneditor && UIP_Patterneditor->md_mode == MD_CC_DRAW
                        ? (g_cc_drawmode - 1) : -1;
-          if (si >= 0 && cf_disp && si < cf_disp->num_slots) {
-            const ZtCcizerSlot *as = &cf_disp->slots[si];
-            if (as->cc == ZT_CCIZER_PB_MARKER) {
-              if (e->effect == 'W') {
-                // Compress 14-bit PB back to 0..0x7F for the bar.
-                data = (e->effect_data >> 7) & 0x7F;
-              } else {
-                data = 0;
-              }
-            } else {
-              if (e->effect == 'S'
-                  && (unsigned char)((e->effect_data >> 8) & 0xFF) == as->cc) {
-                data = e->effect_data & 0x7F;
-              } else {
-                data = 0;
-              }
-            }
+          const ZtCcizerSlot *as = (si >= 0 && cf_disp && si < cf_disp->num_slots)
+                                       ? &cf_disp->slots[si] : NULL;
+          bool armed_match = false;
+          if (as) {
+            if (as->cc == ZT_CCIZER_PB_MARKER) armed_match = (e->effect == 'W');
+            else armed_match = (e->effect == 'S'
+                                && (unsigned char)((e->effect_data >> 8) & 0xFF) == as->cc);
+          }
+          if (armed_match) {
+            data = (e->effect == 'W') ? ((e->effect_data >> 7) & 0x7F)
+                                      : (e->effect_data & 0x7F);
+            cc_draw_ghost = false;
+          } else if (e->effect == 'S' || e->effect == 'W') {
+            // Some other CC/PB lives on this row. Render it as a ghost.
+            data = (e->effect == 'W') ? ((e->effect_data >> 7) & 0x7F)
+                                      : (e->effect_data & 0x7F);
+            cc_draw_ghost = true;
           } else {
             data = 0;
+            cc_draw_ghost = false;
           }
           datamax = 0x7F;
         }
@@ -566,15 +589,24 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       {
 
       case MD_FX_SIGNED:
-        
+
         draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
-        
+
+        break;
+
+      case MD_CC_DRAW:
+
+        if (cc_draw_ghost) {
+          draw_bar_ghost(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        } else {
+          draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        }
         break;
 
       default:
-        
+
         draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
-        
+
         break;
       } ;
       
@@ -1298,8 +1330,30 @@ void CUI_Patterneditor::update()
     kstate = Keys.getstate();
     
     set_note = 0xff;
-    
+
     /* COMMON KEYS */
+
+    // CC drawmode cycle. Ctrl+Shift+§ (SDLK_GRAVE — the keyhandler on
+    // every platform remaps Finnish ISO §, NONUSBACKSLASH, INTERNATIONAL1..3
+    // to GRAVE before key dispatch). Plain Shift+§ is the PEM_MOUSEDRAW
+    // toggle (handled below). Each press advances 0 -> 1 -> ... -> N -> 0
+    // through the loaded CCizer file (see Shift+F3). Sits *above* the
+    // mode switch so it fires in PEM_MOUSEDRAW too -- otherwise "Editing:
+    // Volume" mode would swallow the toggle.
+    //
+    // NOTE: We use a literal modifier check rather than
+    // g_keybindings.match() because the keybinding table is currently
+    // never populated at runtime (g_keybindings.setDefaults() lives in
+    // an unused init function -- see main.cpp::initConsole). All other
+    // shortcuts in zT use the same literal-check style. Once the
+    // Shortcuts table is wired up at app init for real, this can move
+    // back to match() for user-rebindability.
+    if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
+      zt_advance_cc_drawmode();
+      midiInQueue.clear();
+      need_refresh++; key = 0;
+    }
+
     if (kstate == KS_SHIFT) {
 
       switch(key)
@@ -1827,20 +1881,8 @@ void CUI_Patterneditor::update()
           key = 0;
         }
 
-        // CC drawmode cycle. Default Ctrl+Shift+§ (the historic combo);
-        // user-remappable via Shift+F2. Plain Shift+§ is the existing
-        // PEM_MOUSEDRAW toggle (handled above); we use the Ctrl-extended
-        // combo so both gestures coexist. Each press advances the cycle
-        // 0 -> slot 1 -> slot 2 -> ... -> slot N -> 0 through the
-        // currently-loaded CCizer file (see Shift+F3). While a slot is
-        // active, only that slot's CC# (or PB) is captured -- other CCs
-        // are dropped, so a single physical knob/slider can be "armed"
-        // and the user draws one parameter at a time without crosstalk.
-        if (g_keybindings.match(key, kstate) == ZT_ACTION_TOGGLE_CC_DRAWMODE) {
-          zt_advance_cc_drawmode();       // shared with ESC menu (audit H2)
-          midiInQueue.clear();
-          need_refresh++; key = 0;
-        }
+        // (CC drawmode cycle moved to the COMMON KEYS block above so it
+        // also fires in PEM_MOUSEDRAW mode.)
 
         // Double Pattern: Ctrl+Shift+G
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
@@ -3885,6 +3927,20 @@ wrap:;
             }
             if (e->effect == eff_type && e->effect_data == eff_data && mousedrawing==1)
               goto nevermind;
+            // Protect existing drawbars when Overwrite Previous Drawbars
+            // is OFF (the default). Skip the write if the row already
+            // holds a *different* S/W effect -- i.e. a drawbar from
+            // another armed slot. Empty effect cells and same-CC writes
+            // still go through. The Parms (F2 F2) toggle flips this.
+            if (!zt_config_globals.cc_draw_overwrite) {
+              bool already_drawn_by_other =
+                  (e->effect == 'S' || e->effect == 'W') &&
+                  !(e->effect == eff_type
+                    && ((eff_type == 'W')
+                        || (unsigned char)((e->effect_data >> 8) & 0xFF)
+                            == (unsigned char)((eff_data >> 8) & 0xFF)));
+              if (already_drawn_by_other) goto nevermind;
+            }
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,eff_type,eff_data);
             break;
           }
@@ -3951,33 +4007,45 @@ void CUI_Patterneditor::draw(Drawable *S)
 
     // Persistent CC drawmode badge — easy to forget the cycle is armed
     // since the advance-status message scrolls past. Right-aligned on
-    // the title row so it doesn't fight with the pattern data area.
-    // Shows the armed slot's CC# + name so the user always knows which
-    // physical knob is "live".
-    if (g_cc_drawmode > 0) {
-      char badge[96];
-      ZtCcizerFile *cf = zt_ccizer_current_file();
-      int slot_idx = g_cc_drawmode - 1;
-      if (cf && slot_idx < cf->num_slots) {
-        const ZtCcizerSlot *s = &cf->slots[slot_idx];
-        if (s->cc == ZT_CCIZER_PB_MARKER) {
-          snprintf(badge, sizeof(badge), "[CC DRAW slot %d/%d: PB %s]",
-                   g_cc_drawmode, cf->num_slots, s->name);
+    // the row just above the title row. Shows the armed slot's CC# +
+    // name so the user always knows which physical knob is "live".
+    //
+    // IMPORTANT: pad to a fixed width and use printBG so cycling
+    // between slots with different name lengths doesn't leave stale
+    // glyphs behind. The main draw loop only clears row 12 onwards
+    // per frame, so the badge row never gets a background sweep.
+    {
+      static const int BADGE_W = 56;
+      char badge[BADGE_W + 1];
+      memset(badge, ' ', BADGE_W);
+      badge[BADGE_W] = '\0';
+      if (g_cc_drawmode > 0) {
+        char tmp[BADGE_W + 1];
+        ZtCcizerFile *cf = zt_ccizer_current_file();
+        int slot_idx = g_cc_drawmode - 1;
+        if (cf && slot_idx < cf->num_slots) {
+          const ZtCcizerSlot *s = &cf->slots[slot_idx];
+          if (s->cc == ZT_CCIZER_PB_MARKER) {
+            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: PB %s]",
+                     g_cc_drawmode, cf->num_slots, s->name);
+          } else {
+            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: CC%d %s]",
+                     g_cc_drawmode, cf->num_slots, (int)s->cc, s->name);
+          }
         } else {
-          snprintf(badge, sizeof(badge), "[CC DRAW slot %d/%d: CC%d %s]",
-                   g_cc_drawmode, cf->num_slots, (int)s->cc, s->name);
+          snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d -- stale]",
+                   g_cc_drawmode);
         }
-      } else {
-        // Stale slot index (file changed under us). Still flag the
-        // mode is on so the user can advance once to re-arm.
-        snprintf(badge, sizeof(badge), "[CC DRAW slot %d -- stale, advance to re-arm]",
-                 g_cc_drawmode);
+        // Right-justify into the padded BADGE_W field so it always
+        // ends at the same column.
+        int tlen = (int)strlen(tmp);
+        if (tlen > BADGE_W) tlen = BADGE_W;
+        memcpy(badge + (BADGE_W - tlen), tmp, tlen);
       }
-      int badge_len = (int)strlen(badge);
-      int x_col = CHARS_X - badge_len - 2;
+      int x_col = CHARS_X - BADGE_W - 2;
       if (x_col < 2) x_col = 2;
-      print(col(x_col), row(PAGE_TITLE_ROW_Y), badge,
-            COLORS.Brighttext, S);
+      printBG(col(x_col), row(PAGE_TITLE_ROW_Y - 1), badge,
+              COLORS.Brighttext, COLORS.Background, S);
     }
 
     switch(mode) {

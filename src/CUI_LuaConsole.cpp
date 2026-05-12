@@ -66,7 +66,7 @@ void CUI_LuaConsole::enter()
     cur_state = STATE_LUA_CONSOLE;
 
     if (!s_welcomed) {
-        g_lua.print_line("zTracker Lua Console — Lua 5.4");
+        g_lua.print_line("zTracker Lua Console - Lua 5.4");
         g_lua.print_line("Enter=run  Up/Down=history  PgUp/PgDn=scroll  Tab=complete  Esc=exit");
         g_lua.print_api_list();
         g_lua.print_line("");

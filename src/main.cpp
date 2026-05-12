@@ -388,6 +388,24 @@ int zt_advance_cc_drawmode(void)
     g_cc_drawmode++;
     if (g_cc_drawmode > max_slot) g_cc_drawmode = 0;
 
+    // Auto-enter / auto-exit Pattern Editor mouse-draw mode so the
+    // user can just hit Ctrl+Shift+§ and immediately draw -- no
+    // separate Shift+§ press required to flip into mouse-draw. The
+    // cycle going OFF returns to regular keys mode.
+    if (UIP_Patterneditor) {
+        if (g_cc_drawmode > 0) {
+            UIP_Patterneditor->mode    = PEM_MOUSEDRAW;
+            UIP_Patterneditor->md_mode = MD_CC_DRAW;
+        } else {
+            UIP_Patterneditor->mode    = PEM_REGULARKEYS;
+            // Don't reset md_mode -- if the user re-cycles drawmode
+            // ON we set it back to MD_CC_DRAW above. Leaving it alone
+            // means a non-drawmode Shift+§ entry returns to the prior
+            // mouse-draw column (vol/fx/etc.) instead of forcing
+            // MD_CC_DRAW with no slot armed.
+        }
+    }
+
     if (g_cc_drawmode == 0) {
         snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: OFF");
     } else {

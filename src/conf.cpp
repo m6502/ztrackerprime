@@ -253,6 +253,7 @@ ZTConf::ZTConf() {
     control_navigation_amount = 2;
     default_directory[0] = '\0';
     record_velocity = 1;
+    cc_draw_overwrite = 0;  // default OFF: protect existing drawbars
     post_load_page = POST_LOAD_PATTERN_EDIT;
     note_audition_step_mode = ZT_NAS_EDITSTEP;
     ccizer_folder[0] = '\0';
@@ -352,6 +353,7 @@ int ZTConf::load()
   autoload_ztfile = getFlag("autoload_ztfile");
   centered_editing = getFlag("centered_edit");
   record_velocity = getFlag("record_velocity");
+  if (Config->get("cc_draw_overwrite")) cc_draw_overwrite = getFlag("cc_draw_overwrite");
   
   if(Config->get("default_directory"))                strcpy(default_directory, Config->get("default_directory"));
   if(Config->get("autoload_ztfile_filename"))         strcpy(autoload_ztfile_filename, Config->get("autoload_ztfile_filename"));
@@ -481,6 +483,11 @@ int ZTConf::save() {
         Config->set("record_velocity","yes");
     else
         Config->set("record_velocity","no");
+
+    if (cc_draw_overwrite)
+        Config->set("cc_draw_overwrite","yes");
+    else
+        Config->set("cc_draw_overwrite","no");
 
     if (midi_in_sync)
         Config->set("midi_in_sync","yes");

@@ -4,6 +4,79 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_13 (CC Drawmode: ghost bars + Overwrite Previous Drawbars toggle)
+----------------------------------------------------------------------------
+
+        + src/CUI_Patterneditor.cpp -- MD_CC_DRAW now renders OTHER
+          slots' drawbars on every row as dim "ghost" bars (flat
+          Lowlight fill, no highlight border) while the armed slot's
+          bar continues to render bright (LCDHigh/Mid/Low). Lets the
+          user see existing drawbars for parameters they haven't
+          armed and avoid overdraw without leaving the page.
+
+        + src/draw_bar_ghost() (new) -- parallel to draw_bar() but
+          uses COLORS.Lowlight for fill and skips the highlight /
+          lowlight borders. Lighter weight so the armed bar stays
+          visually dominant.
+
+        + zt_config_globals.cc_draw_overwrite (new conf key
+          "cc_draw_overwrite") -- protects drawbars across slot
+          cycles. Default OFF: MD_CC_DRAW mouse-drag only writes to
+          rows whose effect column is empty (or already holds the
+          same CC). Rows with a *different* S/W effect are skipped,
+          so dragging CC2 across rows already holding CC1 leaves
+          the CC1 drawbar untouched. Toggle in F2 F2 (Pattern Editor
+          Options) -> "CCOver:" next to DrawMode.
+
+        * src/CUI_PEParms.cpp + src/CUI_Page.h -- the F2 F2 Parms
+          popup gains the cb_cc_draw_overwrite checkbox at column 23
+          on row 18, mirroring the StepEdit / RecVeloc pattern.
+
+        * src/conf.{h,cpp} -- cc_draw_overwrite added to ZTConf,
+          default 0 in resetToDefaults, parsed via getFlag("cc_draw_overwrite")
+          in loadConf and written back on save.
+
+zt 2026_05_12 (CC Drawmode: one-key arm-and-draw + visual cleanup)
+------------------------------------------------------------------
+
+        * src/main.cpp -- zt_advance_cc_drawmode() now auto-enters
+          PEM_MOUSEDRAW + MD_CC_DRAW the moment a slot is armed.
+          Previously the workflow was Ctrl+Shift+§ (cycle to slot K)
+          then Shift+§ (enter mouse-draw) -- two keys for one
+          mental step. Now Ctrl+Shift+§ alone is sufficient: the
+          cycle arms a slot AND drops the Pattern Editor into
+          drawbar-draw mode. Cycling back to OFF returns to
+          PEM_REGULARKEYS.
+
+        * src/CUI_Patterneditor.cpp -- CC DRAW badge moved one row
+          above the "Pattern Editor (F2)" title row. Before, the
+          badge printed on the same character row as the title and
+          overwrote it (visible as "(CC)DRAW slot 16/23: CC24 ..."
+          colliding with "Pattern Editor (F2)").
+
+        * src/CUI_CcConsole.cpp + src/CUI_LuaConsole.cpp +
+          src/CUI_PaletteEditor.cpp + src/ccizer.cpp -- four
+          em-dash (U+2014) char literals replaced with ASCII
+          hyphens. zT's bitmap font is single-byte (CP437-ish),
+          so any multi-byte UTF-8 char rendered as a run of
+          garbage glyphs. The four offenders were the "Loaded
+          foo.txt - N slot(s)" CC Console line, the Lua Console
+          welcome line, the Palette Editor "Selected X - drag the
+          R/G/B bars..." status, and the CC view sidecar file
+          header. Whole-codebase grep confirms no other non-ASCII
+          characters live in string literals that hit print() /
+          printBG() / printtitle().
+
+        * src/CUI_Patterneditor.cpp -- the CC drawmode cycle keypath
+          (Ctrl+Shift+§) reverted from g_keybindings.match() back to
+          a literal kstate / key check, matching every other shortcut
+          in zT. Reason: the keybindings table is never initialised
+          at runtime (g_keybindings.setDefaults() lives in unused
+          init function initConsole), so match() always returned
+          ZT_ACTION_NONE and the cycle never fired. Once the
+          Shortcuts table is wired up at real app init, this can
+          move back to match() for user-rebindability.
+
 zt 2026_05_12 (All 7 hand-tuned palettes: regenerate from Schism's IT data)
 ---------------------------------------------------------------------------
 

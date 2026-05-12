@@ -375,6 +375,12 @@ class CUI_PEParms : public CUI_Page {
         CheckBox *cb_drawmode ;
         int      drawmode_val ;
 
+        // Overwrite Previous Drawbars toggle. Default OFF -- when MD_CC_DRAW
+        // is armed on slot N, mouse-drag only writes to rows whose effect
+        // column is empty (or already holds the same CC). Rows with other
+        // drawbars are protected from accidental overwrite.
+        CheckBox *cb_cc_draw_overwrite ;
+
         ValueSlider *vs_speedup ;
 
         CUI_PEParms();

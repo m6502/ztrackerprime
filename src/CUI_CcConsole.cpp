@@ -376,7 +376,7 @@ void CUI_CcConsole::load_selected(void) {
             sliders[i]->value = v;
         }
         snprintf(status_line, sizeof(status_line),
-                 "Loaded %s — %d slot(s).", g_loaded.basename, g_loaded.num_slots);
+                 "Loaded %s - %d slot(s).", g_loaded.basename, g_loaded.num_slots);
     } else {
         loaded = 0;
         zt_ccizer_set_current_file(NULL);

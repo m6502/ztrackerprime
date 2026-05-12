@@ -103,6 +103,16 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_drawmode->y = (start_y / 8) + 18;
         cb_drawmode->xsize = 3;
         cb_drawmode->value = &drawmode_val;
+
+        // Overwrite Previous Drawbars (MD_CC_DRAW protection toggle).
+        // Default value comes from zt.conf via zt_config_globals.
+        cb_cc_draw_overwrite = new CheckBox;
+        UI->add_element(cb_cc_draw_overwrite, 9);
+        cb_cc_draw_overwrite->frame = 1;
+        cb_cc_draw_overwrite->x = (start_x / 8) + 17 + 16;
+        cb_cc_draw_overwrite->y = (start_y / 8) + 18;
+        cb_cc_draw_overwrite->xsize = 3;
+        cb_cc_draw_overwrite->value = &zt_config_globals.cc_draw_overwrite;
 }
 
 void CUI_PEParms::enter(void) {
@@ -130,6 +140,8 @@ void CUI_PEParms::enter(void) {
     drawmode_val = (UIP_Patterneditor->mode == PEM_MOUSEDRAW) ? 1 : 0;
     cb = (CheckBox *)UI->get_element(8);
     cb->value = &drawmode_val;
+    cb = (CheckBox *)UI->get_element(9);
+    cb->value = &zt_config_globals.cc_draw_overwrite;
 }
 
 void CUI_PEParms::leave(void) {
@@ -240,6 +252,8 @@ void CUI_PEParms::draw(Drawable *S) {
     vs_speedup->y = (start_y / 8) + 16;
     cb_drawmode->x = (start_x / 8) + 17;
     cb_drawmode->y = (start_y / 8) + 18;
+    cb_cc_draw_overwrite->x = (start_x / 8) + 17 + 16;
+    cb_cc_draw_overwrite->y = (start_y / 8) + 18;
 
 
     if (S->lock()==0) {
@@ -263,6 +277,9 @@ void CUI_PEParms::draw(Drawable *S) {
         print(start_x + col(39),start_y + row(14),"RecVeloc:",COLORS.Text,S);
         print(start_x + col(2),start_y + row(16),    "      Speedup:",COLORS.Text,S);
         print(start_x + col(2),start_y + row(18),    "     DrawMode:",COLORS.Text,S);
+        // CC drawbar overwrite-protect toggle. Label width matches the
+        // StepEdit / RecVeloc pattern on row 14.
+        print(start_x + col(23),start_y + row(18),"CCOver:",COLORS.Text,S);
         UI->full_refresh();
         UI->draw(S);
         S->unlock();
