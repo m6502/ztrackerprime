@@ -23,6 +23,45 @@ zt 2026_05_12 (All 7 hand-tuned palettes: regenerate from Schism's IT data)
           / Gold (Vintage) / FX 2.0 / Atlantic / Acid Gas / Hotdog
           Stand) were already imported from Schism on a prior pass
           and were left unchanged.
+zt 2026_05_12 (CC Drawmode: cycle through CCizer slots + Shortcuts rebind)
+--------------------------------------------------------------------------
+
+        * src/main.cpp + src/zt.h -- g_cc_drawmode is now a 1-based
+          slot index instead of a binary on/off. The new toggler
+          zt_advance_cc_drawmode() cycles 0 -> 1 -> 2 -> ... -> N -> 0
+          through the currently-loaded CCizer file's slots (the file
+          loaded via Shift+F3). While slot K is armed, only that
+          slot's CC# (or PB) is captured -- other incoming CCs are
+          dropped, so the user can arm a single physical knob and
+          draw one parameter at a time without crosstalk from idle
+          knobs on the same controller.
+
+        * src/CUI_Patterneditor.cpp -- the MIDI-in handler now
+          filters incoming 0xB0 / 0xE0 by the armed slot's CC# /
+          PB-marker. The keypath (formerly a literal Ctrl+Shift+§
+          test) now goes through g_keybindings.match() so the action
+          is user-remappable via the unified Shortcuts page
+          (Shift+F2).
+
+        * src/keybindings.{h,cpp} -- new action
+          ZT_ACTION_TOGGLE_CC_DRAWMODE with default Ctrl+Shift+§.
+          Shows up in the Shortcuts list as "Cycle CC Drawmode
+          (off/slot N)" so users on layouts where the historic combo
+          is awkward can rebind it.
+
+        * src/CUI_MainMenu.cpp -- the ESC menu entry "Toggle CC
+          Drawmode" is renamed to "Cycle CC Drawmode" and now
+          delegates to zt_advance_cc_drawmode().
+
+        * src/CUI_Patterneditor.cpp -- the persistent badge no longer
+          just says "[CC DRAW]" but "[CC DRAW slot 3/8: CC74 Cutoff]"
+          so the user always knows which physical knob is live
+          without scrolling the status line.
+
+        ! Manual drawbar entry (drawing CC curves with the mouse /
+          keyboard without a physical controller, plus playback
+          sending those CCs out) is a separate followup -- this PR
+          covers the incoming-CC-filter and rebind workflow only.
 
 zt 2026_05_12 (CHANGELOG: union-merge to stop the line-7 PR conflict mill)
 --------------------------------------------------------------------------
