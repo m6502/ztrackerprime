@@ -66,6 +66,12 @@ enum ZtAction {
     ZT_ACTION_NOTE_AUDITION,
     ZT_ACTION_ROW_AUDITION,
 
+    // CC Drawmode -- cycles OFF -> slot 1 -> slot 2 -> ... -> slot N -> OFF
+    // through the current CCizer file's slots. Default Ctrl+Shift+§; remap
+    // via the Shortcuts page if your keyboard layout makes that combo
+    // awkward.
+    ZT_ACTION_TOGGLE_CC_DRAWMODE,
+
     ZT_ACTION_COUNT
 };
 

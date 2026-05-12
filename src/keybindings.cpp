@@ -78,6 +78,7 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "rotate_up",            // ZT_ACTION_ROTATE_UP
     "note_audition",        // ZT_ACTION_NOTE_AUDITION
     "row_audition",         // ZT_ACTION_ROW_AUDITION
+    "toggle_cc_drawmode",   // ZT_ACTION_TOGGLE_CC_DRAWMODE
 };
 
 // Same length as s_actionNames; rendered in the Shortcuts & MIDI
@@ -131,6 +132,7 @@ static const char* const s_actionDescriptions[ZT_ACTION_COUNT] = {
     "Rotate selection up",                 // ZT_ACTION_ROTATE_UP
     "Audition current note (4)",           // ZT_ACTION_NOTE_AUDITION
     "Audition current row (8)",            // ZT_ACTION_ROW_AUDITION
+    "Cycle CC Drawmode (off/slot N)",      // ZT_ACTION_TOGGLE_CC_DRAWMODE
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -221,6 +223,12 @@ void KeyBindings::setDefaults()
     // MIDI mapping column.
     bindings[ZT_ACTION_NOTE_AUDITION]        = { SDLK_4,           0 };
     bindings[ZT_ACTION_ROW_AUDITION]         = { SDLK_8,           0 };
+
+    // CC Drawmode cycle -- preserve the historic Ctrl+Shift+§ default.
+    // SDLK_GRAVE because the keyhandler in main.cpp remaps the Finnish
+    // ISO § scancode to SDLK_GRAVE before key dispatch. Users on
+    // layouts where this combo is awkward can rebind here.
+    bindings[ZT_ACTION_TOGGLE_CC_DRAWMODE]   = { SDLK_GRAVE,       KS_CTRL | KS_SHIFT };
 }
 
 // -----------------------------------------------------------------------
