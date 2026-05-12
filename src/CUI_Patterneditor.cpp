@@ -1298,8 +1298,30 @@ void CUI_Patterneditor::update()
     kstate = Keys.getstate();
     
     set_note = 0xff;
-    
+
     /* COMMON KEYS */
+
+    // CC drawmode cycle. Ctrl+Shift+§ (SDLK_GRAVE — the keyhandler on
+    // every platform remaps Finnish ISO §, NONUSBACKSLASH, INTERNATIONAL1..3
+    // to GRAVE before key dispatch). Plain Shift+§ is the PEM_MOUSEDRAW
+    // toggle (handled below). Each press advances 0 -> 1 -> ... -> N -> 0
+    // through the loaded CCizer file (see Shift+F3). Sits *above* the
+    // mode switch so it fires in PEM_MOUSEDRAW too -- otherwise "Editing:
+    // Volume" mode would swallow the toggle.
+    //
+    // NOTE: We use a literal modifier check rather than
+    // g_keybindings.match() because the keybinding table is currently
+    // never populated at runtime (g_keybindings.setDefaults() lives in
+    // an unused init function -- see main.cpp::initConsole). All other
+    // shortcuts in zT use the same literal-check style. Once the
+    // Shortcuts table is wired up at app init for real, this can move
+    // back to match() for user-rebindability.
+    if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
+      zt_advance_cc_drawmode();
+      midiInQueue.clear();
+      need_refresh++; key = 0;
+    }
+
     if (kstate == KS_SHIFT) {
 
       switch(key)
@@ -1827,20 +1849,8 @@ void CUI_Patterneditor::update()
           key = 0;
         }
 
-        // CC drawmode cycle. Default Ctrl+Shift+§ (the historic combo);
-        // user-remappable via Shift+F2. Plain Shift+§ is the existing
-        // PEM_MOUSEDRAW toggle (handled above); we use the Ctrl-extended
-        // combo so both gestures coexist. Each press advances the cycle
-        // 0 -> slot 1 -> slot 2 -> ... -> slot N -> 0 through the
-        // currently-loaded CCizer file (see Shift+F3). While a slot is
-        // active, only that slot's CC# (or PB) is captured -- other CCs
-        // are dropped, so a single physical knob/slider can be "armed"
-        // and the user draws one parameter at a time without crosstalk.
-        if (g_keybindings.match(key, kstate) == ZT_ACTION_TOGGLE_CC_DRAWMODE) {
-          zt_advance_cc_drawmode();       // shared with ESC menu (audit H2)
-          midiInQueue.clear();
-          need_refresh++; key = 0;
-        }
+        // (CC drawmode cycle moved to the COMMON KEYS block above so it
+        // also fires in PEM_MOUSEDRAW mode.)
 
         // Double Pattern: Ctrl+Shift+G
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
@@ -3976,7 +3986,7 @@ void CUI_Patterneditor::draw(Drawable *S)
       int badge_len = (int)strlen(badge);
       int x_col = CHARS_X - badge_len - 2;
       if (x_col < 2) x_col = 2;
-      print(col(x_col), row(PAGE_TITLE_ROW_Y), badge,
+      print(col(x_col), row(PAGE_TITLE_ROW_Y - 1), badge,
             COLORS.Brighttext, S);
     }
 

@@ -4,6 +4,40 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_12 (CC Drawmode: one-key arm-and-draw + visual cleanup)
+------------------------------------------------------------------
+
+        * src/main.cpp -- zt_advance_cc_drawmode() now auto-enters
+          PEM_MOUSEDRAW + MD_CC_DRAW the moment a slot is armed.
+          Previously the workflow was Ctrl+Shift+§ (cycle to slot K)
+          then Shift+§ (enter mouse-draw) -- two keys for one
+          mental step. Now Ctrl+Shift+§ alone is sufficient: the
+          cycle arms a slot AND drops the Pattern Editor into
+          drawbar-draw mode. Cycling back to OFF returns to
+          PEM_REGULARKEYS.
+
+        * src/CUI_Patterneditor.cpp -- CC DRAW badge moved one row
+          above the "Pattern Editor (F2)" title row. Before, the
+          badge printed on the same character row as the title and
+          overwrote it (visible as "(CC)DRAW slot 16/23: CC24 ..."
+          colliding with "Pattern Editor (F2)").
+
+        * src/CUI_CcConsole.cpp -- the "Loaded foo.txt - N slot(s)"
+          status message dropped its em-dash (U+2014) in favor of an
+          ASCII hyphen. zT's bitmap font is single-byte (CP437-ish),
+          so multi-byte UTF-8 chars rendered as garbage glyphs
+          between the filename and slot count.
+
+        * src/CUI_Patterneditor.cpp -- the CC drawmode cycle keypath
+          (Ctrl+Shift+§) reverted from g_keybindings.match() back to
+          a literal kstate / key check, matching every other shortcut
+          in zT. Reason: the keybindings table is never initialised
+          at runtime (g_keybindings.setDefaults() lives in unused
+          init function initConsole), so match() always returned
+          ZT_ACTION_NONE and the cycle never fired. Once the
+          Shortcuts table is wired up at real app init, this can
+          move back to match() for user-rebindability.
+
 zt 2026_05_12 (All 7 hand-tuned palettes: regenerate from Schism's IT data)
 ---------------------------------------------------------------------------
 
