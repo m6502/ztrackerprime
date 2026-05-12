@@ -1,5 +1,6 @@
 #include "zt.h"
 #include "Button.h"
+#include <string.h>
 
 void BTNCLK_rusure_no(void) {
     Keys.flush();
@@ -18,10 +19,20 @@ void BTNCLK_rusure_yes(void) {
 }
 
 
+// Default Y/N captions. Callers can override via UIP_RUSure->yes_caption /
+// no_caption before popup_window; enter() applies and then resets.
+static const char *kDefaultYesCaption = "  Yes";
+static const char *kDefaultNoCaption  = "  No";
+
 CUI_RUSure::CUI_RUSure(void) {
 
     int tabindex=0;
     UI = new UserInterface;
+    default_button = 1;     // No-focused by default; safe for destructive prompts.
+    OnYes = NULL;
+    str = "";
+    yes_caption = kDefaultYesCaption;
+    no_caption  = kDefaultNoCaption;
 
     int window_width = 40 * col(1);
     int window_height = 12 * row(1);
@@ -52,7 +63,18 @@ CUI_RUSure::CUI_RUSure(void) {
 
 void CUI_RUSure::enter(void) {
     need_refresh = 1;
-    UI->cur_element = 1;
+    UI->cur_element = (default_button == 0) ? 0 : 1;
+    // Apply caller-provided button captions. draw() picks up the
+    // strings + recomputes button widths and positions every frame,
+    // so we just hand off here.
+    button_yes->caption = yes_caption ? yes_caption : kDefaultYesCaption;
+    button_no->caption  = no_caption  ? no_caption  : kDefaultNoCaption;
+    // Reset for next caller -- popups are reused, so a one-shot
+    // override doesn't leak into the next file-overwrite or
+    // discard-changes prompt.
+    default_button = 1;
+    yes_caption    = kDefaultYesCaption;
+    no_caption     = kDefaultNoCaption;
 }
 
 void CUI_RUSure::leave(void) {
@@ -109,11 +131,25 @@ void CUI_RUSure::draw(Drawable *S) {
     int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
 
+    // Auto-size each button to fit its current caption with one cell of
+    // padding inside the frame. This lets a caller swap "Yes" for "OK"
+    // or "No" for "Cancel" without doing arithmetic in their setup
+    // code -- the captions just work.
+    int yes_len = button_yes->caption ? (int)strlen(button_yes->caption) : 0;
+    int no_len  = button_no->caption  ? (int)strlen(button_no->caption)  : 0;
+    button_yes->xsize = yes_len + 2;
+    button_no->xsize  = no_len  + 2;
 
-    button_yes->x = (start_x / 8) + 2 ;
-    button_yes->y = (start_y + (window_height / 2) ) / 8 +1; //23;
-    button_no->x = (start_x / 8) + 2 + 7 + 2;
-    button_no->y = (start_y + (window_height / 2) ) / 8 +1;
+    // Centre the (yes_btn + 2-cell gap + no_btn) cluster horizontally
+    // inside the popup window so OK/Cancel and Yes/No both look balanced.
+    int popup_cols    = window_width / 8;             // 20
+    int total_cols    = button_yes->xsize + 2 + button_no->xsize;
+    int left_pad_cols = (popup_cols - total_cols) / 2;
+    if (left_pad_cols < 1) left_pad_cols = 1;
+    button_yes->x = (start_x / 8) + left_pad_cols;
+    button_yes->y = (start_y + (window_height / 2)) / 8 + 1;
+    button_no->x  = button_yes->x + button_yes->xsize + 2;
+    button_no->y  = button_yes->y;
 
     if (S->lock()==0) {
         S->fillRect(start_x,start_y,start_x + window_width,start_y + window_height,COLORS.Background);

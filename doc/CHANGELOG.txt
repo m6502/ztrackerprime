@@ -30,7 +30,6 @@ zt 2026_05_05 (ztskin: multiplatform skin compiler/decompiler CLI)
           tool target. CI builds it on every push since it lives
           inside the existing extlibs/zlib fetch path.
 
-<<<<<<< HEAD
 zt 2026_05_04 (MIDI device-open errors: in-your-face status + decode)
 ---------------------------------------------------------------------
 
