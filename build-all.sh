@@ -14,22 +14,19 @@ Usage: ./build-all.sh [--pull] [--clean] [--debug|--release] [--run]
                      [--mac] [--linux] [--win32] [--windows]
                      [-- app args...]
 
-Build zTracker for every target available on this host.
+Build zTracker for every target.
 
   --pull              git pull --ff-only before building.
   --clean/--debug/    Forwarded verbatim to each underlying build-*.sh.
     --release/--run
 
-  --mac --linux       Force-select specific targets. If none are passed,
-    --win32 --windows targets are auto-detected from `uname`:
-                        Darwin → mac
-                        Linux  → linux
-                        MINGW*/MSYS*/CYGWIN* → win32 + windows
+  --mac --linux       Restrict to specific targets. If none are passed,
+    --win32 --windows ALL four are attempted (mac + linux + win32 + windows).
+                      Targets whose toolchain is unavailable on this host
+                      will fail loudly; the script continues with the rest
+                      and reports the failing set at the end.
 
 Anything after `--` is forwarded to each build script (mainly useful with --run).
-
-Use case: you're abroad, you want the freshest build for whatever laptop you
-have on you. `./build-all.sh --pull --clean --run` does the obvious thing.
 USAGE
 }
 
@@ -47,12 +44,7 @@ while (($#)); do
 done
 
 if ((${#targets[@]} == 0)); then
-  case "$(uname -s)" in
-    Darwin)               targets=("mac") ;;
-    Linux)                targets=("linux") ;;
-    MINGW*|MSYS*|CYGWIN*) targets=("win32" "windows") ;;
-    *) echo "build-all.sh: unknown host '$(uname -s)'; pass --mac/--linux/--win32/--windows" >&2; exit 1 ;;
-  esac
+  targets=("mac" "linux" "win32" "windows")
 fi
 
 if ((pull)); then
