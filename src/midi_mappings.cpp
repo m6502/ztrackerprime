@@ -163,8 +163,8 @@ int audition_advance_amount() {
     switch (zt_config_globals.note_audition_step_mode) {
         case ZT_NAS_NONE:     return 0;
         case ZT_NAS_EDITSTEP: return cur_step;
-        case ZT_NAS_ONE:
-        default:              return 1;
+        case ZT_NAS_ONE:      return 1;
+        default:              return cur_step;
     }
 }
 
