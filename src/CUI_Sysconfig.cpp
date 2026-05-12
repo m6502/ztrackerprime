@@ -1,5 +1,7 @@
 #include "zt.h"
 #include "Button.h"
+#include <string>
+#include <vector>
 
 MidiOutDeviceOpener *midioutdevlist;
 MidiInDeviceOpener *midiindevlist;
@@ -14,30 +16,89 @@ void BTNCLK_GotoGlobalConfig(UserInterfaceElement*) {
     doredraw++;
 }
 
+// Refresh re-enumerates the host's MIDI devices by destroying and recreating
+// the MidiOut / MidiIn process-wide singletons. Without preserving state,
+// `delete MidiOut` closes every open device handle and `new midiOut` opens
+// none, so a Refresh would silently close every device the user already had
+// open. Snapshot the open-device names beforehand and reopen them on the new
+// instance (post-refresh indices may differ if devices were added/removed,
+// so we match by name).
 void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement*) {
+    std::vector<std::string> previously_open;
+    for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
+        if (MidiOut->QueryDevice(i) && MidiOut->outputDevices[i]) {
+            previously_open.push_back(MidiOut->outputDevices[i]->szName);
+        }
+    }
+
     delete MidiOut;
     MidiOut = new midiOut;
-    
-//    mididevlist->ysize = MidiOut->numMidiDevs-1;
+
+    int reopened = 0;
+    for (size_t k = 0; k < previously_open.size(); ++k) {
+        const std::string &name = previously_open[k];
+        for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
+            if (MidiOut->outputDevices[i] &&
+                zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
+                if (MidiOut->AddDevice(i) == 0) {
+                    ++reopened;
+                }
+                break;
+            }
+        }
+    }
+
     midioutdevlist->OnChange();
     midioutdevlist->need_redraw++;
-    sprintf(szStatmsg,"MIDI-OUT device list refreshed");
+    if (previously_open.empty()) {
+        snprintf(szStatmsg, sizeof(szStatmsg), "MIDI-OUT device list refreshed");
+    } else {
+        snprintf(szStatmsg, sizeof(szStatmsg),
+                 "MIDI-OUT refreshed; reopened %d/%d device%s",
+                 reopened, (int)previously_open.size(),
+                 previously_open.size() == 1 ? "" : "s");
+    }
     statusmsg = szStatmsg;
-    need_refresh++; 
-    
+    need_refresh++;
 }
+
 void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
+    std::vector<std::string> previously_open;
+    for (unsigned int i = 0; i < MidiIn->numMidiDevs; ++i) {
+        if (MidiIn->QueryDevice(i) && MidiIn->midiInDev[i]) {
+            previously_open.push_back(MidiIn->midiInDev[i]->szName);
+        }
+    }
 
     delete MidiIn;
     MidiIn = new midiIn;
-    
-//    mididevlist->ysize = MidiOut->numMidiDevs-1;
+
+    int reopened = 0;
+    for (size_t k = 0; k < previously_open.size(); ++k) {
+        const std::string &name = previously_open[k];
+        for (unsigned int i = 0; i < MidiIn->numMidiDevs; ++i) {
+            if (MidiIn->midiInDev[i] &&
+                zcmp((char *)MidiIn->midiInDev[i]->szName, (char *)name.c_str())) {
+                if (MidiIn->AddDevice(i) == 0) {
+                    ++reopened;
+                }
+                break;
+            }
+        }
+    }
+
     midiindevlist->OnChange();
     midiindevlist->need_redraw++;
-    sprintf(szStatmsg,"MIDI-IN device list refreshed");
+    if (previously_open.empty()) {
+        snprintf(szStatmsg, sizeof(szStatmsg), "MIDI-IN device list refreshed");
+    } else {
+        snprintf(szStatmsg, sizeof(szStatmsg),
+                 "MIDI-IN refreshed; reopened %d/%d device%s",
+                 reopened, (int)previously_open.size(),
+                 previously_open.size() == 1 ? "" : "s");
+    }
     statusmsg = szStatmsg;
-    need_refresh++; 
-    
+    need_refresh++;
 }
 
 // All captions are exactly 15 chars (= button xsize) and centred so the
