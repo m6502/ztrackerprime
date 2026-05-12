@@ -4,6 +4,24 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_12 (Camouflage palette: use IT's actual Camouflage RGBs)
+--------------------------------------------------------------------
+
+        * palettes/camouflage.conf -- the hand-tuned version that
+          shipped previously was all-olive-green (BG #6B7340) and
+          bore no resemblance to Impulse Tracker's real Camouflage
+          palette, which is dominated by tan/brown chrome with
+          green/yellow/magenta accents. Regenerated from Schism
+          Tracker's palettes.c (which preserves the 16-slot 6-bit
+          RGB values from IT) via the existing
+          scripts/import-schism-palettes.py mapper, so BG now reads
+          #7D5945 (medium brown), Highlight #EBEBCA (cream),
+          Lowlight #B69679 (light tan), Data #FFFF55 (the IT
+          camouflage yellow), and so on. The other 6 hand-tuned
+          presets are left alone for now; we can regenerate them
+          on a separate pass if their divergences from IT also turn
+          out to be unintentional.
+
 zt 2026_05_12 (CHANGELOG: union-merge to stop the line-7 PR conflict mill)
 --------------------------------------------------------------------------
 
