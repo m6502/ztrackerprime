@@ -254,7 +254,7 @@ ZTConf::ZTConf() {
     default_directory[0] = '\0';
     record_velocity = 1;
     post_load_page = POST_LOAD_PATTERN_EDIT;
-    note_audition_step_mode = ZT_NAS_ONE;
+    note_audition_step_mode = ZT_NAS_EDITSTEP;
     ccizer_folder[0] = '\0';
     syx_folder[0]    = '\0';
     syx_recv_max_files = 100;   // ~50 MB at typical 500 KB / patch dump
@@ -313,7 +313,7 @@ int ZTConf::load()
       note_audition_step_mode = atoi(Config->get("note_audition_step_mode"));
       if (note_audition_step_mode < ZT_NAS_NONE ||
           note_audition_step_mode > ZT_NAS_EDITSTEP) {
-          note_audition_step_mode = ZT_NAS_ONE;
+          note_audition_step_mode = ZT_NAS_EDITSTEP;
       }
   }
   temp = Config->get("ccizer_folder");

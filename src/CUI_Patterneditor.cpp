@@ -3105,17 +3105,17 @@ case SDLK_DELETE:
                         // 4 / 8 advance distance is configurable via
                         // zt_config_globals.note_audition_step_mode:
                         //   ZT_NAS_NONE     -> stay on the same row
-                        //   ZT_NAS_ONE      -> always advance by 1 row (default)
-                        //   ZT_NAS_EDITSTEP -> advance by cur_step (legacy)
+                        //   ZT_NAS_ONE      -> always advance by 1 row
+                        //   ZT_NAS_EDITSTEP -> advance by cur_step (default)
                       case SDL_SCANCODE_8:
 
                         ztPlayer->play_current_row();
 
                         {
                           int advance =
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE)     ? 0 :
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_EDITSTEP) ? cur_step :
-                              1;
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) ? 0 :
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE)  ? 1 :
+                              cur_step;
                           cur_edit_row += advance;
 
                 // <MANU> 2 Feb 2005 - Arreglado el bug que impedia avanzar el scroll
@@ -3139,9 +3139,9 @@ case SDLK_DELETE:
 
                         {
                           int advance =
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE)     ? 0 :
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_EDITSTEP) ? cur_step :
-                              1;
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) ? 0 :
+                              (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE)  ? 1 :
+                              cur_step;
                           cur_edit_row += advance;
 
                           if (advance > 0 &&
