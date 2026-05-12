@@ -344,7 +344,7 @@ class CUI_Logoscreen : public CUI_Page {
 };
 
 enum { PEM_REGULARKEYS, PEM_MOUSEDRAW };
-enum { MD_VOL=0, MD_FX, MD_FX_SIGNED, MD_END};
+enum { MD_VOL=0, MD_FX, MD_FX_SIGNED, MD_CC_DRAW, MD_END};
 
 class CUI_Patterneditor : public CUI_Page {
     public:

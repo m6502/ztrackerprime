@@ -526,7 +526,40 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
         datamax = 0x7F;
 
         break;
-      } 
+
+      case MD_CC_DRAW:
+        // Drawbar bar shows the S/W effect's value for the armed CC
+        // slot. Render nothing (0) when the row's event isn't tied
+        // to the armed CC -- otherwise stale bars from other CCs
+        // would create a misleading "I drew that" impression.
+        {
+          ZtCcizerFile *cf_disp = zt_ccizer_current_file();
+          int si = UIP_Patterneditor && UIP_Patterneditor->md_mode == MD_CC_DRAW
+                       ? (g_cc_drawmode - 1) : -1;
+          if (si >= 0 && cf_disp && si < cf_disp->num_slots) {
+            const ZtCcizerSlot *as = &cf_disp->slots[si];
+            if (as->cc == ZT_CCIZER_PB_MARKER) {
+              if (e->effect == 'W') {
+                // Compress 14-bit PB back to 0..0x7F for the bar.
+                data = (e->effect_data >> 7) & 0x7F;
+              } else {
+                data = 0;
+              }
+            } else {
+              if (e->effect == 'S'
+                  && (unsigned char)((e->effect_data >> 8) & 0xFF) == as->cc) {
+                data = e->effect_data & 0x7F;
+              } else {
+                data = 0;
+              }
+            }
+          } else {
+            data = 0;
+          }
+          datamax = 0x7F;
+        }
+        break;
+      }
 
 
       switch(UIP_Patterneditor->md_mode)
@@ -1285,10 +1318,38 @@ void CUI_Patterneditor::update()
         }
         else {
           mode = PEM_MOUSEDRAW;
+          // If the user enters mouse-draw mode while a CCizer slot is
+          // armed, jump straight to MD_CC_DRAW so the natural workflow
+          // ("cycle to slot K, draw the drawbar") doesn't require a
+          // separate TAB press. The user can still TAB back to MD_VOL
+          // etc. for non-CC drawing.
+          if (g_cc_drawmode > 0 && md_mode != MD_CC_DRAW) {
+            md_mode = MD_CC_DRAW;
+          }
           switch(md_mode) {
           case MD_VOL:       statusmsg = "Editing: Volume"; break;
           case MD_FX:        statusmsg = "Editing: Effect low-byte (0-0x7F)"; break;
           case MD_FX_SIGNED: statusmsg = "Editing: Effect low-byte signed (0-0x7F)"; break;
+          case MD_CC_DRAW: {
+            static char ccdraw_msg[96];
+            ZtCcizerFile *cf = zt_ccizer_current_file();
+            int si = g_cc_drawmode - 1;
+            if (g_cc_drawmode > 0 && cf && si < cf->num_slots) {
+              const ZtCcizerSlot *s = &cf->slots[si];
+              if (s->cc == ZT_CCIZER_PB_MARKER) {
+                snprintf(ccdraw_msg, sizeof(ccdraw_msg),
+                         "Editing: drag = PB drawbar (%s)", s->name);
+              } else {
+                snprintf(ccdraw_msg, sizeof(ccdraw_msg),
+                         "Editing: drag = CC%d drawbar (%s)",
+                         (int)s->cc, s->name);
+              }
+              statusmsg = ccdraw_msg;
+            } else {
+              statusmsg = "Editing: drag = CC drawbar (no slot armed -- cycle CC Drawmode first)";
+            }
+            break;
+          }
           default:           statusmsg = "Editing: Volume"; break;
           }
         }
@@ -1420,6 +1481,16 @@ void CUI_Patterneditor::update()
           md_mode++;
           if (md_mode>=MD_END)
             md_mode = 0;
+          // MD_CC_DRAW is only useful when a CCizer slot is armed
+          // (otherwise we have nothing to write into the effect's
+          // high byte). Skip past it on the TAB cycle when drawmode
+          // is off; the dedicated entry path in the Shift+§ handler
+          // above still drops the user into MD_CC_DRAW directly if
+          // they had a slot armed before entering mouse-draw.
+          if (md_mode == MD_CC_DRAW && g_cc_drawmode <= 0) {
+            md_mode++;
+            if (md_mode>=MD_END) md_mode = 0;
+          }
           need_refresh++;
           break;
 
@@ -1495,7 +1566,28 @@ void CUI_Patterneditor::update()
         case MD_FX:
           statusmsg = "Editing: Effect low-byte (0-0x7F)";
           break;
-      
+
+        case MD_CC_DRAW: {
+          static char ccdraw_msg2[96];
+          ZtCcizerFile *cf2 = zt_ccizer_current_file();
+          int si2 = g_cc_drawmode - 1;
+          if (g_cc_drawmode > 0 && cf2 && si2 < cf2->num_slots) {
+            const ZtCcizerSlot *s2 = &cf2->slots[si2];
+            if (s2->cc == ZT_CCIZER_PB_MARKER) {
+              snprintf(ccdraw_msg2, sizeof(ccdraw_msg2),
+                       "Editing: drag = PB drawbar (%s)", s2->name);
+            } else {
+              snprintf(ccdraw_msg2, sizeof(ccdraw_msg2),
+                       "Editing: drag = CC%d drawbar (%s)",
+                       (int)s2->cc, s2->name);
+            }
+            statusmsg = ccdraw_msg2;
+          } else {
+            statusmsg = "Editing: drag = CC drawbar (no slot armed)";
+          }
+          break;
+        }
+
         case MD_FX_SIGNED:
           statusmsg = "Editing: Effect low-byte signed (0-0x7F)";
           break;
@@ -3734,6 +3826,7 @@ wrap:;
               break;
             case MD_FX:
             case MD_FX_SIGNED:
+            case MD_CC_DRAW:
               data = 0x0;
               break;
             }
@@ -3747,22 +3840,54 @@ wrap:;
           y+=cur_edit_row_disp;
           switch(md_mode) {
           case MD_VOL:
-            if (e->vol == data && mousedrawing==1) 
+            if (e->vol == data && mousedrawing==1)
               goto nevermind;
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,data,-1,-1,-1);
             break;
           case MD_FX:
             data += (e->effect_data&0xFF00);
-            if (e->effect_data == data && mousedrawing==1) 
+            if (e->effect_data == data && mousedrawing==1)
               goto nevermind;
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,-1,data);
             break;
           case MD_FX_SIGNED:
             data += (e->effect_data&0xFF00);
-            if (e->effect_data == data && mousedrawing==1) 
+            if (e->effect_data == data && mousedrawing==1)
               goto nevermind;
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,-1,data);
             break;
+          case MD_CC_DRAW: {
+            // Drawbar mode: write the full S/W effect (type + data)
+            // using the armed CCizer slot's CC# (or PB marker).
+            // X-position in the row drives the value (0..0x7F for CC,
+            // scaled to 14-bit 0..0x3FFF for PB).
+            ZtCcizerFile *cf = zt_ccizer_current_file();
+            int si = g_cc_drawmode - 1;
+            if (g_cc_drawmode <= 0 || !cf || si >= cf->num_slots) {
+              // Slot evaporated mid-drag. Skip this row -- no write,
+              // no advance. The next ON-cycle will re-arm.
+              goto nevermind;
+            }
+            const ZtCcizerSlot *s = &cf->slots[si];
+            unsigned short eff_data;
+            char eff_type;
+            if (s->cc == ZT_CCIZER_PB_MARKER) {
+              // Pitchbend: scale the 0..0x7F drag value to 14-bit.
+              // (data << 7) gives 0..0x3F80 which spans most of the
+              // PB range; close enough for drawbar work without
+              // needing a 14-bit drag widget.
+              eff_data = (unsigned short)(data << 7);
+              if (eff_data > 0x3FFF) eff_data = 0x3FFF;
+              eff_type = 'W';
+            } else {
+              eff_data = (unsigned short)(((unsigned)s->cc << 8) | (unsigned)data);
+              eff_type = 'S';
+            }
+            if (e->effect == eff_type && e->effect_data == eff_data && mousedrawing==1)
+              goto nevermind;
+            song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,eff_type,eff_data);
+            break;
+          }
           }
           upd_e = song->patterns[cur_edit_pattern]->tracks[track]->get_event(y);
           m_upd++; 

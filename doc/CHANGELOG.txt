@@ -4,6 +4,39 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_12 (CC Drawmode: drag-to-draw CC drawbars with the mouse)
+--------------------------------------------------------------------
+
+        + MD_CC_DRAW (new mouse-draw sub-mode) -- with a CCizer slot
+          armed via Ctrl+Shift+§, Shift+§ enters Pattern Editor's
+          mouse-draw mode straight into MD_CC_DRAW. Click+drag inside
+          the pattern data area writes the armed slot's effect into
+          each crossed row: 'S<cc><val>' for CC slots, 'W<14bit>' for
+          PB slots. Value comes from the mouse X position within the
+          row's track width (0..0x7F mapped 0..fullwidth). Drawing
+          one parameter at a time without typing every byte is the
+          whole point -- "draw and see and draw and see" workflow
+          Esa described, mouse edition.
+
+        * src/CUI_Page.h -- new enum constant MD_CC_DRAW between
+          MD_FX_SIGNED and MD_END. TAB in mouse-draw mode cycles
+          through it only when a slot is armed; otherwise TAB skips
+          past it (the mode is useless without an armed slot's CC#
+          to write).
+
+        * src/CUI_Patterneditor.cpp -- the mouse handler in PEM_MOUSEDRAW
+          now branches MD_CC_DRAW into an S/W effect writer keyed off
+          the armed slot's CC# / PB-marker. The per-row bar renderer
+          (disp_gfxeffect_pattern) shows the bar only for rows whose
+          existing event matches the armed CC -- bars for unrelated
+          CCs aren't shown, so the drawn pattern reflects the armed
+          parameter and nothing else.
+
+        ! Playback already dispatches 'S' as MIDI CC and 'W' as
+          pitchwheel via ET_CC / ET_PITCH (playback.cpp:1471, 1491).
+          Drawn drawbars therefore play back as MIDI CCs out the
+          configured device with no further wiring.
+
 zt 2026_05_12 (CC Drawmode: cycle through CCizer slots + Shortcuts rebind)
 --------------------------------------------------------------------------
 
