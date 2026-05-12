@@ -22,11 +22,18 @@ zt 2026_05_12 (CC Drawmode: one-key arm-and-draw + visual cleanup)
           overwrote it (visible as "(CC)DRAW slot 16/23: CC24 ..."
           colliding with "Pattern Editor (F2)").
 
-        * src/CUI_CcConsole.cpp -- the "Loaded foo.txt - N slot(s)"
-          status message dropped its em-dash (U+2014) in favor of an
-          ASCII hyphen. zT's bitmap font is single-byte (CP437-ish),
-          so multi-byte UTF-8 chars rendered as garbage glyphs
-          between the filename and slot count.
+        * src/CUI_CcConsole.cpp + src/CUI_LuaConsole.cpp +
+          src/CUI_PaletteEditor.cpp + src/ccizer.cpp -- four
+          em-dash (U+2014) char literals replaced with ASCII
+          hyphens. zT's bitmap font is single-byte (CP437-ish),
+          so any multi-byte UTF-8 char rendered as a run of
+          garbage glyphs. The four offenders were the "Loaded
+          foo.txt - N slot(s)" CC Console line, the Lua Console
+          welcome line, the Palette Editor "Selected X - drag the
+          R/G/B bars..." status, and the CC view sidecar file
+          header. Whole-codebase grep confirms no other non-ASCII
+          characters live in string literals that hit print() /
+          printBG() / printtitle().
 
         * src/CUI_Patterneditor.cpp -- the CC drawmode cycle keypath
           (Ctrl+Shift+§) reverted from g_keybindings.match() back to

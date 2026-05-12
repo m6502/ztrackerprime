@@ -188,7 +188,7 @@ int zt_ccizer_save_view_sidecar(const ZtCcizerFile *f) {
     path_swap_extension(f->path, ".cc-view", sidecar, sizeof(sidecar));
     FILE *fp = fopen(sidecar, "w");
     if (!fp) return -2;
-    fprintf(fp, "# zTracker CC Console view hints — slot index, slider|knob\n");
+    fprintf(fp, "# zTracker CC Console view hints - slot index, slider|knob\n");
     for (int i = 0; i < f->num_slots; i++) {
         fprintf(fp, "%d %s\n", i + 1,
                 f->slots[i].view == ZT_CCIZER_VIEW_KNOB ? "knob" : "slider");

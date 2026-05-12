@@ -3961,33 +3961,45 @@ void CUI_Patterneditor::draw(Drawable *S)
 
     // Persistent CC drawmode badge — easy to forget the cycle is armed
     // since the advance-status message scrolls past. Right-aligned on
-    // the title row so it doesn't fight with the pattern data area.
-    // Shows the armed slot's CC# + name so the user always knows which
-    // physical knob is "live".
-    if (g_cc_drawmode > 0) {
-      char badge[96];
-      ZtCcizerFile *cf = zt_ccizer_current_file();
-      int slot_idx = g_cc_drawmode - 1;
-      if (cf && slot_idx < cf->num_slots) {
-        const ZtCcizerSlot *s = &cf->slots[slot_idx];
-        if (s->cc == ZT_CCIZER_PB_MARKER) {
-          snprintf(badge, sizeof(badge), "[CC DRAW slot %d/%d: PB %s]",
-                   g_cc_drawmode, cf->num_slots, s->name);
+    // the row just above the title row. Shows the armed slot's CC# +
+    // name so the user always knows which physical knob is "live".
+    //
+    // IMPORTANT: pad to a fixed width and use printBG so cycling
+    // between slots with different name lengths doesn't leave stale
+    // glyphs behind. The main draw loop only clears row 12 onwards
+    // per frame, so the badge row never gets a background sweep.
+    {
+      static const int BADGE_W = 56;
+      char badge[BADGE_W + 1];
+      memset(badge, ' ', BADGE_W);
+      badge[BADGE_W] = '\0';
+      if (g_cc_drawmode > 0) {
+        char tmp[BADGE_W + 1];
+        ZtCcizerFile *cf = zt_ccizer_current_file();
+        int slot_idx = g_cc_drawmode - 1;
+        if (cf && slot_idx < cf->num_slots) {
+          const ZtCcizerSlot *s = &cf->slots[slot_idx];
+          if (s->cc == ZT_CCIZER_PB_MARKER) {
+            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: PB %s]",
+                     g_cc_drawmode, cf->num_slots, s->name);
+          } else {
+            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: CC%d %s]",
+                     g_cc_drawmode, cf->num_slots, (int)s->cc, s->name);
+          }
         } else {
-          snprintf(badge, sizeof(badge), "[CC DRAW slot %d/%d: CC%d %s]",
-                   g_cc_drawmode, cf->num_slots, (int)s->cc, s->name);
+          snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d -- stale]",
+                   g_cc_drawmode);
         }
-      } else {
-        // Stale slot index (file changed under us). Still flag the
-        // mode is on so the user can advance once to re-arm.
-        snprintf(badge, sizeof(badge), "[CC DRAW slot %d -- stale, advance to re-arm]",
-                 g_cc_drawmode);
+        // Right-justify into the padded BADGE_W field so it always
+        // ends at the same column.
+        int tlen = (int)strlen(tmp);
+        if (tlen > BADGE_W) tlen = BADGE_W;
+        memcpy(badge + (BADGE_W - tlen), tmp, tlen);
       }
-      int badge_len = (int)strlen(badge);
-      int x_col = CHARS_X - badge_len - 2;
+      int x_col = CHARS_X - BADGE_W - 2;
       if (x_col < 2) x_col = 2;
-      print(col(x_col), row(PAGE_TITLE_ROW_Y - 1), badge,
-            COLORS.Brighttext, S);
+      printBG(col(x_col), row(PAGE_TITLE_ROW_Y - 1), badge,
+              COLORS.Brighttext, COLORS.Background, S);
     }
 
     switch(mode) {
