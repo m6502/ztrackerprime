@@ -4,6 +4,26 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_12 (All 7 hand-tuned palettes: regenerate from Schism's IT data)
+---------------------------------------------------------------------------
+
+        * palettes/{camouflage,gold,light_blue,midnight_tracking,
+          pine_colours,soundtracker,volcanic}.conf -- the seven
+          hand-tuned palettes that shipped with zT' since the early
+          forks were drifting from Impulse Tracker's originals. The
+          Camouflage drift was the most visible (the zT' version was
+          all-olive-green with BG #6B7340; IT's Camouflage is
+          tan/brown chrome with green/yellow/magenta accents), but
+          side-by-side screenshots of the Schism Tracker palette
+          editor showed all seven diverging. Regenerated from Schism
+          Tracker's palettes.c (which preserves the 16-slot 6-bit
+          RGB values straight from IT) via the existing
+          scripts/import-schism-palettes.py mapper. The other 9
+          presets (Industrial / Purple Motion / Why Colors? / Kawaii
+          / Gold (Vintage) / FX 2.0 / Atlantic / Acid Gas / Hotdog
+          Stand) were already imported from Schism on a prior pass
+          and were left unchanged.
+
 zt 2026_05_12 (CHANGELOG: union-merge to stop the line-7 PR conflict mill)
 --------------------------------------------------------------------------
 
