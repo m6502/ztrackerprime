@@ -78,6 +78,7 @@
 #include "save_key_dispatch.h"
 #include "zt_crash.h"
 #include "midi_mappings.h"
+#include "ccizer.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -353,6 +354,58 @@ CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
 int g_cc_drawmode = 0;
 int g_cc_draw_session_snapped = 0;
+
+// Cycle CC drawmode: 0 -> 1 -> 2 -> ... -> N -> 0, where N is the
+// currently-loaded CCizer file's slot count. When no file is loaded
+// (or it has zero slots) the cycle collapses to 0 -> 0 and the status
+// line nags the user to load one.
+//
+// Reasoning behind picking "per-slot CC filter" instead of the old
+// binary on/off: with the old behaviour, any incoming CC (from any
+// knob) wrote a Sxxyy at the cursor, so drawing multiple parameters
+// one at a time required the user to also be careful with which
+// physical control they were touching. Per-slot filtering means a
+// single knob/slider is "armed" -- you turn it, see the row, advance
+// the cycle, arm the next one, etc. The "draw and see and draw and
+// see" workflow Esa described.
+int zt_advance_cc_drawmode(void)
+{
+    g_cc_draw_session_snapped = 0;
+    ZtCcizerFile *cf = zt_ccizer_current_file();
+    int max_slot = (cf != NULL) ? cf->num_slots : 0;
+
+    if (max_slot <= 0) {
+        // No CCizer file loaded. Cycle stays at 0 and we tell the
+        // user where to load one.
+        g_cc_drawmode = 0;
+        snprintf(szStatmsg, sizeof(szStatmsg),
+                 "CC drawmode: load a CCizer file first (Shift+F3)");
+        statusmsg = szStatmsg;
+        status_change = 1;
+        return 0;
+    }
+
+    g_cc_drawmode++;
+    if (g_cc_drawmode > max_slot) g_cc_drawmode = 0;
+
+    if (g_cc_drawmode == 0) {
+        snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: OFF");
+    } else {
+        const ZtCcizerSlot *s = &cf->slots[g_cc_drawmode - 1];
+        if (s->cc == ZT_CCIZER_PB_MARKER) {
+            snprintf(szStatmsg, sizeof(szStatmsg),
+                     "CC drawmode: slot %d/%d -- PB (%s)",
+                     g_cc_drawmode, max_slot, s->name);
+        } else {
+            snprintf(szStatmsg, sizeof(szStatmsg),
+                     "CC drawmode: slot %d/%d -- CC %d (%s)",
+                     g_cc_drawmode, max_slot, (int)s->cc, s->name);
+        }
+    }
+    statusmsg = szStatmsg;
+    status_change = 1;
+    return g_cc_drawmode;
+}
 
 
 

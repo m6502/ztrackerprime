@@ -171,14 +171,9 @@ static void mm_quit(void) {
 }
 
 static void mm_toggle_cc_drawmode(void) {
-    // Use the shared toggler in zt.h so the undo-session marker resets
-    // too -- a bare g_cc_drawmode = !g_cc_drawmode would skip the reset
-    // and leave the next drawmode-on session unsnapped (audit H2).
-    zt_toggle_cc_drawmode();
-    snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: %s",
-             g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
-    statusmsg = szStatmsg;
-    status_change = 1;
+    // Shared cycle in main.cpp resets the undo-session marker and writes
+    // its own slot summary into statusmsg.
+    zt_advance_cc_drawmode();
 }
 
 // Build a CLI invocation string that re-launches zt with the same
@@ -275,7 +270,7 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Shortcuts & MIDI Mappings","Shift+F2",             CMD_SWITCH_KEYBINDINGS,     NULL},
     {MM_CMD,        "Paketti CCizer",           "Shift+F3",             CMD_SWITCH_CCCONSOLE,       NULL},
     {MM_CMD,        "SysEx Librarian",          "Shift+F5",             CMD_SWITCH_SYSEX_LIB,       NULL},
-    {MM_FUNC,       "Toggle CC Drawmode",       "Ctrl+Shift+\xA7",      0,                          mm_toggle_cc_drawmode},
+    {MM_FUNC,       "Cycle CC Drawmode",        "Ctrl+Shift+\xA7",      0,                          mm_toggle_cc_drawmode},
     {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
 
