@@ -4,6 +4,18 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_12 (CHANGELOG: union-merge to stop the line-7 PR conflict mill)
+--------------------------------------------------------------------------
+
+        * .gitattributes (new) -- doc/CHANGELOG.txt now uses
+          merge=union. Every PR inserts its entry at the same anchor
+          (top of the file, right under the Legend), so any two open
+          PRs touching the changelog would 3-way-conflict the moment
+          one merged. Union merge concatenates both sides instead of
+          conflicting; the only cost is that newest-on-top ordering
+          may need a manual touch-up after a merge, which is much
+          cheaper than resolving the same nested marker block by
+          hand on every open PR.
 zt 2026_05_05 (ztskin: multiplatform skin compiler/decompiler CLI)
 ------------------------------------------------------------------
 
