@@ -4,6 +4,19 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_14 (CI: bundle CCizer banks + SysEx examples in release artifacts)
+----------------------------------------------------------------------------
+
+        * .github/workflows/build.yml -- Linux, Windows XP (MinGW),
+          and Windows x64 (MSVC) "Stage release" steps now copy
+          assets/ccizer and assets/syx into the staged directory.
+          Without this, downloaded Linux/Windows releases shipped
+          without sc88st.txt, microfreak.txt, etc., leaving the
+          Shift+F3 CC Console and Shift+F5 SysEx Librarian empty
+          out of the box. macOS was already fine because the .app
+          bundle carries assets/ccizer + assets/syx in Resources/
+          via the CMake POST_BUILD step.
+
 zt 2026_05_13 (CC Drawmode: ghost bars + Overwrite Previous Drawbars toggle)
 ----------------------------------------------------------------------------
 

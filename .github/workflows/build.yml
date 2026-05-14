@@ -150,6 +150,8 @@ jobs:
           cp zt.conf                 dist/ztrackerprime-linux-x86_64/
           cp -R skins                dist/ztrackerprime-linux-x86_64/
           cp -R doc                  dist/ztrackerprime-linux-x86_64/
+          cp -R assets/ccizer        dist/ztrackerprime-linux-x86_64/
+          cp -R assets/syx           dist/ztrackerprime-linux-x86_64/
           # Ship libSDL3.so.0 next to the binary so the artifact is self-
           # contained -- the system apt does not yet provide SDL3.
           cp -a sdl3-prefix/lib/libSDL3.so*  dist/ztrackerprime-linux-x86_64/ || true
@@ -441,6 +443,8 @@ jobs:
           cp zt.conf                             dist/ztrackerprime-windows-x86-xp/
           cp -R skins                            dist/ztrackerprime-windows-x86-xp/
           cp -R doc                              dist/ztrackerprime-windows-x86-xp/
+          cp -R assets/ccizer                    dist/ztrackerprime-windows-x86-xp/
+          cp -R assets/syx                       dist/ztrackerprime-windows-x86-xp/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -541,6 +545,8 @@ jobs:
           Copy-Item zt.conf                    $dest
           Copy-Item skins -Recurse             $dest
           Copy-Item doc   -Recurse             $dest
+          Copy-Item assets\ccizer -Recurse     $dest
+          Copy-Item assets\syx    -Recurse     $dest
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
