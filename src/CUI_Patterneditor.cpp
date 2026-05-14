@@ -1711,11 +1711,68 @@ void CUI_Patterneditor::update()
           need_refresh++;
           break;
         } ;
+
+        // Keyjazz audition in mouse-draw mode. Mouse draws drawbars, the
+        // keyboard is otherwise idle here — let the user hear notes while
+        // drawing. noteOff fires automatically from the central key-up
+        // path in main.cpp::keyhandler via jazz_clear_state.
+        if (cur_inst >= 0 && cur_inst < MAX_INSTS &&
+            song->instruments[cur_inst]) {
+          int jazz_note = -1;
+          switch (scancode) {
+          case SDL_SCANCODE_Q: jazz_note = 12*base_octave;          break;
+          case SDL_SCANCODE_2: jazz_note = (12*base_octave)+1;      break;
+          case SDL_SCANCODE_W: jazz_note = (12*base_octave)+2;      break;
+          case SDL_SCANCODE_3: jazz_note = (12*base_octave)+3;      break;
+          case SDL_SCANCODE_E: jazz_note = (12*base_octave)+4;      break;
+          case SDL_SCANCODE_R: jazz_note = (12*base_octave)+5;      break;
+          case SDL_SCANCODE_5: jazz_note = (12*base_octave)+6;      break;
+          case SDL_SCANCODE_T: jazz_note = (12*base_octave)+7;      break;
+          case SDL_SCANCODE_6: jazz_note = (12*base_octave)+8;      break;
+          case SDL_SCANCODE_Y: jazz_note = (12*base_octave)+9;      break;
+          case SDL_SCANCODE_7: jazz_note = (12*base_octave)+10;     break;
+          case SDL_SCANCODE_U: jazz_note = (12*base_octave)+11;     break;
+          case SDL_SCANCODE_I: jazz_note = (12*base_octave)+12;     break;
+          case SDL_SCANCODE_9: jazz_note = (12*base_octave)+1+12;   break;
+          case SDL_SCANCODE_O: jazz_note = (12*base_octave)+2+12;   break;
+          case SDL_SCANCODE_0: jazz_note = (12*base_octave)+3+12;   break;
+          case SDL_SCANCODE_P: jazz_note = (12*base_octave)+4+12;   break;
+          case SDL_SCANCODE_Z: jazz_note = 12*(base_octave-1);      break;
+          case SDL_SCANCODE_S: jazz_note = (12*(base_octave-1))+1;  break;
+          case SDL_SCANCODE_X: jazz_note = (12*(base_octave-1))+2;  break;
+          case SDL_SCANCODE_D: jazz_note = (12*(base_octave-1))+3;  break;
+          case SDL_SCANCODE_C: jazz_note = (12*(base_octave-1))+4;  break;
+          case SDL_SCANCODE_V: jazz_note = (12*(base_octave-1))+5;  break;
+          case SDL_SCANCODE_G: jazz_note = (12*(base_octave-1))+6;  break;
+          case SDL_SCANCODE_B: jazz_note = (12*(base_octave-1))+7;  break;
+          case SDL_SCANCODE_H: jazz_note = (12*(base_octave-1))+8;  break;
+          case SDL_SCANCODE_N: jazz_note = (12*(base_octave-1))+9;  break;
+          case SDL_SCANCODE_J: jazz_note = (12*(base_octave-1))+10; break;
+          case SDL_SCANCODE_M: jazz_note = (12*(base_octave-1))+11; break;
+          default: break;
+          }
+          if (jazz_note >= 0 && jazz_note <= 0x7F &&
+              !jazz_note_is_active((int)key)) {
+            int played = jazz_note + song->instruments[cur_inst]->transpose;
+            if (played > 0x7F) played = 0x7F;
+            if (played < 0)    played = 0;
+            unsigned char vel = song->instruments[cur_inst]->default_volume;
+            if (song->instruments[cur_inst]->global_volume != 0x7F && vel > 0) {
+              vel = (unsigned char)((vel * song->instruments[cur_inst]->global_volume) / 0x7F);
+            }
+            MidiOut->noteOn(song->instruments[cur_inst]->midi_device,
+                            (unsigned char)played,
+                            song->instruments[cur_inst]->channel,
+                            vel, MAX_TRACKS, 0);
+            jazz_set_state((int)key, (unsigned char)played,
+                           song->instruments[cur_inst]->channel);
+          }
+        }
       }
-      
-      
-      
-      
+
+
+
+
       
       
       if (cur_edit_row_disp >= song->patterns[cur_edit_pattern]->length - PATTERN_EDIT_ROWS) {

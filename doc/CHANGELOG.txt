@@ -4,6 +4,32 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_14 (Windows: Ctrl+Shift+` fix + keyjazz audition in mouse-draw)
+----------------------------------------------------------------------------
+
+        * src/main.cpp::keyhandler -- non-Apple branch now remaps
+          SDL_SCANCODE_GRAVE -> SDLK_GRAVE explicitly, matching the
+          existing macOS branch. SDL3 layout-transforms the backtick
+          key under Shift to SDLK_TILDE (~) on Windows + US/Finnish
+          layouts, so Ctrl+Shift+` never produced SDLK_GRAVE and the
+          CC drawmode cycle in the Pattern Editor never fired. The
+          NONUSBACKSLASH/INTERNATIONAL1..3 remap that already lived
+          here only triggered for Finnish ISO § via non-grave
+          scancodes; physical backtick fell through unmapped under
+          modifiers. With this fix Ctrl+Shift+` cycles CCizer slots
+          on Windows the same way Ctrl+Shift+§ does on EU Finnish.
+
+        + src/CUI_Patterneditor.cpp -- keyjazz audition is now
+          available while the Pattern Editor is in PEM_MOUSEDRAW
+          mode (the mode you enter with Shift+§ / Shift+`). Q/2/W/3/
+          E/... and Z/S/X/D/C/... play notes on the current
+          instrument's MIDI channel using the current base octave,
+          same key map as the regular T_NOTE column. The note-off is
+          handled by the existing central key-up path in main.cpp::
+          keyhandler -- no pattern mutation, no row advance, pure
+          audition. Lets you hear what you're drawing CC drawbars
+          against without leaving mouse-draw.
+
 zt 2026_05_14 (CI: bundle CCizer banks + SysEx examples in release artifacts)
 ----------------------------------------------------------------------------
 
