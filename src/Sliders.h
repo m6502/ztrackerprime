@@ -20,6 +20,12 @@ class ValueSlider : public UserInterfaceElement {
         int input_value; // raw typed number from the popup, preserved BEFORE clamping
                          // so callers can see the user's literal input even if it falls
                          // outside [min,max]. Only valid when from_input == 1.
+        // Double-click-to-reset. If dblclick_default is in [min,max], a second
+        // left-click within DBLCLICK_MS on the same widget snaps value to
+        // dblclick_default and bumps `changed`. Sentinel -1 disables. Used by
+        // CC Console to center pitchbend (8192) / zero CCs on a quick re-click.
+        int dblclick_default;
+        unsigned int last_click_ms;
         explicit ValueSlider(int fset = 0);
         virtual ~ValueSlider() = default ;
         int mouseupdate(int cur_element);

@@ -16,6 +16,8 @@ ValueSlider::ValueSlider(int fset)
     focus = fset;
     from_input = 0;
     input_value = 0;
+    dblclick_default = -1;
+    last_click_ms = 0;
 }
 
 
@@ -34,6 +36,26 @@ int ValueSlider::mouseupdate(int cur_element)
         switch(key) {
             case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)):
                 if (checkclick(col(this->x),row(this->y),col(this->x+this->xsize),row(this->y+1))) {
+                    // Double-click reset: a second left-down within 500 ms
+                    // on the same widget snaps value to dblclick_default
+                    // (e.g. PB center 8192, CC zero) and short-circuits
+                    // the drag-to-position path so the snapped value isn't
+                    // immediately overridden by the click's mouse-X.
+                    unsigned int now = SDL_GetTicks();
+                    if (dblclick_default >= min && dblclick_default <= max &&
+                        last_click_ms != 0 && (now - last_click_ms) < 500) {
+                        if (value != dblclick_default) {
+                            value = dblclick_default;
+                            changed++;
+                            need_refresh++;
+                            need_redraw++;
+                        }
+                        last_click_ms = 0;
+                        Keys.getkey();
+                        fixmouse++;
+                        return this->ID;
+                    }
+                    last_click_ms = now;
                     mousestate = 1;
                     act++;
                     newclick=0; // unset click to focus

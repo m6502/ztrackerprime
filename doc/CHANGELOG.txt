@@ -4,6 +4,37 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_14 (CC Console: double-click reset + Ctrl+F2 drawmode cycle)
+----------------------------------------------------------------------------
+
+        + src/Sliders.{h,cpp} -- ValueSlider gains a double-click-
+          to-reset facility. New members:
+            * int dblclick_default  -- sentinel -1 disables; in range
+              [min,max] enables. Caller sets this to the slot's
+              natural rest value.
+            * unsigned int last_click_ms -- timestamp of last left-
+              click on this widget (SDL_GetTicks).
+          A second MOUSE_BUTTON_DOWN_LEFT within 500 ms on the same
+          widget snaps value to dblclick_default and bumps `changed`,
+          short-circuiting the drag-to-position path so the snapped
+          value isn't immediately overridden by the click's mouse-X.
+
+        + src/CUI_CcConsole.cpp::position_sliders -- each visible
+          slot now sets dblclick_default = slot_default(s), i.e.
+          8192 (center) for pitchbend slots and 0 for CC slots.
+          Double-clicking a PB slider snaps it back to center and
+          fires the corresponding MIDI Pitch Wheel via the existing
+          absorb_slider_changes -> send_slot path.
+
+        + src/CUI_Patterneditor.cpp -- Ctrl+F2 is now an alternate
+          CC-drawmode-cycle shortcut, parallel to the existing
+          Ctrl+Shift+§/`. Each press advances 0 -> 1 -> ... -> N -> 0
+          through the currently-loaded CCizer file. Useful when the
+          §/grave key is awkward to reach with two modifiers held
+          (laptop keyboards, non-Finnish layouts). Plain F2 stays
+          the page-switch; Alt+F2 stays the track-1 mute toggle;
+          Ctrl+F2 was otherwise unbound.
+
 zt 2026_05_14 (Windows: Ctrl+Shift+` fix + keyjazz audition in mouse-draw)
 ----------------------------------------------------------------------------
 
