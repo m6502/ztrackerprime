@@ -1477,6 +1477,19 @@ void CUI_Patterneditor::update()
       need_refresh++; key = 0;
     }
 
+    // Ctrl+F2 is an alternate CC-drawmode-cycle shortcut. Same advance as
+    // Ctrl+Shift+§/` -- useful on platforms / layouts where the §/grave
+    // key is awkward to reach with two modifiers held (Windows non-
+    // Finnish layouts, laptop keyboards without a dedicated § key).
+    // Plain F2 stays the global Pattern Editor page-switch; Alt+F2 stays
+    // the track-1 mute toggle below; Ctrl+F2 is otherwise unbound.
+    if ((kstate & KS_CTRL) && !(kstate & KS_SHIFT) && !KS_HAS_ALT(kstate) &&
+        key == SDLK_F2) {
+      zt_advance_cc_drawmode();
+      midiInQueue.clear();
+      need_refresh++; key = 0;
+    }
+
     if (kstate == KS_SHIFT) {
 
       switch(key)

@@ -418,6 +418,7 @@ void CUI_CcConsole::position_sliders(int grid_max_rows) {
         vs->min = 0;
         vs->max = slot_max(s);
         vs->value = s->value;
+        vs->dblclick_default = slot_default(s);
         // Force a paint every frame: UserInterface::draw skips elements
         // with need_redraw==0, but the page-level slot grid blanks the
         // surrounding text on every frame and a sibling slider's drag
