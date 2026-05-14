@@ -299,7 +299,15 @@ void CUI_InstEditor::update() {
             scancode = Keys.getcode();
             kstate = Keys.getstate();
         }
-        const bool editing_name = (ie && ie->text_cursor < 24);
+        // `text_cursor < 24` only means "name field is in edit state". It
+        // does NOT mean the name field is currently focused -- ie's
+        // text_cursor stays whatever it was last set to even after the
+        // user Tabs to another widget (channel slider, midi-device list,
+        // etc.). So also gate on `cur_element == 0`, the tabindex of the
+        // InstEditor list itself, otherwise pressing Q on the channel
+        // slider sees text_cursor==0 and suppresses keyjazz.
+        const bool editing_name = (ie && ie->text_cursor < 24 &&
+                                   UI->cur_element == 0);
 
         switch(kstate) {
             case KS_CTRL:

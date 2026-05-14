@@ -4,6 +4,43 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_14 (IEdit keyjazz + Alt-P centering + Ctrl+C/V/P clipboard)
+----------------------------------------------------------------------------
+
+        * src/CUI_InstEditor.cpp -- keyjazz audition (Q/W/E... and
+          Z/S/X/D/C...) now works when a non-name widget on the
+          Instrument Editor has focus (channel slider, MIDI device
+          listbox, etc.). The previous `editing_name` guard only
+          tested `ie->text_cursor < 24`, but that flag is sticky
+          across focus changes -- once the user clicked the name
+          field, every subsequent press on any other widget got
+          suppressed as "still editing name". Now also requires
+          `UI->cur_element == 0` (the InstEditor list's tabindex),
+          so once focus moves elsewhere keyjazz resumes.
+
+        * src/CUI_SongDuration.cpp -- Alt-P popup. "Song Duration"
+          title and "Total: m:ss" line are now centered against the
+          widget rect (this->x + this->xsize/2), not against the
+          whole screen. At default 640x480 the two centers happen
+          to coincide, but on higher-resolution displays or when
+          the widget is repositioned, the screen-center text could
+          fall outside the widget and be clipped by the right
+          border. User saw "Song Duration: tal: 0:03" (the leading
+          "To" of "Total" eaten by the widget frame).
+
+        + src/CUI_Patterneditor.cpp -- familiar Ctrl+C / Ctrl+V /
+          Ctrl+P clipboard shortcuts wired up alongside the legacy
+          Alt-keyed copy/paste:
+            * Ctrl+C  -- copy current selection to clipboard
+              (mirrors Alt+C).
+            * Ctrl+V  -- paste clipboard at the cursor in OVERWRITE
+              mode (mirrors Alt+O, which is what most users expect
+              from a "paste" shortcut today).
+            * Ctrl+P  -- paste clipboard repeatedly downward from
+              the cursor until the end of the pattern is reached
+              (overwrite fill). Useful for drum loops, ostinatos,
+              and stamping the same chord across the whole pattern.
+
 zt 2026_05_14 (CC Console: double-click reset + Ctrl+F2 drawmode cycle)
 ----------------------------------------------------------------------------
 

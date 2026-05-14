@@ -2385,7 +2385,7 @@ void CUI_Patterneditor::update()
             break;
             
           case SDLK_N: /* Set length of first note to length of selection */
-            if (selected && 
+            if (selected &&
               (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
               ) {
               j = (select_row_end+1 - select_row_start)*(96/song->tpb);
@@ -2396,7 +2396,34 @@ void CUI_Patterneditor::update()
             }
             break;
 
+          // Familiar Ctrl+C / Ctrl+V / Ctrl+P clipboard shortcuts in addition
+          // to the legacy Alt-keyed copy/paste below. Ctrl+P pastes the
+          // clipboard repeatedly downward from the cursor until the end of
+          // the pattern is reached (fill).
+          case SDLK_C:
+            if (selected) {
+              clipboard->copy();
+              SDL_Delay(50);
+              need_refresh++;
+            }
+            break;
 
+          case SDLK_V:
+            clipboard->paste(cur_edit_track, cur_edit_row, 1); // overwrite
+            need_refresh++;
+            break;
+
+          case SDLK_P:
+            if (clipboard->rows > 0) {
+              int target = cur_edit_row;
+              int limit  = song->patterns[cur_edit_pattern]->length;
+              while (target < limit) {
+                clipboard->paste(cur_edit_track, target, 1); // overwrite
+                target += clipboard->rows;
+              }
+              need_refresh++;
+            }
+            break;
 
           } ;
 
