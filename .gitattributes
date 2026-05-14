@@ -1,0 +1,5 @@
+# Concatenate both sides instead of conflicting when two branches both
+# add entries to the changelog. Newest-on-top ordering may need a manual
+# touch-up post-merge, but the 3-way "everyone collides at line 7" pain
+# goes away.
+doc/CHANGELOG.txt merge=union

@@ -78,6 +78,7 @@
 #include "save_key_dispatch.h"
 #include "zt_crash.h"
 #include "midi_mappings.h"
+#include "ccizer.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -287,6 +288,12 @@ Bitmap *VS = NULL;
 
 const char *statusmsg = " ";
 char szStatmsg[1024];
+// Error escalation: when a failure-path call site sets the status line via
+// set_error_status(), this timestamp marks how long the renderer should
+// paint the status row in inverted (highlight) colors so the user actually
+// notices. The original "(1: unknown error)" status looked indistinguishable
+// from routine "Opened[out]: ..." messages and got missed.
+Uint64 statusmsg_error_until_ms = 0;
 
 //unsigned long numMidiDevs;
 
@@ -347,6 +354,76 @@ CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
 int g_cc_drawmode = 0;
 int g_cc_draw_session_snapped = 0;
+
+// Cycle CC drawmode: 0 -> 1 -> 2 -> ... -> N -> 0, where N is the
+// currently-loaded CCizer file's slot count. When no file is loaded
+// (or it has zero slots) the cycle collapses to 0 -> 0 and the status
+// line nags the user to load one.
+//
+// Reasoning behind picking "per-slot CC filter" instead of the old
+// binary on/off: with the old behaviour, any incoming CC (from any
+// knob) wrote a Sxxyy at the cursor, so drawing multiple parameters
+// one at a time required the user to also be careful with which
+// physical control they were touching. Per-slot filtering means a
+// single knob/slider is "armed" -- you turn it, see the row, advance
+// the cycle, arm the next one, etc. The "draw and see and draw and
+// see" workflow Esa described.
+int zt_advance_cc_drawmode(void)
+{
+    g_cc_draw_session_snapped = 0;
+    ZtCcizerFile *cf = zt_ccizer_current_file();
+    int max_slot = (cf != NULL) ? cf->num_slots : 0;
+
+    if (max_slot <= 0) {
+        // No CCizer file loaded. Cycle stays at 0 and we tell the
+        // user where to load one.
+        g_cc_drawmode = 0;
+        snprintf(szStatmsg, sizeof(szStatmsg),
+                 "CC drawmode: load a CCizer file first (Shift+F3)");
+        statusmsg = szStatmsg;
+        status_change = 1;
+        return 0;
+    }
+
+    g_cc_drawmode++;
+    if (g_cc_drawmode > max_slot) g_cc_drawmode = 0;
+
+    // Auto-enter / auto-exit Pattern Editor mouse-draw mode so the
+    // user can just hit Ctrl+Shift+§ and immediately draw -- no
+    // separate Shift+§ press required to flip into mouse-draw. The
+    // cycle going OFF returns to regular keys mode.
+    if (UIP_Patterneditor) {
+        if (g_cc_drawmode > 0) {
+            UIP_Patterneditor->mode    = PEM_MOUSEDRAW;
+            UIP_Patterneditor->md_mode = MD_CC_DRAW;
+        } else {
+            UIP_Patterneditor->mode    = PEM_REGULARKEYS;
+            // Don't reset md_mode -- if the user re-cycles drawmode
+            // ON we set it back to MD_CC_DRAW above. Leaving it alone
+            // means a non-drawmode Shift+§ entry returns to the prior
+            // mouse-draw column (vol/fx/etc.) instead of forcing
+            // MD_CC_DRAW with no slot armed.
+        }
+    }
+
+    if (g_cc_drawmode == 0) {
+        snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: OFF");
+    } else {
+        const ZtCcizerSlot *s = &cf->slots[g_cc_drawmode - 1];
+        if (s->cc == ZT_CCIZER_PB_MARKER) {
+            snprintf(szStatmsg, sizeof(szStatmsg),
+                     "CC drawmode: slot %d/%d -- PB (%s)",
+                     g_cc_drawmode, max_slot, s->name);
+        } else {
+            snprintf(szStatmsg, sizeof(szStatmsg),
+                     "CC drawmode: slot %d/%d -- CC %d (%s)",
+                     g_cc_drawmode, max_slot, (int)s->cc, s->name);
+        }
+    }
+    statusmsg = szStatmsg;
+    status_change = 1;
+    return g_cc_drawmode;
+}
 
 
 
@@ -928,9 +1005,29 @@ void status(const char *msg,Drawable *S)
     if (n > (int)sizeof(wipe) - 1) n = sizeof(wipe) - 1;
     memset(wipe, ' ', n);
     wipe[n] = '\0';
-    printBG(col(3),row(INITIAL_ROW + 6),wipe,COLORS.Text,COLORS.Background,S);
-    printBGCC(col(3),row(INITIAL_ROW + 6),msg,COLORS.Text,COLORS.Background,S);
+    // Within the error window, paint the status row inverted (Background fg
+    // on Highlight bg) so a failed device-open / similar error is impossible
+    // to confuse with the routine "Opened[out]: <name>" green-text traffic.
+    const bool error_active = (SDL_GetTicks() < statusmsg_error_until_ms);
+    const TColor fg = error_active ? COLORS.Background : COLORS.Text;
+    const TColor bg = error_active ? COLORS.Highlight  : COLORS.Background;
+    printBG(col(3),row(INITIAL_ROW + 6),wipe,fg,bg,S);
+    printBGCC(col(3),row(INITIAL_ROW + 6),msg,fg,bg,S);
     screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(max_cols)-1,row(10));
+}
+
+// set_error_status — copy `msg` into the status buffer and arm the
+// inverted-color highlight for ~8 seconds. Use this instead of plain
+// `statusmsg = ...` whenever a code path is reporting a failure the user
+// must notice (failed MIDI device open, file save error, etc).
+void set_error_status(const char *msg)
+{
+    if (!msg) msg = "";
+    snprintf(szStatmsg, sizeof(szStatmsg), "%s", msg);
+    statusmsg = szStatmsg;
+    statusmsg_error_until_ms = SDL_GetTicks() + 8000;
+    status_change = 1;
+    need_refresh++;
 }
 
 
@@ -1309,8 +1406,15 @@ void doquit() {
 //
 //
 void quit() {
-  UIP_RUSure->str = " Sure to quit?";
+  UIP_RUSure->str = " Exit zTracker?";
   UIP_RUSure->OnYes = (VFunc)doquit;
+  // The user initiated the quit explicitly (Ctrl-Q / ESC menu Quit), so
+  // default focus to OK -- a second Enter commits. Other RUSure callers
+  // (file-overwrite, discard-changes) keep the default No-focused
+  // behaviour so an accidental Enter doesn't destroy work.
+  UIP_RUSure->default_button = 0;
+  UIP_RUSure->yes_caption    = "  OK";
+  UIP_RUSure->no_caption     = " Cancel";
   popup_window(UIP_RUSure);
 }
 

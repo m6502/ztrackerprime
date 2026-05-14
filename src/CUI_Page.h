@@ -345,7 +345,7 @@ class CUI_Logoscreen : public CUI_Page {
 };
 
 enum { PEM_REGULARKEYS, PEM_MOUSEDRAW };
-enum { MD_VOL=0, MD_FX, MD_FX_SIGNED, MD_END};
+enum { MD_VOL=0, MD_FX, MD_FX_SIGNED, MD_CC_DRAW, MD_END};
 
 class CUI_Patterneditor : public CUI_Page {
     public:
@@ -376,6 +376,12 @@ class CUI_PEParms : public CUI_Page {
         CheckBox *cb_recveloc ;
         CheckBox *cb_drawmode ;
         int      drawmode_val ;
+
+        // Overwrite Previous Drawbars toggle. Default OFF -- when MD_CC_DRAW
+        // is armed on slot N, mouse-drag only writes to rows whose effect
+        // column is empty (or already holds the same CC). Rows with other
+        // drawbars are protected from accidental overwrite.
+        CheckBox *cb_cc_draw_overwrite ;
 
         ValueSlider *vs_speedup ;
 
@@ -466,6 +472,20 @@ class CUI_RUSure : public CUI_Page {
 
         const char *str;
         VFunc OnYes;
+        // Which button is initially focused: 0 = Yes, 1 = No.
+        // Default is 1 (No) so destructive confirmations (overwrite,
+        // discard) require an explicit Yes -- pressing Enter at the
+        // prompt cancels. Callers that prompt for a clear-cut user
+        // action they already initiated (Ctrl-Q "Exit zTracker?")
+        // can set 0 so a second Enter commits.
+        int default_button;
+        // Per-popup button captions. Defaults are "  Yes" / "  No"
+        // for Y/N-style prompts. Callers wanting OK/Cancel framing
+        // (e.g. quit) can override before popup_window. Both reset
+        // to the defaults at the end of enter() so a one-shot
+        // override doesn't leak into the next popup.
+        const char *yes_caption;
+        const char *no_caption;
 
         CUI_RUSure();
 

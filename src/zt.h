@@ -672,6 +672,8 @@ extern bool bDontKeyRepeat;
 
 extern const char *statusmsg;
 extern char szStatmsg[1024];
+extern Uint64 statusmsg_error_until_ms;
+void set_error_status(const char *msg);
 
 #define COLORS CurrentSkin->Colors
 
@@ -706,28 +708,38 @@ extern int base_octave ;
 extern int cur_step;
 
 // CC drawmode -- when non-zero, the Pattern Editor's MIDI-in handler
-// captures incoming CC (0xB0) and Pitchbend (0xE0) messages and writes
-// them as `Sxxyy` (CC) / `Wxxxx` (PB) effects at the cursor row in the
-// current edit track, advancing the cursor by EditStep. Toggle with
-// Ctrl+Shift+§ from the Pattern Editor or from the ESC main menu.
+// captures incoming CC (0xB0) / Pitchbend (0xE0) messages matching the
+// active CCizer slot and writes them as `Sxxyy` (CC) / `Wxxxx` (PB)
+// effects at the cursor row in the current edit track, advancing the
+// cursor by EditStep.
+//
+// Semantics:
+//   0   = OFF (no capture)
+//   1..N = active slot index (1-based) in the currently-loaded CCizer
+//          file. Only the slot's CC# (or PB) is captured; other CCs
+//          are ignored, letting you draw one parameter at a time
+//          without crosstalk from other knobs.
+//
+// Cycle via the Shortcuts action ZT_ACTION_TOGGLE_CC_DRAWMODE
+// (default Ctrl+Shift+§) or the ESC main menu. Each press advances
+// 0 -> 1 -> ... -> N -> 0.
 extern int g_cc_drawmode;
 
-// Reset to 0 every time CC drawmode flips state, then set to 1 by the
-// first drawmode write so each ON->...->OFF span generates exactly one
-// UNDO_SAVE() snapshot. Lifted out of CUI_Patterneditor.cpp file-static
-// scope so the ESC menu's mm_toggle_cc_drawmode can reset it too --
-// otherwise toggling drawmode via the menu instead of the keypath
-// leaves the marker stale and the next session's first knob tweak is
-// unsnapped (no Ctrl+Z recovery). See audit H2.
+// Reset to 0 every time CC drawmode advances, then set to 1 by the
+// first drawmode write so each session-while-non-zero generates exactly
+// one UNDO_SAVE() snapshot. Lifted out of CUI_Patterneditor.cpp
+// file-static scope so the ESC menu and the Shortcuts dispatcher can
+// reset it too -- otherwise cycling drawmode via a path other than the
+// keypath leaves the marker stale and the next session's first knob
+// tweak is unsnapped (no Ctrl+Z recovery). See audit H2.
 extern int g_cc_draw_session_snapped;
 
-// Single toggler called from both the Pattern Editor keypath
-// (Ctrl+Shift+§) and the ESC menu entry (mm_toggle_cc_drawmode), so
-// session-marker reset can't drift between the two callers.
-static inline void zt_toggle_cc_drawmode(void) {
-    g_cc_drawmode = !g_cc_drawmode;
-    g_cc_draw_session_snapped = 0;
-}
+// Advance CC drawmode by one step in the cycle. Called from the
+// Pattern Editor keypath, the ESC menu, and the Shortcuts dispatcher,
+// so session-marker reset + slot-count lookup can't drift between the
+// callers. Writes a human-readable summary into szStatmsg / statusmsg.
+// Returns the new g_cc_drawmode value.
+int zt_advance_cc_drawmode(void);
 
 extern int keypress;
 extern int keywait;

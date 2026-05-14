@@ -4,6 +4,262 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_13 (CC Drawmode: ghost bars + Overwrite Previous Drawbars toggle)
+----------------------------------------------------------------------------
+
+        + src/CUI_Patterneditor.cpp -- MD_CC_DRAW now renders OTHER
+          slots' drawbars on every row as dim "ghost" bars (flat
+          Lowlight fill, no highlight border) while the armed slot's
+          bar continues to render bright (LCDHigh/Mid/Low). Lets the
+          user see existing drawbars for parameters they haven't
+          armed and avoid overdraw without leaving the page.
+
+        + src/draw_bar_ghost() (new) -- parallel to draw_bar() but
+          uses COLORS.Lowlight for fill and skips the highlight /
+          lowlight borders. Lighter weight so the armed bar stays
+          visually dominant.
+
+        + zt_config_globals.cc_draw_overwrite (new conf key
+          "cc_draw_overwrite") -- protects drawbars across slot
+          cycles. Default OFF: MD_CC_DRAW mouse-drag only writes to
+          rows whose effect column is empty (or already holds the
+          same CC). Rows with a *different* S/W effect are skipped,
+          so dragging CC2 across rows already holding CC1 leaves
+          the CC1 drawbar untouched. Toggle in F2 F2 (Pattern Editor
+          Options) -> "CCOver:" next to DrawMode.
+
+        * src/CUI_PEParms.cpp + src/CUI_Page.h -- the F2 F2 Parms
+          popup gains the cb_cc_draw_overwrite checkbox at column 23
+          on row 18, mirroring the StepEdit / RecVeloc pattern.
+
+        * src/conf.{h,cpp} -- cc_draw_overwrite added to ZTConf,
+          default 0 in resetToDefaults, parsed via getFlag("cc_draw_overwrite")
+          in loadConf and written back on save.
+
+zt 2026_05_12 (CC Drawmode: one-key arm-and-draw + visual cleanup)
+------------------------------------------------------------------
+
+        * src/main.cpp -- zt_advance_cc_drawmode() now auto-enters
+          PEM_MOUSEDRAW + MD_CC_DRAW the moment a slot is armed.
+          Previously the workflow was Ctrl+Shift+§ (cycle to slot K)
+          then Shift+§ (enter mouse-draw) -- two keys for one
+          mental step. Now Ctrl+Shift+§ alone is sufficient: the
+          cycle arms a slot AND drops the Pattern Editor into
+          drawbar-draw mode. Cycling back to OFF returns to
+          PEM_REGULARKEYS.
+
+        * src/CUI_Patterneditor.cpp -- CC DRAW badge moved one row
+          above the "Pattern Editor (F2)" title row. Before, the
+          badge printed on the same character row as the title and
+          overwrote it (visible as "(CC)DRAW slot 16/23: CC24 ..."
+          colliding with "Pattern Editor (F2)").
+
+        * src/CUI_CcConsole.cpp + src/CUI_LuaConsole.cpp +
+          src/CUI_PaletteEditor.cpp + src/ccizer.cpp -- four
+          em-dash (U+2014) char literals replaced with ASCII
+          hyphens. zT's bitmap font is single-byte (CP437-ish),
+          so any multi-byte UTF-8 char rendered as a run of
+          garbage glyphs. The four offenders were the "Loaded
+          foo.txt - N slot(s)" CC Console line, the Lua Console
+          welcome line, the Palette Editor "Selected X - drag the
+          R/G/B bars..." status, and the CC view sidecar file
+          header. Whole-codebase grep confirms no other non-ASCII
+          characters live in string literals that hit print() /
+          printBG() / printtitle().
+
+        * src/CUI_Patterneditor.cpp -- the CC drawmode cycle keypath
+          (Ctrl+Shift+§) reverted from g_keybindings.match() back to
+          a literal kstate / key check, matching every other shortcut
+          in zT. Reason: the keybindings table is never initialised
+          at runtime (g_keybindings.setDefaults() lives in unused
+          init function initConsole), so match() always returned
+          ZT_ACTION_NONE and the cycle never fired. Once the
+          Shortcuts table is wired up at real app init, this can
+          move back to match() for user-rebindability.
+
+zt 2026_05_12 (All 7 hand-tuned palettes: regenerate from Schism's IT data)
+---------------------------------------------------------------------------
+
+        * palettes/{camouflage,gold,light_blue,midnight_tracking,
+          pine_colours,soundtracker,volcanic}.conf -- the seven
+          hand-tuned palettes that shipped with zT' since the early
+          forks were drifting from Impulse Tracker's originals. The
+          Camouflage drift was the most visible (the zT' version was
+          all-olive-green with BG #6B7340; IT's Camouflage is
+          tan/brown chrome with green/yellow/magenta accents), but
+          side-by-side screenshots of the Schism Tracker palette
+          editor showed all seven diverging. Regenerated from Schism
+          Tracker's palettes.c (which preserves the 16-slot 6-bit
+          RGB values straight from IT) via the existing
+          scripts/import-schism-palettes.py mapper. The other 9
+          presets (Industrial / Purple Motion / Why Colors? / Kawaii
+          / Gold (Vintage) / FX 2.0 / Atlantic / Acid Gas / Hotdog
+          Stand) were already imported from Schism on a prior pass
+          and were left unchanged.
+zt 2026_05_12 (CC Drawmode: drag-to-draw CC drawbars with the mouse)
+--------------------------------------------------------------------
+
+        + MD_CC_DRAW (new mouse-draw sub-mode) -- with a CCizer slot
+          armed via Ctrl+Shift+§, Shift+§ enters Pattern Editor's
+          mouse-draw mode straight into MD_CC_DRAW. Click+drag inside
+          the pattern data area writes the armed slot's effect into
+          each crossed row: 'S<cc><val>' for CC slots, 'W<14bit>' for
+          PB slots. Value comes from the mouse X position within the
+          row's track width (0..0x7F mapped 0..fullwidth). Drawing
+          one parameter at a time without typing every byte is the
+          whole point -- "draw and see and draw and see" workflow
+          Esa described, mouse edition.
+
+        * src/CUI_Page.h -- new enum constant MD_CC_DRAW between
+          MD_FX_SIGNED and MD_END. TAB in mouse-draw mode cycles
+          through it only when a slot is armed; otherwise TAB skips
+          past it (the mode is useless without an armed slot's CC#
+          to write).
+
+        * src/CUI_Patterneditor.cpp -- the mouse handler in PEM_MOUSEDRAW
+          now branches MD_CC_DRAW into an S/W effect writer keyed off
+          the armed slot's CC# / PB-marker. The per-row bar renderer
+          (disp_gfxeffect_pattern) shows the bar only for rows whose
+          existing event matches the armed CC -- bars for unrelated
+          CCs aren't shown, so the drawn pattern reflects the armed
+          parameter and nothing else.
+
+        ! Playback already dispatches 'S' as MIDI CC and 'W' as
+          pitchwheel via ET_CC / ET_PITCH (playback.cpp:1471, 1491).
+          Drawn drawbars therefore play back as MIDI CCs out the
+          configured device with no further wiring.
+
+zt 2026_05_12 (CC Drawmode: cycle through CCizer slots + Shortcuts rebind)
+--------------------------------------------------------------------------
+
+        * src/main.cpp + src/zt.h -- g_cc_drawmode is now a 1-based
+          slot index instead of a binary on/off. The new toggler
+          zt_advance_cc_drawmode() cycles 0 -> 1 -> 2 -> ... -> N -> 0
+          through the currently-loaded CCizer file's slots (the file
+          loaded via Shift+F3). While slot K is armed, only that
+          slot's CC# (or PB) is captured -- other incoming CCs are
+          dropped, so the user can arm a single physical knob and
+          draw one parameter at a time without crosstalk from idle
+          knobs on the same controller.
+
+        * src/CUI_Patterneditor.cpp -- the MIDI-in handler now
+          filters incoming 0xB0 / 0xE0 by the armed slot's CC# /
+          PB-marker. The keypath (formerly a literal Ctrl+Shift+§
+          test) now goes through g_keybindings.match() so the action
+          is user-remappable via the unified Shortcuts page
+          (Shift+F2).
+
+        * src/keybindings.{h,cpp} -- new action
+          ZT_ACTION_TOGGLE_CC_DRAWMODE with default Ctrl+Shift+§.
+          Shows up in the Shortcuts list as "Cycle CC Drawmode
+          (off/slot N)" so users on layouts where the historic combo
+          is awkward can rebind it.
+
+        * src/CUI_MainMenu.cpp -- the ESC menu entry "Toggle CC
+          Drawmode" is renamed to "Cycle CC Drawmode" and now
+          delegates to zt_advance_cc_drawmode().
+
+        * src/CUI_Patterneditor.cpp -- the persistent badge no longer
+          just says "[CC DRAW]" but "[CC DRAW slot 3/8: CC74 Cutoff]"
+          so the user always knows which physical knob is live
+          without scrolling the status line.
+
+        ! Manual drawbar entry (drawing CC curves with the mouse /
+          keyboard without a physical controller, plus playback
+          sending those CCs out) is a separate followup -- this PR
+          covers the incoming-CC-filter and rebind workflow only.
+
+zt 2026_05_12 (CHANGELOG: union-merge to stop the line-7 PR conflict mill)
+--------------------------------------------------------------------------
+
+        * .gitattributes (new) -- doc/CHANGELOG.txt now uses
+          merge=union. Every PR inserts its entry at the same anchor
+          (top of the file, right under the Legend), so any two open
+          PRs touching the changelog would 3-way-conflict the moment
+          one merged. Union merge concatenates both sides instead of
+          conflicting; the only cost is that newest-on-top ordering
+          may need a manual touch-up after a merge, which is much
+          cheaper than resolving the same nested marker block by
+          hand on every open PR.
+
+zt 2026_05_05 (ztskin: multiplatform skin compiler/decompiler CLI)
+------------------------------------------------------------------
+
+        + tools/ztskin/ztskin.c -- ported Daniel Kahlin's 2001-era
+          ztskin skin packer/exploder from the original archived
+          zTracker tree. Now multiplatform (CMake), C99, builds clean
+          under -Wall -Wextra -Wpedantic on GCC/Clang and /W3 on MSVC.
+          Drops the Win32-only ZLIB_DLL/_WINDOWS macros (we statically
+          link the bundled extlibs/zlib instead). Lets users build
+          custom zT skin archives offline; pairs with the existing 8
+          bundled skins in skins/.
+
+        * CMakeLists.txt -- factored the bundled extlibs/zlib sources
+          into a new zt_zlib_static STATIC library shared by both `zt`
+          and the new `ztskin` target. Behaviour-preserving for the
+          main binary; only structural change is that zlib's own
+          warnings are now silenced on its own target instead of
+          contaminating the global compile-options for zt.
+
+        + tools/ztskin/README.md -- usage, build instructions, and
+          a documented file-format table for the .zts archive layout.
+
+        ! New CMake option ZT_BUILD_ZTSKIN (default ON) toggles the
+          tool target. CI builds it on every push since it lives
+          inside the existing extlibs/zlib fetch path.
+
+zt 2026_05_04 (MIDI device-open errors: in-your-face status + decode)
+---------------------------------------------------------------------
+
+        * src/main.cpp + src/zt.h -- new statusmsg_error_until_ms
+          timestamp + set_error_status(msg) helper. The status row
+          renderer paints itself inverted (Background fg on Highlight
+          bg) for ~8 seconds after set_error_status() is called, so a
+          failure-path message is visually distinct from the routine
+          green-text "Opened[out]: <name>" / "Closed[out]: <name>"
+          traffic that flows through the same row.
+        * src/UserInterface.cpp -- midi_out_sel / midi_in_sel error
+          paths now route through set_error_status(), prefix the
+          message with "*** ERROR:", and decode several WinMM error
+          codes the previous switch was missing. Code 1 (the
+          MMSYSERR_ERROR returned by midiOutOpen on a device handle
+          that is not actually a MIDI port -- e.g. a USB Audio
+          endpoint Windows enumerated alongside the real MIDI ports)
+          previously fell through to "Unknown error", giving the user
+          no actionable information. Now reads as "device error (not
+          a MIDI device?)". Codes added: 1, 2, 3, 5, 6, 11.
+        * src/UserInterface.cpp -- midi_out_sel / midi_in_sel success
+          paths (Closed[out]: / Opened[out]: / Closed[in]: /
+          Opened[in]:) now actually publish their status string
+          instead of writing into the buffer and never pointing
+          statusmsg at it. Previously, opening a working MIDI device
+          via Space/Enter on the Sysconfig listbox produced no
+          visible confirmation -- the buffer was rewritten but
+          statusmsg still pointed at whatever the previous frame had
+          set, so the user saw the row toggle silently.
+        * src/winmm_compat.h -- defines MMSYSERR_BADDEVICEID,
+          MMSYSERR_NOTENABLED, MMSYSERR_INVALHANDLE,
+          MMSYSERR_NODRIVER, MMSYSERR_INVALPARAM (matching the
+          Windows SDK numeric values) so the cross-platform shim
+          covers the codes the new decoder switches on.
+
+zt 2026_05_04 (Sysconfig Refresh: preserve open MIDI devices)
+-------------------------------------------------------------
+
+        * src/CUI_Sysconfig.cpp -- BTNCLK_RefreshMidiOutDeviceList /
+          BTNCLK_RefreshMidiInDeviceList now snapshot the names of
+          currently-open devices before destroying the MidiOut /
+          MidiIn singletons, then re-open each name on the new
+          instance. Previously, pressing Refresh closed every open
+          device (delete MidiOut → all handles freed; the new
+          midiOut() constructor opens nothing) and the user had to
+          manually re-open each one. Names are matched (not indices)
+          because re-enumeration after a hardware add/remove can
+          shift the device index. Status line reports
+          "MIDI-OUT refreshed; reopened N/M devices" when at least
+          one device was open before; falls back to the original
+          "device list refreshed" message otherwise.
+
 zt 2026_05_04 (Windows XP: GetTickCount64 polyfill for libwinpthread)
 ---------------------------------------------------------------------
 

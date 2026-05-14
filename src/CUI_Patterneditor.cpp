@@ -1,6 +1,7 @@
 #include "zt.h"
 #include "platform/undo.h"
 #include "ccizer.h"
+#include "keybindings.h"
 
 // KS_META stub for Cmd key support (SDL3 maps macOS Cmd to SDL_KMOD_GUI).
 // Currently keybuffer does not translate GUI -> KS_META, so KS_META is a
@@ -459,24 +460,39 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S) 
+void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S)
 {
   int howfar;
 
   howfar = value*(xsize-1)/maxval;
-  
+
   for (int cy=y;cy<y+ysize;cy++) {
 
     S->drawHLine(cy,x,x+xsize,bg);
     if (value>0) S->drawHLine(cy,x,x+howfar,COLORS.LCDMid);
   }
-  
+
   if (value>0) {
 
     S->drawHLine(y,x,x+howfar,COLORS.LCDHigh);
     S->drawVLine(x,y,y+ysize-1,COLORS.LCDHigh);
     S->drawHLine(y+ysize-1,x,x+howfar,COLORS.LCDLow);
     S->drawVLine(x+howfar,y,y+ysize-1,COLORS.LCDLow);
+  }
+}
+
+// Dim "ghost" variant of draw_bar -- shows the value with a subdued
+// flat fill and no highlight/lowlight borders. Used by MD_CC_DRAW to
+// render OTHER CC slots' drawbars on the same row: the armed slot
+// gets the full draw_bar treatment, every other slot's effect on
+// that row appears as a ghost so the user can see existing drawbars
+// for parameters they haven't selected (and avoid overwriting them).
+void draw_bar_ghost(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S)
+{
+  int howfar = value*(xsize-1)/maxval;
+  for (int cy=y;cy<y+ysize;cy++) {
+    S->drawHLine(cy,x,x+xsize,bg);
+    if (value>0) S->drawHLine(cy,x,x+howfar,COLORS.Lowlight);
   }
 }
 
@@ -551,6 +567,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 {
   int num_displayed_tracks,num_displayed_rows,data,datamax;
   TColor bg;
+  bool cc_draw_ghost = false;
   event *e;
   char str[64];
 
@@ -630,22 +647,71 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
         datamax = 0x7F;
 
         break;
-      } 
+
+      case MD_CC_DRAW:
+        // Drawbar bar shows the S/W effect's value. The armed CC slot
+        // renders as a bright bar (draw_bar). Any OTHER S/W effect on
+        // the same row renders as a ghost bar (draw_bar_ghost) -- dim
+        // flat fill, no highlight border -- so the user can see
+        // existing drawbars for CCs they haven't armed yet and avoid
+        // overwriting them on the next pass.
+        //
+        // We can't decide the bar style here (this switch only
+        // populates `data`); we record the choice via cc_draw_ghost
+        // and let the second switch dispatch the right draw call.
+        {
+          ZtCcizerFile *cf_disp = zt_ccizer_current_file();
+          int si = UIP_Patterneditor && UIP_Patterneditor->md_mode == MD_CC_DRAW
+                       ? (g_cc_drawmode - 1) : -1;
+          const ZtCcizerSlot *as = (si >= 0 && cf_disp && si < cf_disp->num_slots)
+                                       ? &cf_disp->slots[si] : NULL;
+          bool armed_match = false;
+          if (as) {
+            if (as->cc == ZT_CCIZER_PB_MARKER) armed_match = (e->effect == 'W');
+            else armed_match = (e->effect == 'S'
+                                && (unsigned char)((e->effect_data >> 8) & 0xFF) == as->cc);
+          }
+          if (armed_match) {
+            data = (e->effect == 'W') ? ((e->effect_data >> 7) & 0x7F)
+                                      : (e->effect_data & 0x7F);
+            cc_draw_ghost = false;
+          } else if (e->effect == 'S' || e->effect == 'W') {
+            // Some other CC/PB lives on this row. Render it as a ghost.
+            data = (e->effect == 'W') ? ((e->effect_data >> 7) & 0x7F)
+                                      : (e->effect_data & 0x7F);
+            cc_draw_ghost = true;
+          } else {
+            data = 0;
+            cc_draw_ghost = false;
+          }
+          datamax = 0x7F;
+        }
+        break;
+      }
 
 
       switch(UIP_Patterneditor->md_mode)
       {
 
       case MD_FX_SIGNED:
-        
+
         draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
-        
+
+        break;
+
+      case MD_CC_DRAW:
+
+        if (cc_draw_ghost) {
+          draw_bar_ghost(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        } else {
+          draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        }
         break;
 
       default:
-        
+
         draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
-        
+
         break;
       } ;
       
@@ -1389,6 +1455,28 @@ void CUI_Patterneditor::update()
     }
     
     /* COMMON KEYS */
+
+    // CC drawmode cycle. Ctrl+Shift+§ (SDLK_GRAVE — the keyhandler on
+    // every platform remaps Finnish ISO §, NONUSBACKSLASH, INTERNATIONAL1..3
+    // to GRAVE before key dispatch). Plain Shift+§ is the PEM_MOUSEDRAW
+    // toggle (handled below). Each press advances 0 -> 1 -> ... -> N -> 0
+    // through the loaded CCizer file (see Shift+F3). Sits *above* the
+    // mode switch so it fires in PEM_MOUSEDRAW too -- otherwise "Editing:
+    // Volume" mode would swallow the toggle.
+    //
+    // NOTE: We use a literal modifier check rather than
+    // g_keybindings.match() because the keybinding table is currently
+    // never populated at runtime (g_keybindings.setDefaults() lives in
+    // an unused init function -- see main.cpp::initConsole). All other
+    // shortcuts in zT use the same literal-check style. Once the
+    // Shortcuts table is wired up at app init for real, this can move
+    // back to match() for user-rebindability.
+    if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
+      zt_advance_cc_drawmode();
+      midiInQueue.clear();
+      need_refresh++; key = 0;
+    }
+
     if (kstate == KS_SHIFT) {
 
       switch(key)
@@ -1407,10 +1495,38 @@ void CUI_Patterneditor::update()
         }
         else {
           mode = PEM_MOUSEDRAW;
+          // If the user enters mouse-draw mode while a CCizer slot is
+          // armed, jump straight to MD_CC_DRAW so the natural workflow
+          // ("cycle to slot K, draw the drawbar") doesn't require a
+          // separate TAB press. The user can still TAB back to MD_VOL
+          // etc. for non-CC drawing.
+          if (g_cc_drawmode > 0 && md_mode != MD_CC_DRAW) {
+            md_mode = MD_CC_DRAW;
+          }
           switch(md_mode) {
           case MD_VOL:       statusmsg = "Editing: Volume"; break;
           case MD_FX:        statusmsg = "Editing: Effect low-byte (0-0x7F)"; break;
           case MD_FX_SIGNED: statusmsg = "Editing: Effect low-byte signed (0-0x7F)"; break;
+          case MD_CC_DRAW: {
+            static char ccdraw_msg[96];
+            ZtCcizerFile *cf = zt_ccizer_current_file();
+            int si = g_cc_drawmode - 1;
+            if (g_cc_drawmode > 0 && cf && si < cf->num_slots) {
+              const ZtCcizerSlot *s = &cf->slots[si];
+              if (s->cc == ZT_CCIZER_PB_MARKER) {
+                snprintf(ccdraw_msg, sizeof(ccdraw_msg),
+                         "Editing: drag = PB drawbar (%s)", s->name);
+              } else {
+                snprintf(ccdraw_msg, sizeof(ccdraw_msg),
+                         "Editing: drag = CC%d drawbar (%s)",
+                         (int)s->cc, s->name);
+              }
+              statusmsg = ccdraw_msg;
+            } else {
+              statusmsg = "Editing: drag = CC drawbar (no slot armed -- cycle CC Drawmode first)";
+            }
+            break;
+          }
           default:           statusmsg = "Editing: Volume"; break;
           }
         }
@@ -1542,6 +1658,16 @@ void CUI_Patterneditor::update()
           md_mode++;
           if (md_mode>=MD_END)
             md_mode = 0;
+          // MD_CC_DRAW is only useful when a CCizer slot is armed
+          // (otherwise we have nothing to write into the effect's
+          // high byte). Skip past it on the TAB cycle when drawmode
+          // is off; the dedicated entry path in the Shift+§ handler
+          // above still drops the user into MD_CC_DRAW directly if
+          // they had a slot armed before entering mouse-draw.
+          if (md_mode == MD_CC_DRAW && g_cc_drawmode <= 0) {
+            md_mode++;
+            if (md_mode>=MD_END) md_mode = 0;
+          }
           need_refresh++;
           break;
 
@@ -1617,7 +1743,28 @@ void CUI_Patterneditor::update()
         case MD_FX:
           statusmsg = "Editing: Effect low-byte (0-0x7F)";
           break;
-      
+
+        case MD_CC_DRAW: {
+          static char ccdraw_msg2[96];
+          ZtCcizerFile *cf2 = zt_ccizer_current_file();
+          int si2 = g_cc_drawmode - 1;
+          if (g_cc_drawmode > 0 && cf2 && si2 < cf2->num_slots) {
+            const ZtCcizerSlot *s2 = &cf2->slots[si2];
+            if (s2->cc == ZT_CCIZER_PB_MARKER) {
+              snprintf(ccdraw_msg2, sizeof(ccdraw_msg2),
+                       "Editing: drag = PB drawbar (%s)", s2->name);
+            } else {
+              snprintf(ccdraw_msg2, sizeof(ccdraw_msg2),
+                       "Editing: drag = CC%d drawbar (%s)",
+                       (int)s2->cc, s2->name);
+            }
+            statusmsg = ccdraw_msg2;
+          } else {
+            statusmsg = "Editing: drag = CC drawbar (no slot armed)";
+          }
+          break;
+        }
+
         case MD_FX_SIGNED:
           statusmsg = "Editing: Effect low-byte signed (0-0x7F)";
           break;
@@ -1857,18 +2004,8 @@ void CUI_Patterneditor::update()
           key = 0;
         }
 
-        // CC drawmode toggle: Ctrl+Shift+§ (GRAVE). Plain Shift+§ is the
-        // existing PEM_MOUSEDRAW toggle (handled above); we use the
-        // Ctrl-extended combo so both gestures coexist. While CC drawmode
-        // is on, the MIDI-in handler below intercepts incoming CC (0xB0)
-        // and Pitchbend (0xE0) messages and writes Sxxyy / Wxxxx effects
-        // at the cursor row.
-        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_GRAVE) {
-          zt_toggle_cc_drawmode();        // shared with ESC menu (audit H2)
-          midiInQueue.clear();
-          sprintf(szStatmsg, "CC drawmode: %s", g_cc_drawmode ? "ON  (incoming CC writes S/W effects)" : "OFF");
-          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
-        }
+        // (CC drawmode cycle moved to the COMMON KEYS block above so it
+        // also fires in PEM_MOUSEDRAW mode.)
 
         // Double Pattern: Ctrl+Shift+G
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
@@ -3236,15 +3373,14 @@ case SDLK_DELETE:
 
                         {
                           int advance = cur_step;
-                          if (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) {
-                            advance = 0;
-                          } else if (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE) {
-                            advance = 1;
-                          }
+                          
+                          if (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) advance = 0;
+                          else if (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE) advance = 1;
+
                           cur_edit_row += advance;
 
-                // <MANU> 2 Feb 2005 - Arreglado el bug que impedia avanzar el scroll
-                //        mientras se tocaba la nota actual o la linea actual y llegabamos abajo
+                          // <MANU> 2 Feb 2005 - Arreglado el bug que impedia avanzar el scroll
+                          //        mientras se tocaba la nota actual o la linea actual y llegabamos abajo
                           if (advance > 0 &&
                               (cur_edit_row-1 - cur_edit_row_disp) >= (PATTERN_EDIT_ROWS-1)) {
                             if (cur_edit_row_disp <
@@ -3264,11 +3400,10 @@ case SDLK_DELETE:
 
                         {
                           int advance = cur_step;
-                          if (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) {
-                            advance = 0;
-                          } else if (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE) {
-                            advance = 1;
-                          }
+                          
+                          if (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) advance = 0;
+                          else if (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE) advance = 1;
+                          
                           cur_edit_row += advance;
 
                           if (advance > 0 &&
@@ -3356,29 +3491,59 @@ case SDLK_DELETE:
               // at the cursor row in the current edit track. Cursor advances
               // by EditStep (step-follow). When drawmode is OFF the message
               // falls through to the legacy 0x80/0x90 jazz-recording path.
-              if (g_cc_drawmode && (hi == 0xB0 || hi == 0xE0)) {
+              //
+              // FILTERING: g_cc_drawmode > 0 names a 1-based slot index in
+              // the current CCizer file. Only the slot's CC# (or PB) is
+              // captured -- other incoming CCs are dropped so a single
+              // physical knob can be "armed" while drawing one parameter
+              // at a time.
+              // Filter test: are we armed AND does the incoming message
+              // match the active slot? (Pulled out of the big if so the
+              // drop-path can short-circuit cleanly without `continue`,
+              // which the surrounding scope is not a loop.)
+              bool drawmode_armed_match = false;
+              bool drawmode_drop = false;
+              if (g_cc_drawmode > 0 && (hi == 0xB0 || hi == 0xE0)) {
+                ZtCcizerFile *cf_filter = zt_ccizer_current_file();
+                int slot_idx = g_cc_drawmode - 1;
+                if (cf_filter && slot_idx < cf_filter->num_slots) {
+                  const ZtCcizerSlot *active = &cf_filter->slots[slot_idx];
+                  int d1 = (dw >> 8) & 0x7F;
+                  if (active->cc == ZT_CCIZER_PB_MARKER) {
+                    drawmode_armed_match = (hi == 0xE0);
+                  } else {
+                    drawmode_armed_match = (hi == 0xB0 && (unsigned char)d1 == active->cc);
+                  }
+                }
+                // Either we have no CCizer file, the slot index is
+                // stale, or the incoming CC doesn't match the armed
+                // slot. Drop with no row write / no cursor advance /
+                // no status churn so unrelated knobs don't pollute
+                // the pattern.
+                drawmode_drop = !drawmode_armed_match;
+              }
+              if (drawmode_drop) {
+                set_note = 0xFF;
+                p1 = -1;
+              } else if (drawmode_armed_match) {
                 int data1 = (dw >> 8)  & 0x7F;
                 int data2 = (dw >> 16) & 0x7F;
+                ZtCcizerFile *cf = zt_ccizer_current_file();
+                const ZtCcizerSlot *active = &cf->slots[g_cc_drawmode - 1];
                 // Snapshot the pattern before the first write of this
                 // drawmode session so the user can undo a knob run with
-                // a single Ctrl+Z. The session marker is reset by the
-                // Ctrl+Shift+§ toggler itself (above) whenever drawmode
-                // flips on/off, so each ON->...->OFF span generates one
+                // a single Ctrl+Z. The session marker is reset by
+                // zt_advance_cc_drawmode() whenever the cycle advances,
+                // so each "armed -> draw -> advance" span generates one
                 // undo step.
                 if (!g_cc_draw_session_snapped) {
                     UNDO_SAVE();
                     g_cc_draw_session_snapped = 1;
                 }
-                // Look up the friendly slot name from the currently-loaded
-                // CCizer file (if any) — matches by learn binding so we
-                // get "Cutoff" instead of "CC 74" in the status line.
-                const char *slot_name = NULL;
-                ZtCcizerFile *cf = zt_ccizer_current_file();
-                if (cf) {
-                  int m = zt_ccizer_find_learn_match(
-                      cf, status, (hi == 0xE0) ? 0 : (unsigned char)data1);
-                  if (m >= 0) slot_name = cf->slots[m].name;
-                }
+                // Use the active slot's name directly for the status
+                // line -- we already know which slot is armed, no need
+                // to learn-match against the incoming bytes.
+                const char *slot_name = active->name;
                 if (hi == 0xB0) {
                   // S<cc>:<val>  ->  effect 'S', effect_data = (cc<<8) | val
                   unsigned short eff_data = (unsigned short)((data1 << 8) | data2);
@@ -3828,6 +3993,7 @@ wrap:;
               break;
             case MD_FX:
             case MD_FX_SIGNED:
+            case MD_CC_DRAW:
               data = 0x0;
               break;
             }
@@ -3841,22 +4007,68 @@ wrap:;
           y+=cur_edit_row_disp;
           switch(md_mode) {
           case MD_VOL:
-            if (e->vol == data && mousedrawing==1) 
+            if (e->vol == data && mousedrawing==1)
               goto nevermind;
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,data,-1,-1,-1);
             break;
           case MD_FX:
             data += (e->effect_data&0xFF00);
-            if (e->effect_data == data && mousedrawing==1) 
+            if (e->effect_data == data && mousedrawing==1)
               goto nevermind;
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,-1,data);
             break;
           case MD_FX_SIGNED:
             data += (e->effect_data&0xFF00);
-            if (e->effect_data == data && mousedrawing==1) 
+            if (e->effect_data == data && mousedrawing==1)
               goto nevermind;
             song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,-1,data);
             break;
+          case MD_CC_DRAW: {
+            // Drawbar mode: write the full S/W effect (type + data)
+            // using the armed CCizer slot's CC# (or PB marker).
+            // X-position in the row drives the value (0..0x7F for CC,
+            // scaled to 14-bit 0..0x3FFF for PB).
+            ZtCcizerFile *cf = zt_ccizer_current_file();
+            int si = g_cc_drawmode - 1;
+            if (g_cc_drawmode <= 0 || !cf || si >= cf->num_slots) {
+              // Slot evaporated mid-drag. Skip this row -- no write,
+              // no advance. The next ON-cycle will re-arm.
+              goto nevermind;
+            }
+            const ZtCcizerSlot *s = &cf->slots[si];
+            unsigned short eff_data;
+            char eff_type;
+            if (s->cc == ZT_CCIZER_PB_MARKER) {
+              // Pitchbend: scale the 0..0x7F drag value to 14-bit.
+              // (data << 7) gives 0..0x3F80 which spans most of the
+              // PB range; close enough for drawbar work without
+              // needing a 14-bit drag widget.
+              eff_data = (unsigned short)(data << 7);
+              if (eff_data > 0x3FFF) eff_data = 0x3FFF;
+              eff_type = 'W';
+            } else {
+              eff_data = (unsigned short)(((unsigned)s->cc << 8) | (unsigned)data);
+              eff_type = 'S';
+            }
+            if (e->effect == eff_type && e->effect_data == eff_data && mousedrawing==1)
+              goto nevermind;
+            // Protect existing drawbars when Overwrite Previous Drawbars
+            // is OFF (the default). Skip the write if the row already
+            // holds a *different* S/W effect -- i.e. a drawbar from
+            // another armed slot. Empty effect cells and same-CC writes
+            // still go through. The Parms (F2 F2) toggle flips this.
+            if (!zt_config_globals.cc_draw_overwrite) {
+              bool already_drawn_by_other =
+                  (e->effect == 'S' || e->effect == 'W') &&
+                  !(e->effect == eff_type
+                    && ((eff_type == 'W')
+                        || (unsigned char)((e->effect_data >> 8) & 0xFF)
+                            == (unsigned char)((eff_data >> 8) & 0xFF)));
+              if (already_drawn_by_other) goto nevermind;
+            }
+            song->patterns[cur_edit_pattern]->tracks[track]->update_event(y,-1,-1,-1,-1,eff_type,eff_data);
+            break;
+          }
           }
           upd_e = song->patterns[cur_edit_pattern]->tracks[track]->get_event(y);
           m_upd++; 
@@ -3920,16 +4132,47 @@ void CUI_Patterneditor::draw(Drawable *S)
 
     printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
 
-    // Persistent CC drawmode badge — easy to forget the toggle is on
-    // since the toggle's status message scrolls past. Right-aligned on
-    // the title row so it doesn't fight with the pattern data area.
-    if (g_cc_drawmode) {
-      const char *badge = "[CC DRAW] (Ctrl+Shift+\xA7 toggles)";
-      int badge_len = (int)strlen(badge);
-      int x_col = CHARS_X - badge_len - 2;
+    // Persistent CC drawmode badge — easy to forget the cycle is armed
+    // since the advance-status message scrolls past. Right-aligned on
+    // the row just above the title row. Shows the armed slot's CC# +
+    // name so the user always knows which physical knob is "live".
+    //
+    // IMPORTANT: pad to a fixed width and use printBG so cycling
+    // between slots with different name lengths doesn't leave stale
+    // glyphs behind. The main draw loop only clears row 12 onwards
+    // per frame, so the badge row never gets a background sweep.
+    {
+      static const int BADGE_W = 56;
+      char badge[BADGE_W + 1];
+      memset(badge, ' ', BADGE_W);
+      badge[BADGE_W] = '\0';
+      if (g_cc_drawmode > 0) {
+        char tmp[BADGE_W + 1];
+        ZtCcizerFile *cf = zt_ccizer_current_file();
+        int slot_idx = g_cc_drawmode - 1;
+        if (cf && slot_idx < cf->num_slots) {
+          const ZtCcizerSlot *s = &cf->slots[slot_idx];
+          if (s->cc == ZT_CCIZER_PB_MARKER) {
+            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: PB %s]",
+                     g_cc_drawmode, cf->num_slots, s->name);
+          } else {
+            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: CC%d %s]",
+                     g_cc_drawmode, cf->num_slots, (int)s->cc, s->name);
+          }
+        } else {
+          snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d -- stale]",
+                   g_cc_drawmode);
+        }
+        // Right-justify into the padded BADGE_W field so it always
+        // ends at the same column.
+        int tlen = (int)strlen(tmp);
+        if (tlen > BADGE_W) tlen = BADGE_W;
+        memcpy(badge + (BADGE_W - tlen), tmp, tlen);
+      }
+      int x_col = CHARS_X - BADGE_W - 2;
       if (x_col < 2) x_col = 2;
-      print(col(x_col), row(PAGE_TITLE_ROW_Y), badge,
-            COLORS.Brighttext, S);
+      printBG(col(x_col), row(PAGE_TITLE_ROW_Y - 1), badge,
+              COLORS.Brighttext, COLORS.Background, S);
     }
 
     if (!pat || !pat->tracks[cur_edit_track]) {

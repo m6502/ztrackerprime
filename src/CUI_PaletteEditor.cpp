@@ -653,7 +653,7 @@ void CUI_PaletteEditor::update(void) {
                 channel_edit = 0;
                 reset_accum();
                 snprintf(status_line, sizeof(status_line),
-                         "Selected %s — drag the R/G/B bars or press R/G/B then 0-9",
+                         "Selected %s - drag the R/G/B bars or press R/G/B then 0-9",
                          g_slots[i].name);
                 need_refresh++;
                 return;
