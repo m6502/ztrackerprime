@@ -49,6 +49,52 @@ static int clamp_int(int value, int min_value, int max_value)
   return value;
 }
 
+pattern *CUI_Patterneditor::sanitize_cursor()
+{
+  if (tracks_shown < 1) tracks_shown = 1;
+  if (tracks_shown > MAX_TRACKS) tracks_shown = MAX_TRACKS;
+  if (cols_shown < 1) cols_shown = 1;
+  if (cols_shown > 41) cols_shown = 41;
+
+  cur_edit_pattern = clamp_int(cur_edit_pattern, 0, ZTM_MAX_PATTERNS - 1);
+  cur_edit_track = clamp_int(cur_edit_track, 0, MAX_TRACKS - 1);
+  cur_edit_col = clamp_int(cur_edit_col, 0, cols_shown - 1);
+  cur_edit_track_disp = clamp_int(cur_edit_track_disp, 0, MAX_TRACKS - tracks_shown);
+
+  if (cur_edit_track < cur_edit_track_disp) cur_edit_track = cur_edit_track_disp;
+  if (cur_edit_track >= cur_edit_track_disp + tracks_shown)
+    cur_edit_track = cur_edit_track_disp + tracks_shown - 1;
+
+  if (!song) return NULL;
+  pattern *pat = song->patterns[cur_edit_pattern];
+  if (!pat) return NULL;
+
+  int pattern_len = pat->length;
+  if (pattern_len < 1) pattern_len = 1;
+
+  cur_edit_row = clamp_int(cur_edit_row, 0, pattern_len - 1);
+  int visible_rows = PATTERN_EDIT_ROWS;
+  if (visible_rows < 1) visible_rows = 1;
+  if (visible_rows > pattern_len) visible_rows = pattern_len;
+  cur_edit_row_disp = clamp_int(cur_edit_row_disp, 0, pattern_len - visible_rows);
+
+  if (!pat->tracks[cur_edit_track]) {
+    for (int i = 0; i < MAX_TRACKS; ++i) {
+      if (pat->tracks[i]) {
+        cur_edit_track = i;
+        if (cur_edit_track < cur_edit_track_disp)
+          cur_edit_track_disp = cur_edit_track;
+        if (cur_edit_track >= cur_edit_track_disp + tracks_shown)
+          cur_edit_track_disp = clamp_int(cur_edit_track - tracks_shown + 1,
+                                          0, MAX_TRACKS - tracks_shown);
+        break;
+      }
+    }
+  }
+
+  return pat;
+}
+
 static void adjust_pattern_scroll_after_row_count_change(int old_edit_rows, int new_edit_rows)
 {
   if (old_edit_rows == new_edit_rows) return;
@@ -90,6 +136,40 @@ static void adjust_pattern_scroll_after_row_count_change(int old_edit_rows, int 
   if (new_max_scroll < 0) new_max_scroll = 0;
 
   cur_edit_row_disp = clamp_int(new_top, 0, new_max_scroll);
+}
+
+static int track_header_toggle_column(int visible_track_index, int field_size)
+{
+  int block_width = field_size + 1;
+  int toggle_width = 5;
+  int right_padding = 5;
+  if (block_width < toggle_width + right_padding) return -1;
+  return g_posx_tracks + (visible_track_index * block_width) + block_width - toggle_width - right_padding;
+}
+
+static int track_header_toggle_at_mouse(int tracks_shown, int field_size)
+{
+  if (MousePressY < row(TRACKS_ROW_Y)) return -1;
+  if (MousePressY > row(TRACKS_ROW_Y + 1)) return -1;
+
+  int visible_track = 0;
+  for (int track_index = cur_edit_track_disp;
+       track_index < cur_edit_track_disp + tracks_shown;
+       track_index++) {
+    if (track_index < 0) continue;
+    if (track_index >= MAX_TRACKS) continue;
+
+    int toggle_col = track_header_toggle_column(visible_track, field_size);
+    if (toggle_col >= 0) {
+      if (checkclick(col(toggle_col), row(TRACKS_ROW_Y),
+                     col(toggle_col + 5), row(TRACKS_ROW_Y + 1))) {
+        return track_index;
+      }
+    }
+    visible_track++;
+  }
+
+  return -1;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -329,16 +409,41 @@ char *printBlankNote(char *str, int cur_edit_mode)
 void draw_track_markers(int tracks_shown, int field_size, Drawable *S) 
 {
   static char str[256];
+  static char name[32];
   int j;
   int p=0;
 
   for(j=cur_edit_track_disp;j<cur_edit_track_disp+tracks_shown;j++) {
 
-    if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(str," Track %.2d ",j+1);
-    else sprintf(str," %.2d ",j+1);
+    int block_width = field_size + 1;
+    if (block_width < 1) block_width = 1;
+    if (block_width > 255) block_width = 255;
 
-    if (song->track_mute[j]) printBG(col(g_posx_tracks + (p*(field_size+1))),row(TRACKS_ROW_Y),str,COLORS.Text,COLORS.Lowlight,S);
-    else printBG(col(g_posx_tracks + (p*(field_size+1))),row(TRACKS_ROW_Y),str,COLORS.Brighttext,COLORS.Lowlight,S);
+    if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," Track %.2d ",j+1);
+    else sprintf(name," %.2d ",j+1);
+
+    int toggle_start = block_width - 3;
+    if (toggle_start < 0) toggle_start = block_width;
+
+    int name_len = (int)strlen(name);
+    if (name_len > toggle_start) name_len = toggle_start;
+    for (int c = 0; c < name_len; c++) {
+      str[c] = name[c];
+    }
+    str[name_len] = 0;
+
+    TColor fg = COLORS.Brighttext;
+    if (song->track_mute[j]) fg = COLORS.Text;
+
+    int start_col = g_posx_tracks + (p * block_width);
+    printBG(col(start_col), row(TRACKS_ROW_Y), str, fg, COLORS.Lowlight, S);
+
+    int toggle_col = track_header_toggle_column(p, field_size);
+    if (toggle_col >= 0) {
+      const char *toggle_text = "[On ]";
+      if (song->track_mute[j]) toggle_text = "[Off]";
+      printBG(col(toggle_col), row(TRACKS_ROW_Y), (char *)toggle_text, fg, COLORS.Lowlight, S);
+    }
     
     p++;
   }
@@ -1264,6 +1369,24 @@ void CUI_Patterneditor::update()
     kstate = Keys.getstate();
     
     set_note = 0xff;
+
+    if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
+      int clicked_track = track_header_toggle_at_mouse(tracks_shown, field_size);
+      if (clicked_track >= 0) {
+        toggle_track_mute(clicked_track);
+        cur_edit_track = clicked_track;
+        need_refresh++;
+        clear++;
+        if (song->track_mute[clicked_track]) {
+          sprintf(szStatmsg, "Track %.2d Off", clicked_track + 1);
+        } else {
+          sprintf(szStatmsg, "Track %.2d On", clicked_track + 1);
+        }
+        statusmsg = szStatmsg;
+        status_change = 1;
+        return;
+      }
+    }
     
     /* COMMON KEYS */
     if (kstate == KS_SHIFT) {
@@ -3112,10 +3235,12 @@ case SDLK_DELETE:
                         ztPlayer->play_current_row();
 
                         {
-                          int advance =
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) ? 0 :
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE)  ? 1 :
-                              cur_step;
+                          int advance = cur_step;
+                          if (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) {
+                            advance = 0;
+                          } else if (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE) {
+                            advance = 1;
+                          }
                           cur_edit_row += advance;
 
                 // <MANU> 2 Feb 2005 - Arreglado el bug que impedia avanzar el scroll
@@ -3138,10 +3263,12 @@ case SDLK_DELETE:
                         ztPlayer->play_current_note();
 
                         {
-                          int advance =
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) ? 0 :
-                              (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE)  ? 1 :
-                              cur_step;
+                          int advance = cur_step;
+                          if (zt_config_globals.note_audition_step_mode == ZT_NAS_NONE) {
+                            advance = 0;
+                          } else if (zt_config_globals.note_audition_step_mode == ZT_NAS_ONE) {
+                            advance = 1;
+                          }
                           cur_edit_row += advance;
 
                           if (advance > 0 &&
@@ -3787,6 +3914,8 @@ void CUI_Patterneditor::draw(Drawable *S)
       clear=0;
     }
     
+    pattern *pat = sanitize_cursor();
+
     draw_status_vars(S);
 
     printtitle(PAGE_TITLE_ROW_Y,"Pattern Editor (F2)",COLORS.Text,COLORS.Background,S);
@@ -3801,6 +3930,11 @@ void CUI_Patterneditor::draw(Drawable *S)
       if (x_col < 2) x_col = 2;
       print(col(x_col), row(PAGE_TITLE_ROW_Y), badge,
             COLORS.Brighttext, S);
+    }
+
+    if (!pat || !pat->tracks[cur_edit_track]) {
+      if (!ztPlayer->playing) status(S);
+      goto pattern_draw_done;
     }
 
     switch(mode) {
@@ -3820,7 +3954,15 @@ void CUI_Patterneditor::draw(Drawable *S)
       
     case PEM_REGULARKEYS:
 
-      e = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row);
+      track *trk = NULL;
+      if (pat) {
+        trk = pat->tracks[cur_edit_track];
+      }
+
+      e = NULL;
+      if (trk) {
+        e = trk->get_event(cur_edit_row);
+      }
 
       if (edit_cols[cur_edit_col].type == T_FXP || edit_cols[cur_edit_col].type == T_FX) {    
         
@@ -3882,6 +4024,8 @@ void CUI_Patterneditor::draw(Drawable *S)
 #endif
       break;
     }
+
+pattern_draw_done:
     
     need_refresh = 0;
     updated++;

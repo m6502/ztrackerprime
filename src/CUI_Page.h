@@ -18,6 +18,7 @@ class UserInterface ;
 class UserInterfaceElement ;
 class ValueSlider ;
 class ListBox ;
+class pattern ;
 
 typedef void (*VFunc)();
 
@@ -358,6 +359,7 @@ class CUI_Patterneditor : public CUI_Page {
         void leave(void);
         void update(void);
         void draw(Drawable *S);
+        pattern *sanitize_cursor(void);
 };
 
 
