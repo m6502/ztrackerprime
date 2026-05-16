@@ -2678,6 +2678,14 @@ void keyhandler(SDL_KeyboardEvent *e) {
         e->scancode == SDL_SCANCODE_NONUSHASH) {
       id = SDLK_GRAVE;
     }
+    // Windows + US (and Finnish) layouts: SDL3 layout-transforms the
+    // backtick key under Shift to SDLK_TILDE (~), so Ctrl+Shift+` never
+    // produces SDLK_GRAVE and the CC drawmode cycle in Pattern Editor
+    // never fires. Force GRAVE on every physical-grave event regardless
+    // of modifier. Matches the macOS branch below.
+    else if (e->scancode == SDL_SCANCODE_GRAVE) {
+      id = SDLK_GRAVE;
+    }
 #else
     // macOS Finnish ISO (verified via ZT_KEYDEBUG):
     //  * The top-left §-key reports scancode=SDL_SCANCODE_GRAVE with a

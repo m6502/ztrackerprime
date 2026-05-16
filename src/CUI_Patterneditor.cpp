@@ -1477,6 +1477,19 @@ void CUI_Patterneditor::update()
       need_refresh++; key = 0;
     }
 
+    // Ctrl+F2 is an alternate CC-drawmode-cycle shortcut. Same advance as
+    // Ctrl+Shift+§/` -- useful on platforms / layouts where the §/grave
+    // key is awkward to reach with two modifiers held (Windows non-
+    // Finnish layouts, laptop keyboards without a dedicated § key).
+    // Plain F2 stays the global Pattern Editor page-switch; Alt+F2 stays
+    // the track-1 mute toggle below; Ctrl+F2 is otherwise unbound.
+    if ((kstate & KS_CTRL) && !(kstate & KS_SHIFT) && !KS_HAS_ALT(kstate) &&
+        key == SDLK_F2) {
+      zt_advance_cc_drawmode();
+      midiInQueue.clear();
+      need_refresh++; key = 0;
+    }
+
     if (kstate == KS_SHIFT) {
 
       switch(key)
@@ -1711,11 +1724,68 @@ void CUI_Patterneditor::update()
           need_refresh++;
           break;
         } ;
+
+        // Keyjazz audition in mouse-draw mode. Mouse draws drawbars, the
+        // keyboard is otherwise idle here — let the user hear notes while
+        // drawing. noteOff fires automatically from the central key-up
+        // path in main.cpp::keyhandler via jazz_clear_state.
+        if (cur_inst >= 0 && cur_inst < MAX_INSTS &&
+            song->instruments[cur_inst]) {
+          int jazz_note = -1;
+          switch (scancode) {
+          case SDL_SCANCODE_Q: jazz_note = 12*base_octave;          break;
+          case SDL_SCANCODE_2: jazz_note = (12*base_octave)+1;      break;
+          case SDL_SCANCODE_W: jazz_note = (12*base_octave)+2;      break;
+          case SDL_SCANCODE_3: jazz_note = (12*base_octave)+3;      break;
+          case SDL_SCANCODE_E: jazz_note = (12*base_octave)+4;      break;
+          case SDL_SCANCODE_R: jazz_note = (12*base_octave)+5;      break;
+          case SDL_SCANCODE_5: jazz_note = (12*base_octave)+6;      break;
+          case SDL_SCANCODE_T: jazz_note = (12*base_octave)+7;      break;
+          case SDL_SCANCODE_6: jazz_note = (12*base_octave)+8;      break;
+          case SDL_SCANCODE_Y: jazz_note = (12*base_octave)+9;      break;
+          case SDL_SCANCODE_7: jazz_note = (12*base_octave)+10;     break;
+          case SDL_SCANCODE_U: jazz_note = (12*base_octave)+11;     break;
+          case SDL_SCANCODE_I: jazz_note = (12*base_octave)+12;     break;
+          case SDL_SCANCODE_9: jazz_note = (12*base_octave)+1+12;   break;
+          case SDL_SCANCODE_O: jazz_note = (12*base_octave)+2+12;   break;
+          case SDL_SCANCODE_0: jazz_note = (12*base_octave)+3+12;   break;
+          case SDL_SCANCODE_P: jazz_note = (12*base_octave)+4+12;   break;
+          case SDL_SCANCODE_Z: jazz_note = 12*(base_octave-1);      break;
+          case SDL_SCANCODE_S: jazz_note = (12*(base_octave-1))+1;  break;
+          case SDL_SCANCODE_X: jazz_note = (12*(base_octave-1))+2;  break;
+          case SDL_SCANCODE_D: jazz_note = (12*(base_octave-1))+3;  break;
+          case SDL_SCANCODE_C: jazz_note = (12*(base_octave-1))+4;  break;
+          case SDL_SCANCODE_V: jazz_note = (12*(base_octave-1))+5;  break;
+          case SDL_SCANCODE_G: jazz_note = (12*(base_octave-1))+6;  break;
+          case SDL_SCANCODE_B: jazz_note = (12*(base_octave-1))+7;  break;
+          case SDL_SCANCODE_H: jazz_note = (12*(base_octave-1))+8;  break;
+          case SDL_SCANCODE_N: jazz_note = (12*(base_octave-1))+9;  break;
+          case SDL_SCANCODE_J: jazz_note = (12*(base_octave-1))+10; break;
+          case SDL_SCANCODE_M: jazz_note = (12*(base_octave-1))+11; break;
+          default: break;
+          }
+          if (jazz_note >= 0 && jazz_note <= 0x7F &&
+              !jazz_note_is_active((int)key)) {
+            int played = jazz_note + song->instruments[cur_inst]->transpose;
+            if (played > 0x7F) played = 0x7F;
+            if (played < 0)    played = 0;
+            unsigned char vel = song->instruments[cur_inst]->default_volume;
+            if (song->instruments[cur_inst]->global_volume != 0x7F && vel > 0) {
+              vel = (unsigned char)((vel * song->instruments[cur_inst]->global_volume) / 0x7F);
+            }
+            MidiOut->noteOn(song->instruments[cur_inst]->midi_device,
+                            (unsigned char)played,
+                            song->instruments[cur_inst]->channel,
+                            vel, MAX_TRACKS, 0);
+            jazz_set_state((int)key, (unsigned char)played,
+                           song->instruments[cur_inst]->channel);
+          }
+        }
       }
-      
-      
-      
-      
+
+
+
+
       
       
       if (cur_edit_row_disp >= song->patterns[cur_edit_pattern]->length - PATTERN_EDIT_ROWS) {
@@ -2315,7 +2385,7 @@ void CUI_Patterneditor::update()
             break;
             
           case SDLK_N: /* Set length of first note to length of selection */
-            if (selected && 
+            if (selected &&
               (e = song->patterns[cur_edit_pattern]->tracks[select_track_start]->get_event(select_row_start))
               ) {
               j = (select_row_end+1 - select_row_start)*(96/song->tpb);
@@ -2326,7 +2396,34 @@ void CUI_Patterneditor::update()
             }
             break;
 
+          // Familiar Ctrl+C / Ctrl+V / Ctrl+P clipboard shortcuts in addition
+          // to the legacy Alt-keyed copy/paste below. Ctrl+P pastes the
+          // clipboard repeatedly downward from the cursor until the end of
+          // the pattern is reached (fill).
+          case SDLK_C:
+            if (selected) {
+              clipboard->copy();
+              SDL_Delay(50);
+              need_refresh++;
+            }
+            break;
 
+          case SDLK_V:
+            clipboard->paste(cur_edit_track, cur_edit_row, 1); // overwrite
+            need_refresh++;
+            break;
+
+          case SDLK_P:
+            if (clipboard->rows > 0) {
+              int target = cur_edit_row;
+              int limit  = song->patterns[cur_edit_pattern]->length;
+              while (target < limit) {
+                clipboard->paste(cur_edit_track, target, 1); // overwrite
+                target += clipboard->rows;
+              }
+              need_refresh++;
+            }
+            break;
 
           } ;
 

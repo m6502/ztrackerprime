@@ -4,6 +4,113 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_14 (IEdit keyjazz + Alt-P centering + Ctrl+C/V/P clipboard)
+----------------------------------------------------------------------------
+
+        * src/CUI_InstEditor.cpp -- keyjazz audition (Q/W/E... and
+          Z/S/X/D/C...) now works when a non-name widget on the
+          Instrument Editor has focus (channel slider, MIDI device
+          listbox, etc.). The previous `editing_name` guard only
+          tested `ie->text_cursor < 24`, but that flag is sticky
+          across focus changes -- once the user clicked the name
+          field, every subsequent press on any other widget got
+          suppressed as "still editing name". Now also requires
+          `UI->cur_element == 0` (the InstEditor list's tabindex),
+          so once focus moves elsewhere keyjazz resumes.
+
+        * src/CUI_SongDuration.cpp -- Alt-P popup. "Song Duration"
+          title and "Total: m:ss" line are now centered against the
+          widget rect (this->x + this->xsize/2), not against the
+          whole screen. At default 640x480 the two centers happen
+          to coincide, but on higher-resolution displays or when
+          the widget is repositioned, the screen-center text could
+          fall outside the widget and be clipped by the right
+          border. User saw "Song Duration: tal: 0:03" (the leading
+          "To" of "Total" eaten by the widget frame).
+
+        + src/CUI_Patterneditor.cpp -- familiar Ctrl+C / Ctrl+V /
+          Ctrl+P clipboard shortcuts wired up alongside the legacy
+          Alt-keyed copy/paste:
+            * Ctrl+C  -- copy current selection to clipboard
+              (mirrors Alt+C).
+            * Ctrl+V  -- paste clipboard at the cursor in OVERWRITE
+              mode (mirrors Alt+O, which is what most users expect
+              from a "paste" shortcut today).
+            * Ctrl+P  -- paste clipboard repeatedly downward from
+              the cursor until the end of the pattern is reached
+              (overwrite fill). Useful for drum loops, ostinatos,
+              and stamping the same chord across the whole pattern.
+
+zt 2026_05_14 (CC Console: double-click reset + Ctrl+F2 drawmode cycle)
+----------------------------------------------------------------------------
+
+        + src/Sliders.{h,cpp} -- ValueSlider gains a double-click-
+          to-reset facility. New members:
+            * int dblclick_default  -- sentinel -1 disables; in range
+              [min,max] enables. Caller sets this to the slot's
+              natural rest value.
+            * unsigned int last_click_ms -- timestamp of last left-
+              click on this widget (SDL_GetTicks).
+          A second MOUSE_BUTTON_DOWN_LEFT within 500 ms on the same
+          widget snaps value to dblclick_default and bumps `changed`,
+          short-circuiting the drag-to-position path so the snapped
+          value isn't immediately overridden by the click's mouse-X.
+
+        + src/CUI_CcConsole.cpp::position_sliders -- each visible
+          slot now sets dblclick_default = slot_default(s), i.e.
+          8192 (center) for pitchbend slots and 0 for CC slots.
+          Double-clicking a PB slider snaps it back to center and
+          fires the corresponding MIDI Pitch Wheel via the existing
+          absorb_slider_changes -> send_slot path.
+
+        + src/CUI_Patterneditor.cpp -- Ctrl+F2 is now an alternate
+          CC-drawmode-cycle shortcut, parallel to the existing
+          Ctrl+Shift+§/`. Each press advances 0 -> 1 -> ... -> N -> 0
+          through the currently-loaded CCizer file. Useful when the
+          §/grave key is awkward to reach with two modifiers held
+          (laptop keyboards, non-Finnish layouts). Plain F2 stays
+          the page-switch; Alt+F2 stays the track-1 mute toggle;
+          Ctrl+F2 was otherwise unbound.
+
+zt 2026_05_14 (Windows: Ctrl+Shift+` fix + keyjazz audition in mouse-draw)
+----------------------------------------------------------------------------
+
+        * src/main.cpp::keyhandler -- non-Apple branch now remaps
+          SDL_SCANCODE_GRAVE -> SDLK_GRAVE explicitly, matching the
+          existing macOS branch. SDL3 layout-transforms the backtick
+          key under Shift to SDLK_TILDE (~) on Windows + US/Finnish
+          layouts, so Ctrl+Shift+` never produced SDLK_GRAVE and the
+          CC drawmode cycle in the Pattern Editor never fired. The
+          NONUSBACKSLASH/INTERNATIONAL1..3 remap that already lived
+          here only triggered for Finnish ISO § via non-grave
+          scancodes; physical backtick fell through unmapped under
+          modifiers. With this fix Ctrl+Shift+` cycles CCizer slots
+          on Windows the same way Ctrl+Shift+§ does on EU Finnish.
+
+        + src/CUI_Patterneditor.cpp -- keyjazz audition is now
+          available while the Pattern Editor is in PEM_MOUSEDRAW
+          mode (the mode you enter with Shift+§ / Shift+`). Q/2/W/3/
+          E/... and Z/S/X/D/C/... play notes on the current
+          instrument's MIDI channel using the current base octave,
+          same key map as the regular T_NOTE column. The note-off is
+          handled by the existing central key-up path in main.cpp::
+          keyhandler -- no pattern mutation, no row advance, pure
+          audition. Lets you hear what you're drawing CC drawbars
+          against without leaving mouse-draw.
+
+zt 2026_05_14 (CI: bundle CCizer banks + SysEx examples in release artifacts)
+----------------------------------------------------------------------------
+
+        * .github/workflows/build.yml -- Linux, Windows XP (MinGW),
+          and Windows x64 (MSVC) "Stage release" steps now copy
+          assets/ccizer and assets/syx into the staged directory.
+          Without this, downloaded Linux/Windows releases shipped
+          without sc88st.txt, microfreak.txt, etc., leaving the
+          Shift+F3 CC Console and Shift+F5 SysEx Librarian empty
+          out of the box. macOS was already fine because the .app
+          bundle carries assets/ccizer + assets/syx in Resources/
+          via the CMake POST_BUILD step.
+
 zt 2026_05_13 (CC Drawmode: ghost bars + Overwrite Previous Drawbars toggle)
 ----------------------------------------------------------------------------
 

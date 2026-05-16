@@ -146,12 +146,15 @@ void CUI_SongDuration::draw(Drawable *S) {
             printchar(col(this->x+this->xsize-1),row(i),146,COLORS.Lowlight,S);
         } 
         printline(col(this->x),row(this->y ),143,this->xsize,COLORS.Highlight,S);
-        print(col(this->x),row(this->y + 1),"    Song Duration",COLORS.Text,S);
+        const char *title = "Song Duration";
+        int title_x = this->x + (this->xsize - (int)strlen(title)) / 2;
+        print(col(title_x),row(this->y + 1),title,COLORS.Text,S);
         char str[50];
         int m = seconds/60;
         int s = seconds%60;
         sprintf(str,"Total: %d:%.2d",m,s);
-        print(col(textcenter(str)),row(this->y + 3),str,COLORS.Text,S);
+        int total_x = this->x + (this->xsize - (int)strlen(str)) / 2;
+        print(col(total_x),row(this->y + 3),str,COLORS.Text,S);
         UI->draw(S);
         S->unlock();
         need_refresh = 0;
