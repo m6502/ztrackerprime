@@ -883,7 +883,8 @@ void CClipboard::paste(int start_track, int start_row, int mode)
 
 
     int i,j,target_row;
-    event *h;//,*t;
+    int note, inst, vol, length, effect, effect_data;
+    event *h,*t;
 
     file_changed++;
 
@@ -906,7 +907,32 @@ void CClipboard::paste(int start_track, int start_row, int mode)
         while(h) {
             target_row = h->row + start_row;
             if (j<MAX_TRACKS  &&  target_row<song->patterns[cur_edit_pattern]->length) {
-                song->patterns[cur_edit_pattern]->tracks[j]->update_event(target_row,h);
+                if (mode == 2) {
+                    note = -1;
+                    inst = -1;
+                    vol = -1;
+                    length = -1;
+                    effect = -1;
+                    effect_data = -1;
+                    t = song->patterns[cur_edit_pattern]->tracks[j]->get_event(target_row);
+
+                    if (h->note != 0x80 && (!t || t->note == 0x80))
+                        note = h->note;
+                    if (h->inst < MAX_INSTS && (!t || t->inst >= MAX_INSTS))
+                        inst = h->inst;
+                    if (h->vol < 0x80 && (!t || t->vol >= 0x80))
+                        vol = h->vol;
+                    if (h->length != 0x0000 && (!t || t->length == 0x0000))
+                        length = h->length;
+                    if (h->effect != 0xff && (!t || t->effect == 0xff))
+                        effect = h->effect;
+                    if ((h->effect_data != 0x0000 || h->effect != 0xff) && (!t || t->effect_data == 0x0000))
+                        effect_data = h->effect_data;
+
+                    if (note >= 0 || inst >= 0 || vol >= 0 || length >= 0 || effect >= 0 || effect_data >= 0)
+                        song->patterns[cur_edit_pattern]->tracks[j]->update_event(target_row,note,inst,vol,length,effect,effect_data);
+                } else
+                    song->patterns[cur_edit_pattern]->tracks[j]->update_event(target_row,h);
             }
             h = h->next_event;
         }
