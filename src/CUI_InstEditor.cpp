@@ -236,7 +236,27 @@ CUI_InstEditor::CUI_InstEditor(void) {
     mds->y=37;
     mds->xsize = 44;
     mds->ysize = 15;
-    
+
+#ifdef USE_CC_ENVELOPES
+    // CC envelope slot bindings (IDs 12..15). Each slider picks one
+    // ccenv_default[s] for the focused instrument; -1 = no envelope
+    // armed for this slot. When a note plays (pattern OR keyjazz Q),
+    // every non-Off slot's envelope is armed alongside the note.
+    // See playback.cpp's cc_env_voice (pattern path) and the
+    // zt_audition_env_arm() audition path.
+    for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+        ValueSliderOFF *evs = new ValueSliderOFF(1);
+        UI->add_element(evs, tabindex++);
+        evs->x = 35 + s * 7;     // 35, 42, 49, 56 -- ends at col 62, clear of MIDI dev sel
+        evs->y = 34;
+        evs->xsize = 6;
+        evs->ysize = 1;
+        evs->min = -1;
+        evs->max = ZTM_MAX_CCENVELOPES - 1;
+        evs->value = -1;
+    }
+#endif
+
     reset = 0;
 }
 
@@ -583,7 +603,35 @@ void CUI_InstEditor::draw(Drawable *S)
         printBG(col(36),row(23),"Global Volume",COLORS.Text,COLORS.Background,S);
         printBG(col(58),row(23),"Transpose",COLORS.Text,COLORS.Background,S);
         printBG(col(36),row(28),"Channel",COLORS.Text,COLORS.Background,S);
-        need_refresh = 0; 
+
+#ifdef USE_CC_ENVELOPES
+        // CC envelope binding row. Each non-Off slot fires that
+        // envelope when this instrument plays a note (pattern OR
+        // keyjazz). See Shift+F6 to author the envelope curves.
+        {
+            instrument *ic = (cur_inst >= 0 && cur_inst < MAX_INSTS)
+                                ? song->instruments[cur_inst] : NULL;
+            // Sync widgets <-> data BEFORE drawing the labels so a
+            // value just typed into a slider lands on the right slot.
+            for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                ValueSliderOFF *evs = (ValueSliderOFF *)UI->get_element(12 + s);
+                if (!evs) continue;
+                if (evs->changed && !reset && ic) {
+                    if (evs->value < 0)
+                        ic->ccenv_default[s] = ZTM_CCENV_NONE;
+                    else
+                        ic->ccenv_default[s] = (unsigned char)evs->value;
+                } else if (ic) {
+                    int ei = (int)ic->ccenv_default[s];
+                    evs->value = (ei == ZTM_CCENV_NONE) ? -1 : ei;
+                }
+            }
+            printBG(col(35), row(33), "Envelopes (Shift+F6)",
+                    COLORS.Text, COLORS.Background, S);
+        }
+#endif
+
+        need_refresh = 0;
         updated=2;
         S->unlock();
     }
