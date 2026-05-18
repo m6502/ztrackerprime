@@ -319,15 +319,34 @@ void CUI_Help::update() {
                 int ctrl  = (kstate & KS_CTRL) != 0;
                 int alt   = (kstate & (KS_ALT | KS_META)) != 0;
                 int shift = (kstate & KS_SHIFT) != 0;
-                char tokens[4][32];
+                char tokens[6][32];
                 int  ntok = 0;
                 const char *shift_part = shift ? "SHIFT-" : "";
                 if (ctrl && alt) {
                     snprintf(tokens[ntok++], 32, "CTRL-ALT-%s%s", shift_part, keyname);
+#ifdef __APPLE__
+                    // macOS help.txt rewrites "CTRL-ALT-X" verbatim
+                    // (compound combos like Cmd-Opt are reserved by the
+                    // OS) so the CTRL-ALT token IS the rendered form.
+#endif
                 } else if (ctrl) {
                     snprintf(tokens[ntok++], 32, "CTRL-%s%s", shift_part, keyname);
                 } else if (alt) {
                     snprintf(tokens[ntok++], 32, "ALT-%s%s", shift_part, keyname);
+#ifdef __APPLE__
+                    // On macOS the help-text rewriter folds "CTRL-X"
+                    // into "CMD-X/ALT-X". Pressing either Cmd or Opt
+                    // produces an "ALT-..." token here, but the
+                    // line-start of the rendered help row is "CMD-X",
+                    // not "ALT-X". Generate "CMD-..." as an additional
+                    // candidate so the line-start match succeeds
+                    // without relying on the substring fallback.
+                    // Also try CTRL- because reserved-on-macOS shortcuts
+                    // (Cmd-W/H/TAB) leave the modifier verbatim in the
+                    // help file.
+                    snprintf(tokens[ntok++], 32, "CMD-%s%s",  shift_part, keyname);
+                    snprintf(tokens[ntok++], 32, "CTRL-%s%s", shift_part, keyname);
+#endif
                 } else if (shift) {
                     snprintf(tokens[ntok++], 32, "SHIFT-%s", keyname);
                 }
