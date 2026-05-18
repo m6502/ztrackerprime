@@ -259,12 +259,13 @@ public:
     }
 
     // Find the nearest node to (px, py) within a small radius.
-    // Returns -1 if none. Radius is generous (12px) so a stubby
-    // finger can grab a node easily.
+    // Returns -1 if none. 5px is the visual radius of the selected
+    // node marker -- anything farther counts as empty space so the
+    // click adds a new node rather than reselecting the old one.
     int find_node_near(int px, int py, const ccenvelope *e) const {
         if (!e || e->num_nodes == 0) return -1;
         int best = -1;
-        int best_dsq = 12 * 12;
+        int best_dsq = 5 * 5;
         for (int i = 0; i < e->num_nodes; i++) {
             int dx = px - node_pix_x(i, e);
             int dy = py - node_pix_y(i, e);
@@ -290,6 +291,10 @@ public:
                 if (hit >= 0) {
                     ce_selected = hit;
                     dragging = 1;
+                    int nn_sel = e ? e->num_nodes : 0;
+                    ce_set_status("Selected node %d/%d (click elsewhere "
+                                  "to add a new one; drag to move)",
+                                  hit, nn_sel);
                 } else if (e && e->num_nodes < ZTM_CCENV_MAX_NODES) {
                     // Add a node at the clicked position.
                     int t = pix_to_tick(MousePressX, e);
@@ -299,8 +304,8 @@ public:
                     e->num_nodes++;
                     ce_selected = ce_sort_after_move(e, e->num_nodes - 1);
                     file_changed++;
-                    ce_set_status("Added node %d at tick %d, value %d",
-                                  ce_selected, t, v);
+                    ce_set_status("Added node %d/%d at tick=%d value=%d",
+                                  ce_selected, e->num_nodes, t, v);
                 }
                 Keys.getkey();
                 need_refresh++;
@@ -548,21 +553,35 @@ public:
             return;
         }
 
-        // Curve (interpolated value at each canvas X pixel).
+        // Curve (interpolated value at each canvas X pixel). Drawn 2px
+        // tall so a flat single-node line is unmistakable.
         int mt = ce_max_tick_view(e);
         TColor curve_color = COLORS.Highlight;
         for (int px = 1; px < wpx - 1; px++) {
             int pos = (px * mt) / (wpx > 0 ? wpx : 1);
             int val = ccenv_interp_raw(e->tick, e->value, e->num_nodes, pos);
             int cy = y0 + ((127 - val) * (hpx - 2)) / 127 + 1;
-            S->fillRect(x0 + px, cy, x0 + px + 1, cy + 1, curve_color);
+            S->fillRect(x0 + px, cy, x0 + px + 1, cy + 2, curve_color);
         }
 
-        // Nodes. Selected node = bright filled square (4px), others = 2px dot.
+        // Faint vertical guide at each node's x so you can see where
+        // the X-axis nodes sit even if values are similar.
+        for (int i = 0; i < e->num_nodes; i++) {
+            int nx = node_pix_x(i, e);
+            if (nx > x0 + 1 && nx < x1 - 1) {
+                // 1px dotted column in EditBGlow.
+                for (int yy = y0 + 2; yy < y1 - 2; yy += 3)
+                    S->fillRect(nx, yy, nx + 1, yy + 1, COLORS.EditBGlow);
+            }
+        }
+
+        // Nodes. Selected = 6px filled square (bright text); others =
+        // 4px filled square in the highlight color. Bigger than before
+        // so users can actually see them.
         for (int i = 0; i < e->num_nodes; i++) {
             int nx = node_pix_x(i, e);
             int ny = node_pix_y(i, e);
-            int s = (i == ce_selected) ? 4 : 2;
+            int s = (i == ce_selected) ? 6 : 4;
             TColor c = (i == ce_selected) ? COLORS.Text : COLORS.Highlight;
             S->fillRect(nx - s/2, ny - s/2, nx - s/2 + s, ny - s/2 + s, c);
         }
