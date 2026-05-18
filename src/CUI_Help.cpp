@@ -399,11 +399,11 @@ void CUI_Help::update() {
                 }
                 if (found_line >= 0) {
                     Keys.getkey(); // consume
-                    // Anchor a couple of lines above the match so the
-                    // matched row isn't pinned to the very top edge.
-                    int anchor = found_line - 2;
-                    if (anchor < 0) anchor = 0;
-                    tb->startline = anchor;
+                    // Put the matched line AT THE TOP of the visible
+                    // area so the user's eye lands on it immediately.
+                    // (Previous version anchored -2 above for context;
+                    // Esa wanted the row to land at the top.)
+                    tb->startline = found_line;
                     tb->bEof = false;
                     UI->full_refresh();
                     need_refresh++;

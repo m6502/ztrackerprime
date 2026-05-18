@@ -73,6 +73,24 @@ static int ce_flag_loop  = 0;
 static int ce_flag_sus   = 0;
 static int ce_flag_carry = 0;
 
+// Pointer to the active page's UI so the canvas's mouseupdate/update
+// can bump need_redraw on EVERY widget (the Schism-grade refresh
+// pattern). Set in the constructor.
+static UserInterface *ce_page_ui = NULL;
+
+// Full-page refresh primitive: bump every flag any other "make the
+// screen actually update" path in main.cpp bumps. This is the same
+// chain zt_request_ui_full_refresh() (main.cpp:3024) fires on
+// Cmd-Tab focus-gain, which is the only thing the user has been
+// able to use to make clicks visible. Hammering it from every
+// state-mutating widget handler closes the gap.
+static void ce_force_full_refresh(void) {
+    if (ce_page_ui) ce_page_ui->full_refresh();
+    doredraw++;
+    need_refresh++;
+    screenmanager.UpdateAll();
+}
+
 // Canvas geometry (character units). The metadata strip occupies
 // rows BASE_Y+0..BASE_Y+8; legend sits at row CANVAS_Y-1; canvas
 // itself runs from CANVAS_Y down CANVAS_H rows.
@@ -308,10 +326,8 @@ public:
                                   ce_selected, e->num_nodes, t, v);
                 }
                 Keys.getkey();
-                need_refresh++;
-                doredraw++;       // force redrawscreen() this frame
                 this->need_redraw++;
-                screenmanager.UpdateAll();
+                ce_force_full_refresh();
                 return this->ID;
             }
         }
@@ -330,24 +346,29 @@ public:
                     ce_set_status("Deleted node %d", hit);
                 }
                 Keys.getkey();
-                need_refresh++;
-                doredraw++;       // force redrawscreen() this frame
                 this->need_redraw++;
-                screenmanager.UpdateAll();
+                ce_force_full_refresh();
                 return this->ID;
             }
         }
-        // Left button up: stop dragging.
+        // Left button up: ALWAYS consume the event whether or not we
+        // were dragging. If a button-up sits in the Keys queue (no
+        // widget claims it), it stalls every subsequent button-down
+        // -- THAT was the "click freezes" symptom; not a refresh
+        // problem at all. Clears the queue so the next click goes
+        // through.
         if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT))) {
+            Keys.getkey();
             if (dragging) {
                 dragging = 0;
-                Keys.getkey();
-                need_refresh++;
-                doredraw++;       // force redrawscreen() this frame
                 this->need_redraw++;
-                screenmanager.UpdateAll();
+                ce_force_full_refresh();
                 return this->ID;
             }
+        }
+        // Right button up: same deal -- swallow it so the queue stays clean.
+        if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT))) {
+            Keys.getkey();
         }
         // Live drag: move the selected node to follow the cursor.
         if (dragging && e && ce_selected >= 0 && ce_selected < e->num_nodes) {
@@ -359,10 +380,8 @@ public:
                     e->value[ce_selected] = (unsigned char)new_v;
                     ce_selected = ce_sort_after_move(e, ce_selected);
                     file_changed++;
-                    need_refresh++;
-                    doredraw++;
                     this->need_redraw++;
-                    screenmanager.UpdateAll();
+                    ce_force_full_refresh();
                 }
             }
         }
@@ -520,10 +539,8 @@ public:
 
         if (consumed) {
             Keys.getkey();
-            need_refresh++;
-            doredraw++;            // critical: triggers redrawscreen() at top of action()
             this->need_redraw++;
-            screenmanager.UpdateAll();
+            ce_force_full_refresh();
         }
         return 0;
     }
@@ -719,6 +736,7 @@ static void ce_push_from_widgets(UserInterface *UI) {
 
 CUI_CCEnvelopeEditor::CUI_CCEnvelopeEditor(void) {
     UI = new UserInterface;
+    ce_page_ui = UI;   // expose to the canvas widget for ce_force_full_refresh
 
     ValueSlider *vs;
     TextInput   *ti;
