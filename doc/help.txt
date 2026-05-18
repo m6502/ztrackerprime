@@ -112,7 +112,10 @@
 
 |L|%==|H|Global Keys|L|==%|U|
 
- F1             : Help (That is this text)
+ F1             : Help (That is this text). While on this page, press any
+                  modifier+key combo (e.g. ALT-M, CTRL-S, ALT-D) to jump
+                  to the line that documents it. Tab / Shift-Tab navigate
+                  between section headers.
  F2             : Pattern editor - Pressing F2 again while in the pattern
                   editing screen brings up the pattern settings.
  F3             : Instrument editor

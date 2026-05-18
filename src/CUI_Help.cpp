@@ -277,6 +277,156 @@ void CUI_Help::update() {
     if (Keys.size()) {
         key = Keys.checkkey();
         kstate = Keys.cur_state;
+        // Keyjazz the Help: any modifier (CTRL / ALT / CMD / SHIFT) +
+        // a letter/digit/F-key/grave is treated as a shortcut lookup.
+        // Build a token in the same format as doc/help.txt
+        // ("CTRL-S", "ALT-M", "SHIFT-F5", "CTRL-SHIFT-G", etc.) and
+        // jump tb->startline to the first line whose first non-space
+        // character matches that token at a word boundary.
+        //
+        // Trigger conditions: a modifier is held AND the keysym is a
+        // searchable token. Plain F1/ESC fall through to the
+        // close-help branch below; plain letters fall through to
+        // TextBox::update() so basic typing isn't intercepted.
+        if (key && (kstate & (KS_ALT | KS_CTRL | KS_META | KS_SHIFT))
+            && key != SDLK_TAB && key != SDLK_ESCAPE && key != SDLK_RETURN
+            && key != SDLK_UP && key != SDLK_DOWN
+            && key != SDLK_LEFT && key != SDLK_RIGHT
+            && key != SDLK_PAGEUP && key != SDLK_PAGEDOWN
+            && key != SDLK_HOME && key != SDLK_END) {
+            char keyname[16] = {0};
+            int got_keyname = 0;
+            if ((unsigned)key >= SDLK_F1 && (unsigned)key <= SDLK_F12) {
+                snprintf(keyname, sizeof keyname, "F%d", (int)(key - SDLK_F1 + 1));
+                got_keyname = 1;
+            } else if (key >= 'a' && key <= 'z') {
+                keyname[0] = (char)(key - 'a' + 'A');
+                got_keyname = 1;
+            } else if (key >= 'A' && key <= 'Z') {
+                keyname[0] = (char)key;
+                got_keyname = 1;
+            } else if (key >= '0' && key <= '9') {
+                keyname[0] = (char)key;
+                got_keyname = 1;
+            } else if (key == SDLK_GRAVE) {
+                // help.txt uses both "ALT-`" (literal grave) and
+                // "CTRL-SHIFT-`"; both substring-match "`".
+                keyname[0] = '`';
+                got_keyname = 1;
+            }
+
+            if (got_keyname) {
+                int ctrl  = (kstate & KS_CTRL) != 0;
+                int alt   = (kstate & (KS_ALT | KS_META)) != 0;
+                int shift = (kstate & KS_SHIFT) != 0;
+                char tokens[6][32];
+                int  ntok = 0;
+                const char *shift_part = shift ? "SHIFT-" : "";
+                if (ctrl && alt) {
+                    snprintf(tokens[ntok++], 32, "CTRL-ALT-%s%s", shift_part, keyname);
+#ifdef __APPLE__
+                    // macOS help.txt rewrites "CTRL-ALT-X" verbatim
+                    // (compound combos like Cmd-Opt are reserved by the
+                    // OS) so the CTRL-ALT token IS the rendered form.
+#endif
+                } else if (ctrl) {
+                    snprintf(tokens[ntok++], 32, "CTRL-%s%s", shift_part, keyname);
+                } else if (alt) {
+                    snprintf(tokens[ntok++], 32, "ALT-%s%s", shift_part, keyname);
+#ifdef __APPLE__
+                    // On macOS the help-text rewriter folds "CTRL-X"
+                    // into "CMD-X/ALT-X". Pressing either Cmd or Opt
+                    // produces an "ALT-..." token here, but the
+                    // line-start of the rendered help row is "CMD-X",
+                    // not "ALT-X". Generate "CMD-..." as an additional
+                    // candidate so the line-start match succeeds
+                    // without relying on the substring fallback.
+                    // Also try CTRL- because reserved-on-macOS shortcuts
+                    // (Cmd-W/H/TAB) leave the modifier verbatim in the
+                    // help file.
+                    snprintf(tokens[ntok++], 32, "CMD-%s%s",  shift_part, keyname);
+                    snprintf(tokens[ntok++], 32, "CTRL-%s%s", shift_part, keyname);
+#endif
+                } else if (shift) {
+                    snprintf(tokens[ntok++], 32, "SHIFT-%s", keyname);
+                }
+
+                const char *t = tb->text;
+                int line_idx = 0;
+                int found_line = -1;
+                // Pass 1: token at start of line (the documented shortcut
+                // rows). Pass 2: substring anywhere in the line (catches
+                // inline prose mentions like "press CTRL-L to ...").
+                for (int pass = 0; pass < 2 && found_line < 0; pass++) {
+                    line_idx = 0;
+                    for (int i = 0; t && t[i] && found_line < 0; ) {
+                        int ls = i;
+                        int le = ls;
+                        while (t[le] && t[le] != '\n') le++;
+                        int p_start, p_end;
+                        if (pass == 0) {
+                            p_start = ls;
+                            while (p_start < le && (t[p_start] == ' ' || t[p_start] == '\t')) p_start++;
+                            p_end = p_start + 1;   // only check start position
+                        } else {
+                            p_start = ls;
+                            p_end   = le;          // scan whole line
+                        }
+                        for (int p = p_start; p < p_end && found_line < 0; p++) {
+                            int rem = le - p;
+                            for (int j = 0; j < ntok && found_line < 0; j++) {
+                                int tl = (int)strlen(tokens[j]);
+                                if (rem < tl) continue;
+                                if (strncmp(t + p, tokens[j], tl) != 0) continue;
+                                // Word boundaries on both sides: the chars
+                                // adjacent to the token must not continue
+                                // an identifier so "ALT-M" won't match
+                                // "ALT-Move".
+                                char pc = (p > ls) ? t[p - 1] : ' ';
+                                char nc = (p + tl < le) ? t[p + tl] : ' ';
+                                int left_ok  = !(pc >= 'A' && pc <= 'Z')
+                                            && !(pc >= 'a' && pc <= 'z')
+                                            && !(pc >= '0' && pc <= '9');
+                                int right_ok = !(nc >= 'A' && nc <= 'Z')
+                                            && !(nc >= 'a' && nc <= 'z')
+                                            && !(nc >= '0' && nc <= '9');
+                                if (left_ok && right_ok) found_line = line_idx;
+                            }
+                        }
+                        line_idx++;
+                        i = (t[le] == '\n') ? le + 1 : le;
+                    }
+                }
+                if (found_line >= 0) {
+                    Keys.getkey(); // consume
+                    // Put the matched line AT THE TOP of the visible
+                    // area so the user's eye lands on it immediately.
+                    // (Previous version anchored -2 above for context;
+                    // Esa wanted the row to land at the top.)
+                    tb->startline = found_line;
+                    tb->bEof = false;
+                    UI->full_refresh();
+                    need_refresh++;
+                    snprintf(szStatmsg, sizeof szStatmsg,
+                             "Help: jumped to %s", tokens[0]);
+                    statusmsg = szStatmsg;
+                    status_change = 1;
+                    return;
+                }
+                // No match -- give the user audible feedback so they
+                // know the lookup ran (otherwise "nothing happened" is
+                // indistinguishable from "key was ignored").
+                Keys.getkey(); // consume so the chord doesn't leak to
+                               // TextBox::update() as a scroll trigger
+                snprintf(szStatmsg, sizeof szStatmsg,
+                         "Help: no entry for %s",
+                         ntok > 0 ? tokens[0] : "?");
+                statusmsg = szStatmsg;
+                status_change = 1;
+                need_refresh++;
+                return;
+            }
+        }
         if (key == SDLK_TAB && section_count > 0) {
             Keys.getkey(); // consume
             if (kstate & KS_SHIFT) {

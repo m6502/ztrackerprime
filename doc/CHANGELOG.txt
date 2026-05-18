@@ -4,6 +4,34 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_18 (Help page keyjazz lookup)
+----------------------------------------------------------------------------
+
+        + src/CUI_Help.cpp -- press any modifier+key combo while on the
+          F1 Help page to jump straight to the line documenting that
+          shortcut. Builds a `<MOD>-<KEY>` token in the same format
+          doc/help.txt renders (`ALT-M`, `CTRL-S`, `SHIFT-F6`,
+          `CTRL-SHIFT-G`, ...) and searches for it. Two-pass: first
+          matches the token at the start of a line (the documented
+          shortcut rows), second pass matches it as a substring anywhere
+          in the line so inline-prose references also catch (e.g. "press
+          CTRL-L to ..."). Word-boundary checked on both sides so
+          ALT-M won't false-hit longer tokens. Matched row lands at
+          tb->startline. Tab / Shift-Tab section nav unchanged.
+
+        + macOS variant: on Apple builds the help text is rewritten to
+          "CMD-X/ALT-X" so users see both modifier names. Cmd or Opt
+          key presses produce the ALT- token in KeyBuffer; the lookup
+          ALSO generates CMD- and CTRL- candidate tokens so the
+          line-start match succeeds against the rewritten rows.
+
+        + Status feedback: every lookup sets statusmsg --
+          "Help: jumped to <token>" on a hit, "Help: no entry for
+          <token>" on a miss. The chord is always consumed so it
+          never leaks to the TextBox scroll path.
+
+        + doc/help.txt -- F1 line documents the new behavior.
+
 zt 2026_05_14 (IEdit keyjazz + Alt-P centering + Ctrl+C/V/P clipboard)
 ----------------------------------------------------------------------------
 
