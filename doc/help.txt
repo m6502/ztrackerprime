@@ -143,6 +143,19 @@
                   64 tracks). Left/right/space/alt-1..0/alt-f9/alt-f10
                   drive playback control as before.
  F6             : Pattern Play - will play the current pattern being edited.
+ SHIFT-F6       : CC Envelope editor. Per-instrument: each instrument owns
+                  up to 32 envelope curves. If the instrument has a CCizer
+                  bank loaded (Shift+F3 set as ccizer_bank in F3), the slot
+                  picker on the left shows the bank's NAMED CC slots
+                  (Brightness CC#74, Cutoff CC#71, ...) -- pick one and
+                  draw the curve. Notes auto-arm every enabled envelope.
+                  Canvas: click to add a node, drag to move, right-click
+                  to delete. Arrow keys nav between nodes; Shift-arrows
+                  tune tick; Up/Dn adjust value (+/-1 or +/-8 with Shift).
+                  Space inserts between nodes; Del removes selected.
+                  L = loop anchor, S = sustain anchor, E = toggle Enabled,
+                  T = test-fire envelope on cur_inst. .env presets
+                  load/save from the configured ccenv_folder.
  F7             : Start the song at the current row -
                   If in the pattern edit mode, F7 will start at the current
                   row, at the first instance of the pattern in the pattern

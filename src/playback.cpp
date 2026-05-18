@@ -38,6 +38,7 @@
  *
  ******/
 #include "zt.h"
+#include "ccenv_advance.h"
 #include "sysex_macro.h"
 #include <algorithm>
 #include <stdint.h>
@@ -257,6 +258,7 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
 
     //this->noteoff_eventlist = NULL;
     this->noteoff_eventlist = new s_note_off[4000];
+    clear_cc_envs();
     noteoff_cur = noteoff_size = 0;
 
     this->play_buffer[0] = new midi_buf;
@@ -760,6 +762,8 @@ void player::stop(void)
     if (song->flag_SendMidiStopStart)
         MidiOut->sendGlobal(0xFC);
     clear_noel_with_midiout();
+    clear_cc_envs();
+    zt_audition_env_clear_all();
     if (zt_config_globals.auto_send_panic)
         MidiOut->hardpanic();
     MidiOut->panic();
@@ -963,11 +967,236 @@ void player::process_noel(midi_buf *buffer, int p_tick) {
             if (tr->last_note == e->note)
                 tr->last_note = 0x80;
             buffer->insert(p_tick,ET_NOTE_OFF,song->instruments[e->inst]->midi_device,e->note,song->instruments[e->inst]->channel,0x0,e->track,e->inst);
+            // Note off: release every envelope voice on this track.
+            // Sustain region falls through to the LOOP / fadeout branch
+            // on the next ccenv_step.
+            release_track_envelopes(e->track);
             kill_noel(i);
         } else {
         //    e->length--;
             i++;
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pattern-playback envelope runtime. The per-track voice grid is sized
+// MAX_TRACKS * ZTM_INST_MAX_ENVELOPES; arming a track scans the
+// instrument's envelopes[] and marks every enabled curve active.
+
+// ---------------------------------------------------------------------------
+// Keyjazz / test-fire audition envelope pool. Driven from the main UI
+// thread by SDL_GetTicks so it works whether or not the song is
+// playing. Independent of the per-track playback grid; shares only
+// ccenv_step's pure logic.
+
+struct aud_voice {
+    int env_inst;        // -1 = slot unused
+    int env_slot;
+    int sdlk_key;        // keyjazz key that owns this voice (sentinel for test-fire)
+    int position;
+    int last_emitted;
+    int speed_counter;
+    int key_off;
+    int done;
+    uint64_t last_advance_ms;
+};
+static const int AUD_MAX = 64;
+static aud_voice g_aud[AUD_MAX];
+static bool g_aud_inited = false;
+
+static void aud_ensure(void) {
+    if (g_aud_inited) return;
+    for (int i = 0; i < AUD_MAX; i++) g_aud[i].env_inst = -1;
+    g_aud_inited = true;
+}
+
+static int aud_find_free(void) {
+    for (int k = 0; k < AUD_MAX; k++) if (g_aud[k].env_inst < 0) return k;
+    return 0;   // steal slot 0 if all in use
+}
+
+void zt_audition_env_arm(int sdlk_key, int inst) {
+    aud_ensure();
+    if (!ztPlayer || !ztPlayer->song) return;
+    if (inst < 0 || inst >= MAX_INSTS) return;
+    instrument *ii = ztPlayer->song->instruments[inst];
+    if (!ii) return;
+    for (int s = 0; s < ZTM_INST_MAX_ENVELOPES; s++) {
+        const inst_envelope &env = ii->envelopes[s];
+        if (env.num_nodes == 0) continue;
+        if (!(env.flags & ZTM_INSTENVF_ENABLED)) continue;
+        int idx = aud_find_free();
+        g_aud[idx].env_inst  = inst;
+        g_aud[idx].env_slot  = s;
+        g_aud[idx].sdlk_key  = sdlk_key;
+        g_aud[idx].position  = 0;
+        g_aud[idx].last_emitted  = -1;
+        g_aud[idx].speed_counter = 0;
+        g_aud[idx].key_off = 0;
+        g_aud[idx].done    = 0;
+        g_aud[idx].last_advance_ms = (uint64_t)SDL_GetTicks();
+    }
+}
+
+void zt_audition_env_arm_one(int inst, int slot, int sentinel_key) {
+    aud_ensure();
+    if (!ztPlayer || !ztPlayer->song) return;
+    if (inst < 0 || inst >= MAX_INSTS) return;
+    if (slot < 0 || slot >= ZTM_INST_MAX_ENVELOPES) return;
+    instrument *ii = ztPlayer->song->instruments[inst];
+    if (!ii) return;
+    const inst_envelope &env = ii->envelopes[slot];
+    if (env.num_nodes == 0) return;
+    int idx = aud_find_free();
+    g_aud[idx].env_inst  = inst;
+    g_aud[idx].env_slot  = slot;
+    g_aud[idx].sdlk_key  = sentinel_key;
+    g_aud[idx].position  = 0;
+    g_aud[idx].last_emitted  = -1;
+    g_aud[idx].speed_counter = 0;
+    g_aud[idx].key_off = 0;
+    g_aud[idx].done    = 0;
+    g_aud[idx].last_advance_ms = (uint64_t)SDL_GetTicks();
+}
+
+void zt_audition_env_release(int sdlk_key) {
+    aud_ensure();
+    for (int k = 0; k < AUD_MAX; k++) {
+        if (g_aud[k].env_inst >= 0 && g_aud[k].sdlk_key == sdlk_key)
+            g_aud[k].key_off = 1;
+    }
+}
+
+void zt_audition_env_clear_all(void) {
+    aud_ensure();
+    for (int k = 0; k < AUD_MAX; k++) g_aud[k].env_inst = -1;
+}
+
+void zt_audition_env_pump(void) {
+    aud_ensure();
+    if (!ztPlayer || !ztPlayer->song) return;
+    int subtick_ms = ztPlayer->subtick_len_ms;
+    if (subtick_ms < 1) subtick_ms = 5;
+    uint64_t now = (uint64_t)SDL_GetTicks();
+
+    for (int k = 0; k < AUD_MAX; k++) {
+        aud_voice &v = g_aud[k];
+        if (v.env_inst < 0) continue;
+        instrument *ii = ztPlayer->song->instruments[v.env_inst];
+        if (!ii) { v.env_inst = -1; continue; }
+        const inst_envelope &env = ii->envelopes[v.env_slot];
+        if (env.num_nodes == 0 || !(env.flags & ZTM_INSTENVF_ENABLED)) {
+            v.env_inst = -1;
+            continue;
+        }
+        uint64_t elapsed = now - v.last_advance_ms;
+        int steps = (int)(elapsed / (uint64_t)subtick_ms);
+        if (steps <= 0) continue;
+        if (steps > 64) steps = 64;
+        v.last_advance_ms += (uint64_t)steps * subtick_ms;
+        int env_speed = env.speed > 0 ? env.speed : 1;
+        unsigned int dev   = ii->midi_device;
+        unsigned char chan = ii->channel;
+        for (int s = 0; s < steps; s++) {
+            v.speed_counter++;
+            if (v.speed_counter < env_speed) continue;
+            v.speed_counter = 0;
+            struct ccenv_voice_state cvs;
+            cvs.position = v.position;
+            cvs.done     = v.done;
+            cvs.key_off  = v.key_off;
+            int newval = ccenv_step(&cvs,
+                                    env.tick, env.value,
+                                    env.num_nodes, env.flags,
+                                    env.loop_start, env.loop_end,
+                                    env.sustain_start, env.sustain_end);
+            v.position = cvs.position;
+            v.done     = cvs.done;
+            if (newval != v.last_emitted) {
+                if (env.kind == 0) {
+                    MidiOut->sendCC(dev, env.cc, (unsigned char)newval, chan);
+                } else if (env.kind == 1) {
+                    int pb = newval * 129;
+                    if (pb > 16383) pb = 16383;
+                    MidiOut->pitchWheel(dev, chan, (unsigned short)pb);
+                }
+                v.last_emitted = newval;
+            }
+            if (cvs.done) { v.env_inst = -1; break; }
+        }
+    }
+}
+
+int zt_envelope_live_position(int inst, int slot,
+                              int *out_position, int *out_last_value)
+{
+    aud_ensure();
+    // Audition pool first (likeliest source when editor is open).
+    for (int k = 0; k < AUD_MAX; k++) {
+        if (g_aud[k].env_inst == inst && g_aud[k].env_slot == slot) {
+            if (out_position)   *out_position   = g_aud[k].position;
+            if (out_last_value) *out_last_value = g_aud[k].last_emitted;
+            return 1;
+        }
+    }
+    // Pattern-playback voices.
+    if (ztPlayer) {
+        for (int t = 0; t < MAX_TRACKS; t++) {
+            const cc_env_voice &vs = ztPlayer->cc_env[t][slot];
+            if (vs.active && (int)vs.inst == inst) {
+                if (out_position)   *out_position   = vs.position;
+                if (out_last_value) *out_last_value = vs.last_emitted;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+void player::clear_cc_envs(void) {
+    for (int t = 0; t < MAX_TRACKS; t++) {
+        for (int s = 0; s < ZTM_INST_MAX_ENVELOPES; s++) {
+            cc_env[t][s].active        = 0;
+            cc_env[t][s].inst          = 0;
+            cc_env[t][s].slot          = (unsigned char)s;
+            cc_env[t][s].position      = 0;
+            cc_env[t][s].last_emitted  = -1;
+            cc_env[t][s].speed_counter = 0;
+            cc_env[t][s].key_off       = 0;
+            cc_env[t][s].done          = 0;
+        }
+    }
+}
+
+void player::arm_track_envelopes(int track, int inst) {
+    if (track < 0 || track >= MAX_TRACKS) return;
+    if (inst < 0 || inst >= MAX_INSTS) return;
+    instrument *ii = song->instruments[inst];
+    if (!ii) return;
+    for (int s = 0; s < ZTM_INST_MAX_ENVELOPES; s++) {
+        const inst_envelope &env = ii->envelopes[s];
+        if (env.num_nodes == 0) continue;
+        if (!(env.flags & ZTM_INSTENVF_ENABLED)) continue;
+        cc_env_voice &v = cc_env[track][s];
+        int carry = (env.flags & ZTM_INSTENVF_CARRY) && v.active && v.inst == inst;
+        v.active        = 1;
+        v.inst          = (unsigned char)inst;
+        v.slot          = (unsigned char)s;
+        if (!carry) v.position = 0;
+        v.last_emitted  = -1;
+        v.speed_counter = 0;
+        v.key_off       = 0;
+        v.done          = 0;
+    }
+}
+
+void player::release_track_envelopes(int track) {
+    if (track < 0 || track >= MAX_TRACKS) return;
+    for (int s = 0; s < ZTM_INST_MAX_ENVELOPES; s++) {
+        if (cc_env[track][s].active)
+            cc_env[track][s].key_off = 1;
     }
 }
 
@@ -1284,6 +1513,65 @@ void player::playback(midi_buf *buffer, int ticks)
         }
 
         process_noel(buffer,p_tick);
+
+        // CC envelope advance: walk every active voice, advance by
+        // one subtick gated by its envelope's speed, emit ET_CC when
+        // the interpolated value changes.
+        for (int et = 0; et < MAX_TRACKS; et++) {
+            for (int s = 0; s < ZTM_INST_MAX_ENVELOPES; s++) {
+                cc_env_voice &vs = cc_env[et][s];
+                if (!vs.active) continue;
+                if (vs.inst >= MAX_INSTS) { vs.active = 0; continue; }
+                instrument *iv = song->instruments[vs.inst];
+                if (!iv) { vs.active = 0; continue; }
+                const inst_envelope &env = iv->envelopes[s];
+                if (env.num_nodes == 0 || !(env.flags & ZTM_INSTENVF_ENABLED)) {
+                    vs.active = 0;
+                    continue;
+                }
+                int env_speed = env.speed > 0 ? env.speed : 1;
+                vs.speed_counter++;
+                if (vs.speed_counter < env_speed) continue;
+                vs.speed_counter = 0;
+                struct ccenv_voice_state cvs;
+                cvs.position = vs.position;
+                cvs.done     = vs.done;
+                cvs.key_off  = vs.key_off;
+                int newval = ccenv_step(&cvs,
+                                        env.tick, env.value,
+                                        env.num_nodes, env.flags,
+                                        env.loop_start, env.loop_end,
+                                        env.sustain_start, env.sustain_end);
+                vs.position = cvs.position;
+                vs.done     = (unsigned char)cvs.done;
+                if (newval != vs.last_emitted) {
+                    unsigned int dev   = iv->midi_device;
+                    unsigned char chan = iv->channel;
+                    if (env.kind == 0) {
+                        buffer->insert(p_tick, ET_CC, dev,
+                                       env.cc, (unsigned char)newval,
+                                       chan, (unsigned char)et, vs.inst);
+                    } else if (env.kind == 1) {
+                        int pb = newval * 129;
+                        if (pb > 16383) pb = 16383;
+                        buffer->insert(p_tick, ET_PITCH, dev,
+                                       chan,
+                                       (unsigned char)(pb >> 7),
+                                       (unsigned char)(pb & 0x7F),
+                                       (unsigned char)et, vs.inst);
+                    } else if (env.kind == 2) {
+                        unsigned int packed = (0xD0u | (chan & 0x0F))
+                                            | ((unsigned)newval << 8);
+                        buffer->insert(p_tick, ET_RAW, dev,
+                                       packed & 0xFF,
+                                       (packed >> 8) & 0xFF,
+                                       0, (unsigned char)et, vs.inst);
+                    }
+                    vs.last_emitted = newval;
+                }
+                if (cvs.done) vs.active = 0;
+            }
+        }
 
         if (cur_subtick == 0) {
 
@@ -1669,6 +1957,10 @@ void player::playback(midi_buf *buffer, int ticks)
 
                 if (evento->note < 0x80) {
 
+                  // Arm every enabled CC envelope on this instrument
+                  // for THIS track. The per-subtick advance loop
+                  // (below process_noel) drives them and emits CC.
+                  arm_track_envelopes(t, inst);
 
                   // Aqui j se usa como var1
 

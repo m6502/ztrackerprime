@@ -341,7 +341,8 @@ enum state {
   STATE_KEYBINDINGS,
   STATE_MIDI_MAPPINGS,
   STATE_CCCONSOLE,
-  STATE_SYSEX_LIB
+  STATE_SYSEX_LIB,
+  STATE_CCENVELOPE
 } ;
 
 
@@ -614,7 +615,8 @@ enum E_col_type { T_NOTE, T_OCTAVE, T_INST, T_VOL, T_CHAN, T_LEN,
 
         CMD_SWITCH_KEYBINDINGS,
         CMD_SWITCH_CCCONSOLE,
-        CMD_SWITCH_SYSEX_LIB
+        CMD_SWITCH_SYSEX_LIB,
+        CMD_SWITCH_CCENVELOPE
 
     };
 
@@ -808,6 +810,7 @@ extern CUI_LuaConsole *UIP_LuaConsole;
 extern CUI_KeyBindings *UIP_KeyBindings;
 extern CUI_CcConsole *UIP_CcConsole;
 extern CUI_SysExLibrarian *UIP_SysExLibrarian;
+extern class CUI_CCEnvelopeEditor *UIP_CCEnvelopeEditor;
 extern CUI_Help *UIP_Help;
 extern CUI_MainMenu *UIP_MainMenu;
 

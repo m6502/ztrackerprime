@@ -244,17 +244,27 @@ bool jazz_note_is_active(int key) {
 }
 
 void jazz_set_state(int key, unsigned char note, unsigned char chan) {
-    std::lock_guard<std::mutex> lock(g_jazz_mutex);
-    g_jazz[key].note = note;
-    g_jazz[key].chan = chan;
+    {
+        std::lock_guard<std::mutex> lock(g_jazz_mutex);
+        g_jazz[key].note = note;
+        g_jazz[key].chan = chan;
+    }
+    // Audition: arm every enabled envelope on cur_inst alongside the
+    // note. The audition pump (main loop) emits CC each frame the
+    // interpolated value changes.
+    extern int cur_inst;
+    zt_audition_env_arm(key, cur_inst);
 }
 
 void jazz_clear_state(int key) {
-    std::lock_guard<std::mutex> lock(g_jazz_mutex);
-    const auto it = g_jazz.find(key);
-    if (it != g_jazz.end()) {
-        it->second.note = 0x80;
+    {
+        std::lock_guard<std::mutex> lock(g_jazz_mutex);
+        const auto it = g_jazz.find(key);
+        if (it != g_jazz.end()) {
+            it->second.note = 0x80;
+        }
     }
+    zt_audition_env_release(key);
 }
 
 void jazz_clear_all_states(void) {
@@ -352,6 +362,7 @@ CUI_LuaConsole *UIP_LuaConsole = NULL;
 CUI_KeyBindings *UIP_KeyBindings = NULL;
 CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
+CUI_CCEnvelopeEditor *UIP_CCEnvelopeEditor = NULL;
 int g_cc_drawmode = 0;
 int g_cc_draw_session_snapped = 0;
 
@@ -1262,6 +1273,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_KeyBindings = new CUI_KeyBindings;
     UIP_CcConsole = new CUI_CcConsole;
     UIP_SysExLibrarian = new CUI_SysExLibrarian;
+    UIP_CCEnvelopeEditor = new CUI_CCEnvelopeEditor;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1592,6 +1604,16 @@ void global_keys(Drawable *S)
                 // responses to .syx, replay later).
                 if (kstate & KS_SHIFT) {
                     command = CMD_SWITCH_SYSEX_LIB;
+                    key = Keys.getkey();
+                }
+                break;
+
+            case SDLK_F6:
+                // Plain F6 plays the current pattern. Shift+F6 opens
+                // the CC Envelope Editor -- per-instrument CC curves
+                // that fire on note-on.
+                if (kstate & KS_SHIFT) {
+                    command = CMD_SWITCH_CCENVELOPE;
                     key = Keys.getkey();
                 }
                 break;
@@ -1940,6 +1962,10 @@ void global_keys(Drawable *S)
             doredraw++; clear++;
             break;
         // ------------------------------------------------------------------------
+        case CMD_SWITCH_CCENVELOPE:
+            switch_page(UIP_CCEnvelopeEditor);
+            doredraw++; clear++;
+            break;
         case CMD_SWITCH_SYSEX_LIB:
             switch_page(UIP_SysExLibrarian);
             doredraw++; clear++;
@@ -2565,6 +2591,7 @@ int postAction ()
     delete UIP_KeyBindings;
     delete UIP_CcConsole;
     delete UIP_SysExLibrarian;
+    delete UIP_CCEnvelopeEditor;
     g_lua.shutdown();
     delete ztPlayer;
     delete MidiIn;
@@ -3308,6 +3335,10 @@ int action(Screen *S)
     else
         ActivePage->update();
 
+    // Drive keyjazz / test-fire envelope audition voices. Cheap when
+    // nothing is armed (walks a 64-slot array, skips empty entries).
+    zt_audition_env_pump();
+
 #ifdef DEBUG
     playbuff1_bg->setvalue(ztPlayer->play_buffer[0]->size);
     playbuff2_bg->setvalue(ztPlayer->play_buffer[1]->size);
@@ -3652,6 +3683,7 @@ int initSDL(void)
     UIP_KeyBindings = new CUI_KeyBindings;
     UIP_CcConsole = new CUI_CcConsole;
     UIP_SysExLibrarian = new CUI_SysExLibrarian;
+    UIP_CCEnvelopeEditor = new CUI_CCEnvelopeEditor;
     g_lua.init();
     UIP_PaletteEditor = new CUI_PaletteEditor;
     UIP_MainMenu = new CUI_MainMenu;

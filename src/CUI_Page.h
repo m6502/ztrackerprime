@@ -244,6 +244,19 @@ class CUI_Arpeggioeditor : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// CC Envelope Editor (Shift+F6). Per-instrument: instrument.envelopes[]
+// holds up to 32 curves; if the instrument has a CCizer bank attached
+// the editor's slot list shows the named CC labels (Brightness CC#74,
+// Cutoff CC#71, ...). Notes auto-arm every enabled envelope.
+class CUI_CCEnvelopeEditor : public CUI_Page {
+    public:
+        CUI_CCEnvelopeEditor();
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+};
+
 class CUI_Midimacroeditor : public CUI_Page {
     public:
 

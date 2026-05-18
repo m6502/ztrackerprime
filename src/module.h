@@ -92,6 +92,34 @@ class InflateStream ;
 #define ZTM_MIDIMACRO_MAXLEN                64
 #endif /* USE_MIDIMACRO */
 
+/* CC envelopes (Schism-style). Per-instrument storage. Each
+ * instrument can author up to ZTM_INST_MAX_ENVELOPES curves, each
+ * up to ZTM_INST_ENV_MAX_NODES nodes. Enabled curves auto-arm on
+ * note-on (pattern or keyjazz). No song-level envelope pool, no
+ * V-effect, no global IENV binding -- the instrument IS the binding.
+ */
+#define ZTM_INST_MAX_ENVELOPES              32
+#define ZTM_INST_ENV_MAX_NODES              32
+/* env flags (per envelope) */
+#define ZTM_INSTENVF_ENABLED                0x01
+#define ZTM_INSTENVF_LOOP                   0x02
+#define ZTM_INSTENVF_SUSTAIN                0x04
+#define ZTM_INSTENVF_CARRY                  0x08
+/* sentinel "no CC assigned" -- value stored in cc field */
+#define ZTM_INSTENV_CC_NONE                 0xFF
+
+struct inst_envelope {
+    unsigned char cc;               /* 0..127 = CC#, 0xFF = unused slot */
+    unsigned char kind;             /* 0=CC, 1=Pitchbend, 2=ChanPress */
+    unsigned char flags;            /* ZTM_INSTENVF_* */
+    unsigned char num_nodes;        /* 0..ZTM_INST_ENV_MAX_NODES */
+    unsigned char loop_start, loop_end;
+    unsigned char sustain_start, sustain_end;
+    unsigned short tick[ZTM_INST_ENV_MAX_NODES];
+    unsigned char  value[ZTM_INST_ENV_MAX_NODES];
+    unsigned short speed;           /* subticks per envelope tick, >=1 */
+};
+
 /* max length of the status string returned from I/O functions */
 #define ZTM_STATUSSTR_MAXLEN                256
 
@@ -151,6 +179,11 @@ public:
   // CCBN chunk; the chunk is skipped by older zTracker versions, which
   // load such files cleanly with this field empty (forward-compat).
   char ccizer_bank[256];
+
+  // CC envelopes authored on THIS instrument. Each enabled envelope fires
+  // when the instrument plays a note (pattern + keyjazz both). Persisted
+  // in the optional INSE chunk; old zTracker skips it.
+  inst_envelope envelopes[ZTM_INST_MAX_ENVELOPES];
 
 } ;
 

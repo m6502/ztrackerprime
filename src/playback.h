@@ -43,7 +43,48 @@
 #include "winmm_compat.h"
 
 //#include "zt.h"
+#include "module.h"
 class zt_module ;
+
+// ---------------------------------------------------------------------------
+// CC envelope runtime hooks. Envelopes live on the instrument
+// (inst_envelope inst->envelopes[]). Pattern note-on AND keyjazz
+// audition both fire all enabled envelopes on the active instrument.
+//
+// `cc_env_voice` is one armed envelope on one track. Sized to
+// MAX_TRACKS * ZTM_INST_MAX_ENVELOPES (= 64 * 32 = 2048) inside the
+// player; pre-allocated so playback never touches the heap.
+
+struct cc_env_voice {
+    unsigned char inst;         // instrument that armed this voice
+    unsigned char slot;         // index into inst->envelopes[]
+    unsigned char active;       // 1 = voice live; 0 = empty slot
+    unsigned char key_off;      // 1 = note released; sustain region abandoned
+    unsigned char done;         // envelope finished (caller frees on emit)
+    int           position;     // subticks elapsed since note-on
+    int           last_emitted; // last CC value sent (-1 = none yet)
+    int           speed_counter;
+};
+
+// Audition pool. Independent of the per-track playback grid -- this
+// drives envelopes for keyjazz / test-fire from the main UI thread
+// using SDL_GetTicks for timing.
+void zt_audition_env_arm(int sdlk_key, int inst);
+void zt_audition_env_release(int sdlk_key);
+void zt_audition_env_pump(void);
+void zt_audition_env_clear_all(void);
+
+// Test-fire one envelope from the editor without going through
+// jazz_set_state. `sentinel_key` is a tag the editor can pass to
+// later release this voice via zt_audition_env_release.
+void zt_audition_env_arm_one(int inst, int slot, int sentinel_key);
+
+// Editor live-view: returns 1 if any voice (audition or pattern) is
+// processing inst->envelopes[slot]. Fills out_position with the
+// current tick + out_last_value with the most recent emitted CC.
+int zt_envelope_live_position(int inst, int slot,
+                              int *out_position, int *out_last_value);
+// ---------------------------------------------------------------------------
 
 enum Emeventtypes { 
     ET_NOTE_ON,
@@ -158,6 +199,14 @@ class player {
 
         zt_module *song;
         pattern patt_memory;
+
+        // Per-track CC envelope runtime state. cc_env[t][s] is one
+        // armed voice on track t driving inst->envelopes[s]. The
+        // playback loop advances each active voice every subtick.
+        cc_env_voice cc_env[MAX_TRACKS][ZTM_INST_MAX_ENVELOPES];
+        void clear_cc_envs(void);
+        void arm_track_envelopes(int track, int inst);    // on note-on
+        void release_track_envelopes(int track);          // on note-off
 //      int clock_counter,clock_len_ms,clock_len_mms,clock_error,clock_error_flag;
         
         player(int res,int prebuffer_rows, zt_module *ztm);

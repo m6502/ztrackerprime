@@ -84,6 +84,20 @@ instrument::instrument(int p)
 
   ccizer_bank[0] = '\0';
 
+  // CC envelope slots default to "unused" (cc=0xFF, num_nodes=0).
+  // The Shift+F6 editor populates them on demand.
+  for (int e = 0; e < ZTM_INST_MAX_ENVELOPES; e++) {
+      envelopes[e].cc            = ZTM_INSTENV_CC_NONE;
+      envelopes[e].kind          = 0;
+      envelopes[e].flags         = 0;
+      envelopes[e].num_nodes     = 0;
+      envelopes[e].loop_start    = 0;
+      envelopes[e].loop_end      = 0;
+      envelopes[e].sustain_start = 0;
+      envelopes[e].sustain_end   = 0;
+      envelopes[e].speed         = 1;
+  }
+
   // <Manu>
   MarkAsUnused() ;
 }
@@ -862,5 +876,14 @@ void zt_module::reset(void) {
 
     //file_changed++;
 }
+
+// Guard: ccenv_advance.h defines CCENV_F_* flags locally (SDL-free
+// + module.h-free so the unit test compiles standalone). Drift would
+// silently corrupt envelope behaviour. Lock them together.
+#include "ccenv_advance.h"
+static_assert(CCENV_F_ENABLED == ZTM_INSTENVF_ENABLED, "envelope ENABLED flag drift");
+static_assert(CCENV_F_LOOP    == ZTM_INSTENVF_LOOP,    "envelope LOOP flag drift");
+static_assert(CCENV_F_SUSTAIN == ZTM_INSTENVF_SUSTAIN, "envelope SUSTAIN flag drift");
+static_assert(CCENV_F_CARRY   == ZTM_INSTENVF_CARRY,   "envelope CARRY flag drift");
 /* eof */
 

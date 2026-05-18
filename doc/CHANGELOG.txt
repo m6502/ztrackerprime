@@ -4,6 +4,43 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_18 (CC Envelopes per-instrument, CCizer-aware)
+----------------------------------------------------------------------------
+
+        + CC Envelopes (Shift+F6). Per-INSTRUMENT envelope curves --
+          each instrument's `envelopes[]` array holds up to 32 curves;
+          enabled ones auto-arm on every note-on (pattern or keyjazz).
+          If the instrument has a CCizer bank attached
+          (instrument.ccizer_bank set in F3), the editor's left-pane
+          slot picker shows the bank's NAMED CC slots ("Brightness
+          CC#74", "Cutoff CC#71", ...). Pick a slot, click in the
+          canvas to author the curve. No bank? -> generic Slot 00..31
+          rows with a raw CC# field.
+
+        + Schism-style canvas: thin 1px curve, fine dotted 8x8 grid,
+          loop/sustain visualised as colored vertical bands across the
+          canvas height. Selected node uses COLORS.EditText (bright on
+          black) so it never disappears. Live playhead during T-test
+          shows the envelope's current tick position.
+
+        + .env preset files (single curve each, portable across
+          instruments/CCs) under the configured `ccenv_folder`. Load
+          stamps onto the focused slot; Save writes the focused slot.
+          Folder auto-created on first save.
+
+        + Persistence: new INSE chunk per instrument in the .zt file.
+          Forward-compatible (old zTracker silently skips unknown
+          chunks). No V-effect needed -- envelopes ARE the instrument
+          binding; notes fire all enabled curves automatically.
+
+        + Tests: tests/test_ccenv (linear interpolation clamps,
+          vertical step, multi-segment; advance state machine for
+          disabled / terminate / sustain hold + release / loop).
+          11/11 ctest green.
+
+        + doc/help.txt + this CHANGELOG entry; SKILL.md headless
+          guidance retained from the merged Help-keyjazz PR.
+
 zt 2026_05_18 (Help page keyjazz lookup)
 ----------------------------------------------------------------------------
 

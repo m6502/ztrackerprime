@@ -746,6 +746,54 @@ int zt_module::save(char *fn, int compressed)
             writeblock("MMAC",&buffer,compressed,f,lpDS);
         }
     }
+
+    // INSE: one chunk per instrument that has at least one envelope
+    // with num_nodes > 0. Forward-compat: older zTracker skips the
+    // unrecognized header. Each chunk layout:
+    //   u8  inst_idx
+    //   u8  env_count (slots with num_nodes > 0)
+    //   repeat env_count times:
+    //     u8  slot_idx   (0..ZTM_INST_MAX_ENVELOPES-1)
+    //     u8  cc, kind, flags, num_nodes
+    //     u8  loop_start, loop_end, sustain_start, sustain_end
+    //     u16 speed
+    //     repeat num_nodes:
+    //       u16 tick
+    //       u8  value
+    for (i = 0; i < ZTM_MAX_INSTS; i++) {
+        if (!this->instruments[i]) continue;
+        int any = 0;
+        for (int e = 0; e < ZTM_INST_MAX_ENVELOPES; e++) {
+            if (this->instruments[i]->envelopes[e].num_nodes > 0) { any = 1; break; }
+        }
+        if (!any) continue;
+        buffer.pushuc((unsigned char)i);
+        int env_count = 0;
+        for (int e = 0; e < ZTM_INST_MAX_ENVELOPES; e++) {
+            if (this->instruments[i]->envelopes[e].num_nodes > 0) env_count++;
+        }
+        if (env_count > 255) env_count = 255;
+        buffer.pushuc((unsigned char)env_count);
+        for (int e = 0; e < ZTM_INST_MAX_ENVELOPES; e++) {
+            const inst_envelope &env = this->instruments[i]->envelopes[e];
+            if (env.num_nodes == 0) continue;
+            buffer.pushuc((unsigned char)e);
+            buffer.pushuc(env.cc);
+            buffer.pushuc(env.kind);
+            buffer.pushuc(env.flags);
+            buffer.pushuc(env.num_nodes);
+            buffer.pushuc(env.loop_start);
+            buffer.pushuc(env.loop_end);
+            buffer.pushuc(env.sustain_start);
+            buffer.pushuc(env.sustain_end);
+            buffer.pushusi(env.speed);
+            for (int n = 0; n < (int)env.num_nodes; n++) {
+                buffer.pushusi(env.tick[n]);
+                buffer.pushuc(env.value[n]);
+            }
+        }
+        writeblock("INSE", &buffer, compressed, f, lpDS);
+    }
     
     build_ZT_event_list(&buffer);
     writeblock("ZTev",&buffer,compressed,f,lpDS);
@@ -1252,6 +1300,68 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "ZTpp")) { load_ZT_pattern_properties(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTin")) { load_ZT_instrument(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTev")) { load_ZT_event_list(&buffer); recognized_chunks++; saw_event_list = 1; }
+            if (cmp_hd(&header[0], "INSE")) {
+                // Per-instrument CC envelopes chunk (see save side for
+                // layout). Bounds-checked at every step; on malformed
+                // input we abort this instrument and keep loading the
+                // rest of the song.
+                unsigned char inst_idx = buffer.getuch();
+                unsigned char env_count = buffer.getuch();
+                if (inst_idx < ZTM_MAX_INSTS && this->instruments[inst_idx]) {
+                    for (int kk = 0; kk < (int)env_count; kk++) {
+                        unsigned char slot = buffer.getuch();
+                        unsigned char cc   = buffer.getuch();
+                        unsigned char kind = buffer.getuch();
+                        unsigned char flg  = buffer.getuch();
+                        unsigned char nn   = buffer.getuch();
+                        unsigned char ls   = buffer.getuch();
+                        unsigned char le   = buffer.getuch();
+                        unsigned char ss   = buffer.getuch();
+                        unsigned char se   = buffer.getuch();
+                        unsigned short spd = buffer.getusi();
+                        if (slot >= ZTM_INST_MAX_ENVELOPES || nn > ZTM_INST_ENV_MAX_NODES) {
+                            // Skip remaining nodes for this envelope.
+                            for (int n = 0; n < (int)nn; n++) {
+                                buffer.getusi(); buffer.getuch();
+                            }
+                            continue;
+                        }
+                        inst_envelope &env = this->instruments[inst_idx]->envelopes[slot];
+                        env.cc            = cc;
+                        env.kind          = kind > 2 ? 0 : kind;
+                        env.flags         = flg;
+                        env.num_nodes     = nn;
+                        env.loop_start    = ls;
+                        env.loop_end      = le;
+                        env.sustain_start = ss;
+                        env.sustain_end   = se;
+                        env.speed         = spd == 0 ? 1 : spd;
+                        for (int n = 0; n < (int)nn; n++) {
+                            env.tick[n]  = buffer.getusi();
+                            unsigned char v = buffer.getuch();
+                            if (v > 127) v = 127;
+                            env.value[n] = v;
+                        }
+                    }
+                } else {
+                    // Unknown instrument index -- consume bytes to keep
+                    // the stream aligned.
+                    for (int kk = 0; kk < (int)env_count; kk++) {
+                        buffer.getuch(); // slot
+                        buffer.getuch(); // cc
+                        buffer.getuch(); // kind
+                        buffer.getuch(); // flags
+                        unsigned char nn = buffer.getuch();
+                        buffer.getuch(); buffer.getuch();
+                        buffer.getuch(); buffer.getuch();
+                        buffer.getusi();
+                        for (int n = 0; n < (int)nn; n++) {
+                            buffer.getusi(); buffer.getuch();
+                        }
+                    }
+                }
+                recognized_chunks++;
+            }
             if (cmp_hd(&header[0], "CCBN")) {
                 // Optional per-instrument CCizer bank chunk. Format:
                 //   short int count
