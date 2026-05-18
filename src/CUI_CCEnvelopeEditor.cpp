@@ -513,7 +513,8 @@ public:
         if (consumed) {
             Keys.getkey();
             need_refresh++;
-            need_redraw++;
+            this->need_redraw++;   // mark THIS widget dirty so UI->draw redraws it
+            screenmanager.UpdateAll();
         }
         return 0;
     }
@@ -944,6 +945,14 @@ void CUI_CCEnvelopeEditor::update(void) {
 
 void CUI_CCEnvelopeEditor::draw(Drawable *S) {
     if (S->lock() != 0) return;
+
+    // Force every widget to redraw this frame. UserInterface::draw
+    // only re-paints widgets whose need_redraw is set, which is
+    // bumped by widget-local events. The canvas's curve / playhead
+    // changes whenever envelope state or live position shifts and
+    // those mutations don't always bump need_redraw on the canvas
+    // itself -- full_refresh sidesteps that.
+    UI->full_refresh();
 
     UI->draw(S);
     draw_status(S);
