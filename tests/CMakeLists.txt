@@ -122,3 +122,13 @@ add_executable(test_ccbn_roundtrip
 target_include_directories(test_ccbn_roundtrip PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_ccbn_roundtrip PRIVATE cxx_std_17)
 add_test(NAME ccbn_roundtrip COMMAND test_ccbn_roundtrip)
+
+# CC envelope pure-logic core: linear interp + advance state machine
+# (sustain hold / release, regular loop, terminate). SDL-free,
+# module.h-free; both headers operate on raw arrays.
+add_executable(test_ccenv
+    test_ccenv.cpp
+)
+target_include_directories(test_ccenv PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_ccenv PRIVATE cxx_std_17)
+add_test(NAME ccenv COMMAND test_ccenv)
