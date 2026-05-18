@@ -5,30 +5,25 @@
  * DESCRIPTION
  *   The CC Envelope editor (Shift+F6).
  *
- *   Each song carries up to ZTM_MAX_CCENVELOPES envelopes. An envelope
- *   is a sparse `{tick, value}` curve linearly interpolated each subtick
- *   to drive MIDI CC (or Pitchbend / Channel Pressure) output during a
- *   note's lifetime. See `doc/design/cc-envelopes.md` for the runtime
- *   model.
+ *   Schism-style graphical envelope authoring: a 2D canvas where the
+ *   user clicks to add nodes, drags to move them, right-clicks to
+ *   delete, and keyboard hotkeys mark loop / sustain anchors at the
+ *   selected node. The interpolated curve is rendered live on the
+ *   canvas with the same math the playback thread uses
+ *   (ccenv_interp.h), so what you see on-screen is what you'll hear.
  *
- *   This page is the curve authoring UI. One envelope is in focus at a
- *   time (selected by the Slot slider). Per-envelope metadata sits at
- *   the top (name / cc# / kind / speed / flags / loop+sustain range).
- *   Below, a single "Node N" selector picks which node is being edited;
- *   that node's tick and value get two adjacent sliders. Add / Insert /
- *   Delete buttons modify the node array. A right-hand file picker
- *   loads/saves .env presets from the configured ccenv_folder.
+ *   Top strip carries the metadata (slot, name, cc#, kind, flag
+ *   checkboxes) + a .env file picker. The canvas occupies the rest
+ *   of the page.
  *
- *   Triggered from the pattern editor via the Vxxyy effect (envelope
- *   slot xx, optional cc# override yy = 0x80 to keep envelope's own
- *   cc) OR auto-armed when a note plays an instrument that has this
- *   envelope listed in its ccenv_default[] slots (see Instrument
- *   Editor).
+ *   Runtime triggering: per-instrument auto-arm OR Vxxyy pattern
+ *   effect. See doc/design/cc-envelopes.md for the wider model.
  *
  ******/
 #include "zt.h"
 
 #include "ccenv_io.h"
+#include "ccenv_interp.h"
 #include "editor_layout.h"
 #include "Button.h"
 #include "Sliders.h"
@@ -36,28 +31,19 @@
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define SPACE_AT_BOTTOM 8
 
-// Widget IDs -- low IDs first so set_focus(0) lands on the slot slider.
+// Widget IDs. The canvas tab-stop is FIRST so Tab from outside lands
+// straight on the drawing surface -- that's the page's primary
+// interaction. Metadata follows; everything else trails.
 enum {
-    W_SLOT = 0,
+    W_CANVAS = 0,
+    W_SLOT,
     W_NAME,
     W_CC,
     W_KIND,
-    W_SPEED,
-    W_NUMNODES,
     W_FLAG_ENA,
     W_FLAG_LOOP,
     W_FLAG_SUS,
     W_FLAG_CARRY,
-    W_LOOP_S,
-    W_LOOP_E,
-    W_SUS_S,
-    W_SUS_E,
-    W_NODE_IDX,
-    W_NODE_TICK,
-    W_NODE_VAL,
-    W_BTN_ADD,
-    W_BTN_INS,
-    W_BTN_DEL,
     W_FILE_LIST,
     W_FILENAME,
     W_BTN_LOAD,
@@ -65,7 +51,7 @@ enum {
 };
 
 static int  ce_slot     = 0;
-static int  ce_node_sel = 0;     // currently-selected node index
+static int  ce_selected = -1;   // selected node index on the canvas (-1 = none)
 static char ce_name_buf[ZTM_CCENVNAME_MAXLEN] = {0};
 static char ce_filename_buf[256] = {0};
 static char ce_folder[1024]      = {0};
@@ -73,19 +59,31 @@ static char ce_files[256][256];
 static int  ce_num_files         = 0;
 static char ce_status[160]       = {0};
 
-// CheckBox->value is `int *` (a pointer to a backing int the page owns).
-// Mirror the on/off bits here; ce_push_from_widgets() reads these.
+// CheckBox::value is `int *` (a pointer to a backing int the page owns).
 static int ce_flag_ena   = 0;
 static int ce_flag_loop  = 0;
 static int ce_flag_sus   = 0;
 static int ce_flag_carry = 0;
+
+// Canvas geometry (character units). The metadata strip occupies
+// rows BASE_Y+0..BASE_Y+8; legend sits at row CANVAS_Y-1; canvas
+// itself runs from CANVAS_Y down CANVAS_H rows.
+static int CANVAS_X  = 2;
+static int CANVAS_Y  = 22;
+static int CANVAS_W  = 70;
+static int CANVAS_H  = 14;
 
 // ---------------------------------------------------------------------------
 // Helpers
 
 static ccenvelope *ce_ensure(int slot) {
     if (slot < 0 || slot >= ZTM_MAX_CCENVELOPES) return NULL;
-    if (!song->ccenvelopes[slot]) song->ccenvelopes[slot] = new ccenvelope;
+    if (!song->ccenvelopes[slot]) {
+        song->ccenvelopes[slot] = new ccenvelope;
+        // Sensible default: enabled, empty node list. User clicks to
+        // populate.
+        song->ccenvelopes[slot]->flags = ZTM_CCENVF_ENABLED;
+    }
     return song->ccenvelopes[slot];
 }
 
@@ -126,6 +124,38 @@ static void ce_rescan_folder(void) {
     }
 }
 
+// Best displayed x-tick range. Auto-fits to ~120% of the last node
+// or 64 ticks, whichever is larger. Caps at 65535 so we don't get
+// nonsense at the upper bound.
+static int ce_max_tick_view(const ccenvelope *e) {
+    if (!e || e->num_nodes == 0) return 64;
+    int t = (int)e->tick[e->num_nodes - 1];
+    int v = t + (t / 4);   // 25% headroom
+    if (v < 64)    v = 64;
+    if (v > 65535) v = 65535;
+    return v;
+}
+
+// Sort nodes by tick after a move (keeps the array monotonic so
+// ccenv_interp_raw works correctly). Returns the new index of the
+// node that was at `moved_idx`.
+static int ce_sort_after_move(ccenvelope *e, int moved_idx) {
+    if (!e || moved_idx < 0 || moved_idx >= e->num_nodes) return moved_idx;
+    // Bubble the moved node into position.
+    int idx = moved_idx;
+    while (idx > 0 && e->tick[idx - 1] > e->tick[idx]) {
+        unsigned short t = e->tick[idx]; e->tick[idx] = e->tick[idx - 1]; e->tick[idx - 1] = t;
+        unsigned char  v = e->value[idx]; e->value[idx] = e->value[idx - 1]; e->value[idx - 1] = v;
+        idx--;
+    }
+    while (idx + 1 < e->num_nodes && e->tick[idx] > e->tick[idx + 1]) {
+        unsigned short t = e->tick[idx]; e->tick[idx] = e->tick[idx + 1]; e->tick[idx + 1] = t;
+        unsigned char  v = e->value[idx]; e->value[idx] = e->value[idx + 1]; e->value[idx + 1] = v;
+        idx++;
+    }
+    return idx;
+}
+
 // ---------------------------------------------------------------------------
 // File-picker listbox
 
@@ -140,14 +170,9 @@ public:
     }
     void OnChange() override {
         clear();
-        // insertItem prepends when unsorted; walk backwards.
-        for (int i = ce_num_files - 1; i >= 0; --i) {
-            insertItem(ce_files[i]);
-        }
+        for (int i = ce_num_files - 1; i >= 0; --i) insertItem(ce_files[i]);
     }
     void OnSelectChange() override {
-        // Each arrow keypress lands here; mirror the highlighted item
-        // into ce_filename_buf so Load/Save use it without extra clicks.
         LBNode *p = getNode(cur_sel + y_start);
         if (p && p->caption) {
             strncpy(ce_filename_buf, p->caption, sizeof ce_filename_buf - 1);
@@ -162,133 +187,424 @@ public:
         ListBox::OnSelect(p);
     }
 };
+
+// ---------------------------------------------------------------------------
+// The drawing canvas. This is where the user lives.
+//
+// Mouse:
+//   Left-click on empty space   -> add a node at the clicked position,
+//                                  select it.
+//   Left-click on existing node -> select it; drag to move.
+//   Right-click on node         -> delete it.
+//
+// Keyboard (when canvas has focus -- the default tab stop):
+//   Left  / Right       : select previous / next node
+//   Up    / Down        : selected node's value +/-
+//   Shift-Left / Right  : selected node's tick  -/+ (also re-sorts)
+//   Delete / Backspace  : delete selected node
+//   L                   : assign loop-start at selected node;
+//                         second press assigns loop-end (toggles)
+//   S                   : same for sustain
+//   E                   : toggle Enabled flag
+//   Space               : add a new node halfway between selected
+//                         and the next one
+//
+// The widget interprets MousePressX/Y (last-down location) for click
+// hit-testing and LastX/Y (current position) for drag motion. The
+// dragging flag keeps motion local until mouse-up.
+class EnvCanvas : public UserInterfaceElement {
+public:
+    int dragging;
+
+    EnvCanvas() {
+        no_tab_stop = false;
+        dragging = 0;
+        // x/y/xsize/ysize set by the page constructor based on
+        // CANVAS_X/Y/W/H constants.
+    }
+
+    int pix_to_tick(int px, const ccenvelope *e) const {
+        int rel = px - col(this->x);
+        int span = col(this->xsize);
+        if (span <= 0) return 0;
+        int mt = ce_max_tick_view(e);
+        int t = (rel * mt) / span;
+        if (t < 0) t = 0; if (t > 65535) t = 65535;
+        return t;
+    }
+    int pix_to_value(int py) const {
+        int rel = py - row(this->y);
+        int span = row(this->ysize);
+        if (span <= 0) return 0;
+        int v = 127 - (rel * 127) / span;
+        if (v < 0) v = 0; if (v > 127) v = 127;
+        return v;
+    }
+    int node_pix_x(int n_idx, const ccenvelope *e) const {
+        int mt = ce_max_tick_view(e);
+        int span = col(this->xsize);
+        return col(this->x) + ((int)e->tick[n_idx] * span) / (mt > 0 ? mt : 1);
+    }
+    int node_pix_y(int n_idx, const ccenvelope *e) const {
+        int span = row(this->ysize);
+        return row(this->y) + ((127 - (int)e->value[n_idx]) * span) / 127;
+    }
+
+    // Find the nearest node to (px, py) within a small radius.
+    // Returns -1 if none. Radius is generous (12px) so a stubby
+    // finger can grab a node easily.
+    int find_node_near(int px, int py, const ccenvelope *e) const {
+        if (!e || e->num_nodes == 0) return -1;
+        int best = -1;
+        int best_dsq = 12 * 12;
+        for (int i = 0; i < e->num_nodes; i++) {
+            int dx = px - node_pix_x(i, e);
+            int dy = py - node_pix_y(i, e);
+            int dsq = dx * dx + dy * dy;
+            if (dsq < best_dsq) { best = i; best_dsq = dsq; }
+        }
+        return best;
+    }
+
+    int hit_canvas(int px, int py) const {
+        return px >= col(this->x) && px < col(this->x + this->xsize)
+            && py >= row(this->y) && py < row(this->y + this->ysize);
+    }
+
+    int mouseupdate(int cur_element) override {
+        KBKey key = Keys.checkkey();
+        ccenvelope *e = ce_ensure(ce_slot);
+
+        // Left button down: select existing node or add a new one.
+        if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
+            if (hit_canvas(MousePressX, MousePressY)) {
+                int hit = find_node_near(MousePressX, MousePressY, e);
+                if (hit >= 0) {
+                    ce_selected = hit;
+                    dragging = 1;
+                } else if (e && e->num_nodes < ZTM_CCENV_MAX_NODES) {
+                    // Add a node at the clicked position.
+                    int t = pix_to_tick(MousePressX, e);
+                    int v = pix_to_value(MousePressY);
+                    e->tick[e->num_nodes]  = (unsigned short)t;
+                    e->value[e->num_nodes] = (unsigned char)v;
+                    e->num_nodes++;
+                    ce_selected = ce_sort_after_move(e, e->num_nodes - 1);
+                    file_changed++;
+                    ce_set_status("Added node %d at tick %d, value %d",
+                                  ce_selected, t, v);
+                }
+                Keys.getkey();
+                need_refresh++;
+                need_redraw++;
+                return this->ID;
+            }
+        }
+        // Right button down on a node: delete it.
+        if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT))) {
+            if (hit_canvas(MousePressX, MousePressY)) {
+                int hit = find_node_near(MousePressX, MousePressY, e);
+                if (hit >= 0 && e) {
+                    for (int k = hit; k + 1 < e->num_nodes; k++) {
+                        e->tick[k]  = e->tick[k + 1];
+                        e->value[k] = e->value[k + 1];
+                    }
+                    e->num_nodes--;
+                    if (ce_selected >= e->num_nodes) ce_selected = e->num_nodes - 1;
+                    file_changed++;
+                    ce_set_status("Deleted node %d", hit);
+                }
+                Keys.getkey();
+                need_refresh++;
+                need_redraw++;
+                return this->ID;
+            }
+        }
+        // Left button up: stop dragging.
+        if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT))) {
+            if (dragging) {
+                dragging = 0;
+                Keys.getkey();
+                need_refresh++;
+                need_redraw++;
+                return this->ID;
+            }
+        }
+        // Live drag: move the selected node to follow the cursor.
+        if (dragging && e && ce_selected >= 0 && ce_selected < e->num_nodes) {
+            if (hit_canvas(LastX, LastY)) {
+                int new_t = pix_to_tick(LastX, e);
+                int new_v = pix_to_value(LastY);
+                if (new_t != e->tick[ce_selected] || new_v != e->value[ce_selected]) {
+                    e->tick[ce_selected]  = (unsigned short)new_t;
+                    e->value[ce_selected] = (unsigned char)new_v;
+                    ce_selected = ce_sort_after_move(e, ce_selected);
+                    file_changed++;
+                    need_refresh++;
+                    need_redraw++;
+                }
+            }
+        }
+        return cur_element;
+    }
+
+    int update() override {
+        KBKey k = Keys.checkkey();
+        KBMod ks = Keys.cur_state;
+        if (!k) return 0;
+        ccenvelope *e = song->ccenvelopes[ce_slot];
+        if (!e) return 0;
+        int nn = e->num_nodes;
+        int max_idx = nn > 0 ? nn - 1 : 0;
+
+        bool consumed = false;
+
+        if (k == SDLK_LEFT) {
+            if (ks & KS_SHIFT) {
+                if (ce_selected >= 0 && ce_selected < nn && e->tick[ce_selected] > 0) {
+                    int t = e->tick[ce_selected] - 1;
+                    if (t < 0) t = 0;
+                    e->tick[ce_selected] = (unsigned short)t;
+                    ce_selected = ce_sort_after_move(e, ce_selected);
+                    file_changed++;
+                }
+            } else {
+                if (ce_selected > 0)        ce_selected--;
+                else if (nn > 0)            ce_selected = 0;
+            }
+            consumed = true;
+        } else if (k == SDLK_RIGHT) {
+            if (ks & KS_SHIFT) {
+                if (ce_selected >= 0 && ce_selected < nn && e->tick[ce_selected] < 65535) {
+                    int t = e->tick[ce_selected] + 1;
+                    if (t > 65535) t = 65535;
+                    e->tick[ce_selected] = (unsigned short)t;
+                    ce_selected = ce_sort_after_move(e, ce_selected);
+                    file_changed++;
+                }
+            } else {
+                if (ce_selected < max_idx)  ce_selected++;
+                else if (nn > 0)            ce_selected = max_idx;
+            }
+            consumed = true;
+        } else if (k == SDLK_UP) {
+            if (ce_selected >= 0 && ce_selected < nn && e->value[ce_selected] < 127) {
+                int delta = (ks & KS_SHIFT) ? 8 : 1;
+                int v = (int)e->value[ce_selected] + delta;
+                if (v > 127) v = 127;
+                e->value[ce_selected] = (unsigned char)v;
+                file_changed++;
+            }
+            consumed = true;
+        } else if (k == SDLK_DOWN) {
+            if (ce_selected >= 0 && ce_selected < nn && e->value[ce_selected] > 0) {
+                int delta = (ks & KS_SHIFT) ? 8 : 1;
+                int v = (int)e->value[ce_selected] - delta;
+                if (v < 0) v = 0;
+                e->value[ce_selected] = (unsigned char)v;
+                file_changed++;
+            }
+            consumed = true;
+        } else if (k == SDLK_DELETE || k == SDLK_BACKSPACE) {
+            if (ce_selected >= 0 && ce_selected < nn) {
+                for (int j = ce_selected; j + 1 < nn; j++) {
+                    e->tick[j]  = e->tick[j + 1];
+                    e->value[j] = e->value[j + 1];
+                }
+                e->num_nodes--;
+                if (ce_selected >= e->num_nodes) ce_selected = e->num_nodes - 1;
+                file_changed++;
+                ce_set_status("Deleted node");
+            }
+            consumed = true;
+        } else if (k == SDLK_SPACE) {
+            // Insert a node halfway between selected and the next.
+            if (nn > 0 && nn < ZTM_CCENV_MAX_NODES && ce_selected >= 0) {
+                int ins = ce_selected + 1;
+                if (ins > nn) ins = nn;
+                for (int j = nn; j > ins; j--) {
+                    e->tick[j]  = e->tick[j - 1];
+                    e->value[j] = e->value[j - 1];
+                }
+                int t0 = (ins > 0)       ? (int)e->tick[ins - 1]  : 0;
+                int t1 = (ins < nn)      ? (int)e->tick[ins]      : t0 + 16;
+                int v0 = (ins > 0)       ? (int)e->value[ins - 1] : 0;
+                int v1 = (ins < nn)      ? (int)e->value[ins]     : v0;
+                e->tick[ins]  = (unsigned short)((t0 + t1) / 2);
+                e->value[ins] = (unsigned char)((v0 + v1) / 2);
+                e->num_nodes++;
+                ce_selected = ins;
+                file_changed++;
+                ce_set_status("Inserted node at %d", ins);
+            } else if (nn == 0) {
+                // Empty envelope: a single first node at tick 0, value 64.
+                e->tick[0] = 0; e->value[0] = 64;
+                e->num_nodes = 1;
+                ce_selected = 0;
+                file_changed++;
+                ce_set_status("First node added (tick 0, value 64)");
+            }
+            consumed = true;
+        } else if (k == SDLK_L && !(ks & (KS_CTRL | KS_ALT | KS_META))) {
+            // Cycle loop_start / loop_end onto the selected node, and
+            // make sure the LOOP flag is set. Pressing L the first time
+            // sets loop_start. Pressing it again (with the same node)
+            // sets loop_end. After that, pressing it AGAIN moves
+            // loop_start back to the selected node and so on.
+            if (ce_selected >= 0 && ce_selected < nn) {
+                if (e->loop_start == ce_selected && e->loop_end != ce_selected) {
+                    e->loop_end = (unsigned char)ce_selected;
+                } else {
+                    e->loop_start = (unsigned char)ce_selected;
+                    if (e->loop_end < e->loop_start)
+                        e->loop_end = (unsigned char)ce_selected;
+                }
+                e->flags |= ZTM_CCENVF_LOOP;
+                ce_flag_loop = 1;
+                file_changed++;
+                ce_set_status("Loop set: %u..%u", e->loop_start, e->loop_end);
+            }
+            consumed = true;
+        } else if (k == SDLK_S && !(ks & (KS_CTRL | KS_ALT | KS_META))) {
+            if (ce_selected >= 0 && ce_selected < nn) {
+                if (e->sustain_start == ce_selected && e->sustain_end != ce_selected) {
+                    e->sustain_end = (unsigned char)ce_selected;
+                } else {
+                    e->sustain_start = (unsigned char)ce_selected;
+                    if (e->sustain_end < e->sustain_start)
+                        e->sustain_end = (unsigned char)ce_selected;
+                }
+                e->flags |= ZTM_CCENVF_SUSTAIN;
+                ce_flag_sus = 1;
+                file_changed++;
+                ce_set_status("Sustain set: %u..%u", e->sustain_start, e->sustain_end);
+            }
+            consumed = true;
+        } else if (k == SDLK_E && !(ks & (KS_CTRL | KS_ALT | KS_META))) {
+            e->flags ^= ZTM_CCENVF_ENABLED;
+            ce_flag_ena = (e->flags & ZTM_CCENVF_ENABLED) ? 1 : 0;
+            file_changed++;
+            ce_set_status("Enabled: %s", ce_flag_ena ? "on" : "off");
+            consumed = true;
+        }
+
+        if (consumed) {
+            Keys.getkey();
+            need_refresh++;
+            need_redraw++;
+        }
+        return 0;
+    }
+
+    void draw(Drawable *S, int active) override {
+        ccenvelope *e = song->ccenvelopes[ce_slot];
+
+        int x0 = col(this->x);
+        int y0 = row(this->y);
+        int wpx = col(this->xsize);
+        int hpx = row(this->ysize);
+        int x1 = x0 + wpx;
+        int y1 = y0 + hpx;
+
+        // NOTE: fillRect takes (x1,y1, x2,y2) -- TWO CORNERS, not (x,y,w,h).
+
+        // Fill canvas background black so the curve stands out.
+        S->fillRect(x0, y0, x1, y1, COLORS.EditBG);
+
+        // Border. Frame the canvas with a 1-px outline (4 thin rects).
+        TColor frame_color = active ? COLORS.Highlight : COLORS.Text;
+        S->fillRect(x0,     y0,     x1,     y0 + 1, frame_color); // top
+        S->fillRect(x0,     y1 - 1, x1,     y1,     frame_color); // bottom
+        S->fillRect(x0,     y0,     x0 + 1, y1,     frame_color); // left
+        S->fillRect(x1 - 1, y0,     x1,     y1,     frame_color); // right
+
+        // Mid-value reference line (dashed, at value=64).
+        int mid_y = y0 + (hpx / 2);
+        for (int xx = x0 + 2; xx < x1 - 2; xx += 4) {
+            S->fillRect(xx, mid_y, xx + 2, mid_y + 1, COLORS.EditBGlow);
+        }
+
+        if (!e || e->num_nodes == 0) {
+            print(x0 + 6, y0 + (hpx / 2) - 4,
+                  "Click in this box to add the first node.",
+                  COLORS.Text, S);
+            return;
+        }
+
+        // Curve (interpolated value at each canvas X pixel).
+        int mt = ce_max_tick_view(e);
+        TColor curve_color = COLORS.Highlight;
+        for (int px = 1; px < wpx - 1; px++) {
+            int pos = (px * mt) / (wpx > 0 ? wpx : 1);
+            int val = ccenv_interp_raw(e->tick, e->value, e->num_nodes, pos);
+            int cy = y0 + ((127 - val) * (hpx - 2)) / 127 + 1;
+            S->fillRect(x0 + px, cy, x0 + px + 1, cy + 1, curve_color);
+        }
+
+        // Nodes. Selected node = bright filled square (4px), others = 2px dot.
+        for (int i = 0; i < e->num_nodes; i++) {
+            int nx = node_pix_x(i, e);
+            int ny = node_pix_y(i, e);
+            int s = (i == ce_selected) ? 4 : 2;
+            TColor c = (i == ce_selected) ? COLORS.Text : COLORS.Highlight;
+            S->fillRect(nx - s/2, ny - s/2, nx - s/2 + s, ny - s/2 + s, c);
+        }
+
+        // Loop / sustain markers on the canvas edges.
+        if (e->flags & ZTM_CCENVF_LOOP) {
+            int lx0 = node_pix_x(e->loop_start, e);
+            int lx1 = node_pix_x(e->loop_end, e);
+            S->fillRect(lx0, y1 - 3, lx0 + 1, y1 - 1, COLORS.Text);
+            S->fillRect(lx1, y1 - 3, lx1 + 1, y1 - 1, COLORS.Text);
+            print(lx0 - 4, y1 - 11, "L", COLORS.Text, S);
+        }
+        if (e->flags & ZTM_CCENVF_SUSTAIN) {
+            int sx0 = node_pix_x(e->sustain_start, e);
+            int sx1 = node_pix_x(e->sustain_end, e);
+            S->fillRect(sx0, y0 + 1, sx0 + 1, y0 + 3, COLORS.Text);
+            S->fillRect(sx1, y0 + 1, sx1 + 1, y0 + 3, COLORS.Text);
+            print(sx0 + 2, y0 + 1, "S", COLORS.Text, S);
+        }
+    }
+};
 } // namespace
 
 // ---------------------------------------------------------------------------
-// Refresh / sync
+// Sync widgets <-> envelope struct (the canvas already mutates the
+// struct directly; this only covers the metadata controls).
 
 static void ce_pull_to_widgets(UserInterface *UI) {
     ccenvelope *e = song->ccenvelopes[ce_slot];
-    int nn = e ? e->num_nodes : 0;
-    if (ce_node_sel >= nn && nn > 0) ce_node_sel = nn - 1;
-    if (ce_node_sel < 0) ce_node_sel = 0;
-
-    ((ValueSlider *)UI->get_element(W_SLOT))->value     = ce_slot;
-    ((ValueSlider *)UI->get_element(W_CC))->value       = e ? e->cc       : 1;
-    ((ValueSlider *)UI->get_element(W_KIND))->value     = e ? e->kind     : 0;
-    ((ValueSlider *)UI->get_element(W_SPEED))->value    = e ? e->speed    : 1;
-    ((ValueSlider *)UI->get_element(W_NUMNODES))->value = nn;
-    ce_flag_ena   = e ? !!(e->flags & ZTM_CCENVF_ENABLED) : 0;
+    ((ValueSlider *)UI->get_element(W_SLOT))->value = ce_slot;
+    ((ValueSlider *)UI->get_element(W_CC))->value   = e ? e->cc   : 1;
+    ((ValueSlider *)UI->get_element(W_KIND))->value = e ? e->kind : 0;
+    ce_flag_ena   = e ? !!(e->flags & ZTM_CCENVF_ENABLED) : 1;  // default enabled
     ce_flag_loop  = e ? !!(e->flags & ZTM_CCENVF_LOOP)    : 0;
     ce_flag_sus   = e ? !!(e->flags & ZTM_CCENVF_SUSTAIN) : 0;
     ce_flag_carry = e ? !!(e->flags & ZTM_CCENVF_CARRY)   : 0;
-    int max_idx = nn > 0 ? nn - 1 : 0;
-    ((ValueSlider *)UI->get_element(W_LOOP_S))->max  = max_idx;
-    ((ValueSlider *)UI->get_element(W_LOOP_E))->max  = max_idx;
-    ((ValueSlider *)UI->get_element(W_SUS_S))->max   = max_idx;
-    ((ValueSlider *)UI->get_element(W_SUS_E))->max   = max_idx;
-    ((ValueSlider *)UI->get_element(W_NODE_IDX))->max = max_idx;
-    ((ValueSlider *)UI->get_element(W_LOOP_S))->value  = e ? e->loop_start    : 0;
-    ((ValueSlider *)UI->get_element(W_LOOP_E))->value  = e ? e->loop_end      : 0;
-    ((ValueSlider *)UI->get_element(W_SUS_S))->value   = e ? e->sustain_start : 0;
-    ((ValueSlider *)UI->get_element(W_SUS_E))->value   = e ? e->sustain_end   : 0;
-    ((ValueSlider *)UI->get_element(W_NODE_IDX))->value = ce_node_sel;
-
-    int t = (e && ce_node_sel < nn) ? e->tick[ce_node_sel]  : 0;
-    int v = (e && ce_node_sel < nn) ? e->value[ce_node_sel] : 0;
-    ((ValueSlider *)UI->get_element(W_NODE_TICK))->value = t;
-    ((ValueSlider *)UI->get_element(W_NODE_VAL))->value  = v;
-
     ce_load_name(ce_slot);
 }
 
 static void ce_push_from_widgets(UserInterface *UI) {
     int v_cc       = ((ValueSlider *)UI->get_element(W_CC))->value;
     int v_kind     = ((ValueSlider *)UI->get_element(W_KIND))->value;
-    int v_speed    = ((ValueSlider *)UI->get_element(W_SPEED))->value;
-    int v_numnodes = ((ValueSlider *)UI->get_element(W_NUMNODES))->value;
-    int v_loop_s   = ((ValueSlider *)UI->get_element(W_LOOP_S))->value;
-    int v_loop_e   = ((ValueSlider *)UI->get_element(W_LOOP_E))->value;
-    int v_sus_s    = ((ValueSlider *)UI->get_element(W_SUS_S))->value;
-    int v_sus_e    = ((ValueSlider *)UI->get_element(W_SUS_E))->value;
-    int v_node     = ((ValueSlider *)UI->get_element(W_NODE_IDX))->value;
-    int v_tick     = ((ValueSlider *)UI->get_element(W_NODE_TICK))->value;
-    int v_val      = ((ValueSlider *)UI->get_element(W_NODE_VAL))->value;
-    int f_ena      = ce_flag_ena;
-    int f_loop     = ce_flag_loop;
-    int f_sus      = ce_flag_sus;
-    int f_carry    = ce_flag_carry;
-
+    int desired_flags = (ce_flag_ena ? ZTM_CCENVF_ENABLED : 0)
+                      | (ce_flag_loop ? ZTM_CCENVF_LOOP : 0)
+                      | (ce_flag_sus  ? ZTM_CCENVF_SUSTAIN : 0)
+                      | (ce_flag_carry ? ZTM_CCENVF_CARRY : 0);
     ccenvelope *e = song->ccenvelopes[ce_slot];
-    int e_nn = e ? e->num_nodes : 0;
-    int e_cc = e ? e->cc        : 1;
-    int e_kind = e ? e->kind    : 0;
-    int e_speed = e ? e->speed  : 1;
-    int e_loop_s = e ? e->loop_start    : 0;
-    int e_loop_e = e ? e->loop_end      : 0;
-    int e_sus_s  = e ? e->sustain_start : 0;
-    int e_sus_e  = e ? e->sustain_end   : 0;
-    int e_flags  = e ? e->flags         : 0;
-    int e_tick = (e && v_node < e_nn) ? e->tick[v_node]  : -1;
-    int e_val  = (e && v_node < e_nn) ? e->value[v_node] : -1;
-    int desired_flags = (f_ena ? ZTM_CCENVF_ENABLED : 0)
-                      | (f_loop ? ZTM_CCENVF_LOOP : 0)
-                      | (f_sus  ? ZTM_CCENVF_SUSTAIN : 0)
-                      | (f_carry ? ZTM_CCENVF_CARRY : 0);
-
-    bool any_change = e && (
-        e_cc       != v_cc
-     || e_kind     != v_kind
-     || e_speed    != v_speed
-     || e_nn       != v_numnodes
-     || e_loop_s   != v_loop_s
-     || e_loop_e   != v_loop_e
-     || e_sus_s    != v_sus_s
-     || e_sus_e    != v_sus_e
-     || e_flags    != desired_flags
-     || (v_node < e_nn && (e_tick != v_tick || e_val != v_val))
-    );
-    bool create_now = !e && (v_numnodes > 0 || v_cc != 1 || desired_flags != 0);
-
-    if (!any_change && !create_now) return;
-    e = ce_ensure(ce_slot);
-    if (!e) return;
-    e->cc       = (unsigned char)v_cc;
-    e->kind     = (unsigned char)v_kind;
-    e->speed    = (unsigned short)v_speed;
-    if (v_numnodes < 0) v_numnodes = 0;
-    if (v_numnodes > ZTM_CCENV_MAX_NODES) v_numnodes = ZTM_CCENV_MAX_NODES;
-    int old_nn = e->num_nodes;
-    e->num_nodes = (unsigned char)v_numnodes;
-    // When the user expands the array, default-fill the freshly
-    // exposed nodes to a sane ramp tail so they don't appear as 0/0.
-    if (v_numnodes > old_nn) {
-        int last_t = old_nn > 0 ? e->tick[old_nn - 1] : 0;
-        for (int i = old_nn; i < v_numnodes; i++) {
-            last_t += 16;
-            if (last_t > 65535) last_t = 65535;
-            e->tick[i]  = (unsigned short)last_t;
-            e->value[i] = e->value[i] ? e->value[i] : 64;
-        }
+    int e_cc    = e ? e->cc    : 1;
+    int e_kind  = e ? e->kind  : 0;
+    int e_flags = e ? e->flags : 0;
+    if (!e || e_cc != v_cc || e_kind != v_kind || e_flags != desired_flags) {
+        if (e_cc == v_cc && e_kind == v_kind && e_flags == desired_flags) return;
+        e = ce_ensure(ce_slot);
+        if (!e) return;
+        e->cc    = (unsigned char)v_cc;
+        e->kind  = (unsigned char)v_kind;
+        e->flags = (unsigned char)desired_flags;
+        file_changed++;
     }
-    int max_idx = e->num_nodes > 0 ? e->num_nodes - 1 : 0;
-    if (v_loop_s < 0) v_loop_s = 0; if (v_loop_s > max_idx) v_loop_s = max_idx;
-    if (v_loop_e < v_loop_s) v_loop_e = v_loop_s; if (v_loop_e > max_idx) v_loop_e = max_idx;
-    if (v_sus_s  < 0) v_sus_s  = 0; if (v_sus_s  > max_idx) v_sus_s  = max_idx;
-    if (v_sus_e  < v_sus_s)  v_sus_e  = v_sus_s;  if (v_sus_e  > max_idx) v_sus_e  = max_idx;
-    e->loop_start    = (unsigned char)v_loop_s;
-    e->loop_end      = (unsigned char)v_loop_e;
-    e->sustain_start = (unsigned char)v_sus_s;
-    e->sustain_end   = (unsigned char)v_sus_e;
-    e->flags = (unsigned char)desired_flags;
-    if (v_node < e->num_nodes) {
-        if (v_tick < 0) v_tick = 0; if (v_tick > 65535) v_tick = 65535;
-        if (v_val  < 0) v_val  = 0; if (v_val  > 127)   v_val  = 127;
-        e->tick[v_node]  = (unsigned short)v_tick;
-        e->value[v_node] = (unsigned char)v_val;
-    }
-    ce_node_sel = v_node;
-    file_changed++;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,15 +618,17 @@ CUI_CCEnvelopeEditor::CUI_CCEnvelopeEditor(void) {
     CheckBox    *cb;
     Button      *bt;
 
-    // Two columns, with plenty of padding so widget value displays
-    // never collide with labels. Left pane: cols 2..43. Right pane
-    // (file picker): cols 48..76. Labels live at col 2 (drawn in
-    // draw()); widgets start at col 12 with at least 2 chars of
-    // breathing room.
     const int INP_X   = 12;
-    const int INP_W   = 16;     // default slider width
-    const int RIGHT_X = 48;
+    const int INP_W   = 14;
+    const int RIGHT_X = 50;
     const int RIGHT_W = 28;
+
+    // The canvas is the centerpiece. Position it BELOW the metadata
+    // strip (rows BASE_Y+0..BASE_Y+9). 14 rows tall, 70 cols wide.
+    EnvCanvas *cv = new EnvCanvas;
+    UI->add_element(cv, W_CANVAS);
+    cv->x = CANVAS_X; cv->y = CANVAS_Y;
+    cv->xsize = CANVAS_W; cv->ysize = CANVAS_H;
 
     // Row 0: Slot
     vs = new ValueSlider;
@@ -323,7 +641,7 @@ CUI_CCEnvelopeEditor::CUI_CCEnvelopeEditor(void) {
     UI->add_element(ti, W_NAME);
     ti->frame = 1;
     ti->x = INP_X; ti->y = BASE_Y + 2;
-    ti->xsize = 30; ti->length = ZTM_CCENVNAME_MAXLEN - 1;
+    ti->xsize = 28; ti->length = ZTM_CCENVNAME_MAXLEN - 1;
     ti->str = (unsigned char *)ce_name_buf;
 
     // Row 4: CC#
@@ -332,100 +650,46 @@ CUI_CCEnvelopeEditor::CUI_CCEnvelopeEditor(void) {
     vs->x = INP_X; vs->y = BASE_Y + 4; vs->xsize = INP_W; vs->ysize = 1;
     vs->min = 0; vs->max = 127; vs->value = 1;
 
-    // Row 6: Kind (0 CC, 1 PB, 2 CP); "(CC)" / "(Pitchbend)" / "(ChanPress)"
-    //         label drawn separately in draw() at col INP_X + INP_W + 1.
+    // Row 6: Kind on its own row (the "(CC/PB/CP)" decoration is
+    // drawn by draw() right of the slider value display).
     vs = new ValueSlider;
     UI->add_element(vs, W_KIND);
     vs->x = INP_X; vs->y = BASE_Y + 6; vs->xsize = 6; vs->ysize = 1;
     vs->min = 0; vs->max = 2; vs->value = 0;
 
-    // Row 8: Speed
-    vs = new ValueSlider;
-    UI->add_element(vs, W_SPEED);
-    vs->x = INP_X; vs->y = BASE_Y + 8; vs->xsize = 10; vs->ysize = 1;
-    vs->min = 1; vs->max = 255; vs->value = 1;
-
-    // Row 10: NumNodes
-    vs = new ValueSlider;
-    UI->add_element(vs, W_NUMNODES);
-    vs->x = INP_X; vs->y = BASE_Y + 10; vs->xsize = 10; vs->ysize = 1;
-    vs->min = 0; vs->max = ZTM_CCENV_MAX_NODES; vs->value = 0;
-
-    // Rows 12..15: flag checkboxes -- ONE PER ROW so each checkbox's
-    // own [Off]/[On] text doesn't collide with anything. The text
-    // label that names the flag is drawn at LBL_X by draw() so the
-    // checkbox at INP_X never overdraws it.
+    // Row 8: 4 flag checkboxes side by side. Each checkbox is 3 chars
+    // (frame + Off/On text); labels go to the right of each box.
     cb = new CheckBox; UI->add_element(cb, W_FLAG_ENA);
-    cb->x = INP_X; cb->y = BASE_Y + 12; cb->xsize = 3;
+    cb->x = INP_X;      cb->y = BASE_Y + 8; cb->xsize = 3;
     cb->frame = 1; cb->value = &ce_flag_ena;
     cb = new CheckBox; UI->add_element(cb, W_FLAG_LOOP);
-    cb->x = INP_X; cb->y = BASE_Y + 13; cb->xsize = 3;
+    cb->x = INP_X + 10; cb->y = BASE_Y + 8; cb->xsize = 3;
     cb->frame = 1; cb->value = &ce_flag_loop;
     cb = new CheckBox; UI->add_element(cb, W_FLAG_SUS);
-    cb->x = INP_X; cb->y = BASE_Y + 14; cb->xsize = 3;
+    cb->x = INP_X + 20; cb->y = BASE_Y + 8; cb->xsize = 3;
     cb->frame = 1; cb->value = &ce_flag_sus;
     cb = new CheckBox; UI->add_element(cb, W_FLAG_CARRY);
-    cb->x = INP_X; cb->y = BASE_Y + 15; cb->xsize = 3;
+    cb->x = INP_X + 30; cb->y = BASE_Y + 8; cb->xsize = 3;
     cb->frame = 1; cb->value = &ce_flag_carry;
 
-    // Rows 17..18: Loop S / Loop E on separate lines so the value
-    // boxes don't collide.
-    vs = new ValueSlider; UI->add_element(vs, W_LOOP_S);
-    vs->x = INP_X; vs->y = BASE_Y + 17; vs->xsize = 8; vs->ysize = 1;
-    vs->min = 0; vs->max = 0; vs->value = 0;
-    vs = new ValueSlider; UI->add_element(vs, W_LOOP_E);
-    vs->x = INP_X; vs->y = BASE_Y + 18; vs->xsize = 8; vs->ysize = 1;
-    vs->min = 0; vs->max = 0; vs->value = 0;
-
-    // Rows 20..21: Sustain S / E
-    vs = new ValueSlider; UI->add_element(vs, W_SUS_S);
-    vs->x = INP_X; vs->y = BASE_Y + 20; vs->xsize = 8; vs->ysize = 1;
-    vs->min = 0; vs->max = 0; vs->value = 0;
-    vs = new ValueSlider; UI->add_element(vs, W_SUS_E);
-    vs->x = INP_X; vs->y = BASE_Y + 21; vs->xsize = 8; vs->ysize = 1;
-    vs->min = 0; vs->max = 0; vs->value = 0;
-
-    // Rows 23..25: Node selector + node tick + node value
-    vs = new ValueSlider; UI->add_element(vs, W_NODE_IDX);
-    vs->x = INP_X; vs->y = BASE_Y + 23; vs->xsize = 8; vs->ysize = 1;
-    vs->min = 0; vs->max = 0; vs->value = 0;
-    vs = new ValueSlider; UI->add_element(vs, W_NODE_TICK);
-    vs->x = INP_X; vs->y = BASE_Y + 24; vs->xsize = 14; vs->ysize = 1;
-    vs->min = 0; vs->max = 65535; vs->value = 0;
-    vs = new ValueSlider; UI->add_element(vs, W_NODE_VAL);
-    vs->x = INP_X; vs->y = BASE_Y + 25; vs->xsize = 14; vs->ysize = 1;
-    vs->min = 0; vs->max = 127; vs->value = 0;
-
-    // Row 27: Add / Insert / Delete buttons
-    bt = new Button; UI->add_element(bt, W_BTN_ADD);
-    bt->x = INP_X     ; bt->y = BASE_Y + 27; bt->xsize = 6; bt->ysize = 1;
-    bt->caption = "Add";
-    bt = new Button; UI->add_element(bt, W_BTN_INS);
-    bt->x = INP_X + 8 ; bt->y = BASE_Y + 27; bt->xsize = 6; bt->ysize = 1;
-    bt->caption = "Ins";
-    bt = new Button; UI->add_element(bt, W_BTN_DEL);
-    bt->x = INP_X + 16; bt->y = BASE_Y + 27; bt->xsize = 6; bt->ysize = 1;
-    bt->caption = "Del";
-
-    // Right pane: file picker. Starts at col 48 -- well clear of all
-    // left-pane widgets (which top out at the Name input ending at
-    // col 12+30 = 42).
+    // Right pane (rows 1..9): file picker + filename + buttons. All
+    // ABOVE the canvas (which starts at row CANVAS_Y=22). No content
+    // in the right pane overflows into the canvas's row range.
     CeFileList *fl = new CeFileList;
     UI->add_element(fl, W_FILE_LIST);
-    fl->x = RIGHT_X; fl->y = BASE_Y + 2;
-    fl->xsize = RIGHT_W;  fl->ysize = 14;
+    fl->x = RIGHT_X; fl->y = BASE_Y + 1;
+    fl->xsize = RIGHT_W; fl->ysize = 6;
 
-    // Filename input + Load / Save buttons
     ti = new TextInput; UI->add_element(ti, W_FILENAME);
-    ti->frame = 1; ti->x = RIGHT_X; ti->y = BASE_Y + 18;
+    ti->frame = 1; ti->x = RIGHT_X; ti->y = BASE_Y + 8;
     ti->xsize = RIGHT_W; ti->length = sizeof ce_filename_buf - 1;
     ti->str = (unsigned char *)ce_filename_buf;
 
     bt = new Button; UI->add_element(bt, W_BTN_LOAD);
-    bt->x = RIGHT_X     ; bt->y = BASE_Y + 20; bt->xsize = 12; bt->ysize = 1;
+    bt->x = RIGHT_X     ; bt->y = BASE_Y + 9; bt->xsize = 12; bt->ysize = 1;
     bt->caption = "Load";
     bt = new Button; UI->add_element(bt, W_BTN_SAVE);
-    bt->x = RIGHT_X + 14; bt->y = BASE_Y + 20; bt->xsize = 12; bt->ysize = 1;
+    bt->x = RIGHT_X + 14; bt->y = BASE_Y + 9; bt->xsize = 12; bt->ysize = 1;
     bt->caption = "Save";
 }
 
@@ -435,10 +699,19 @@ void CUI_CCEnvelopeEditor::enter(void) {
     ce_rescan_folder();
     ((CeFileList *)UI->get_element(W_FILE_LIST))->OnChange();
     ce_pull_to_widgets(UI);
-    UI->set_focus(W_SLOT);
+    // Default the canvas selected-node to the first node if envelope
+    // is populated.
+    {
+        ccenvelope *e = song->ccenvelopes[ce_slot];
+        if (e && e->num_nodes > 0 && (ce_selected < 0 || ce_selected >= e->num_nodes))
+            ce_selected = 0;
+        else if (!e || e->num_nodes == 0)
+            ce_selected = -1;
+    }
+    UI->set_focus(W_CANVAS);
     Keys.flush();
-    ce_set_status("CC Envelope Editor -- Shift+F6. Slot=%d, %d files in folder.",
-                  ce_slot, ce_num_files);
+    ce_set_status("Click in the canvas to draw. Arrows = nav, "
+                  "L=loop, S=sustain, E=enable, Del=remove, ESC=back");
 }
 
 void CUI_CCEnvelopeEditor::leave(void) {
@@ -447,9 +720,8 @@ void CUI_CCEnvelopeEditor::leave(void) {
 
 void CUI_CCEnvelopeEditor::update(void) {
     // Navigation keys: peek BEFORE UI->update() so a focused widget
-    // (Slot slider, Name TextInput, etc.) doesn't swallow ESC / F-keys
-    // and trap the user on this page. Mirrors the explicit F-key
-    // passthrough in CUI_Arpeggioeditor (note around line 870).
+    // (Slot slider, Name TextInput) doesn't swallow ESC / F-keys and
+    // trap the user on this page.
     if (Keys.size()) {
         KBKey nk = Keys.checkkey();
         KBMod nks = Keys.cur_state;
@@ -460,16 +732,13 @@ void CUI_CCEnvelopeEditor::update(void) {
             need_refresh++;
             return;
         }
-        // F-keys: leave in queue so global_keys() (main.cpp) handles
-        // the page switch on the next iteration. Just bump need_refresh
-        // so the screen redraws. NOTE: returning here without calling
-        // UI->update() is intentional -- otherwise a focused widget
-        // consumes the F-key as input.
         if ((nk == SDLK_F1 || nk == SDLK_F2 || nk == SDLK_F3 ||
              nk == SDLK_F4 || nk == SDLK_F5 || nk == SDLK_F6 ||
              nk == SDLK_F7 || nk == SDLK_F8 || nk == SDLK_F9 ||
              nk == SDLK_F10 || nk == SDLK_F11 || nk == SDLK_F12)
-            && !(nks & (KS_CTRL))) {
+            && !(nks & KS_CTRL)) {
+            // Leave the key in the queue so global_keys() in main.cpp
+            // dispatches the page switch.
             ce_store_name(ce_slot);
             need_refresh++;
             return;
@@ -483,21 +752,8 @@ void CUI_CCEnvelopeEditor::update(void) {
     if (vs_slot && vs_slot->value != ce_slot) {
         ce_store_name(ce_slot);
         ce_slot = vs_slot->value;
-        ce_node_sel = 0;
+        ce_selected = -1;
         ce_pull_to_widgets(UI);
-        need_refresh++; doredraw++;
-    }
-
-    // Node selector changed -> reload tick/value sliders to that node's
-    // current data without writing back.
-    ValueSlider *vs_ni = (ValueSlider *)UI->get_element(W_NODE_IDX);
-    if (vs_ni && vs_ni->value != ce_node_sel) {
-        ce_node_sel = vs_ni->value;
-        ccenvelope *e = song->ccenvelopes[ce_slot];
-        if (e && ce_node_sel < e->num_nodes) {
-            ((ValueSlider *)UI->get_element(W_NODE_TICK))->value = e->tick[ce_node_sel];
-            ((ValueSlider *)UI->get_element(W_NODE_VAL))->value  = e->value[ce_node_sel];
-        }
         need_refresh++; doredraw++;
     }
 
@@ -508,69 +764,8 @@ void CUI_CCEnvelopeEditor::update(void) {
         ti_name->changed = 0;
     }
 
-    // Buttons
+    // Load button
     Button *b;
-    b = (Button *)UI->get_element(W_BTN_ADD);
-    if (b && b->changed) {
-        ccenvelope *e = ce_ensure(ce_slot);
-        if (e && e->num_nodes < ZTM_CCENV_MAX_NODES) {
-            int t = e->num_nodes > 0 ? e->tick[e->num_nodes - 1] + 16 : 0;
-            if (t > 65535) t = 65535;
-            int v = e->num_nodes > 0 ? e->value[e->num_nodes - 1]      : 64;
-            e->tick[e->num_nodes]  = (unsigned short)t;
-            e->value[e->num_nodes] = (unsigned char)v;
-            e->num_nodes++;
-            ce_node_sel = e->num_nodes - 1;
-            file_changed++;
-            ce_set_status("Added node %d (tick %d, value %d)", ce_node_sel, t, v);
-            ce_pull_to_widgets(UI);
-        } else {
-            ce_set_status("Node limit reached (%d)", ZTM_CCENV_MAX_NODES);
-        }
-        b->changed = 0; need_refresh++; doredraw++;
-    }
-    b = (Button *)UI->get_element(W_BTN_INS);
-    if (b && b->changed) {
-        ccenvelope *e = ce_ensure(ce_slot);
-        if (e && e->num_nodes < ZTM_CCENV_MAX_NODES) {
-            int ins = ce_node_sel;
-            if (ins < 0) ins = 0;
-            if (ins > e->num_nodes) ins = e->num_nodes;
-            for (int k = e->num_nodes; k > ins; k--) {
-                e->tick[k]  = e->tick[k-1];
-                e->value[k] = e->value[k-1];
-            }
-            int t0 = ins > 0 ? e->tick[ins - 1] : 0;
-            int t1 = ins < e->num_nodes ? e->tick[ins] : t0 + 16;
-            int v0 = ins > 0 ? e->value[ins - 1] : 0;
-            int v1 = ins < e->num_nodes ? e->value[ins] : v0;
-            e->tick[ins]  = (unsigned short)((t0 + t1) / 2);
-            e->value[ins] = (unsigned char)((v0 + v1) / 2);
-            e->num_nodes++;
-            ce_node_sel = ins;
-            file_changed++;
-            ce_set_status("Inserted node at %d", ins);
-            ce_pull_to_widgets(UI);
-        }
-        b->changed = 0; need_refresh++; doredraw++;
-    }
-    b = (Button *)UI->get_element(W_BTN_DEL);
-    if (b && b->changed) {
-        ccenvelope *e = song->ccenvelopes[ce_slot];
-        if (e && e->num_nodes > 0 && ce_node_sel < e->num_nodes) {
-            for (int k = ce_node_sel; k + 1 < e->num_nodes; k++) {
-                e->tick[k]  = e->tick[k+1];
-                e->value[k] = e->value[k+1];
-            }
-            e->num_nodes--;
-            if (ce_node_sel >= e->num_nodes && e->num_nodes > 0)
-                ce_node_sel = e->num_nodes - 1;
-            file_changed++;
-            ce_set_status("Deleted node");
-            ce_pull_to_widgets(UI);
-        }
-        b->changed = 0; need_refresh++; doredraw++;
-    }
     b = (Button *)UI->get_element(W_BTN_LOAD);
     if (b && b->changed) {
         if (ce_filename_buf[0]) {
@@ -580,13 +775,13 @@ void CUI_CCEnvelopeEditor::update(void) {
             if (e && ccenv_read_file(path, e) == 0) {
                 ce_set_status("Loaded %s into slot %d", ce_filename_buf, ce_slot);
                 file_changed++;
-                ce_node_sel = 0;
+                ce_selected = (e->num_nodes > 0) ? 0 : -1;
                 ce_pull_to_widgets(UI);
             } else {
                 ce_set_status("Failed to load %s", ce_filename_buf);
             }
         } else {
-            ce_set_status("No filename selected.");
+            ce_set_status("Select a file from the list first.");
         }
         b->changed = 0; need_refresh++; doredraw++;
     }
@@ -597,10 +792,9 @@ void CUI_CCEnvelopeEditor::update(void) {
             if (e && !e->isempty()) {
                 char path[2048];
                 snprintf(path, sizeof path, "%s/%s", ce_folder, ce_filename_buf);
-                // Ensure the basename ends in .env
                 int n = (int)strlen(path);
                 if (n < 4 || strcasecmp(path + n - 4, ".env") != 0) {
-                    if (n + 4 < (int)sizeof path) { strcat(path, ".env"); }
+                    if (n + 4 < (int)sizeof path) strcat(path, ".env");
                 }
                 if (ccenv_write_file(path, e) == 0) {
                     ce_set_status("Saved to %s", path);
@@ -618,62 +812,8 @@ void CUI_CCEnvelopeEditor::update(void) {
         b->changed = 0; need_refresh++; doredraw++;
     }
 
-    // Sync all other widgets back to the envelope struct.
+    // Push metadata into envelope.
     ce_push_from_widgets(UI);
-
-    if (Keys.size()) {
-        KBKey k = Keys.checkkey();
-        if (k == SDLK_ESCAPE) {
-            Keys.getkey();
-            switch_page(UIP_Patterneditor);
-            need_refresh++;
-        }
-    }
-}
-
-// ASCII curve preview: 60 cols wide, 8 rows tall. Walks tick range
-// and prints '*' at interpolated value. Just below the right pane.
-static void ce_draw_curve(Drawable *S) {
-    ccenvelope *e = song->ccenvelopes[ce_slot];
-    if (!e || e->num_nodes < 2) return;
-
-    const int W = 60;
-    const int H = 8;
-    int origin_x = col(2);
-    int origin_y = row(BASE_Y + 29);
-
-    // Border row -- visual frame for the curve area.
-    char hdr[80];
-    snprintf(hdr, sizeof hdr,
-             "Curve  [tick 0..%u, value 0..127]",
-             (unsigned)e->tick[e->num_nodes - 1]);
-    print(origin_x, origin_y, hdr, COLORS.Text, S);
-
-    int last_tick = e->tick[e->num_nodes - 1];
-    if (last_tick <= 0) last_tick = 1;
-
-    // 8 row plot. Row 0 is top (value 127), row H-1 is bottom (0).
-    for (int rxy = 0; rxy < H; rxy++) {
-        char line[80];
-        for (int x = 0; x < W; x++) {
-            int pos = (x * last_tick) / (W - 1);
-            int v = 0;
-            // Linear scan, fine for <=32 nodes.
-            if (pos <= e->tick[0]) v = e->value[0];
-            else if (pos >= e->tick[e->num_nodes - 1]) v = e->value[e->num_nodes - 1];
-            else {
-                int i;
-                for (i = 1; i < e->num_nodes; i++) if (e->tick[i] >= pos) break;
-                int x0 = e->tick[i - 1], x1 = e->tick[i];
-                int y0 = e->value[i - 1], y1 = e->value[i];
-                v = (x1 > x0) ? y0 + ((pos - x0) * (y1 - y0)) / (x1 - x0) : y1;
-            }
-            int rowval = (H - 1) - ((v * (H - 1)) / 127);
-            line[x] = (rxy == rowval) ? '*' : (rxy == H - 1 ? '_' : ' ');
-        }
-        line[W] = 0;
-        print(origin_x, origin_y + (1 + rxy) * 8, line, COLORS.Text, S);
-    }
 }
 
 void CUI_CCEnvelopeEditor::draw(Drawable *S) {
@@ -684,16 +824,13 @@ void CUI_CCEnvelopeEditor::draw(Drawable *S) {
     printtitle(PAGE_TITLE_ROW_Y, "CC Envelope Editor (Shift+F6)",
                COLORS.Text, COLORS.Background, S);
 
-    // All labels live in cols 2..9 (LBL_X=2, max 8 chars). Widgets
-    // start at col 12 with at least 2 chars of breathing room.
     const int LBL_X   = 2;
-    const int RIGHT_X = 48;
-    const int KIND_LBL_X = 19;     // right of the kind slider (xsize 6 at col 12)
+    const int RIGHT_X = 50;
 
-    print(col(LBL_X), row(BASE_Y + 0),  "Slot",      COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 2),  "Name",      COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 4),  "CC#",       COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 6),  "Kind",      COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 0), "Slot",   COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 2), "Name",   COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 4), "CC#",    COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 6), "Kind",   COLORS.Text, S);
     {
         ccenvelope *e = song->ccenvelopes[ce_slot];
         const char *knd = "CC";
@@ -701,55 +838,94 @@ void CUI_CCEnvelopeEditor::draw(Drawable *S) {
             if      (e->kind == 1) knd = "Pitchbend";
             else if (e->kind == 2) knd = "ChanPress";
         }
-        char kbuf[24]; snprintf(kbuf, sizeof kbuf, "(%s)", knd);
-        print(col(KIND_LBL_X), row(BASE_Y + 6), kbuf, COLORS.Text, S);
+        char buf[24]; snprintf(buf, sizeof buf, "(%s)", knd);
+        print(col(22), row(BASE_Y + 6), buf, COLORS.Text, S);
     }
-    print(col(LBL_X), row(BASE_Y + 8),  "Speed",     COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 10), "Nodes",     COLORS.Text, S);
 
-    // Flag rows -- each checkbox sits at col 12 with its name to the
-    // RIGHT of the box (the checkbox itself shows Off/On so the
-    // name has to be elsewhere). Names go at col 16 to clear the
-    // checkbox's frame + value text.
-    print(col(LBL_X), row(BASE_Y + 12), "Flags",     COLORS.Text, S);
-    print(col(16),    row(BASE_Y + 12), "Enabled",   COLORS.Text, S);
-    print(col(16),    row(BASE_Y + 13), "Loop",      COLORS.Text, S);
-    print(col(16),    row(BASE_Y + 14), "Sustain",   COLORS.Text, S);
-    print(col(16),    row(BASE_Y + 15), "Carry",     COLORS.Text, S);
+    // Flag row. Labels to the RIGHT of each checkbox.
+    print(col(LBL_X),       row(BASE_Y + 8), "Flags", COLORS.Text, S);
+    print(col(12 + 4),      row(BASE_Y + 8), "En",    COLORS.Text, S);
+    print(col(12 + 10 + 4), row(BASE_Y + 8), "Lp",    COLORS.Text, S);
+    print(col(12 + 20 + 4), row(BASE_Y + 8), "Su",    COLORS.Text, S);
+    print(col(12 + 30 + 4), row(BASE_Y + 8), "Cy",    COLORS.Text, S);
 
-    print(col(LBL_X), row(BASE_Y + 17), "Loop S",    COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 18), "Loop E",    COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 20), "Sus S",     COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 21), "Sus E",     COLORS.Text, S);
+    // Right pane labels (all rows 0..7; clear of the canvas).
+    print(col(RIGHT_X), row(BASE_Y + 0),  ".env presets", COLORS.Text, S);
+    print(col(RIGHT_X), row(BASE_Y + 7),  "Filename",     COLORS.Text, S);
 
-    print(col(LBL_X), row(BASE_Y + 23), "Node",      COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 24), "Tick",      COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 25), "Value",     COLORS.Text, S);
-
-    // Right pane labels
-    print(col(RIGHT_X), row(BASE_Y + 1),  ".env presets", COLORS.Text, S);
-    print(col(RIGHT_X), row(BASE_Y + 17), "Filename",     COLORS.Text, S);
-
-    // Folder line
+    // Canvas legend on the LEFT only (cols 2..44). Pad to a fixed
+    // width with trailing spaces so older, longer strings don't leak
+    // through when the message shortens. `print()` doesn't blank the
+    // background, so we pre-build a 48-char buffer.
     {
+        ccenvelope *e = song->ccenvelopes[ce_slot];
+        char line[64];
+        memset(line, ' ', sizeof line);
+        line[sizeof line - 1] = 0;
+        int nn = e ? e->num_nodes : 0;
+        char buf[64];
+        if (nn == 0) {
+            snprintf(buf, sizeof buf, "Empty -- click in canvas");
+        } else if (ce_selected >= 0 && ce_selected < nn) {
+            snprintf(buf, sizeof buf,
+                     "Node %d/%d  t=%u v=%u",
+                     ce_selected, nn,
+                     (unsigned)e->tick[ce_selected],
+                     (unsigned)e->value[ce_selected]);
+        } else {
+            snprintf(buf, sizeof buf, "%d nodes (no sel)", nn);
+        }
+        memcpy(line, buf, strlen(buf));   // overwrite leading bytes
+        // Append loop / sustain info after column 28 / 38 respectively.
+        if (e && (e->flags & ZTM_CCENVF_LOOP) && 28 + 12 < (int)sizeof line) {
+            char lr[16];
+            snprintf(lr, sizeof lr, "L %u..%u",
+                     (unsigned)e->loop_start, (unsigned)e->loop_end);
+            memcpy(line + 28, lr, strlen(lr));
+        }
+        if (e && (e->flags & ZTM_CCENVF_SUSTAIN) && 38 + 12 < (int)sizeof line) {
+            char sr[16];
+            snprintf(sr, sizeof sr, "S %u..%u",
+                     (unsigned)e->sustain_start, (unsigned)e->sustain_end);
+            memcpy(line + 38, sr, strlen(sr));
+        }
+        line[48] = 0;   // truncate so we stay clear of the right pane
+        // printBG fills the character cells with COLORS.Background so
+        // a previous longer status doesn't leave residual glyphs.
+        printBG(col(CANVAS_X), row(CANVAS_Y - 1), line,
+                COLORS.Text, COLORS.Background, S);
+    }
+
+    // Folder line BELOW the canvas, padded with printBG.
+    {
+        char line[160];
+        memset(line, ' ', sizeof line);
+        line[sizeof line - 1] = 0;
         char buf[160];
         snprintf(buf, sizeof buf, "Folder: %s",
                  ce_folder[0] ? ce_folder : "(none)");
-        print(col(RIGHT_X), row(BASE_Y + 22), buf, COLORS.Text, S);
+        memcpy(line, buf, strlen(buf));
+        line[100] = 0;
+        printBG(col(2), row(CANVAS_Y + CANVAS_H + 1), line,
+                COLORS.Text, COLORS.Background, S);
     }
 
-    // Status line
-    if (ce_status[0]) {
-        print(col(2), row(CHARS_Y - SPACE_AT_BOTTOM - 2), ce_status,
-              COLORS.Text, S);
+    // Status line padded with printBG.
+    {
+        char line[160];
+        memset(line, ' ', sizeof line);
+        line[sizeof line - 1] = 0;
+        memcpy(line, ce_status, strlen(ce_status));
+        line[100] = 0;
+        printBG(col(2), row(CHARS_Y - SPACE_AT_BOTTOM - 2), line,
+                COLORS.Text, COLORS.Background, S);
     }
 
-    // Hint line
     print(col(2), row(CHARS_Y - SPACE_AT_BOTTOM - 1),
-          "Tab = next field, Enter = activate button, ESC = back",
+          "Click=add/select, Drag=move, Right-click=delete, "
+          "Arrows=nav, Sh-Arr=tick, Space=insert, L=loop, S=sus, E=ena, "
+          "Del=remove, ESC=back",
           COLORS.Text, S);
-
-    ce_draw_curve(S);
 
     need_refresh = 0; updated = 2;
     ztPlayer->num_orders();
