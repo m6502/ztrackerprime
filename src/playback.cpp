@@ -759,6 +759,146 @@ void player::play_current_note()
 //
 //
 #ifdef USE_CC_ENVELOPES
+// ---------------------------------------------------------------------------
+// Audition envelopes -- triggered by keyjazz (Q-W-E-...) so the user
+// can preview envelope curves before they're armed in a pattern. The
+// pump runs on the main (UI) thread via the main-loop hook, NOT on the
+// playback timer thread, so there's no shared state with the
+// per-track cc_env grid that playback.cpp's playback() drives.
+
+struct audition_voice {
+    int env_idx;        // -1 = unused
+    int sdlk_key;       // which keyjazz keysym armed this voice
+    int inst;
+    int cc_override;
+    int position;
+    int last_emitted;
+    int speed_counter;
+    int key_off;
+    int done;
+    uint64_t last_advance_ms;
+};
+static const int AUD_MAX = 16;
+static audition_voice g_aud[AUD_MAX];
+static bool g_aud_inited = false;
+
+static void aud_ensure(void) {
+    if (g_aud_inited) return;
+    for (int i = 0; i < AUD_MAX; i++) g_aud[i].env_idx = -1;
+    g_aud_inited = true;
+}
+
+void zt_audition_env_arm(int sdlk_key, int inst) {
+    aud_ensure();
+    if (!ztPlayer || !ztPlayer->song) return;
+    if (inst < 0 || inst >= MAX_INSTS) return;
+    instrument *ii = ztPlayer->song->instruments[inst];
+    if (!ii) return;
+    for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+        unsigned char ei = ii->ccenv_default[s];
+        if (ei == ZTM_CCENV_NONE || ei >= ZTM_MAX_CCENVELOPES) continue;
+        ccenvelope *env = ztPlayer->song->ccenvelopes[ei];
+        if (!env || env->isempty() || !(env->flags & ZTM_CCENVF_ENABLED)) continue;
+        // Find a free audition slot, or steal the oldest done one.
+        int slot = -1;
+        for (int k = 0; k < AUD_MAX; k++) {
+            if (g_aud[k].env_idx < 0) { slot = k; break; }
+        }
+        if (slot < 0) {
+            // All slots in use -- reuse slot 0 (oldest hopefully).
+            slot = 0;
+        }
+        g_aud[slot].env_idx       = ei;
+        g_aud[slot].sdlk_key      = sdlk_key;
+        g_aud[slot].inst          = inst;
+        g_aud[slot].cc_override   = ii->ccenv_cc_override[s];
+        g_aud[slot].position      = 0;
+        g_aud[slot].last_emitted  = -1;
+        g_aud[slot].speed_counter = 0;
+        g_aud[slot].key_off       = 0;
+        g_aud[slot].done          = 0;
+        g_aud[slot].last_advance_ms = (uint64_t)SDL_GetTicks();
+    }
+}
+
+void zt_audition_env_release(int sdlk_key) {
+    aud_ensure();
+    for (int k = 0; k < AUD_MAX; k++) {
+        if (g_aud[k].env_idx >= 0 && g_aud[k].sdlk_key == sdlk_key) {
+            g_aud[k].key_off = 1;
+        }
+    }
+}
+
+void zt_audition_env_clear_all(void) {
+    aud_ensure();
+    for (int k = 0; k < AUD_MAX; k++) g_aud[k].env_idx = -1;
+}
+
+void zt_audition_env_pump(void) {
+    aud_ensure();
+    if (!ztPlayer || !ztPlayer->song) return;
+    int subtick_ms = ztPlayer->subtick_len_ms;
+    if (subtick_ms < 1) subtick_ms = 5;   // sane fallback ~200Hz
+    uint64_t now = (uint64_t)SDL_GetTicks();
+
+    for (int k = 0; k < AUD_MAX; k++) {
+        audition_voice &v = g_aud[k];
+        if (v.env_idx < 0) continue;
+        ccenvelope *env = ztPlayer->song->ccenvelopes[v.env_idx];
+        if (!env || env->isempty() || !(env->flags & ZTM_CCENVF_ENABLED)) {
+            v.env_idx = -1;
+            continue;
+        }
+        uint64_t elapsed = now - v.last_advance_ms;
+        int steps = (int)(elapsed / (uint64_t)subtick_ms);
+        if (steps <= 0) continue;
+        if (steps > 64) steps = 64;       // catch up but don't burn forever
+        v.last_advance_ms += (uint64_t)steps * subtick_ms;
+
+        int env_speed = env->speed > 0 ? env->speed : 1;
+        instrument *ii = ztPlayer->song->instruments[v.inst];
+        if (!ii) { v.env_idx = -1; continue; }
+        unsigned int dev   = ii->midi_device;
+        unsigned char chan = ii->channel;
+        unsigned char cc_num = (v.cc_override <= 127)
+                                   ? (unsigned char)v.cc_override
+                                   : env->cc;
+
+        for (int s = 0; s < steps; s++) {
+            v.speed_counter++;
+            if (v.speed_counter < env_speed) continue;
+            v.speed_counter = 0;
+
+            struct ccenv_voice_state cvs;
+            cvs.position = v.position;
+            cvs.done     = v.done;
+            cvs.key_off  = v.key_off;
+            int newval = ccenv_step(&cvs,
+                                    env->tick, env->value, env->num_nodes,
+                                    env->flags,
+                                    env->loop_start, env->loop_end,
+                                    env->sustain_start, env->sustain_end);
+            v.position = cvs.position;
+            v.done     = cvs.done;
+
+            if (newval != v.last_emitted) {
+                if (env->kind == 0) {
+                    MidiOut->sendCC(dev, cc_num, (unsigned char)newval, chan);
+                } else if (env->kind == 1) {
+                    int pb = newval * 129;
+                    if (pb > 16383) pb = 16383;
+                    MidiOut->pitchWheel(dev, chan, (unsigned short)pb);
+                }
+                // env->kind == 2 (Channel Pressure): no direct API on
+                // MidiOut; skipped in audition for now.
+                v.last_emitted = newval;
+            }
+            if (cvs.done) { v.env_idx = -1; break; }
+        }
+    }
+}
+
 void player::clear_cc_envs(void) {
     for (int t = 0; t < MAX_TRACKS; t++) {
         for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
@@ -786,6 +926,7 @@ void player::stop(void)
     clear_noel_with_midiout();
 #ifdef USE_CC_ENVELOPES
     clear_cc_envs();
+    zt_audition_env_clear_all();
 #endif
     if (zt_config_globals.auto_send_panic)
         MidiOut->hardpanic();

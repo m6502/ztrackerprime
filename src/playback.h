@@ -47,6 +47,18 @@
 class zt_module ;
 
 #ifdef USE_CC_ENVELOPES
+// Keyjazz / audition envelope hooks. Independent of the playback
+// engine's per-track cc_env grid -- driven by wall-clock SDL_GetTicks
+// from the main loop so envelopes can fire from a Q-W-E-... key
+// audition even when the song isn't playing. The arming side reads
+// the active instrument's ccenv_default[] slots.
+void zt_audition_env_arm(int sdlk_key, int inst);
+void zt_audition_env_release(int sdlk_key);
+void zt_audition_env_pump(void);
+void zt_audition_env_clear_all(void);
+#endif
+
+#ifdef USE_CC_ENVELOPES
 // Per-track runtime state for a single armed CC envelope. The player
 // owns a MAX_TRACKS x ZTM_CCENV_PER_INST grid of these. env_idx ==
 // ZTM_CCENV_NONE marks the slot free.

@@ -244,17 +244,34 @@ bool jazz_note_is_active(int key) {
 }
 
 void jazz_set_state(int key, unsigned char note, unsigned char chan) {
-    std::lock_guard<std::mutex> lock(g_jazz_mutex);
-    g_jazz[key].note = note;
-    g_jazz[key].chan = chan;
+    {
+        std::lock_guard<std::mutex> lock(g_jazz_mutex);
+        g_jazz[key].note = note;
+        g_jazz[key].chan = chan;
+    }
+#ifdef USE_CC_ENVELOPES
+    // Audition: arm any envelopes the current instrument has wired
+    // up via its ccenv_default[] slots, so pressing Q-W-E etc. fires
+    // both the note AND its CC envelope curve.
+    extern int cur_inst;
+    zt_audition_env_arm(key, cur_inst);
+#endif
 }
 
 void jazz_clear_state(int key) {
-    std::lock_guard<std::mutex> lock(g_jazz_mutex);
-    const auto it = g_jazz.find(key);
-    if (it != g_jazz.end()) {
-        it->second.note = 0x80;
+    {
+        std::lock_guard<std::mutex> lock(g_jazz_mutex);
+        const auto it = g_jazz.find(key);
+        if (it != g_jazz.end()) {
+            it->second.note = 0x80;
+        }
     }
+#ifdef USE_CC_ENVELOPES
+    // Release any audition envelope voices armed by this key. The
+    // sustain region will fall through to the loop / fadeout branch
+    // on the next zt_audition_env_pump() tick.
+    zt_audition_env_release(key);
+#endif
 }
 
 void jazz_clear_all_states(void) {
@@ -3325,6 +3342,13 @@ int action(Screen *S)
         window_stack.update();
     else
         ActivePage->update();
+
+#ifdef USE_CC_ENVELOPES
+    // Drive keyjazz-audition envelopes from the main loop using
+    // SDL_GetTicks for timing. Cheap when nothing is armed (the pump
+    // just walks a 16-slot array and skips inactive voices).
+    zt_audition_env_pump();
+#endif
 
 #ifdef DEBUG
     playbuff1_bg->setvalue(ztPlayer->play_buffer[0]->size);

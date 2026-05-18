@@ -40,7 +40,54 @@ ctest --output-on-failure      # unit-test harness (Linux CI runs this)
 
 `open <path>/zt.app` (or `open <path>/zt`) — gives the app its own session. Avoid `./zt &` from a non-interactive shell; it can exit silently when stdin is detached.
 
-`scripts/zt-screenshot.sh` (macOS) launches zt.app and captures F1/F2/F3/F11/F12/Ctrl+F12 via `screencapture -R` + AppleScript. Output at `/tmp/zt-shots/`. Use it to self-verify layout changes.
+## Headless verification — USE THIS, NOT AppleScript
+
+**Headless ≠ "launch zt and press keys via AppleScript".** Real headless = no window opens at all, no focus theft, no screen-stealing. zTracker has a proper headless mode built in. Use it.
+
+```sh
+build/Program/zt --headless --script <script.txt>
+```
+
+`--headless` sets `SDL_HINT_VIDEO_DRIVER=dummy` so SDL never opens a window. `--script` reads commands from a file and injects synthetic keys / dumps PNG screenshots / sets `do_exit`. The dump is libpng on the in-memory `ARGB8888` surface — exactly what the page paints into. From the page's perspective the synthetic keys are indistinguishable from real ones.
+
+Implementation: `src/zt_headless.{h,cpp}`. Docs: `docs/headless-script.md`. Script syntax:
+
+```
+wait 250                    # ms delay before next command
+key shift+f6                # synthetic keystroke; chord syntax supports
+                            #   shift+ / ctrl+ / alt+ / meta+ / cmd+
+shot /tmp/foo.png           # dump current surface
+quit                        # set do_exit (always end CI scripts with this)
+```
+
+Worked example for visually verifying a Shift+F6 (CC Envelope Editor) layout change:
+
+```sh
+cat > /tmp/env.script <<'EOF'
+wait 250
+key shift+f6
+wait 150
+shot /tmp/zt-shots/envelope.png
+quit
+EOF
+mkdir -p /tmp/zt-shots
+build/Program/zt --headless --script /tmp/env.script
+# Read the PNG to verify -- no window opens, no focus theft.
+```
+
+**Limitations of the current driver:**
+
+- Only **keyboard** events are injectable. Mouse-driven page paths (e.g. click-to-add-node on the CC Envelope canvas) can't be exercised. To verify mouse-driven UI, extend `src/zt_headless.cpp`'s `parse_command` switch to accept `mouse <x> <y> <button>` and inject `SDL_EVENT_MOUSE_BUTTON_DOWN/UP` events. Worth doing on any PR that adds significant mouse interaction.
+- Playback timing is wall-clock based, so you can't headlessly assert "the V-effect emitted CC bytes" without a `play_for <ms>` extension that drives the timer + captures buffer events.
+
+**Banned patterns (do not use, they break the user's screen):**
+
+- `osascript -e 'tell application "zTracker" to activate'` — pulls zt to the foreground.
+- `osascript -e 'tell application "System Events" to key code N'` — requires the app to be frontmost.
+- `screencapture -l <window-id>` on a windowed zt — works for capture, but only if zt is actually running with a window, which means the user sees it.
+- `scripts/zt-screenshot.sh` — exists for the case where mouse simulation is genuinely required (manual smoke-tests), but ALWAYS opens a visible window. **Never** use it for routine layout verification; reach for `--headless --script` instead.
+
+If you cannot verify a change because the headless driver lacks a needed event type (mouse, playback advancement, ...), say so to the user and offer to extend the driver. Do NOT fall back to AppleScript.
 
 ## Key files
 
