@@ -309,7 +309,9 @@ public:
                 }
                 Keys.getkey();
                 need_refresh++;
-                need_redraw++;
+                doredraw++;       // force redrawscreen() this frame
+                this->need_redraw++;
+                screenmanager.UpdateAll();
                 return this->ID;
             }
         }
@@ -329,7 +331,9 @@ public:
                 }
                 Keys.getkey();
                 need_refresh++;
-                need_redraw++;
+                doredraw++;       // force redrawscreen() this frame
+                this->need_redraw++;
+                screenmanager.UpdateAll();
                 return this->ID;
             }
         }
@@ -339,7 +343,9 @@ public:
                 dragging = 0;
                 Keys.getkey();
                 need_refresh++;
-                need_redraw++;
+                doredraw++;       // force redrawscreen() this frame
+                this->need_redraw++;
+                screenmanager.UpdateAll();
                 return this->ID;
             }
         }
@@ -354,7 +360,9 @@ public:
                     ce_selected = ce_sort_after_move(e, ce_selected);
                     file_changed++;
                     need_refresh++;
-                    need_redraw++;
+                    doredraw++;
+                    this->need_redraw++;
+                    screenmanager.UpdateAll();
                 }
             }
         }
@@ -513,7 +521,8 @@ public:
         if (consumed) {
             Keys.getkey();
             need_refresh++;
-            this->need_redraw++;   // mark THIS widget dirty so UI->draw redraws it
+            doredraw++;            // critical: triggers redrawscreen() at top of action()
+            this->need_redraw++;
             screenmanager.UpdateAll();
         }
         return 0;
@@ -529,14 +538,14 @@ public:
         int x1 = x0 + wpx;
         int y1 = y0 + hpx;
 
-        // fillRect signature: (x1, y1, x2, y2) -- two corners.
+        // Schism-style envelope viewport: thin lines, small node
+        // squares, fine dotted grid. The whole thing should read as
+        // a precise scientific plot, not a chunky cartoon.
 
         // (1) Background.
         S->fillRect(x0, y0, x1, y1, COLORS.EditBG);
 
-        // (2) Loop / sustain colored bands BEFORE the curve so the
-        // curve draws on top. Schism uses transparent shading; we
-        // approximate with EditBGhigh (loop) and EditBGlow (sustain).
+        // (2) Loop / sustain colored bands BEFORE the curve.
         if (e && e->num_nodes > 1 && (e->flags & ZTM_CCENVF_LOOP)) {
             int lx0 = node_pix_x(e->loop_start, e);
             int lx1 = node_pix_x(e->loop_end, e);
@@ -550,23 +559,16 @@ public:
                 S->fillRect(sx0, y0 + 1, sx1, y1 - 1, COLORS.EditBGlow);
         }
 
-        // (3) Cartesian grid. Quarter-height horizontals at 25/50/75%
-        // and value 127 reference line at the top.
-        for (int q = 1; q <= 3; q++) {
-            int gy = y0 + (q * hpx) / 4;
-            for (int xx = x0 + 2; xx < x1 - 2; xx += 6) {
-                S->fillRect(xx, gy, xx + 2, gy + 1, COLORS.EditBGlow);
-            }
-        }
-        // Eighth-width vertical gridlines.
-        for (int q = 1; q <= 7; q++) {
-            int gx = x0 + (q * wpx) / 8;
-            for (int yy = y0 + 2; yy < y1 - 2; yy += 6) {
-                S->fillRect(gx, yy, gx + 1, yy + 2, COLORS.EditBGlow);
+        // (3) Fine dotted grid: 1px dots spaced 8px apart in both
+        // axes. Same density as Schism. Subtle enough to be a hint,
+        // not a distraction.
+        for (int gy = y0 + 8; gy < y1 - 4; gy += 8) {
+            for (int gx = x0 + 8; gx < x1 - 4; gx += 8) {
+                S->fillRect(gx, gy, gx + 1, gy + 1, COLORS.EditBGlow);
             }
         }
 
-        // (4) Border.
+        // (4) Border (1px thin).
         TColor frame_color = active ? COLORS.Highlight : COLORS.Text;
         S->fillRect(x0,     y0,     x1,     y0 + 1, frame_color);
         S->fillRect(x0,     y1 - 1, x1,     y1,     frame_color);
@@ -583,24 +585,23 @@ public:
 
         int mt = ce_max_tick_view(e);
 
-        // (5) Curve as connected line segments between adjacent nodes
-        // (Bresenham-ish). 3px thick so it reads cleanly on retina.
+        // (5) Curve as connected 1px line segments between adjacent
+        // nodes -- crisp single-pixel line, no chunky 3px staircase.
         TColor curve_color = COLORS.Highlight;
         for (int i = 0; i + 1 < e->num_nodes; i++) {
             int ax = node_pix_x(i, e);
             int ay = node_pix_y(i, e);
             int bx = node_pix_x(i + 1, e);
             int by = node_pix_y(i + 1, e);
-            draw_line_3px(S, ax, ay, bx, by, curve_color);
+            draw_line_1px(S, ax, ay, bx, by, curve_color);
         }
-        // Single-node case: a horizontal stub at the node's value.
+        // Single-node case: 1px horizontal stub at the node's value.
         if (e->num_nodes == 1) {
             int ny = node_pix_y(0, e);
-            S->fillRect(x0 + 1, ny - 1, x1 - 1, ny + 2, curve_color);
+            S->fillRect(x0 + 1, ny, x1 - 1, ny + 1, curve_color);
         }
 
-        // (6) Loop / sustain start+end vertical edge markers (sharp lines
-        // at the boundaries of the colored bands).
+        // (6) Loop / sustain start+end vertical edge markers.
         if (e->num_nodes > 0 && (e->flags & ZTM_CCENVF_LOOP)) {
             int lx0 = node_pix_x(e->loop_start, e);
             int lx1 = node_pix_x(e->loop_end, e);
@@ -614,69 +615,62 @@ public:
             S->fillRect(sx1 - 1, y0 + 1, sx1,     y1 - 1, COLORS.Highlight);
         }
 
-        // (7) Nodes. Big, with an outline that distinguishes selected
-        // (filled bright) from unselected (filled highlight + 1px text-color outline).
+        // (7) Nodes: small (3px) filled square. Selected = 5px filled
+        // bright square with a 1px black border ring -- the same idiom
+        // Schism uses to mark the cursor node.
         for (int i = 0; i < e->num_nodes; i++) {
             int nx = node_pix_x(i, e);
             int ny = node_pix_y(i, e);
             if (i == ce_selected) {
-                // Selected: 8px filled bright square + 1px outline ring.
-                S->fillRect(nx - 5, ny - 5, nx + 6, ny + 6, COLORS.Text);
-                S->fillRect(nx - 4, ny - 4, nx + 5, ny + 5, COLORS.EditBG);
-                S->fillRect(nx - 3, ny - 3, nx + 4, ny + 4, COLORS.Text);
+                // 5x5 black "halo" + 3x3 bright center to make the
+                // selected node visually distinct without bloating.
+                S->fillRect(nx - 2, ny - 2, nx + 3, ny + 3, COLORS.EditBG);
+                S->fillRect(nx - 1, ny - 1, nx + 2, ny + 2, COLORS.Text);
             } else {
-                // Unselected: 6px filled highlight square.
-                S->fillRect(nx - 3, ny - 3, nx + 4, ny + 4, COLORS.Highlight);
+                // 3x3 highlight square.
+                S->fillRect(nx - 1, ny - 1, nx + 2, ny + 2, COLORS.Highlight);
             }
         }
 
-        // (8) Live playhead.
+        // (8) Live playhead: 1px vertical line + 3x3 marker dot at
+        // the curve. Same thinness as the curve itself.
         int live_pos = -1, live_val = -1;
         if (zt_envelope_live_position(ce_slot, &live_pos, &live_val)
             && live_pos >= 0) {
             int px = x0 + (live_pos * wpx) / (mt > 0 ? mt : 1);
             if (px > x0 + 1 && px < x1 - 1) {
-                // Vertical playhead line.
-                S->fillRect(px - 1, y0 + 1, px + 2, y1 - 1, COLORS.Text);
+                S->fillRect(px, y0 + 1, px + 1, y1 - 1, COLORS.Text);
             }
             int v = ccenv_interp_raw(e->tick, e->value, e->num_nodes, live_pos);
             int cy = y0 + ((127 - v) * (hpx - 2)) / 127 + 1;
-            S->fillRect(px - 4, cy - 4, px + 5, cy + 5, COLORS.Text);
-            S->fillRect(px - 3, cy - 3, px + 4, cy + 4, COLORS.Highlight);
+            S->fillRect(px - 1, cy - 1, px + 2, cy + 2, COLORS.Text);
         }
 
-        // Mark the entire canvas region dirty so screenmanager pushes
-        // it to the window on the next Refresh(). Without this the
-        // changes only become visible after Alt-Tab.
         mark_dirty(x0, y0, x1, y1);
     }
 
 private:
-    // Mark a screen-space rectangle dirty so the SDL backend pushes
-    // it on the next present.
     void mark_dirty(int x0, int y0, int x1, int y1) const {
         if (x1 > x0 && y1 > y0)
             screenmanager.UpdateWH(x0, y0, x1 - x0, y1 - y0);
     }
 
-    // Thick (3px) Bresenham line for the curve. Simple stepping
-    // algorithm -- envelope curves never get long enough to matter
-    // performance-wise.
-    static void draw_line_3px(Drawable *S, int x0, int y0, int x1, int y1,
+    // True 1px Bresenham line for the curve. Schism-thin.
+    static void draw_line_1px(Drawable *S, int ax, int ay, int bx, int by,
                               TColor c) {
-        int dx = x1 - x0;
-        int dy = y1 - y0;
+        int dx = bx - ax;
+        int dy = by - ay;
         int adx = dx < 0 ? -dx : dx;
         int ady = dy < 0 ? -dy : dy;
         int steps = adx > ady ? adx : ady;
         if (steps <= 0) {
-            S->fillRect(x0 - 1, y0 - 1, x0 + 2, y0 + 2, c);
+            S->fillRect(ax, ay, ax + 1, ay + 1, c);
             return;
         }
         for (int s = 0; s <= steps; s++) {
-            int x = x0 + (dx * s) / steps;
-            int y = y0 + (dy * s) / steps;
-            S->fillRect(x - 1, y - 1, x + 2, y + 2, c);
+            int x = ax + (dx * s) / steps;
+            int y = ay + (dy * s) / steps;
+            S->fillRect(x, y, x + 1, y + 1, c);
         }
     }
 };
