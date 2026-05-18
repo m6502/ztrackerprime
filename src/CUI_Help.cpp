@@ -335,28 +335,48 @@ void CUI_Help::update() {
                 const char *t = tb->text;
                 int line_idx = 0;
                 int found_line = -1;
-                for (int i = 0; t && t[i] && found_line < 0; ) {
-                    int ls = i;
-                    int le = ls;
-                    while (t[le] && t[le] != '\n') le++;
-                    int p = ls;
-                    while (p < le && (t[p] == ' ' || t[p] == '\t')) p++;
-                    int rem = le - p;
-                    for (int j = 0; j < ntok && found_line < 0; j++) {
-                        int tl = (int)strlen(tokens[j]);
-                        if (rem >= tl && strncmp(t + p, tokens[j], tl) == 0) {
-                            // Word-boundary check: char after token must not
-                            // continue an identifier (so "ALT-M" doesn't match
-                            // "ALT-Move" if that ever appears).
-                            char nc = (p + tl < le) ? t[p + tl] : ' ';
-                            int boundary = !(nc >= 'A' && nc <= 'Z')
-                                        && !(nc >= 'a' && nc <= 'z')
-                                        && !(nc >= '0' && nc <= '9');
-                            if (boundary) found_line = line_idx;
+                // Pass 1: token at start of line (the documented shortcut
+                // rows). Pass 2: substring anywhere in the line (catches
+                // inline prose mentions like "press CTRL-L to ...").
+                for (int pass = 0; pass < 2 && found_line < 0; pass++) {
+                    line_idx = 0;
+                    for (int i = 0; t && t[i] && found_line < 0; ) {
+                        int ls = i;
+                        int le = ls;
+                        while (t[le] && t[le] != '\n') le++;
+                        int p_start, p_end;
+                        if (pass == 0) {
+                            p_start = ls;
+                            while (p_start < le && (t[p_start] == ' ' || t[p_start] == '\t')) p_start++;
+                            p_end = p_start + 1;   // only check start position
+                        } else {
+                            p_start = ls;
+                            p_end   = le;          // scan whole line
                         }
+                        for (int p = p_start; p < p_end && found_line < 0; p++) {
+                            int rem = le - p;
+                            for (int j = 0; j < ntok && found_line < 0; j++) {
+                                int tl = (int)strlen(tokens[j]);
+                                if (rem < tl) continue;
+                                if (strncmp(t + p, tokens[j], tl) != 0) continue;
+                                // Word boundaries on both sides: the chars
+                                // adjacent to the token must not continue
+                                // an identifier so "ALT-M" won't match
+                                // "ALT-Move".
+                                char pc = (p > ls) ? t[p - 1] : ' ';
+                                char nc = (p + tl < le) ? t[p + tl] : ' ';
+                                int left_ok  = !(pc >= 'A' && pc <= 'Z')
+                                            && !(pc >= 'a' && pc <= 'z')
+                                            && !(pc >= '0' && pc <= '9');
+                                int right_ok = !(nc >= 'A' && nc <= 'Z')
+                                            && !(nc >= 'a' && nc <= 'z')
+                                            && !(nc >= '0' && nc <= '9');
+                                if (left_ok && right_ok) found_line = line_idx;
+                            }
+                        }
+                        line_idx++;
+                        i = (t[le] == '\n') ? le + 1 : le;
                     }
-                    line_idx++;
-                    i = (t[le] == '\n') ? le + 1 : le;
                 }
                 if (found_line >= 0) {
                     Keys.getkey(); // consume
@@ -368,10 +388,24 @@ void CUI_Help::update() {
                     tb->bEof = false;
                     UI->full_refresh();
                     need_refresh++;
+                    snprintf(szStatmsg, sizeof szStatmsg,
+                             "Help: jumped to %s", tokens[0]);
+                    statusmsg = szStatmsg;
+                    status_change = 1;
                     return;
                 }
-                // No match — fall through; either TextBox handles it
-                // or the unmatched combo is harmlessly ignored.
+                // No match -- give the user audible feedback so they
+                // know the lookup ran (otherwise "nothing happened" is
+                // indistinguishable from "key was ignored").
+                Keys.getkey(); // consume so the chord doesn't leak to
+                               // TextBox::update() as a scroll trigger
+                snprintf(szStatmsg, sizeof szStatmsg,
+                         "Help: no entry for %s",
+                         ntok > 0 ? tokens[0] : "?");
+                statusmsg = szStatmsg;
+                status_change = 1;
+                need_refresh++;
+                return;
             }
         }
         if (key == SDLK_TAB && section_count > 0) {
