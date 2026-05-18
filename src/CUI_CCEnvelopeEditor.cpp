@@ -528,97 +528,154 @@ public:
         int x1 = x0 + wpx;
         int y1 = y0 + hpx;
 
-        // NOTE: fillRect takes (x1,y1, x2,y2) -- TWO CORNERS, not (x,y,w,h).
+        // fillRect signature: (x1, y1, x2, y2) -- two corners.
 
-        // Fill canvas background black so the curve stands out.
+        // (1) Background.
         S->fillRect(x0, y0, x1, y1, COLORS.EditBG);
 
-        // Border. Frame the canvas with a 1-px outline (4 thin rects).
-        TColor frame_color = active ? COLORS.Highlight : COLORS.Text;
-        S->fillRect(x0,     y0,     x1,     y0 + 1, frame_color); // top
-        S->fillRect(x0,     y1 - 1, x1,     y1,     frame_color); // bottom
-        S->fillRect(x0,     y0,     x0 + 1, y1,     frame_color); // left
-        S->fillRect(x1 - 1, y0,     x1,     y1,     frame_color); // right
-
-        // Mid-value reference line (dashed, at value=64).
-        int mid_y = y0 + (hpx / 2);
-        for (int xx = x0 + 2; xx < x1 - 2; xx += 4) {
-            S->fillRect(xx, mid_y, xx + 2, mid_y + 1, COLORS.EditBGlow);
+        // (2) Loop / sustain colored bands BEFORE the curve so the
+        // curve draws on top. Schism uses transparent shading; we
+        // approximate with EditBGhigh (loop) and EditBGlow (sustain).
+        if (e && e->num_nodes > 1 && (e->flags & ZTM_CCENVF_LOOP)) {
+            int lx0 = node_pix_x(e->loop_start, e);
+            int lx1 = node_pix_x(e->loop_end, e);
+            if (lx1 > lx0)
+                S->fillRect(lx0, y0 + 1, lx1, y1 - 1, COLORS.EditBGhigh);
         }
+        if (e && e->num_nodes > 1 && (e->flags & ZTM_CCENVF_SUSTAIN)) {
+            int sx0 = node_pix_x(e->sustain_start, e);
+            int sx1 = node_pix_x(e->sustain_end, e);
+            if (sx1 > sx0)
+                S->fillRect(sx0, y0 + 1, sx1, y1 - 1, COLORS.EditBGlow);
+        }
+
+        // (3) Cartesian grid. Quarter-height horizontals at 25/50/75%
+        // and value 127 reference line at the top.
+        for (int q = 1; q <= 3; q++) {
+            int gy = y0 + (q * hpx) / 4;
+            for (int xx = x0 + 2; xx < x1 - 2; xx += 6) {
+                S->fillRect(xx, gy, xx + 2, gy + 1, COLORS.EditBGlow);
+            }
+        }
+        // Eighth-width vertical gridlines.
+        for (int q = 1; q <= 7; q++) {
+            int gx = x0 + (q * wpx) / 8;
+            for (int yy = y0 + 2; yy < y1 - 2; yy += 6) {
+                S->fillRect(gx, yy, gx + 1, yy + 2, COLORS.EditBGlow);
+            }
+        }
+
+        // (4) Border.
+        TColor frame_color = active ? COLORS.Highlight : COLORS.Text;
+        S->fillRect(x0,     y0,     x1,     y0 + 1, frame_color);
+        S->fillRect(x0,     y1 - 1, x1,     y1,     frame_color);
+        S->fillRect(x0,     y0,     x0 + 1, y1,     frame_color);
+        S->fillRect(x1 - 1, y0,     x1,     y1,     frame_color);
 
         if (!e || e->num_nodes == 0) {
             print(x0 + 6, y0 + (hpx / 2) - 4,
                   "Click in this box to add the first node.",
                   COLORS.Text, S);
+            mark_dirty(x0, y0, x1, y1);
             return;
         }
 
-        // Curve (interpolated value at each canvas X pixel). Drawn 2px
-        // tall so a flat single-node line is unmistakable.
         int mt = ce_max_tick_view(e);
+
+        // (5) Curve as connected line segments between adjacent nodes
+        // (Bresenham-ish). 3px thick so it reads cleanly on retina.
         TColor curve_color = COLORS.Highlight;
-        for (int px = 1; px < wpx - 1; px++) {
-            int pos = (px * mt) / (wpx > 0 ? wpx : 1);
-            int val = ccenv_interp_raw(e->tick, e->value, e->num_nodes, pos);
-            int cy = y0 + ((127 - val) * (hpx - 2)) / 127 + 1;
-            S->fillRect(x0 + px, cy, x0 + px + 1, cy + 2, curve_color);
+        for (int i = 0; i + 1 < e->num_nodes; i++) {
+            int ax = node_pix_x(i, e);
+            int ay = node_pix_y(i, e);
+            int bx = node_pix_x(i + 1, e);
+            int by = node_pix_y(i + 1, e);
+            draw_line_3px(S, ax, ay, bx, by, curve_color);
+        }
+        // Single-node case: a horizontal stub at the node's value.
+        if (e->num_nodes == 1) {
+            int ny = node_pix_y(0, e);
+            S->fillRect(x0 + 1, ny - 1, x1 - 1, ny + 2, curve_color);
         }
 
-        // Faint vertical guide at each node's x so you can see where
-        // the X-axis nodes sit even if values are similar.
-        for (int i = 0; i < e->num_nodes; i++) {
-            int nx = node_pix_x(i, e);
-            if (nx > x0 + 1 && nx < x1 - 1) {
-                // 1px dotted column in EditBGlow.
-                for (int yy = y0 + 2; yy < y1 - 2; yy += 3)
-                    S->fillRect(nx, yy, nx + 1, yy + 1, COLORS.EditBGlow);
-            }
+        // (6) Loop / sustain start+end vertical edge markers (sharp lines
+        // at the boundaries of the colored bands).
+        if (e->num_nodes > 0 && (e->flags & ZTM_CCENVF_LOOP)) {
+            int lx0 = node_pix_x(e->loop_start, e);
+            int lx1 = node_pix_x(e->loop_end, e);
+            S->fillRect(lx0,     y0 + 1, lx0 + 1, y1 - 1, COLORS.Text);
+            S->fillRect(lx1 - 1, y0 + 1, lx1,     y1 - 1, COLORS.Text);
+        }
+        if (e->num_nodes > 0 && (e->flags & ZTM_CCENVF_SUSTAIN)) {
+            int sx0 = node_pix_x(e->sustain_start, e);
+            int sx1 = node_pix_x(e->sustain_end, e);
+            S->fillRect(sx0,     y0 + 1, sx0 + 1, y1 - 1, COLORS.Highlight);
+            S->fillRect(sx1 - 1, y0 + 1, sx1,     y1 - 1, COLORS.Highlight);
         }
 
-        // Nodes. Selected = 6px filled square (bright text); others =
-        // 4px filled square in the highlight color. Bigger than before
-        // so users can actually see them.
+        // (7) Nodes. Big, with an outline that distinguishes selected
+        // (filled bright) from unselected (filled highlight + 1px text-color outline).
         for (int i = 0; i < e->num_nodes; i++) {
             int nx = node_pix_x(i, e);
             int ny = node_pix_y(i, e);
-            int s = (i == ce_selected) ? 6 : 4;
-            TColor c = (i == ce_selected) ? COLORS.Text : COLORS.Highlight;
-            S->fillRect(nx - s/2, ny - s/2, nx - s/2 + s, ny - s/2 + s, c);
+            if (i == ce_selected) {
+                // Selected: 8px filled bright square + 1px outline ring.
+                S->fillRect(nx - 5, ny - 5, nx + 6, ny + 6, COLORS.Text);
+                S->fillRect(nx - 4, ny - 4, nx + 5, ny + 5, COLORS.EditBG);
+                S->fillRect(nx - 3, ny - 3, nx + 4, ny + 4, COLORS.Text);
+            } else {
+                // Unselected: 6px filled highlight square.
+                S->fillRect(nx - 3, ny - 3, nx + 4, ny + 4, COLORS.Highlight);
+            }
         }
 
-        // Live playhead. If any envelope voice is running for this
-        // slot (audition or pattern-playback), draw a vertical line
-        // at its current tick position so the user SEES the envelope
-        // processing. The page bumps need_refresh while a voice is
-        // live so this redraws at the main-loop rate.
+        // (8) Live playhead.
         int live_pos = -1, live_val = -1;
         if (zt_envelope_live_position(ce_slot, &live_pos, &live_val)
             && live_pos >= 0) {
-            int span = wpx;
-            int px = x0 + (live_pos * span) / (mt > 0 ? mt : 1);
-            if (px > x0 && px < x1 - 1) {
-                S->fillRect(px, y0 + 1, px + 1, y1 - 1, COLORS.Text);
+            int px = x0 + (live_pos * wpx) / (mt > 0 ? mt : 1);
+            if (px > x0 + 1 && px < x1 - 1) {
+                // Vertical playhead line.
+                S->fillRect(px - 1, y0 + 1, px + 2, y1 - 1, COLORS.Text);
             }
-            // Round dot at the curve's interpolated value at this tick.
             int v = ccenv_interp_raw(e->tick, e->value, e->num_nodes, live_pos);
             int cy = y0 + ((127 - v) * (hpx - 2)) / 127 + 1;
-            S->fillRect(px - 2, cy - 2, px + 3, cy + 3, COLORS.Text);
+            S->fillRect(px - 4, cy - 4, px + 5, cy + 5, COLORS.Text);
+            S->fillRect(px - 3, cy - 3, px + 4, cy + 4, COLORS.Highlight);
         }
 
-        // Loop / sustain markers on the canvas edges.
-        if (e->flags & ZTM_CCENVF_LOOP) {
-            int lx0 = node_pix_x(e->loop_start, e);
-            int lx1 = node_pix_x(e->loop_end, e);
-            S->fillRect(lx0, y1 - 3, lx0 + 1, y1 - 1, COLORS.Text);
-            S->fillRect(lx1, y1 - 3, lx1 + 1, y1 - 1, COLORS.Text);
-            print(lx0 - 4, y1 - 11, "L", COLORS.Text, S);
+        // Mark the entire canvas region dirty so screenmanager pushes
+        // it to the window on the next Refresh(). Without this the
+        // changes only become visible after Alt-Tab.
+        mark_dirty(x0, y0, x1, y1);
+    }
+
+private:
+    // Mark a screen-space rectangle dirty so the SDL backend pushes
+    // it on the next present.
+    void mark_dirty(int x0, int y0, int x1, int y1) const {
+        if (x1 > x0 && y1 > y0)
+            screenmanager.UpdateWH(x0, y0, x1 - x0, y1 - y0);
+    }
+
+    // Thick (3px) Bresenham line for the curve. Simple stepping
+    // algorithm -- envelope curves never get long enough to matter
+    // performance-wise.
+    static void draw_line_3px(Drawable *S, int x0, int y0, int x1, int y1,
+                              TColor c) {
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+        int adx = dx < 0 ? -dx : dx;
+        int ady = dy < 0 ? -dy : dy;
+        int steps = adx > ady ? adx : ady;
+        if (steps <= 0) {
+            S->fillRect(x0 - 1, y0 - 1, x0 + 2, y0 + 2, c);
+            return;
         }
-        if (e->flags & ZTM_CCENVF_SUSTAIN) {
-            int sx0 = node_pix_x(e->sustain_start, e);
-            int sx1 = node_pix_x(e->sustain_end, e);
-            S->fillRect(sx0, y0 + 1, sx0 + 1, y0 + 3, COLORS.Text);
-            S->fillRect(sx1, y0 + 1, sx1 + 1, y0 + 3, COLORS.Text);
-            print(sx0 + 2, y0 + 1, "S", COLORS.Text, S);
+        for (int s = 0; s <= steps; s++) {
+            int x = x0 + (dx * s) / steps;
+            int y = y0 + (dy * s) / steps;
+            S->fillRect(x - 1, y - 1, x + 2, y + 2, c);
         }
     }
 };
@@ -995,6 +1052,14 @@ void CUI_CCEnvelopeEditor::draw(Drawable *S) {
           "Arrows=nav, Sh-Arr=tick, Space=insert, L=loop, S=sus, E=ena, "
           "Del=remove, ESC=back",
           COLORS.Text, S);
+
+    // Mark the whole page surface dirty so SDL pushes the new frame
+    // on the next backend present. Without this, fillRect / print
+    // writes sit in the in-memory surface unread by the window until
+    // something else (focus-gained, popup close, etc.) triggers a
+    // full refresh -- which is why clicks "didn't update" until the
+    // user Alt-Tab'd away and back.
+    screenmanager.UpdateAll();
 
     need_refresh = 0; updated = 2;
     ztPlayer->num_orders();
