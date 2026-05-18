@@ -56,6 +56,18 @@ void zt_audition_env_arm(int sdlk_key, int inst);
 void zt_audition_env_release(int sdlk_key);
 void zt_audition_env_pump(void);
 void zt_audition_env_clear_all(void);
+
+// Editor "test note" trigger: arm an envelope by index, on the given
+// instrument, without going through jazz_set_state. Used by the
+// envelope editor's T key so the user can preview a curve from
+// inside the editor.
+void zt_audition_env_arm_envelope(int env_idx, int inst, int sentinel_key);
+
+// Editor live-view: returns 1 if any audition / pattern voice is
+// currently driving envelope `env_idx`, and fills *out_position with
+// its current tick position and *out_last_value with the most recent
+// emitted CC value. Returns 0 if no voice is active.
+int zt_envelope_live_position(int env_idx, int *out_position, int *out_last_value);
 #endif
 
 #ifdef USE_CC_ENVELOPES

@@ -835,6 +835,60 @@ void zt_audition_env_clear_all(void) {
     for (int k = 0; k < AUD_MAX; k++) g_aud[k].env_idx = -1;
 }
 
+void zt_audition_env_arm_envelope(int env_idx, int inst, int sentinel_key) {
+    aud_ensure();
+    if (!ztPlayer || !ztPlayer->song) return;
+    if (env_idx < 0 || env_idx >= ZTM_MAX_CCENVELOPES) return;
+    if (inst < 0 || inst >= MAX_INSTS) return;
+    ccenvelope *env = ztPlayer->song->ccenvelopes[env_idx];
+    if (!env || env->isempty() || !(env->flags & ZTM_CCENVF_ENABLED)) return;
+    instrument *ii = ztPlayer->song->instruments[inst];
+    if (!ii) return;
+    int slot = -1;
+    for (int k = 0; k < AUD_MAX; k++) {
+        if (g_aud[k].env_idx < 0) { slot = k; break; }
+    }
+    if (slot < 0) slot = 0;
+    g_aud[slot].env_idx       = env_idx;
+    g_aud[slot].sdlk_key      = sentinel_key;
+    g_aud[slot].inst          = inst;
+    g_aud[slot].cc_override   = 0x80;       // use envelope's own cc
+    g_aud[slot].position      = 0;
+    g_aud[slot].last_emitted  = -1;
+    g_aud[slot].speed_counter = 0;
+    g_aud[slot].key_off       = 0;
+    g_aud[slot].done          = 0;
+    g_aud[slot].last_advance_ms = (uint64_t)SDL_GetTicks();
+}
+
+int zt_envelope_live_position(int env_idx, int *out_position, int *out_last_value) {
+    aud_ensure();
+    if (env_idx < 0) return 0;
+    // Audition pool first (likely source when the user is in the editor).
+    for (int k = 0; k < AUD_MAX; k++) {
+        if (g_aud[k].env_idx == env_idx) {
+            if (out_position)   *out_position   = g_aud[k].position;
+            if (out_last_value) *out_last_value = g_aud[k].last_emitted;
+            return 1;
+        }
+    }
+    // Pattern-playback voices (cc_env grid).
+    if (ztPlayer) {
+        for (int t = 0; t < MAX_TRACKS; t++) {
+            for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                if ((int)ztPlayer->cc_env[t][s].env_idx == env_idx) {
+                    if (out_position)
+                        *out_position = ztPlayer->cc_env[t][s].position;
+                    if (out_last_value)
+                        *out_last_value = ztPlayer->cc_env[t][s].last_emitted;
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 void zt_audition_env_pump(void) {
     aud_ensure();
     if (!ztPlayer || !ztPlayer->song) return;

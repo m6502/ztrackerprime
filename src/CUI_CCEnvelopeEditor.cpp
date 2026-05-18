@@ -28,6 +28,14 @@
 #include "Button.h"
 #include "Sliders.h"
 
+#if defined(_WIN32) && !defined(strcasecmp)
+  #define strcasecmp _stricmp
+#endif
+
+// Forward-decl at file scope so the anonymous-namespace EnvCanvas
+// sees the GLOBAL cur_inst (not an internal-linkage clone).
+extern int cur_inst;
+
 #define BASE_Y          (TRACKS_ROW_Y + 0)
 #define SPACE_AT_BOTTOM 8
 
@@ -486,6 +494,15 @@ public:
             file_changed++;
             ce_set_status("Enabled: %s", ce_flag_ena ? "on" : "off");
             consumed = true;
+        } else if (k == SDLK_T && !(ks & (KS_CTRL | KS_ALT | KS_META))) {
+            // Test-fire: arm this envelope on cur_inst right here so
+            // the user can watch the playhead animate without leaving
+            // the editor. Sentinel key 0 lets us release it on Esc /
+            // page-leave but won't collide with real keyjazz keys.
+            zt_audition_env_arm_envelope(ce_slot, cur_inst, 0);
+            ce_set_status("Test-fired envelope %d on inst %d",
+                          ce_slot, cur_inst);
+            consumed = true;
         }
 
         if (consumed) {
@@ -548,6 +565,25 @@ public:
             int s = (i == ce_selected) ? 4 : 2;
             TColor c = (i == ce_selected) ? COLORS.Text : COLORS.Highlight;
             S->fillRect(nx - s/2, ny - s/2, nx - s/2 + s, ny - s/2 + s, c);
+        }
+
+        // Live playhead. If any envelope voice is running for this
+        // slot (audition or pattern-playback), draw a vertical line
+        // at its current tick position so the user SEES the envelope
+        // processing. The page bumps need_refresh while a voice is
+        // live so this redraws at the main-loop rate.
+        int live_pos = -1, live_val = -1;
+        if (zt_envelope_live_position(ce_slot, &live_pos, &live_val)
+            && live_pos >= 0) {
+            int span = wpx;
+            int px = x0 + (live_pos * span) / (mt > 0 ? mt : 1);
+            if (px > x0 && px < x1 - 1) {
+                S->fillRect(px, y0 + 1, px + 1, y1 - 1, COLORS.Text);
+            }
+            // Round dot at the curve's interpolated value at this tick.
+            int v = ccenv_interp_raw(e->tick, e->value, e->num_nodes, live_pos);
+            int cy = y0 + ((127 - v) * (hpx - 2)) / 127 + 1;
+            S->fillRect(px - 2, cy - 2, px + 3, cy + 3, COLORS.Text);
         }
 
         // Loop / sustain markers on the canvas edges.
@@ -814,6 +850,20 @@ void CUI_CCEnvelopeEditor::update(void) {
 
     // Push metadata into envelope.
     ce_push_from_widgets(UI);
+
+    // Live-view: while ANY voice is processing this envelope, keep
+    // the page refreshing at main-loop rate so the playhead animates
+    // and the last-emitted-CC value in the status line updates.
+    int live_pos = -1, live_val = -1;
+    if (zt_envelope_live_position(ce_slot, &live_pos, &live_val)) {
+        need_refresh++;
+        if (live_val >= 0) {
+            ccenvelope *e_live = song->ccenvelopes[ce_slot];
+            int cc_num = e_live ? (int)e_live->cc : -1;
+            ce_set_status("LIVE  pos=%d  CC#%d -> %d",
+                          live_pos, cc_num, live_val);
+        }
+    }
 }
 
 void CUI_CCEnvelopeEditor::draw(Drawable *S) {

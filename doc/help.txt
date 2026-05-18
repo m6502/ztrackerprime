@@ -143,9 +143,14 @@
                   64 tracks). Left/right/space/alt-1..0/alt-f9/alt-f10
                   drive playback control as before.
  F6             : Pattern Play - will play the current pattern being edited.
- SHIFT-F6       : CC Envelope editor — author curves of MIDI CC / Pitchbend /
-                  Channel Pressure values triggered on note-on. See Pattern
-                  Effects: V<env><cc>.
+ SHIFT-F6       : CC Envelope editor. Click in canvas to add nodes, drag to
+                  move, right-click to delete. Keyboard: arrows nav, Shift-arrows
+                  tune tick, Up/Down adjust value, Space inserts a node,
+                  Delete removes selected, L = loop anchor, S = sustain anchor,
+                  E = toggle Enabled, T = test-fire envelope on cur_inst (you
+                  see a live playhead animate across the curve + last-emitted
+                  CC value in the status line). Pattern Effects: V<env><cc>.
+                  Per-instrument binding: F3 -> "Envelopes" sliders.
  F7             : Start the song at the current row -
                   If in the pattern edit mode, F7 will start at the current
                   row, at the first instance of the pattern in the pattern

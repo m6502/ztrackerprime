@@ -11,6 +11,11 @@
 
 #if defined(_WIN32)
   #include <windows.h>
+  // MSVC has _stricmp / _S_IFDIR but not strcasecmp / S_ISDIR.
+  #define strcasecmp _stricmp
+  #ifndef S_ISDIR
+    #define S_ISDIR(m) (((m) & _S_IFDIR) == _S_IFDIR)
+  #endif
 #else
   #include <dirent.h>
 #endif
