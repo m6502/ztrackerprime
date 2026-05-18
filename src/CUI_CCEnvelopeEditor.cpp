@@ -320,15 +320,21 @@ public:
                                   "to add a new one; drag to move)",
                                   hit, nn_sel);
                 } else if (e && e->num_nodes < ZTM_CCENV_MAX_NODES) {
-                    // Add a node at the clicked position.
+                    // Add a node at the clicked position AND enter drag
+                    // mode immediately, so the user can click-and-drag
+                    // in one continuous motion to place the node where
+                    // they actually want it. Previously create + drag
+                    // required two separate mouse interactions.
                     int t = pix_to_tick(MousePressX, e);
                     int v = pix_to_value(MousePressY);
                     e->tick[e->num_nodes]  = (unsigned short)t;
                     e->value[e->num_nodes] = (unsigned char)v;
                     e->num_nodes++;
                     ce_selected = ce_sort_after_move(e, e->num_nodes - 1);
+                    dragging = 1;
                     file_changed++;
-                    ce_set_status("Added node %d/%d at tick=%d value=%d",
+                    ce_set_status("Added node %d/%d at tick=%d value=%d "
+                                  "(still holding -- drag to move)",
                                   ce_selected, e->num_nodes, t, v);
                 }
                 Keys.getkey();
