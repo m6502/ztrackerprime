@@ -259,6 +259,7 @@ ZTConf::ZTConf() {
     ccizer_folder[0] = '\0';
     syx_folder[0]    = '\0';
     syx_recv_max_files = 100;   // ~50 MB at typical 500 KB / patch dump
+    ccenv_folder[0]  = '\0';
 }
 
 ZTConf::~ZTConf() {
@@ -330,6 +331,11 @@ int ZTConf::load()
   if (Config->get("syx_recv_max_files")) {
       syx_recv_max_files = atoi(Config->get("syx_recv_max_files"));
       if (syx_recv_max_files < 0) syx_recv_max_files = 0;
+  }
+  temp = Config->get("ccenv_folder");
+  if (temp) {
+      strncpy(ccenv_folder, temp, MAX_PATH);
+      ccenv_folder[MAX_PATH] = '\0';
   }
   
   ////////////////////////////////////////////////
@@ -469,6 +475,7 @@ int ZTConf::save() {
 
     Config->set("ccizer_folder", ccizer_folder);
     Config->set("syx_folder",    syx_folder);
+    Config->set("ccenv_folder",  ccenv_folder);
     sprintf(s, "%d", syx_recv_max_files);
     Config->set("syx_recv_max_files", s);
 

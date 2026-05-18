@@ -4,6 +4,58 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_18 (CC Envelopes + Help keyjazz)
+----------------------------------------------------------------------------
+
+        + CC Envelopes (Shift+F6). New page authors per-song
+          envelope curves -- sparse {tick, value} nodes linearly
+          interpolated each subtick to drive MIDI CC, Pitchbend,
+          or Channel Pressure during a note's lifetime. Up to
+          128 envelopes per song, 32 nodes per envelope.
+
+          Triggering: per-instrument auto-arm (instrument editor
+          binds up to 4 default envelope slots) OR per-row via
+          the Vxxyy effect (xx = envelope index, yy = CC# override
+          or 0x80 to keep the envelope's own CC#).
+
+          Sustain region holds while the note is on; on note-off
+          the position falls through to the optional regular loop
+          or terminates at the last node.
+
+          Presets: each envelope can be saved as a .env text file
+          in the configured ccenv_folder (zt.conf key), reloadable
+          across songs. Format documented in src/ccenv_io.h.
+
+          Persistence in .zt: new optional CENV chunk per envelope
+          + IENV chunk for per-instrument bindings. Older zTracker
+          skips both silently (forward-compat via existing
+          readblock advance-past behaviour).
+
+          New files: src/ccenv_interp.h, src/ccenv_advance.h
+          (pure SDL-free logic, unit-tested at tests/test_ccenv.cpp
+          covering 9 cases), src/ccenv_io.{h,cpp}, src/CUI_CCEnvelopeEditor.cpp.
+
+          Touched: src/module.{h,cpp} (ccenvelope class + per-
+          instrument ccenv_default[] field), src/playback.{h,cpp}
+          (per-track cc_env_voice runtime + V-effect dispatch +
+          per-subtick advance + note-off release), src/ztfile-io.cpp
+          (CENV + IENV chunk save/load), src/conf.{h,cpp}
+          (ccenv_folder key), src/zt.h (STATE_CCENVELOPE,
+          CMD_SWITCH_CCENVELOPE, UIP_CCEnvelopeEditor), src/CUI_Page.h
+          (page class), src/main.cpp (page init/destroy + Shift+F6
+          dispatch), CMakeLists.txt + tests/CMakeLists.txt,
+          doc/help.txt, doc/design/cc-envelopes.md.
+
+        + Help (F1) keyjazz. Press any modifier+key combo (ALT-M,
+          CTRL-S, SHIFT-F6, etc.) while on the Help page to jump
+          straight to the line documenting that shortcut. Lookup
+          uses the same "<MOD>-<KEY>" tokens that doc/help.txt
+          renders. Word-boundary matched so ALT-M won't false-hit
+          longer tokens. Tab / Shift-Tab section navigation
+          unchanged.
+
+          Touched: src/CUI_Help.cpp.
+
 zt 2026_05_14 (IEdit keyjazz + Alt-P centering + Ctrl+C/V/P clipboard)
 ----------------------------------------------------------------------------
 

@@ -411,6 +411,62 @@ void zt_module::build_arpeggio(CDataBuf *buf, int num) {
     return;
 }
 
+#ifdef USE_CC_ENVELOPES
+/*************************************************************************
+ *
+ * NAME  zt_module::build_CC_envelope()
+ *
+ * DESCRIPTION
+ *   Build a CC envelope (CENV) chunk to the buffer.
+ *
+ *   Layout (little-endian, all unsigned):
+ *     usi  num            envelope index in song table
+ *     usi  name_len       (capped at ZTM_CCENVNAME_MAXLEN-1)
+ *     N    name bytes
+ *     uch  cc             CC# (0..127)
+ *     uch  kind           0=CC, 1=Pitchbend, 2=ChanPressure
+ *     uch  flags          ZTM_CCENVF_*
+ *     uch  num_nodes      2..ZTM_CCENV_MAX_NODES
+ *     uch  loop_start, loop_end, sustain_start, sustain_end
+ *     usi  speed
+ *     for each node:
+ *       usi tick
+ *       uch value
+ *
+ * Older zTracker silently skips unknown 'CENV' headers via the
+ * readblock advance-past behaviour (same forward-compat trick as
+ * the CCBN per-instrument bank chunk).
+ *
+ ******/
+void zt_module::build_CC_envelope(CDataBuf *buf, int num) {
+    ccenvelope *e = this->ccenvelopes[num];
+    if (!e) return;
+
+    buf->pushusi(num);
+
+    unsigned short len = (unsigned short)strlen(e->name);
+    buf->pushusi(len);
+    buf->write(e->name, len);
+
+    buf->pushuc(e->cc);
+    buf->pushuc(e->kind);
+    buf->pushuc(e->flags);
+    buf->pushuc(e->num_nodes);
+    buf->pushuc(e->loop_start);
+    buf->pushuc(e->loop_end);
+    buf->pushuc(e->sustain_start);
+    buf->pushuc(e->sustain_end);
+    buf->pushusi(e->speed);
+
+    int nn = (int)e->num_nodes;
+    if (nn > ZTM_CCENV_MAX_NODES) nn = ZTM_CCENV_MAX_NODES;
+    for (int i = 0; i < nn; i++) {
+        buf->pushusi(e->tick[i]);
+        buf->pushuc(e->value[i]);
+    }
+}
+#endif /* USE_CC_ENVELOPES */
+
 /*************************************************************************
  *
  * NAME  zt_module::build_MIDI_macro()
@@ -746,6 +802,48 @@ int zt_module::save(char *fn, int compressed)
             writeblock("MMAC",&buffer,compressed,f,lpDS);
         }
     }
+
+#ifdef USE_CC_ENVELOPES
+    for(i=0; i<ZTM_MAX_CCENVELOPES; i++) {
+        if (this->ccenvelopes[i] && !this->ccenvelopes[i]->isempty()) {
+            build_CC_envelope(&buffer, i);
+            writeblock("CENV", &buffer, compressed, f, lpDS);
+        }
+    }
+    // Per-instrument envelope binding (IENV chunk). One row per instrument
+    // that has at least one armed slot. Each row stores all 4 slot
+    // pairs (env_idx, cc_override). Older zTracker skips this silently.
+    {
+        short int count = 0;
+        for (int k = 0; k < ZTM_MAX_INSTS; k++) {
+            if (!this->instruments[k]) continue;
+            for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                if (this->instruments[k]->ccenv_default[s] != ZTM_CCENV_NONE) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        if (count > 0) {
+            buffer.write((const char *)&count, sizeof(short int));
+            for (int k = 0; k < ZTM_MAX_INSTS; k++) {
+                if (!this->instruments[k]) continue;
+                int any = 0;
+                for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                    if (this->instruments[k]->ccenv_default[s] != ZTM_CCENV_NONE) { any = 1; break; }
+                }
+                if (!any) continue;
+                unsigned char inst_idx = (unsigned char)k;
+                buffer.write((const char *)&inst_idx, sizeof(unsigned char));
+                for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                    buffer.write((const char *)&this->instruments[k]->ccenv_default[s], 1);
+                    buffer.write((const char *)&this->instruments[k]->ccenv_cc_override[s], 1);
+                }
+            }
+            writeblock("IENV", &buffer, compressed, f, lpDS);
+        }
+    }
+#endif /* USE_CC_ENVELOPES */
     
     build_ZT_event_list(&buffer);
     writeblock("ZTev",&buffer,compressed,f,lpDS);
@@ -915,6 +1013,66 @@ int zt_module::load_arpeggio(CDataBuf *buf) {
     this->arpeggios[num]=arp;
     return 0;
 }
+
+#ifdef USE_CC_ENVELOPES
+/*************************************************************************
+ *
+ * NAME  zt_module::load_CC_envelope()
+ *
+ * DESCRIPTION
+ *   Load a CC envelope (CENV) chunk into the module. Layout matches
+ *   build_CC_envelope(); failure on any range check deletes the
+ *   partial envelope and returns -1.
+ *
+ ******/
+int zt_module::load_CC_envelope(CDataBuf *buf) {
+    unsigned short num = buf->getusi();
+    if (num >= ZTM_MAX_CCENVELOPES) return -1;
+
+    if (this->ccenvelopes[num]) {
+        delete this->ccenvelopes[num];
+        this->ccenvelopes[num] = NULL;
+    }
+
+    ccenvelope *e = new ccenvelope();
+    if (!e) return -1;
+
+    unsigned short name_len = buf->getusi();
+    int j = 0;
+    for (unsigned short i = 0; i < name_len; i++) {
+        char c = buf->getch();
+        if (i < ZTM_CCENVNAME_MAXLEN - 1) e->name[j++] = c;
+    }
+    e->name[j] = 0;
+
+    e->cc            = buf->getuch();
+    e->kind          = buf->getuch();
+    e->flags         = buf->getuch();
+    e->num_nodes     = buf->getuch();
+    e->loop_start    = buf->getuch();
+    e->loop_end      = buf->getuch();
+    e->sustain_start = buf->getuch();
+    e->sustain_end   = buf->getuch();
+    e->speed         = buf->getusi();
+
+    if (e->num_nodes > ZTM_CCENV_MAX_NODES) {
+        delete e;
+        return -1;
+    }
+    for (int i = 0; i < (int)e->num_nodes; i++) {
+        e->tick[i]  = buf->getusi();
+        unsigned char v = buf->getuch();
+        if (v > 127) v = 127;
+        e->value[i] = v;
+    }
+    if (e->cc > 127) e->cc = 127;
+    if (e->kind > 2) e->kind = 0;
+    if (e->speed == 0) e->speed = 1;
+
+    this->ccenvelopes[num] = e;
+    return 0;
+}
+#endif /* USE_CC_ENVELOPES */
 
 /*************************************************************************
  *
@@ -1246,6 +1404,35 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "SMSG")) { load_song_message(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ARPG")) { load_arpeggio(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "MMAC")) { load_MIDI_macro(&buffer); recognized_chunks++; }
+#ifdef USE_CC_ENVELOPES
+            if (cmp_hd(&header[0], "CENV")) { load_CC_envelope(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "IENV")) {
+                // Per-instrument envelope binding. Format:
+                //   short int count
+                //   repeat: uint8 inst_idx, then ZTM_CCENV_PER_INST pairs
+                //          (env_idx u8, cc_override u8)
+                short int count = buffer.getsi();
+                if (count >= 0 && count <= ZTM_MAX_INSTS) {
+                    for (short int rc = 0; rc < count; rc++) {
+                        unsigned char inst_idx = buffer.getuch();
+                        if (inst_idx >= ZTM_MAX_INSTS || !this->instruments[inst_idx]) {
+                            // skip the slots so the stream stays aligned
+                            for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                                buffer.getuch(); buffer.getuch();
+                            }
+                            continue;
+                        }
+                        for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                            unsigned char ei = buffer.getuch();
+                            unsigned char co = buffer.getuch();
+                            this->instruments[inst_idx]->ccenv_default[s]     = ei;
+                            this->instruments[inst_idx]->ccenv_cc_override[s] = co;
+                        }
+                    }
+                }
+                recognized_chunks++;
+            }
+#endif /* USE_CC_ENVELOPES */
             if (cmp_hd(&header[0], "ZTtm")) { load_ZT_track_mutes(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTol")) { load_ZT_order_list(&buffer); recognized_chunks++; saw_order_list = 1; }
             if (cmp_hd(&header[0], "ZTpl")) { load_ZT_pattern_lengths(&buffer); recognized_chunks++; saw_pattern_lengths = 1; }

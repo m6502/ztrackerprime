@@ -122,3 +122,14 @@ add_executable(test_ccbn_roundtrip
 target_include_directories(test_ccbn_roundtrip PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_ccbn_roundtrip PRIVATE cxx_std_17)
 add_test(NAME ccbn_roundtrip COMMAND test_ccbn_roundtrip)
+
+# CC envelope pure-logic core (ccenv_interp.h + ccenv_advance.h).
+# Verifies linear interpolation, sustain loop while key down,
+# sustain release on note-off, regular loop, and terminate-at-last-node.
+# SDL-free, module.h-free -- both headers are self-contained.
+add_executable(test_ccenv
+    test_ccenv.cpp
+)
+target_include_directories(test_ccenv PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_ccenv PRIVATE cxx_std_17)
+add_test(NAME ccenv COMMAND test_ccenv)

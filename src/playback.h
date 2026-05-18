@@ -43,7 +43,25 @@
 #include "winmm_compat.h"
 
 //#include "zt.h"
+#include "module.h"
 class zt_module ;
+
+#ifdef USE_CC_ENVELOPES
+// Per-track runtime state for a single armed CC envelope. The player
+// owns a MAX_TRACKS x ZTM_CCENV_PER_INST grid of these. env_idx ==
+// ZTM_CCENV_NONE marks the slot free.
+struct cc_env_voice {
+    unsigned char env_idx;       // ZTM_CCENV_NONE = unused
+    unsigned char cc_override;   // 0..127 overrides envelope's cc; 0x80 = use envelope's own cc
+    unsigned char inst;          // instrument that armed this voice
+    unsigned char track;         // owning track (mirrors array index, but handy)
+    int           position;      // subticks elapsed since note-on
+    int           last_emitted;  // last CC value sent (-1 = none yet)
+    int           speed_counter; // counts down to next ccenv_step()
+    unsigned char key_off;       // 1 = note-off received; transition out of sustain
+    unsigned char done;          // envelope finished playing
+};
+#endif
 
 enum Emeventtypes { 
     ET_NOTE_ON,
@@ -158,6 +176,13 @@ class player {
 
         zt_module *song;
         pattern patt_memory;
+
+#ifdef USE_CC_ENVELOPES
+        // Per-track CC envelope runtime state. Slots 0..ZTM_CCENV_PER_INST-1
+        // per track; armed on note-on from instrument defaults or V-effect.
+        cc_env_voice cc_env[MAX_TRACKS][ZTM_CCENV_PER_INST];
+        void clear_cc_envs(void);
+#endif
 //      int clock_counter,clock_len_ms,clock_len_mms,clock_error,clock_error_flag;
         
         player(int res,int prebuffer_rows, zt_module *ztm);

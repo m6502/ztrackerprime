@@ -39,6 +39,9 @@
  ******/
 #include "zt.h"
 #include "sysex_macro.h"
+#ifdef USE_CC_ENVELOPES
+#include "ccenv_advance.h"
+#endif
 #include <algorithm>
 #include <stdint.h>
 
@@ -258,6 +261,9 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
     //this->noteoff_eventlist = NULL;
     this->noteoff_eventlist = new s_note_off[4000];
     noteoff_cur = noteoff_size = 0;
+#ifdef USE_CC_ENVELOPES
+    clear_cc_envs();
+#endif
 
     this->play_buffer[0] = new midi_buf;
     this->play_buffer[1] = new midi_buf;
@@ -752,6 +758,24 @@ void player::play_current_note()
 // ------------------------------------------------------------------------------------------------
 //
 //
+#ifdef USE_CC_ENVELOPES
+void player::clear_cc_envs(void) {
+    for (int t = 0; t < MAX_TRACKS; t++) {
+        for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+            cc_env[t][s].env_idx       = ZTM_CCENV_NONE;
+            cc_env[t][s].cc_override   = 0x80;
+            cc_env[t][s].inst          = 0;
+            cc_env[t][s].track         = (unsigned char)t;
+            cc_env[t][s].position      = 0;
+            cc_env[t][s].last_emitted  = -1;
+            cc_env[t][s].speed_counter = 0;
+            cc_env[t][s].key_off       = 0;
+            cc_env[t][s].done          = 0;
+        }
+    }
+}
+#endif
+
 void player::stop(void)
 {
     playing = 0;
@@ -760,6 +784,9 @@ void player::stop(void)
     if (song->flag_SendMidiStopStart)
         MidiOut->sendGlobal(0xFC);
     clear_noel_with_midiout();
+#ifdef USE_CC_ENVELOPES
+    clear_cc_envs();
+#endif
     if (zt_config_globals.auto_send_panic)
         MidiOut->hardpanic();
     MidiOut->panic();
@@ -963,6 +990,17 @@ void player::process_noel(midi_buf *buffer, int p_tick) {
             if (tr->last_note == e->note)
                 tr->last_note = 0x80;
             buffer->insert(p_tick,ET_NOTE_OFF,song->instruments[e->inst]->midi_device,e->note,song->instruments[e->inst]->channel,0x0,e->track,e->inst);
+#ifdef USE_CC_ENVELOPES
+            // Mark this track's armed envelopes as released. The
+            // sustain region will fall through to the loop / fadeout
+            // branch on subsequent ccenv_step() calls.
+            if (e->track < MAX_TRACKS) {
+                for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                    if (cc_env[e->track][s].env_idx != ZTM_CCENV_NONE)
+                        cc_env[e->track][s].key_off = 1;
+                }
+            }
+#endif
             kill_noel(i);
         } else {
         //    e->length--;
@@ -1285,6 +1323,89 @@ void player::playback(midi_buf *buffer, int ticks)
 
         process_noel(buffer,p_tick);
 
+#ifdef USE_CC_ENVELOPES
+        // Advance every armed CC envelope by one subtick. Each envelope
+        // is gated by its own `speed` (envelope subticks per playback
+        // subtick) so users can stretch a curve to taste. Emit ET_CC
+        // (or ET_PITCH for kind==1) only when the interpolated value
+        // changes -- this keeps the buffer + MIDI stream clean and
+        // avoids hammering controllers with duplicate values.
+        for (int et = 0; et < MAX_TRACKS; et++) {
+            for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                cc_env_voice &vs = cc_env[et][s];
+                if (vs.env_idx == ZTM_CCENV_NONE) continue;
+                if (vs.env_idx >= ZTM_MAX_CCENVELOPES) {
+                    vs.env_idx = ZTM_CCENV_NONE;
+                    continue;
+                }
+                ccenvelope *env = song->ccenvelopes[vs.env_idx];
+                if (!env || env->isempty() || !(env->flags & ZTM_CCENVF_ENABLED)) {
+                    vs.env_idx = ZTM_CCENV_NONE;
+                    continue;
+                }
+                int env_speed = env->speed > 0 ? env->speed : 1;
+                vs.speed_counter++;
+                if (vs.speed_counter < env_speed) continue;
+                vs.speed_counter = 0;
+
+                struct ccenv_voice_state cvs;
+                cvs.position = vs.position;
+                cvs.done     = vs.done;
+                cvs.key_off  = vs.key_off;
+                int newval = ccenv_step(&cvs,
+                                        env->tick, env->value,
+                                        env->num_nodes, env->flags,
+                                        env->loop_start, env->loop_end,
+                                        env->sustain_start, env->sustain_end);
+                vs.position = cvs.position;
+                vs.done     = (unsigned char)cvs.done;
+
+                if (newval != vs.last_emitted) {
+                    if (vs.inst < MAX_INSTS && song->instruments[vs.inst]) {
+                        instrument *iout = song->instruments[vs.inst];
+                        unsigned int dev = iout->midi_device;
+                        unsigned char chan = iout->channel;
+                        unsigned char cc_num = (vs.cc_override <= 127)
+                                                   ? vs.cc_override
+                                                   : env->cc;
+                        if (env->kind == 0) {
+                            // CC
+                            buffer->insert(p_tick, ET_CC, dev,
+                                           cc_num, (unsigned char)newval,
+                                           chan, (unsigned char)et,
+                                           vs.inst);
+                        } else if (env->kind == 1) {
+                            // Pitchbend: scale 0..127 -> 0..16383
+                            int pb = newval * 129;
+                            if (pb > 16383) pb = 16383;
+                            buffer->insert(p_tick, ET_PITCH, dev,
+                                           chan,
+                                           (unsigned char)(pb >> 7),
+                                           (unsigned char)(pb & 0x7F),
+                                           (unsigned char)et,
+                                           vs.inst);
+                        } else if (env->kind == 2) {
+                            // Channel Pressure: Dn vv (2-byte msg). Emit
+                            // as ET_RAW so the existing MIDI plumbing
+                            // delivers it untouched.
+                            unsigned int packed = (0xD0u | (chan & 0x0F))
+                                                | ((unsigned)newval << 8);
+                            buffer->insert(p_tick, ET_RAW, dev,
+                                           packed & 0xFF,
+                                           (packed >> 8) & 0xFF,
+                                           0, (unsigned char)et,
+                                           vs.inst);
+                        }
+                    }
+                    vs.last_emitted = newval;
+                }
+                if (cvs.done) {
+                    vs.env_idx = ZTM_CCENV_NONE;
+                }
+            }
+        }
+#endif /* USE_CC_ENVELOPES */
+
         if (cur_subtick == 0) {
 
           if (die==0)
@@ -1571,6 +1692,33 @@ void player::playback(midi_buf *buffer, int ticks)
                     }
                     break;
 #endif /* USE_ARPEGGIOS */
+#ifdef USE_CC_ENVELOPES
+                  case 'V':  // Vxxyy arm CC envelope xx (yy = cc# override, 0x80 = use envelope's own cc)
+                    {
+                        int env_idx = GET_HIGH_BYTE(evento->effect_data);
+                        int cc_over = GET_LOW_BYTE(evento->effect_data);
+                        if (env_idx >= 0 && env_idx < ZTM_MAX_CCENVELOPES
+                            && song->ccenvelopes[env_idx]
+                            && !song->ccenvelopes[env_idx]->isempty()
+                            && (song->ccenvelopes[env_idx]->flags & ZTM_CCENVF_ENABLED)) {
+                            cc_env_voice &vs = cc_env[t][0];
+                            vs.env_idx       = (unsigned char)env_idx;
+                            vs.cc_override   = (unsigned char)cc_over;
+                            vs.inst          = (unsigned char)inst;
+                            vs.track         = (unsigned char)t;
+                            vs.position      = 0;
+                            vs.last_emitted  = -1;
+                            vs.speed_counter = 0;
+                            vs.key_off       = 0;
+                            vs.done          = 0;
+                            // V-effect commandeers slot 0 and clears the other
+                            // slots so the user's intent is unambiguous.
+                            for (int s = 1; s < ZTM_CCENV_PER_INST; s++)
+                                cc_env[t][s].env_idx = ZTM_CCENV_NONE;
+                        }
+                    }
+                    break;
+#endif /* USE_CC_ENVELOPES */
 #ifdef USE_MIDIMACROS
                   case 'Z':  // Zxxyy send midimacro xx with parameter yy
                     {
@@ -1669,6 +1817,38 @@ void player::playback(midi_buf *buffer, int ticks)
 
                 if (evento->note < 0x80) {
 
+#ifdef USE_CC_ENVELOPES
+                  // Arm CC envelopes from the instrument's defaults
+                  // (skipped if a V-effect was processed this row -- V
+                  // is handled in the effects switch above and already
+                  // populated slot 0 with its envelope-of-choice).
+                  if (evento->effect != 'V' && inst < MAX_INSTS && song->instruments[inst]) {
+                      instrument *iarm = song->instruments[inst];
+                      for (int s = 0; s < ZTM_CCENV_PER_INST; s++) {
+                          unsigned char ei = iarm->ccenv_default[s];
+                          if (ei == ZTM_CCENV_NONE || ei >= ZTM_MAX_CCENVELOPES) {
+                              cc_env[t][s].env_idx = ZTM_CCENV_NONE;
+                              continue;
+                          }
+                          ccenvelope *env = song->ccenvelopes[ei];
+                          if (!env || env->isempty() || !(env->flags & ZTM_CCENVF_ENABLED)) {
+                              cc_env[t][s].env_idx = ZTM_CCENV_NONE;
+                              continue;
+                          }
+                          cc_env_voice &vs = cc_env[t][s];
+                          int carry = (env->flags & ZTM_CCENVF_CARRY) && vs.env_idx == ei;
+                          vs.env_idx       = ei;
+                          if (!carry) vs.position = 0;
+                          vs.last_emitted  = -1;
+                          vs.speed_counter = 0;
+                          vs.key_off       = 0;
+                          vs.done          = 0;
+                          vs.cc_override   = iarm->ccenv_cc_override[s];
+                          vs.inst          = (unsigned char)inst;
+                          vs.track         = (unsigned char)t;
+                      }
+                  }
+#endif
 
                   // Aqui j se usa como var1
 

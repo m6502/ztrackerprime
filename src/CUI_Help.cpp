@@ -277,6 +277,103 @@ void CUI_Help::update() {
     if (Keys.size()) {
         key = Keys.checkkey();
         kstate = Keys.cur_state;
+        // Keyjazz the Help: any modifier (CTRL / ALT / CMD / SHIFT) +
+        // a letter/digit/F-key/grave is treated as a shortcut lookup.
+        // Build a token in the same format as doc/help.txt
+        // ("CTRL-S", "ALT-M", "SHIFT-F5", "CTRL-SHIFT-G", etc.) and
+        // jump tb->startline to the first line whose first non-space
+        // character matches that token at a word boundary.
+        //
+        // Trigger conditions: a modifier is held AND the keysym is a
+        // searchable token. Plain F1/ESC fall through to the
+        // close-help branch below; plain letters fall through to
+        // TextBox::update() so basic typing isn't intercepted.
+        if (key && (kstate & (KS_ALT | KS_CTRL | KS_META | KS_SHIFT))
+            && key != SDLK_TAB && key != SDLK_ESCAPE && key != SDLK_RETURN
+            && key != SDLK_UP && key != SDLK_DOWN
+            && key != SDLK_LEFT && key != SDLK_RIGHT
+            && key != SDLK_PAGEUP && key != SDLK_PAGEDOWN
+            && key != SDLK_HOME && key != SDLK_END) {
+            char keyname[16] = {0};
+            int got_keyname = 0;
+            if ((unsigned)key >= SDLK_F1 && (unsigned)key <= SDLK_F12) {
+                snprintf(keyname, sizeof keyname, "F%d", (int)(key - SDLK_F1 + 1));
+                got_keyname = 1;
+            } else if (key >= 'a' && key <= 'z') {
+                keyname[0] = (char)(key - 'a' + 'A');
+                got_keyname = 1;
+            } else if (key >= 'A' && key <= 'Z') {
+                keyname[0] = (char)key;
+                got_keyname = 1;
+            } else if (key >= '0' && key <= '9') {
+                keyname[0] = (char)key;
+                got_keyname = 1;
+            } else if (key == SDLK_GRAVE) {
+                // help.txt uses both "ALT-`" (literal grave) and
+                // "CTRL-SHIFT-`"; both substring-match "`".
+                keyname[0] = '`';
+                got_keyname = 1;
+            }
+
+            if (got_keyname) {
+                int ctrl  = (kstate & KS_CTRL) != 0;
+                int alt   = (kstate & (KS_ALT | KS_META)) != 0;
+                int shift = (kstate & KS_SHIFT) != 0;
+                char tokens[4][32];
+                int  ntok = 0;
+                const char *shift_part = shift ? "SHIFT-" : "";
+                if (ctrl && alt) {
+                    snprintf(tokens[ntok++], 32, "CTRL-ALT-%s%s", shift_part, keyname);
+                } else if (ctrl) {
+                    snprintf(tokens[ntok++], 32, "CTRL-%s%s", shift_part, keyname);
+                } else if (alt) {
+                    snprintf(tokens[ntok++], 32, "ALT-%s%s", shift_part, keyname);
+                } else if (shift) {
+                    snprintf(tokens[ntok++], 32, "SHIFT-%s", keyname);
+                }
+
+                const char *t = tb->text;
+                int line_idx = 0;
+                int found_line = -1;
+                for (int i = 0; t && t[i] && found_line < 0; ) {
+                    int ls = i;
+                    int le = ls;
+                    while (t[le] && t[le] != '\n') le++;
+                    int p = ls;
+                    while (p < le && (t[p] == ' ' || t[p] == '\t')) p++;
+                    int rem = le - p;
+                    for (int j = 0; j < ntok && found_line < 0; j++) {
+                        int tl = (int)strlen(tokens[j]);
+                        if (rem >= tl && strncmp(t + p, tokens[j], tl) == 0) {
+                            // Word-boundary check: char after token must not
+                            // continue an identifier (so "ALT-M" doesn't match
+                            // "ALT-Move" if that ever appears).
+                            char nc = (p + tl < le) ? t[p + tl] : ' ';
+                            int boundary = !(nc >= 'A' && nc <= 'Z')
+                                        && !(nc >= 'a' && nc <= 'z')
+                                        && !(nc >= '0' && nc <= '9');
+                            if (boundary) found_line = line_idx;
+                        }
+                    }
+                    line_idx++;
+                    i = (t[le] == '\n') ? le + 1 : le;
+                }
+                if (found_line >= 0) {
+                    Keys.getkey(); // consume
+                    // Anchor a couple of lines above the match so the
+                    // matched row isn't pinned to the very top edge.
+                    int anchor = found_line - 2;
+                    if (anchor < 0) anchor = 0;
+                    tb->startline = anchor;
+                    tb->bEof = false;
+                    UI->full_refresh();
+                    need_refresh++;
+                    return;
+                }
+                // No match — fall through; either TextBox handles it
+                // or the unmatched combo is harmlessly ignored.
+            }
+        }
         if (key == SDLK_TAB && section_count > 0) {
             Keys.getkey(); // consume
             if (kstate & KS_SHIFT) {

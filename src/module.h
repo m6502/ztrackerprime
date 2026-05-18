@@ -56,6 +56,12 @@ class InflateStream ;
 /* experimental midi macro support */
 #define USE_MIDIMACROS
 
+/* CC envelopes — Schism-style node + interp + sustain/loop curves
+ * that emit MIDI CC during the lifetime of a note. See
+ * doc/design/cc-envelopes.md.
+ */
+#define USE_CC_ENVELOPES
+
 /*************************************************************************
  *
  *  ztracker module definitions.
@@ -91,6 +97,21 @@ class InflateStream ;
 #define ZTM_MAX_MIDIMACROS                  256
 #define ZTM_MIDIMACRO_MAXLEN                64
 #endif /* USE_MIDIMACRO */
+
+#ifdef USE_CC_ENVELOPES
+#define ZTM_CCENVNAME_MAXLEN                40
+#define ZTM_MAX_CCENVELOPES                 128
+#define ZTM_CCENV_MAX_NODES                 32
+/* envelope flags */
+#define ZTM_CCENVF_ENABLED                  0x01
+#define ZTM_CCENVF_LOOP                     0x02
+#define ZTM_CCENVF_SUSTAIN                  0x04
+#define ZTM_CCENVF_CARRY                    0x08
+/* sentinel for instrument.ccenv_default[].env_idx meaning "unused" */
+#define ZTM_CCENV_NONE                      0xFF
+/* per-instrument simultaneous envelope slots */
+#define ZTM_CCENV_PER_INST                  4
+#endif /* USE_CC_ENVELOPES */
 
 /* max length of the status string returned from I/O functions */
 #define ZTM_STATUSSTR_MAXLEN                256
@@ -151,6 +172,16 @@ public:
   // CCBN chunk; the chunk is skipped by older zTracker versions, which
   // load such files cleanly with this field empty (forward-compat).
   char ccizer_bank[256];
+
+#ifdef USE_CC_ENVELOPES
+  // CC envelopes auto-armed for this instrument. Each slot stores an
+  // envelope index (0..ZTM_MAX_CCENVELOPES-1) or ZTM_CCENV_NONE.
+  // cc_override is 0..127 for "use this CC# instead of the envelope's
+  // own cc field", or 0x80 for "use the envelope's cc". Persisted in
+  // the optional IENV chunk; older zTracker silently skips it.
+  unsigned char ccenv_default[ZTM_CCENV_PER_INST];
+  unsigned char ccenv_cc_override[ZTM_CCENV_PER_INST];
+#endif /* USE_CC_ENVELOPES */
 
 } ;
 
@@ -288,6 +319,51 @@ class midimacro {
         int isempty(void);
 };
 #endif /* USE_MIDIMACROS */
+
+#ifdef USE_CC_ENVELOPES
+/* Schism-style envelope adapted for MIDI CC output.
+ *
+ * Nodes are stored sparsely: tick[] is the x axis (subticks since
+ * note-on, monotonically increasing), value[] is the y axis (0..127
+ * MIDI CC value). The runtime linearly interpolates between adjacent
+ * nodes to produce a per-subtick CC value.
+ *
+ * Loop and sustain regions are inclusive node-index ranges. When
+ * `flags & SUSTAIN` and the note is still held, the runtime wraps the
+ * envelope position between tick[sustain_start] and tick[sustain_end].
+ * On note-off, sustain is abandoned; if `flags & LOOP`, the position
+ * wraps between tick[loop_start] and tick[loop_end]; otherwise the
+ * envelope plays to its last node and stops.
+ *
+ * `kind` controls what kind of MIDI message the value drives:
+ *   0 = CC          (value 0..127  -> Bn cc value)
+ *   1 = Pitchbend   (value 0..127  -> En lo hi, scaled to 0..16383)
+ *   2 = Channel Pressure (Dn value)
+ *
+ * Persistence: CENV chunk. Pure logic (interp, advance) lives in
+ * src/ccenv_interp.h + src/ccenv_advance.h and is unit-tested.
+ */
+class ccenvelope {
+    public:
+        char name[ZTM_CCENVNAME_MAXLEN];
+        unsigned char cc;          // CC# this envelope drives (0..127)
+        unsigned char kind;        // 0=CC, 1=Pitchbend, 2=ChanPressure
+        unsigned char flags;       // ZTM_CCENVF_*
+        unsigned char num_nodes;   // 2..ZTM_CCENV_MAX_NODES
+        unsigned char loop_start, loop_end;
+        unsigned char sustain_start, sustain_end;
+        unsigned short tick[ZTM_CCENV_MAX_NODES];   // x: subticks
+        unsigned char  value[ZTM_CCENV_MAX_NODES];  // y: 0..127
+        unsigned short speed;      // subticks per envelope tick (>=1)
+
+        ccenvelope(void);
+        ~ccenvelope(void);
+
+        int isempty(void) const;
+        // Default 2-node ramp 0..127 over 64 subticks, enabled.
+        void reset_to_default(void);
+};
+#endif /* USE_CC_ENVELOPES */
 /*
 class songmsg {
     public:
@@ -326,6 +402,10 @@ class zt_module
 #ifdef USE_MIDIMACROS
         midimacro *midimacros[ZTM_MAX_MIDIMACROS];
 #endif /* USE_MIDIMACROS */
+
+#ifdef USE_CC_ENVELOPES
+        ccenvelope *ccenvelopes[ZTM_MAX_CCENVELOPES];
+#endif /* USE_CC_ENVELOPES */
         
         songmsg *songmessage;
         //CDataBuf *songmessage;
@@ -381,6 +461,9 @@ class zt_module
         void build_song_message(CDataBuf *buf);           /* SMSG - song message */
         void build_MIDI_macro(CDataBuf *buf, int num);  /* MMAC - midi macro */
         void build_arpeggio(CDataBuf *buf, int num);  /* ARPG - arpeggio */
+#ifdef USE_CC_ENVELOPES
+        void build_CC_envelope(CDataBuf *buf, int num);  /* CENV - cc envelope */
+#endif /* USE_CC_ENVELOPES */
         //void build_PATT(CDataBuf *buf);  /* PATT - pattern */
         //void build_INST(CDataBuf *buf);  /* INST - instrument */
         //void build_TMUT(CDataBuf *buf);  /* TMUT - track mutes */
@@ -397,6 +480,9 @@ class zt_module
         int load_song_message(CDataBuf *buf);  /* SMSG - song message */
         int load_MIDI_macro(CDataBuf *buf);  /* MMAC - midi macro */
         int load_arpeggio(CDataBuf *buf);  /* ARPG - arpeggio */
+#ifdef USE_CC_ENVELOPES
+        int load_CC_envelope(CDataBuf *buf);  /* CENV - cc envelope */
+#endif /* USE_CC_ENVELOPES */
         //void load_PATT(CDataBuf *buf);  /* PATT - pattern */
         //void load_INST(CDataBuf *buf);  /* INST - instrument */
         //void load_TMUT(CDataBuf *buf);  /* TMUT - track mutes */

@@ -125,6 +125,11 @@ class ZTConf {
         // before the SysEx Librarian deletes the oldest. 0 disables
         // rotation entirely (never delete; user manages by hand). Audit L15.
         int syx_recv_max_files;
+
+        // Folder where the CC Envelope Editor (Shift+F6) loads/saves
+        // .env presets. Empty = use the default-resolve order in
+        // ccenv_resolve_folder().
+        char ccenv_folder[MAX_PATH + 1];
 };
 
 // Allowed values for zt_config_globals.note_audition_step_mode.

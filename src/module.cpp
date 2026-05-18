@@ -84,6 +84,13 @@ instrument::instrument(int p)
 
   ccizer_bank[0] = '\0';
 
+#ifdef USE_CC_ENVELOPES
+  for (int e = 0; e < ZTM_CCENV_PER_INST; e++) {
+      ccenv_default[e]     = ZTM_CCENV_NONE;
+      ccenv_cc_override[e] = 0x80;   // 0x80 = use envelope's own cc
+  }
+#endif
+
   // <Manu>
   MarkAsUnused() ;
 }
@@ -736,6 +743,53 @@ int arpeggio::isempty(void) {
 
 #endif /* USE_ARPEGGIOS */
 
+
+#ifdef USE_CC_ENVELOPES
+// Guard: the runtime headers (ccenv_advance.h) duplicate the flag
+// masks because they stay module.h-free for unit tests. Keep them
+// in sync here.
+#include "ccenv_advance.h"
+static_assert(CCENV_F_ENABLED == ZTM_CCENVF_ENABLED, "CC envelope ENABLED flag drift");
+static_assert(CCENV_F_LOOP    == ZTM_CCENVF_LOOP,    "CC envelope LOOP flag drift");
+static_assert(CCENV_F_SUSTAIN == ZTM_CCENVF_SUSTAIN, "CC envelope SUSTAIN flag drift");
+static_assert(CCENV_F_CARRY   == ZTM_CCENVF_CARRY,   "CC envelope CARRY flag drift");
+
+ccenvelope::ccenvelope(void) {
+    this->name[0]    = 0;
+    this->cc         = 1;     // CC #1 (Mod Wheel) is the most common default target
+    this->kind       = 0;     // 0 = CC
+    this->flags      = 0;     // disabled by default
+    this->num_nodes  = 0;
+    this->loop_start    = 0;
+    this->loop_end      = 0;
+    this->sustain_start = 0;
+    this->sustain_end   = 0;
+    this->speed         = 1;
+    for (int i = 0; i < ZTM_CCENV_MAX_NODES; i++) {
+        this->tick[i]  = 0;
+        this->value[i] = 0;
+    }
+}
+
+ccenvelope::~ccenvelope(void) {
+}
+
+int ccenvelope::isempty(void) const {
+    return (this->num_nodes == 0 && this->name[0] == 0);
+}
+
+void ccenvelope::reset_to_default(void) {
+    this->num_nodes = 2;
+    this->tick[0]  = 0;    this->value[0]  = 0;
+    this->tick[1]  = 64;   this->value[1]  = 127;
+    this->flags    = ZTM_CCENVF_ENABLED;
+    this->loop_start = 0; this->loop_end = 1;
+    this->sustain_start = 0; this->sustain_end = 1;
+    this->speed = 1;
+}
+#endif /* USE_CC_ENVELOPES */
+
+
 zt_module::zt_module(int t,int b) {
     statusstr=NULL;
     tpb = t; bpm = b;
@@ -786,6 +840,11 @@ void zt_module::init(void)
         midimacros[i]=NULL;
 #endif /* USE_MIDIMACROS */
 
+#ifdef USE_CC_ENVELOPES
+    for(i=0;i<ZTM_MAX_CCENVELOPES; i++)
+        ccenvelopes[i]=NULL;
+#endif /* USE_CC_ENVELOPES */
+
     flag_SendMidiClock = zt_config_globals.midi_clock;
     flag_SendMidiStopStart = zt_config_globals.midi_stop_start;
     flag_SlideOnSubtick = 1;
@@ -830,6 +889,14 @@ void zt_module::de_init(void) {
         this->arpeggios[i]=NULL;
     }
 #endif /* USE_ARPEGGIOS */
+#ifdef USE_CC_ENVELOPES
+    // delete cc envelopes
+    for(i=0; i<ZTM_MAX_CCENVELOPES; i++) {
+        if (this->ccenvelopes[i])
+            delete this->ccenvelopes[i];
+        this->ccenvelopes[i]=NULL;
+    }
+#endif /* USE_CC_ENVELOPES */
 #ifdef USE_MIDIMACROS
     // delete midimacros
     for(i=0; i<ZTM_MAX_MIDIMACROS; i++) {

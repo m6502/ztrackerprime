@@ -112,7 +112,10 @@
 
 |L|%==|H|Global Keys|L|==%|U|
 
- F1             : Help (That is this text)
+ F1             : Help (That is this text). While on this page, press any
+                  modifier+key combo (e.g. ALT-M, CTRL-S, SHIFT-F6) to jump
+                  to the line that documents it. Tab / Shift-Tab navigate
+                  between section headers.
  F2             : Pattern editor - Pressing F2 again while in the pattern
                   editing screen brings up the pattern settings.
  F3             : Instrument editor
@@ -140,6 +143,9 @@
                   64 tracks). Left/right/space/alt-1..0/alt-f9/alt-f10
                   drive playback control as before.
  F6             : Pattern Play - will play the current pattern being edited.
+ SHIFT-F6       : CC Envelope editor — author curves of MIDI CC / Pitchbend /
+                  Channel Pressure values triggered on note-on. See Pattern
+                  Effects: V<env><cc>.
  F7             : Start the song at the current row -
                   If in the pattern edit mode, F7 will start at the current
                   row, at the first instance of the pattern in the pattern
@@ -193,6 +199,10 @@
          ex. S0142 will set CC #01 (Mod Wheel) to a value of 42.
          >=80 sends last value
  T..xx : Set tempo to xx bpm
+ Vxxyy : Arm CC envelope xx on this track (yy = CC# override, 0x80 to keep
+         the envelope's own CC#). Edit envelopes in SHIFT-F6. Notes can
+         also auto-arm envelopes via the instrument's default-envelope
+         binding.
  Wxxxx : Absolute pitch set, between 0 and 3FFF, 2000 is no pitch change,
          0 is max down, 3FFF is max up
  X..xx : Set panning, 00=left, 40=center, 7F=right

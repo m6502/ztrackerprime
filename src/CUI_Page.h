@@ -244,6 +244,21 @@ class CUI_Arpeggioeditor : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// CC Envelope Editor (Shift+F6). Authors `ccenvelope` curves -- sparse
+// {tick, value} nodes that the playback thread linearly interpolates
+// each subtick to drive MIDI CC / Pitchbend / Channel Pressure during
+// a note's lifetime. Presets save/load as .env text files in the
+// configured ccenv_folder.
+class CUI_CCEnvelopeEditor : public CUI_Page {
+    public:
+        CUI_CCEnvelopeEditor();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+};
+
 class CUI_Midimacroeditor : public CUI_Page {
     public:
 
