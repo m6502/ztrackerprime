@@ -613,30 +613,40 @@ public:
         }
 
         int mt = ce_max_tick_view(e);
+        (void)mt;
 
-        // (5) Curve rendered column-by-column across the WHOLE canvas
-        // width using ccenv_interp_raw -- same math the playback
-        // thread uses to emit CC. The curve is "clamped" left of the
-        // first node (constant at value[0]) and right of the last
-        // node (constant at value[last]), matching Schism's volume
-        // envelope rendering. No more empty black before / after the
-        // node range.
+        // (5) Curve: Bresenham line segments between adjacent nodes
+        // for SMOOTH diagonals (the column-by-column interp approach
+        // creates a staircase because many horizontal pixels share
+        // the same tick value), PLUS flat horizontal tails from the
+        // canvas left edge to node 0, and from the last node to the
+        // canvas right edge. Matches Schism's volume envelope which
+        // also extends the first/last node's value out to the edges.
         TColor curve_color = COLORS.Highlight;
-        int prev_cy = -1;
-        for (int px = 0; px < wpx; px++) {
-            int pos = (px * mt) / (wpx > 0 ? wpx : 1);
-            int val = ccenv_interp_raw(e->tick, e->value, e->num_nodes, pos);
-            int cy = y0 + ((127 - val) * (hpx - 2)) / 127 + 1;
-            if (prev_cy >= 0 && prev_cy != cy) {
-                // Fill the vertical gap between adjacent columns so
-                // steep slopes render as continuous lines, not dotted.
-                int lo = (prev_cy < cy) ? prev_cy : cy;
-                int hi = (prev_cy < cy) ? cy : prev_cy;
-                S->fillRect(x0 + px, lo, x0 + px + 1, hi + 1, curve_color);
-            } else {
-                S->fillRect(x0 + px, cy, x0 + px + 1, cy + 1, curve_color);
-            }
-            prev_cy = cy;
+
+        // Flat tail before the first node.
+        {
+            int fx = node_pix_x(0, e);
+            int fy = node_pix_y(0, e);
+            if (fx > x0)
+                S->fillRect(x0, fy, fx + 1, fy + 1, curve_color);
+        }
+
+        // Diagonals between adjacent nodes.
+        for (int i = 0; i + 1 < e->num_nodes; i++) {
+            int ax = node_pix_x(i, e);
+            int ay = node_pix_y(i, e);
+            int bx = node_pix_x(i + 1, e);
+            int by = node_pix_y(i + 1, e);
+            draw_line_1px(S, ax, ay, bx, by, curve_color);
+        }
+
+        // Flat tail after the last node.
+        {
+            int lx = node_pix_x(e->num_nodes - 1, e);
+            int ly = node_pix_y(e->num_nodes - 1, e);
+            if (lx < x1 - 1)
+                S->fillRect(lx, ly, x1, ly + 1, curve_color);
         }
 
         // (6) Loop / sustain start+end vertical edge markers.
