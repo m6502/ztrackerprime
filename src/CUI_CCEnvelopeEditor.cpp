@@ -78,6 +78,12 @@ static int ce_flag_carry = 0;
 // pattern). Set in the constructor.
 static UserInterface *ce_page_ui = NULL;
 
+// Counter for the post-enter Keys.flush sweep. Reset on enter() so
+// each entry gets a fresh 3-frame flush window. See update().
+static int ce_frames_since_enter = 999;
+extern "C" void ce_reset_enter_frame_counter(void);
+void ce_reset_enter_frame_counter(void) { ce_frames_since_enter = 0; }
+
 // Full-page refresh primitive: bump every flag any other "make the
 // screen actually update" path in main.cpp bumps. This is the same
 // chain zt_request_ui_full_refresh() (main.cpp:3024) fires on
@@ -632,19 +638,20 @@ public:
             S->fillRect(sx1 - 1, y0 + 1, sx1,     y1 - 1, COLORS.Highlight);
         }
 
-        // (7) Nodes: small (3px) filled square. Selected = 5px filled
-        // bright square with a 1px black border ring -- the same idiom
-        // Schism uses to mark the cursor node.
+        // (7) Nodes. Selected node uses COLORS.EditText -- the BRIGHT
+        // color defined as "text inside the pattern editor and other
+        // boxes" -- so it's visible on the EditBG (black) canvas.
+        // COLORS.Text is the DARK color for labels on the tan
+        // background; on black it looks invisible (Esa: "the selected
+        // node turns black, so it is impossible to see it").
         for (int i = 0; i < e->num_nodes; i++) {
             int nx = node_pix_x(i, e);
             int ny = node_pix_y(i, e);
             if (i == ce_selected) {
-                // 5x5 black "halo" + 3x3 bright center to make the
-                // selected node visually distinct without bloating.
+                // 5x5 dark halo + 3x3 bright center.
                 S->fillRect(nx - 2, ny - 2, nx + 3, ny + 3, COLORS.EditBG);
-                S->fillRect(nx - 1, ny - 1, nx + 2, ny + 2, COLORS.Text);
+                S->fillRect(nx - 1, ny - 1, nx + 2, ny + 2, COLORS.EditText);
             } else {
-                // 3x3 highlight square.
                 S->fillRect(nx - 1, ny - 1, nx + 2, ny + 2, COLORS.Highlight);
             }
         }
@@ -656,11 +663,11 @@ public:
             && live_pos >= 0) {
             int px = x0 + (live_pos * wpx) / (mt > 0 ? mt : 1);
             if (px > x0 + 1 && px < x1 - 1) {
-                S->fillRect(px, y0 + 1, px + 1, y1 - 1, COLORS.Text);
+                S->fillRect(px, y0 + 1, px + 1, y1 - 1, COLORS.EditText);
             }
             int v = ccenv_interp_raw(e->tick, e->value, e->num_nodes, live_pos);
             int cy = y0 + ((127 - v) * (hpx - 2)) / 127 + 1;
-            S->fillRect(px - 1, cy - 1, px + 2, cy + 2, COLORS.Text);
+            S->fillRect(px - 1, cy - 1, px + 2, cy + 2, COLORS.EditText);
         }
 
         mark_dirty(x0, y0, x1, y1);
@@ -821,6 +828,10 @@ CUI_CCEnvelopeEditor::CUI_CCEnvelopeEditor(void) {
 void CUI_CCEnvelopeEditor::enter(void) {
     need_refresh++;
     cur_state = STATE_CCENVELOPE;
+    // Reset the first-frame flush counter so the next entry to the
+    // page sees the same clean Keys queue.
+    extern void ce_reset_enter_frame_counter(void);
+    ce_reset_enter_frame_counter();
     ce_rescan_folder();
     ((CeFileList *)UI->get_element(W_FILE_LIST))->OnChange();
     ce_pull_to_widgets(UI);
@@ -844,6 +855,15 @@ void CUI_CCEnvelopeEditor::leave(void) {
 }
 
 void CUI_CCEnvelopeEditor::update(void) {
+    // Drain stale events from the Keys queue for the first few
+    // frames after entering. Cmd-Tab's "fix" worked because it
+    // called Keys.flush(); this gives every page entry the same
+    // clean slate without requiring the user to Cmd-Tab.
+    if (ce_frames_since_enter < 3) {
+        Keys.flush();
+        ce_frames_since_enter++;
+    }
+
     // Navigation keys: peek BEFORE UI->update() so a focused widget
     // (Slot slider, Name TextInput) doesn't swallow ESC / F-keys and
     // trap the user on this page.
