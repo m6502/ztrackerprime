@@ -357,24 +357,30 @@ public:
                 return this->ID;
             }
         }
-        // Left button up: ALWAYS consume the event whether or not we
-        // were dragging. If a button-up sits in the Keys queue (no
-        // widget claims it), it stalls every subsequent button-down
-        // -- THAT was the "click freezes" symptom; not a refresh
-        // problem at all. Clears the queue so the next click goes
-        // through.
+        // Left button up: consume ONLY if the originating button-down
+        // was inside this canvas (or we're actively dragging a node).
+        // If the click started on another widget -- e.g. the user is
+        // dragging the CC# slider -- we MUST NOT eat its button-up
+        // because the canvas is widget ID 0 and runs first, beating
+        // the slider's own mouseupdate to the punch. That bug was
+        // making sliders stuck-on-drag.
         if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT))) {
-            Keys.getkey();
-            if (dragging) {
-                dragging = 0;
-                this->need_redraw++;
-                ce_force_full_refresh();
-                return this->ID;
+            const bool was_my_click = hit_canvas(MousePressX, MousePressY);
+            if (dragging || was_my_click) {
+                Keys.getkey();
+                if (dragging) {
+                    dragging = 0;
+                    this->need_redraw++;
+                    ce_force_full_refresh();
+                    return this->ID;
+                }
             }
         }
-        // Right button up: same deal -- swallow it so the queue stays clean.
+        // Right button up: same rule -- only if the press was on us.
         if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_RIGHT))) {
-            Keys.getkey();
+            if (hit_canvas(MousePressX, MousePressY)) {
+                Keys.getkey();
+            }
         }
         // Live drag: move the selected node to follow the cursor.
         if (dragging && e && ce_selected >= 0 && ce_selected < e->num_nodes) {
