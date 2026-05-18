@@ -614,20 +614,29 @@ public:
 
         int mt = ce_max_tick_view(e);
 
-        // (5) Curve as connected 1px line segments between adjacent
-        // nodes -- crisp single-pixel line, no chunky 3px staircase.
+        // (5) Curve rendered column-by-column across the WHOLE canvas
+        // width using ccenv_interp_raw -- same math the playback
+        // thread uses to emit CC. The curve is "clamped" left of the
+        // first node (constant at value[0]) and right of the last
+        // node (constant at value[last]), matching Schism's volume
+        // envelope rendering. No more empty black before / after the
+        // node range.
         TColor curve_color = COLORS.Highlight;
-        for (int i = 0; i + 1 < e->num_nodes; i++) {
-            int ax = node_pix_x(i, e);
-            int ay = node_pix_y(i, e);
-            int bx = node_pix_x(i + 1, e);
-            int by = node_pix_y(i + 1, e);
-            draw_line_1px(S, ax, ay, bx, by, curve_color);
-        }
-        // Single-node case: 1px horizontal stub at the node's value.
-        if (e->num_nodes == 1) {
-            int ny = node_pix_y(0, e);
-            S->fillRect(x0 + 1, ny, x1 - 1, ny + 1, curve_color);
+        int prev_cy = -1;
+        for (int px = 0; px < wpx; px++) {
+            int pos = (px * mt) / (wpx > 0 ? wpx : 1);
+            int val = ccenv_interp_raw(e->tick, e->value, e->num_nodes, pos);
+            int cy = y0 + ((127 - val) * (hpx - 2)) / 127 + 1;
+            if (prev_cy >= 0 && prev_cy != cy) {
+                // Fill the vertical gap between adjacent columns so
+                // steep slopes render as continuous lines, not dotted.
+                int lo = (prev_cy < cy) ? prev_cy : cy;
+                int hi = (prev_cy < cy) ? cy : prev_cy;
+                S->fillRect(x0 + px, lo, x0 + px + 1, hi + 1, curve_color);
+            } else {
+                S->fillRect(x0 + px, cy, x0 + px + 1, cy + 1, curve_color);
+            }
+            prev_cy = cy;
         }
 
         // (6) Loop / sustain start+end vertical edge markers.
