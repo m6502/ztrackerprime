@@ -240,7 +240,7 @@ Ask for clarification only if the bug **report itself** is ambiguous about the s
 ## Common user behaviour (learned)
 
 - **"Launch the app"** = visibly running on the desktop, not just a process ID. Use `open .../zt.app`.
-- **Don't ask the user to test.** Run the binary yourself first and verify basic rendering, ideally with `scripts/zt-screenshot.sh`. Only ask the user when something requires their interactive judgement.
+- **Don't ask the user to test.** Run the binary yourself first and verify basic rendering using `build/Program/zt --headless --script <file>` (see `docs/headless-script.md` and `.claude/skills/ztrackerprime/SKILL.md` → "Headless verification"). The `--headless` path uses SDL's dummy video driver, opens NO window, dumps PNGs of the in-memory surface — zero focus theft. **Never** drive verification via `osascript activate + key code` or `scripts/zt-screenshot.sh`; both steal the user's screen and were the cause of the 2026-05-18 "you keep flooding my screen with screenshots" incident. Only ask the user when something requires their interactive judgement or hardware they alone have (e.g. real MIDI device CC verification).
 - They use **Finnish keyboard layout**. § is critical. Plain § = Note Off, Shift+§ = drawmode.
 - **PR quality over PR count.** Finish one well before starting another.
 - **Don't lecture.** Be specific, show diffs, explain *why*, then act.
