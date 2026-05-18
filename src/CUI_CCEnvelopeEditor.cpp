@@ -302,115 +302,130 @@ CUI_CCEnvelopeEditor::CUI_CCEnvelopeEditor(void) {
     CheckBox    *cb;
     Button      *bt;
 
-    int LBL_X   = 2;       // label column
-    int INP_X   = 14;      // first widget column
-    int RIGHT_X = 50;      // right-pane file list
+    // Two columns, with plenty of padding so widget value displays
+    // never collide with labels. Left pane: cols 2..43. Right pane
+    // (file picker): cols 48..76. Labels live at col 2 (drawn in
+    // draw()); widgets start at col 12 with at least 2 chars of
+    // breathing room.
+    const int INP_X   = 12;
+    const int INP_W   = 16;     // default slider width
+    const int RIGHT_X = 48;
+    const int RIGHT_W = 28;
 
     // Row 0: Slot
     vs = new ValueSlider;
     UI->add_element(vs, W_SLOT);
-    vs->x = INP_X; vs->y = BASE_Y + 0; vs->xsize = 18; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 0; vs->xsize = INP_W; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_MAX_CCENVELOPES - 1; vs->value = 0;
 
-    // Row 1: Name
+    // Row 2: Name
     ti = new TextInput;
     UI->add_element(ti, W_NAME);
     ti->frame = 1;
     ti->x = INP_X; ti->y = BASE_Y + 2;
-    ti->xsize = 32; ti->length = ZTM_CCENVNAME_MAXLEN - 1;
+    ti->xsize = 30; ti->length = ZTM_CCENVNAME_MAXLEN - 1;
     ti->str = (unsigned char *)ce_name_buf;
 
-    // Row 2: CC#
+    // Row 4: CC#
     vs = new ValueSlider;
     UI->add_element(vs, W_CC);
-    vs->x = INP_X; vs->y = BASE_Y + 4; vs->xsize = 18; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 4; vs->xsize = INP_W; vs->ysize = 1;
     vs->min = 0; vs->max = 127; vs->value = 1;
 
-    // Row 3: Kind (0 CC, 1 PB, 2 CP)
+    // Row 6: Kind (0 CC, 1 PB, 2 CP); "(CC)" / "(Pitchbend)" / "(ChanPress)"
+    //         label drawn separately in draw() at col INP_X + INP_W + 1.
     vs = new ValueSlider;
     UI->add_element(vs, W_KIND);
-    vs->x = INP_X; vs->y = BASE_Y + 6; vs->xsize = 8; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 6; vs->xsize = 6; vs->ysize = 1;
     vs->min = 0; vs->max = 2; vs->value = 0;
 
-    // Row 4: Speed
+    // Row 8: Speed
     vs = new ValueSlider;
     UI->add_element(vs, W_SPEED);
-    vs->x = INP_X; vs->y = BASE_Y + 8; vs->xsize = 12; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 8; vs->xsize = 10; vs->ysize = 1;
     vs->min = 1; vs->max = 255; vs->value = 1;
 
-    // Row 5: NumNodes
+    // Row 10: NumNodes
     vs = new ValueSlider;
     UI->add_element(vs, W_NUMNODES);
-    vs->x = INP_X; vs->y = BASE_Y + 10; vs->xsize = 12; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 10; vs->xsize = 10; vs->ysize = 1;
     vs->min = 0; vs->max = ZTM_CCENV_MAX_NODES; vs->value = 0;
 
-    // Row 6..9: flag checkboxes -- CheckBox::value is `int *` pointing
-    // at the backing flag bit. ce_pull_to_widgets / ce_push_from_widgets
-    // sync these bits with the envelope's flags byte.
+    // Rows 12..15: flag checkboxes -- ONE PER ROW so each checkbox's
+    // own [Off]/[On] text doesn't collide with anything. The text
+    // label that names the flag is drawn at LBL_X by draw() so the
+    // checkbox at INP_X never overdraws it.
     cb = new CheckBox; UI->add_element(cb, W_FLAG_ENA);
-    cb->x = INP_X     ; cb->y = BASE_Y + 12; cb->value = &ce_flag_ena;
+    cb->x = INP_X; cb->y = BASE_Y + 12; cb->xsize = 3;
+    cb->frame = 1; cb->value = &ce_flag_ena;
     cb = new CheckBox; UI->add_element(cb, W_FLAG_LOOP);
-    cb->x = INP_X + 14; cb->y = BASE_Y + 12; cb->value = &ce_flag_loop;
+    cb->x = INP_X; cb->y = BASE_Y + 13; cb->xsize = 3;
+    cb->frame = 1; cb->value = &ce_flag_loop;
     cb = new CheckBox; UI->add_element(cb, W_FLAG_SUS);
-    cb->x = INP_X + 24; cb->y = BASE_Y + 12; cb->value = &ce_flag_sus;
+    cb->x = INP_X; cb->y = BASE_Y + 14; cb->xsize = 3;
+    cb->frame = 1; cb->value = &ce_flag_sus;
     cb = new CheckBox; UI->add_element(cb, W_FLAG_CARRY);
-    cb->x = INP_X + 38; cb->y = BASE_Y + 12; cb->value = &ce_flag_carry;
+    cb->x = INP_X; cb->y = BASE_Y + 15; cb->xsize = 3;
+    cb->frame = 1; cb->value = &ce_flag_carry;
 
-    // Loop start / end
+    // Rows 17..18: Loop S / Loop E on separate lines so the value
+    // boxes don't collide.
     vs = new ValueSlider; UI->add_element(vs, W_LOOP_S);
-    vs->x = INP_X; vs->y = BASE_Y + 14; vs->xsize = 8; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 17; vs->xsize = 8; vs->ysize = 1;
     vs->min = 0; vs->max = 0; vs->value = 0;
     vs = new ValueSlider; UI->add_element(vs, W_LOOP_E);
-    vs->x = INP_X + 14; vs->y = BASE_Y + 14; vs->xsize = 8; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 18; vs->xsize = 8; vs->ysize = 1;
     vs->min = 0; vs->max = 0; vs->value = 0;
 
-    // Sustain start / end
+    // Rows 20..21: Sustain S / E
     vs = new ValueSlider; UI->add_element(vs, W_SUS_S);
-    vs->x = INP_X; vs->y = BASE_Y + 16; vs->xsize = 8; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 20; vs->xsize = 8; vs->ysize = 1;
     vs->min = 0; vs->max = 0; vs->value = 0;
     vs = new ValueSlider; UI->add_element(vs, W_SUS_E);
-    vs->x = INP_X + 14; vs->y = BASE_Y + 16; vs->xsize = 8; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 21; vs->xsize = 8; vs->ysize = 1;
     vs->min = 0; vs->max = 0; vs->value = 0;
 
-    // Node selector + node tick + node value
+    // Rows 23..25: Node selector + node tick + node value
     vs = new ValueSlider; UI->add_element(vs, W_NODE_IDX);
-    vs->x = INP_X; vs->y = BASE_Y + 19; vs->xsize = 8; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 23; vs->xsize = 8; vs->ysize = 1;
     vs->min = 0; vs->max = 0; vs->value = 0;
     vs = new ValueSlider; UI->add_element(vs, W_NODE_TICK);
-    vs->x = INP_X; vs->y = BASE_Y + 21; vs->xsize = 14; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 24; vs->xsize = 14; vs->ysize = 1;
     vs->min = 0; vs->max = 65535; vs->value = 0;
     vs = new ValueSlider; UI->add_element(vs, W_NODE_VAL);
-    vs->x = INP_X; vs->y = BASE_Y + 23; vs->xsize = 14; vs->ysize = 1;
+    vs->x = INP_X; vs->y = BASE_Y + 25; vs->xsize = 14; vs->ysize = 1;
     vs->min = 0; vs->max = 127; vs->value = 0;
 
-    // Node Add / Insert / Delete buttons
+    // Row 27: Add / Insert / Delete buttons
     bt = new Button; UI->add_element(bt, W_BTN_ADD);
-    bt->x = INP_X     ; bt->y = BASE_Y + 25; bt->xsize = 6; bt->ysize = 1;
+    bt->x = INP_X     ; bt->y = BASE_Y + 27; bt->xsize = 6; bt->ysize = 1;
     bt->caption = "Add";
     bt = new Button; UI->add_element(bt, W_BTN_INS);
-    bt->x = INP_X + 8 ; bt->y = BASE_Y + 25; bt->xsize = 6; bt->ysize = 1;
+    bt->x = INP_X + 8 ; bt->y = BASE_Y + 27; bt->xsize = 6; bt->ysize = 1;
     bt->caption = "Ins";
     bt = new Button; UI->add_element(bt, W_BTN_DEL);
-    bt->x = INP_X + 16; bt->y = BASE_Y + 25; bt->xsize = 6; bt->ysize = 1;
+    bt->x = INP_X + 16; bt->y = BASE_Y + 27; bt->xsize = 6; bt->ysize = 1;
     bt->caption = "Del";
 
-    // File picker (right pane)
+    // Right pane: file picker. Starts at col 48 -- well clear of all
+    // left-pane widgets (which top out at the Name input ending at
+    // col 12+30 = 42).
     CeFileList *fl = new CeFileList;
     UI->add_element(fl, W_FILE_LIST);
     fl->x = RIGHT_X; fl->y = BASE_Y + 2;
-    fl->xsize = 28;  fl->ysize = 16;
+    fl->xsize = RIGHT_W;  fl->ysize = 14;
 
     // Filename input + Load / Save buttons
     ti = new TextInput; UI->add_element(ti, W_FILENAME);
-    ti->frame = 1; ti->x = RIGHT_X; ti->y = BASE_Y + 20;
-    ti->xsize = 28; ti->length = sizeof ce_filename_buf - 1;
+    ti->frame = 1; ti->x = RIGHT_X; ti->y = BASE_Y + 18;
+    ti->xsize = RIGHT_W; ti->length = sizeof ce_filename_buf - 1;
     ti->str = (unsigned char *)ce_filename_buf;
 
     bt = new Button; UI->add_element(bt, W_BTN_LOAD);
-    bt->x = RIGHT_X     ; bt->y = BASE_Y + 22; bt->xsize = 10; bt->ysize = 1;
+    bt->x = RIGHT_X     ; bt->y = BASE_Y + 20; bt->xsize = 12; bt->ysize = 1;
     bt->caption = "Load";
     bt = new Button; UI->add_element(bt, W_BTN_SAVE);
-    bt->x = RIGHT_X + 12; bt->y = BASE_Y + 22; bt->xsize = 10; bt->ysize = 1;
+    bt->x = RIGHT_X + 14; bt->y = BASE_Y + 20; bt->xsize = 12; bt->ysize = 1;
     bt->caption = "Save";
 }
 
@@ -431,6 +446,36 @@ void CUI_CCEnvelopeEditor::leave(void) {
 }
 
 void CUI_CCEnvelopeEditor::update(void) {
+    // Navigation keys: peek BEFORE UI->update() so a focused widget
+    // (Slot slider, Name TextInput, etc.) doesn't swallow ESC / F-keys
+    // and trap the user on this page. Mirrors the explicit F-key
+    // passthrough in CUI_Arpeggioeditor (note around line 870).
+    if (Keys.size()) {
+        KBKey nk = Keys.checkkey();
+        KBMod nks = Keys.cur_state;
+        if (nk == SDLK_ESCAPE) {
+            Keys.getkey();
+            ce_store_name(ce_slot);
+            switch_page(UIP_Patterneditor);
+            need_refresh++;
+            return;
+        }
+        // F-keys: leave in queue so global_keys() (main.cpp) handles
+        // the page switch on the next iteration. Just bump need_refresh
+        // so the screen redraws. NOTE: returning here without calling
+        // UI->update() is intentional -- otherwise a focused widget
+        // consumes the F-key as input.
+        if ((nk == SDLK_F1 || nk == SDLK_F2 || nk == SDLK_F3 ||
+             nk == SDLK_F4 || nk == SDLK_F5 || nk == SDLK_F6 ||
+             nk == SDLK_F7 || nk == SDLK_F8 || nk == SDLK_F9 ||
+             nk == SDLK_F10 || nk == SDLK_F11 || nk == SDLK_F12)
+            && !(nks & (KS_CTRL))) {
+            ce_store_name(ce_slot);
+            need_refresh++;
+            return;
+        }
+    }
+
     UI->update();
 
     // Slot changed?
@@ -595,7 +640,7 @@ static void ce_draw_curve(Drawable *S) {
     const int W = 60;
     const int H = 8;
     int origin_x = col(2);
-    int origin_y = row(BASE_Y + 28);
+    int origin_y = row(BASE_Y + 29);
 
     // Border row -- visual frame for the curve area.
     char hdr[80];
@@ -639,11 +684,16 @@ void CUI_CCEnvelopeEditor::draw(Drawable *S) {
     printtitle(PAGE_TITLE_ROW_Y, "CC Envelope Editor (Shift+F6)",
                COLORS.Text, COLORS.Background, S);
 
-    int LBL_X = 2;
-    print(col(LBL_X), row(BASE_Y + 0),  "Slot",       COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 2),  "Name",       COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 4),  "CC#",        COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 6),  "Kind",       COLORS.Text, S);
+    // All labels live in cols 2..9 (LBL_X=2, max 8 chars). Widgets
+    // start at col 12 with at least 2 chars of breathing room.
+    const int LBL_X   = 2;
+    const int RIGHT_X = 48;
+    const int KIND_LBL_X = 19;     // right of the kind slider (xsize 6 at col 12)
+
+    print(col(LBL_X), row(BASE_Y + 0),  "Slot",      COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 2),  "Name",      COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 4),  "CC#",       COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 6),  "Kind",      COLORS.Text, S);
     {
         ccenvelope *e = song->ccenvelopes[ce_slot];
         const char *knd = "CC";
@@ -651,33 +701,41 @@ void CUI_CCEnvelopeEditor::draw(Drawable *S) {
             if      (e->kind == 1) knd = "Pitchbend";
             else if (e->kind == 2) knd = "ChanPress";
         }
-        char buf[24]; snprintf(buf, sizeof buf, "(%s)", knd);
-        print(col(LBL_X + 24), row(BASE_Y + 6), buf, COLORS.Text, S);
+        char kbuf[24]; snprintf(kbuf, sizeof kbuf, "(%s)", knd);
+        print(col(KIND_LBL_X), row(BASE_Y + 6), kbuf, COLORS.Text, S);
     }
-    print(col(LBL_X), row(BASE_Y + 8),  "Speed",      COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 10), "NumNodes",   COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 12), "Flags",      COLORS.Text, S);
-    print(col(14    ), row(BASE_Y + 12), "On",        COLORS.Text, S);
-    print(col(14+11), row(BASE_Y + 12), "Loop",       COLORS.Text, S);
-    print(col(14+21), row(BASE_Y + 12), "Sustain",    COLORS.Text, S);
-    print(col(14+35), row(BASE_Y + 12), "Carry",      COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 14), "Loop S..E",  COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 16), "Sus  S..E",  COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 19), "Node",       COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 21), "Tick",       COLORS.Text, S);
-    print(col(LBL_X), row(BASE_Y + 23), "Value",      COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 8),  "Speed",     COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 10), "Nodes",     COLORS.Text, S);
+
+    // Flag rows -- each checkbox sits at col 12 with its name to the
+    // RIGHT of the box (the checkbox itself shows Off/On so the
+    // name has to be elsewhere). Names go at col 16 to clear the
+    // checkbox's frame + value text.
+    print(col(LBL_X), row(BASE_Y + 12), "Flags",     COLORS.Text, S);
+    print(col(16),    row(BASE_Y + 12), "Enabled",   COLORS.Text, S);
+    print(col(16),    row(BASE_Y + 13), "Loop",      COLORS.Text, S);
+    print(col(16),    row(BASE_Y + 14), "Sustain",   COLORS.Text, S);
+    print(col(16),    row(BASE_Y + 15), "Carry",     COLORS.Text, S);
+
+    print(col(LBL_X), row(BASE_Y + 17), "Loop S",    COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 18), "Loop E",    COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 20), "Sus S",     COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 21), "Sus E",     COLORS.Text, S);
+
+    print(col(LBL_X), row(BASE_Y + 23), "Node",      COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 24), "Tick",      COLORS.Text, S);
+    print(col(LBL_X), row(BASE_Y + 25), "Value",     COLORS.Text, S);
 
     // Right pane labels
-    int RIGHT_X = 50;
-    print(col(RIGHT_X), row(BASE_Y + 1),  ".env presets",      COLORS.Text, S);
-    print(col(RIGHT_X), row(BASE_Y + 19), "Filename",          COLORS.Text, S);
+    print(col(RIGHT_X), row(BASE_Y + 1),  ".env presets", COLORS.Text, S);
+    print(col(RIGHT_X), row(BASE_Y + 17), "Filename",     COLORS.Text, S);
 
     // Folder line
     {
         char buf[160];
         snprintf(buf, sizeof buf, "Folder: %s",
                  ce_folder[0] ? ce_folder : "(none)");
-        print(col(RIGHT_X), row(BASE_Y + 25), buf, COLORS.Text, S);
+        print(col(RIGHT_X), row(BASE_Y + 22), buf, COLORS.Text, S);
     }
 
     // Status line

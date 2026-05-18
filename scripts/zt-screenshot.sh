@@ -141,6 +141,11 @@ echo "shift-f5 (SysEx Librarian):"
 press_key_mod 96 "shift down"
 capture_zt "$OUT/shift-f5.png"
 
+# Shift+F6 = CC Envelope Editor (PR #130). F6 keycode = 97.
+echo "shift-f6 (CC Envelope Editor):"
+press_key_mod 97 "shift down"
+capture_zt "$OUT/shift-f6.png"
+
 pkill -9 -f "zt.app/Contents/MacOS/zt" 2>/dev/null || true
 
 echo
