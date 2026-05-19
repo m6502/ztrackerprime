@@ -39,8 +39,8 @@ CUI_Songconfig::CUI_Songconfig(void) {
         ti->frame = 1;
         ti->x = 20;
         ti->y = base_y;
-        ti->xsize=28;
-        ti->length=28;
+        ti->xsize=ZTM_SONGTITLE_MAXLEN - 1;
+        ti->length=ZTM_SONGTITLE_MAXLEN - 1;
         ti->str = &song->title[0];
     // END Test Slider
     /* Initialize BPM Slider */

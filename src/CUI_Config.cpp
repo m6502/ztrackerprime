@@ -1,5 +1,19 @@
 #include "zt.h"
 #include "Button.h"
+#include <stdarg.h>
+
+static void config_buf_append(char *buf, size_t buf_size, const char *fmt, ...)
+{
+    size_t used = strlen(buf);
+    if (used >= buf_size)
+        return;
+
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf + used, buf_size - used, fmt, ap);
+    va_end(ap);
+    buf[buf_size - 1] = '\0';
+}
 
 void BTNCLK_SaveSettings(UserInterfaceElement *b) {
     (void)b;
@@ -328,22 +342,22 @@ void CUI_Config::draw(Drawable *S) {
             case VIEW_BIG:     view_mode_name = "Big"; break;
         }
 #endif
-        sprintf(buf,"|U|Current Settings in memory:");
-        sprintf(buf+strlen(buf),"\n|U| Auto-Open MIDI  |L|[|H|%s|L|]",zt_config_globals.auto_open_midi?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autoload .ZT    |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autoload File   |L|[|H|%s|L|]",zt_config_globals.autoload_ztfile_filename);
-        sprintf(buf+strlen(buf),"\n|U| Default Dir     |L|[|H|%s|L|]",zt_config_globals.default_directory);
-        sprintf(buf+strlen(buf),"\n|U| Record Velocity |L|[|H|%s|L|]",zt_config_globals.record_velocity?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Autosave (s)    |L|[|H|%d|L|]",zt_config_globals.autosave_interval_seconds);
+        snprintf(buf, sizeof(buf), "|U|Current Settings in memory:");
+        config_buf_append(buf, sizeof(buf), "\n|U| Auto-Open MIDI  |L|[|H|%s|L|]", zt_config_globals.auto_open_midi ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Autoload .ZT    |L|[|H|%s|L|]", zt_config_globals.autoload_ztfile ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Autoload File   |L|[|H|%s|L|]", zt_config_globals.autoload_ztfile_filename);
+        config_buf_append(buf, sizeof(buf), "\n|U| Default Dir     |L|[|H|%s|L|]", zt_config_globals.default_directory);
+        config_buf_append(buf, sizeof(buf), "\n|U| Record Velocity |L|[|H|%s|L|]", zt_config_globals.record_velocity ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Autosave (s)    |L|[|H|%d|L|]", zt_config_globals.autosave_interval_seconds);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        sprintf(buf+strlen(buf),"\n|U| View Mode       |L|[|H|%s|L|]",view_mode_name);
+        config_buf_append(buf, sizeof(buf), "\n|U| View Mode       |L|[|H|%s|L|]", view_mode_name);
 #endif
         // Row highlight / Row lowlight live in F11 only — not duplicated here.
-        sprintf(buf+strlen(buf),"\n|U| Pattern Len     |L|[|H|%d|L|]",zt_config_globals.pattern_length);
-        sprintf(buf+strlen(buf),"\n|U| Full Screen     |L|[|H|%s|L|]",zt_config_globals.full_screen?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Send Panic      |L|[|H|%s|L|]",zt_config_globals.auto_send_panic?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| MIDI In Sync    |L|[|H|%s|L|]",zt_config_globals.midi_in_sync?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Chase MIDI Tempo|L|[|H|%s|L|]",zt_config_globals.midi_in_sync_chase_tempo?"On":"Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Pattern Len     |L|[|H|%d|L|]", zt_config_globals.pattern_length);
+        config_buf_append(buf, sizeof(buf), "\n|U| Full Screen     |L|[|H|%s|L|]", zt_config_globals.full_screen ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Send Panic      |L|[|H|%s|L|]", zt_config_globals.auto_send_panic ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| MIDI In Sync    |L|[|H|%s|L|]", zt_config_globals.midi_in_sync ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Chase MIDI Tempo|L|[|H|%s|L|]", zt_config_globals.midi_in_sync_chase_tempo ? "On" : "Off");
         const char *post_load_name = "Pattern Editor (F2)";
         switch (zt_config_globals.post_load_page) {
             case POST_LOAD_PATTERN_EDIT: post_load_name = "Pattern Editor (F2)";    break;
@@ -353,22 +367,22 @@ void CUI_Config::draw(Drawable *S) {
             case POST_LOAD_SONG_MESSAGE: post_load_name = "Song Message (F10)";     break;
             default:                     post_load_name = "Pattern Editor (F2)";    break;
         }
-        sprintf(buf+strlen(buf),"\n|U| Post-Load Page  |L|[|H|%s|L|]",post_load_name);
-        sprintf(buf+strlen(buf),"\n|U| Step Editing    |L|[|H|%s|L|]",zt_config_globals.step_editing?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Centered Edit   |L|[|H|%s|L|]",zt_config_globals.centered_editing?"On":"Off");
-        sprintf(buf+strlen(buf),"\n|U| Screen Size     |L|[|H|%dx%d|L|]",zt_config_globals.screen_width, zt_config_globals.screen_height);
-        sprintf(buf+strlen(buf),"\n|U| Zoom            |L|[|H|%.2f|L|]",zt_config_globals.zoom);
-        sprintf(buf+strlen(buf),"\n|U| Scale Filter    |L|[|H|%s|L|]",zt_config_globals.scale_filter);
-        sprintf(buf+strlen(buf),"\n|U| Ctrl Nav Amt    |L|[|H|%d|L|]",zt_config_globals.control_navigation_amount);
-        sprintf(buf+strlen(buf),"\n|U| Inst Glob Vol   |L|[|H|%d|L|]",zt_config_globals.instrument_global_volume);
-        sprintf(buf+strlen(buf),"\n|U| Default TPB     |L|[|H|%d|L|]",zt_config_globals.default_tpb);
-        sprintf(buf+strlen(buf),"\n|U| Default BPM     |L|[|H|%d|L|]",zt_config_globals.default_bpm);
+        config_buf_append(buf, sizeof(buf), "\n|U| Post-Load Page  |L|[|H|%s|L|]", post_load_name);
+        config_buf_append(buf, sizeof(buf), "\n|U| Step Editing    |L|[|H|%s|L|]", zt_config_globals.step_editing ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Centered Edit   |L|[|H|%s|L|]", zt_config_globals.centered_editing ? "On" : "Off");
+        config_buf_append(buf, sizeof(buf), "\n|U| Screen Size     |L|[|H|%dx%d|L|]", zt_config_globals.screen_width, zt_config_globals.screen_height);
+        config_buf_append(buf, sizeof(buf), "\n|U| Zoom            |L|[|H|%.2f|L|]", zt_config_globals.zoom);
+        config_buf_append(buf, sizeof(buf), "\n|U| Scale Filter    |L|[|H|%s|L|]", zt_config_globals.scale_filter);
+        config_buf_append(buf, sizeof(buf), "\n|U| Ctrl Nav Amt    |L|[|H|%d|L|]", zt_config_globals.control_navigation_amount);
+        config_buf_append(buf, sizeof(buf), "\n|U| Inst Glob Vol   |L|[|H|%d|L|]", zt_config_globals.instrument_global_volume);
+        config_buf_append(buf, sizeof(buf), "\n|U| Default TPB     |L|[|H|%d|L|]", zt_config_globals.default_tpb);
+        config_buf_append(buf, sizeof(buf), "\n|U| Default BPM     |L|[|H|%d|L|]", zt_config_globals.default_bpm);
 #ifdef DISABLED_CONFIGURATION_VALUES
-        sprintf(buf+strlen(buf),"\n|U| Key Repeat      |L|[|H|%d|L|] (disabled)",zt_config_globals.key_repeat_time);
-        sprintf(buf+strlen(buf),"\n|U| Key Wait        |L|[|H|%d|L|] (disabled)",zt_config_globals.key_wait_time);
+        config_buf_append(buf, sizeof(buf), "\n|U| Key Repeat      |L|[|H|%d|L|] (disabled)", zt_config_globals.key_repeat_time);
+        config_buf_append(buf, sizeof(buf), "\n|U| Key Wait        |L|[|H|%d|L|] (disabled)", zt_config_globals.key_wait_time);
 #else
-        sprintf(buf+strlen(buf),"\n|U| Key Repeat      |L|[|H|%d|L|]",zt_config_globals.key_repeat_time);
-        sprintf(buf+strlen(buf),"\n|U| Key Wait        |L|[|H|%d|L|]",zt_config_globals.key_wait_time);
+        config_buf_append(buf, sizeof(buf), "\n|U| Key Repeat      |L|[|H|%d|L|]", zt_config_globals.key_repeat_time);
+        config_buf_append(buf, sizeof(buf), "\n|U| Key Wait        |L|[|H|%d|L|]", zt_config_globals.key_wait_time);
 #endif
 
         if(tb->text != NULL)
@@ -448,4 +462,3 @@ void CUI_Config::draw(Drawable *S) {
         S->unlock();
     }
 }
-
