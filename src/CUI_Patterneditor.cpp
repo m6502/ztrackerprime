@@ -1439,14 +1439,34 @@ void CUI_Patterneditor::update()
     if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
       int clicked_track = track_header_toggle_at_mouse(tracks_shown, field_size);
       if (clicked_track >= 0) {
+        SDL_Keymod mouse_mods = SDL_GetModState();
         toggle_track_mute(clicked_track);
+        if (mouse_mods & SDL_KMOD_CTRL) {
+          for (int t = 0; t < MAX_TRACKS; t++) {
+            if (t != clicked_track) mutetrack(t);
+          }
+        } else if (mouse_mods & SDL_KMOD_SHIFT) {
+          for (int t = 0; t < MAX_TRACKS; t++) {
+            if (t != clicked_track) unmutetrack(t);
+          }
+        }
         cur_edit_track = clicked_track;
         need_refresh++;
         clear++;
         if (song->track_mute[clicked_track]) {
-          sprintf(szStatmsg, "Track %.2d Off", clicked_track + 1);
+          if (mouse_mods & SDL_KMOD_CTRL)
+            sprintf(szStatmsg, "Track %.2d Off, all others Off", clicked_track + 1);
+          else if (mouse_mods & SDL_KMOD_SHIFT)
+            sprintf(szStatmsg, "Track %.2d Off, all others On", clicked_track + 1);
+          else
+            sprintf(szStatmsg, "Track %.2d Off", clicked_track + 1);
         } else {
-          sprintf(szStatmsg, "Track %.2d On", clicked_track + 1);
+          if (mouse_mods & SDL_KMOD_CTRL)
+            sprintf(szStatmsg, "Track %.2d On, all others Off", clicked_track + 1);
+          else if (mouse_mods & SDL_KMOD_SHIFT)
+            sprintf(szStatmsg, "Track %.2d On, all others On", clicked_track + 1);
+          else
+            sprintf(szStatmsg, "Track %.2d On", clicked_track + 1);
         }
         statusmsg = szStatmsg;
         status_change = 1;
