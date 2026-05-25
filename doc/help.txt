@@ -59,9 +59,10 @@
  ALT-D  : Select one beat (press multiple times to select next beats)
 
  CTRL-C : Copy the selected block to the clipboard.
- CTRL-P : Copy pattern, paste to next empty pattern,
-          and jump to new pattern
  CTRL-V : Paste the contents of the clipboard to the cursor location.
+ ALT-P  : Paste continuously - repeatedly overwrite-paste the
+          clipboard downward from the cursor until the end of
+          the current pattern.
  CTRL-O : Overwrite paste
  CTRL-M : Merge paste the contents of the clipboard with the contents
           of the location you're pasting to.
@@ -173,7 +174,10 @@
  ALT-F12        : About
  CTRL-S         : Save Song
  CTRL-ALT-N     : New Song
- ALT-P          : Song Duration
+ CTRL-P         : Song Duration
+ ALT-P          : Duplicate current pattern to next empty pattern
+                  slot and switch to it. (On Pattern Editor F2,
+                  Alt-P is paste-continuously instead - see above.)
  CTRL-Q         : Quit (CTRL-ALT-Q also works)
 
 
