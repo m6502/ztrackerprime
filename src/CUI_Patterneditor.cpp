@@ -2396,10 +2396,11 @@ void CUI_Patterneditor::update()
             }
             break;
 
-          // Familiar Ctrl+C / Ctrl+V / Ctrl+P clipboard shortcuts in addition
-          // to the legacy Alt-keyed copy/paste below. Ctrl+P pastes the
-          // clipboard repeatedly downward from the cursor until the end of
-          // the pattern is reached (fill).
+          // Familiar Ctrl+C / Ctrl+V clipboard shortcuts in addition to
+          // the legacy Alt-keyed copy/paste below. Ctrl-P used to do
+          // paste-continuously here; that moved to Alt-P (see the
+          // KS_HAS_ALT block below) so Ctrl-P can serve as the global
+          // Song Duration shortcut (see main.cpp global_keys).
           case SDLK_C:
             if (selected) {
               clipboard->copy();
@@ -2411,18 +2412,6 @@ void CUI_Patterneditor::update()
           case SDLK_V:
             clipboard->paste(cur_edit_track, cur_edit_row, 1); // overwrite
             need_refresh++;
-            break;
-
-          case SDLK_P:
-            if (clipboard->rows > 0) {
-              int target = cur_edit_row;
-              int limit  = song->patterns[cur_edit_pattern]->length;
-              while (target < limit) {
-                clipboard->paste(cur_edit_track, target, 1); // overwrite
-                target += clipboard->rows;
-              }
-              need_refresh++;
-            }
             break;
 
           } ;
@@ -2464,36 +2453,24 @@ void CUI_Patterneditor::update()
             }
             break;
 
-          case SDLK_P: // copy to new pattern
-            // select all of current pattern
-            {
-              
-              selected = 1;
-              select_row_start = 0;
-              select_row_end = song->patterns[cur_edit_pattern]->length-1;
-              select_track_start = 0;
-              select_track_end = MAX_TRACKS-1;
-              
-              // copy to clipboard
-              CClipboard tempcb;
-              tempcb.copy(); SDL_Delay(50);
-              
-              x = cur_edit_pattern+1;
-              while(x<256 && !song->patterns[x]->isempty()) x++;
-              if (x<256) {
-                sprintf(szStatmsg,"Copied pattern %d to %d",cur_edit_pattern,x);
-                statusmsg = szStatmsg;
-                song->patterns[x]->resize(song->patterns[cur_edit_pattern]->length);
-                cur_edit_pattern = x;
-                tempcb.paste(0,0,0); // insert
-              } else {
-                statusmsg = "Could not find empty pattern for paste";
+          case SDLK_P:
+            // Alt-P = paste continuously: repeatedly overwrite-paste
+            // the clipboard downward from the cursor until the end of
+            // the pattern is reached. Used to be Ctrl-P; moved here so
+            // Ctrl-P could become the global Song Duration shortcut.
+            // The "duplicate pattern to next empty slot" routine that
+            // used to live on Alt-P (Pattern Editor only) was promoted
+            // to a global Alt-P binding for every page EXCEPT the
+            // Pattern Editor (see main.cpp global_keys).
+            if (clipboard->rows > 0) {
+              int target = cur_edit_row;
+              int limit  = song->patterns[cur_edit_pattern]->length;
+              while (target < limit) {
+                clipboard->paste(cur_edit_track, target, 1); // overwrite
+                target += clipboard->rows;
               }
+              need_refresh++;
             }
-            // paste pattern and unselect
-            selected = 0;
-            need_refresh++;
-            
             break;
             
           case SDLK_GRAVE: 

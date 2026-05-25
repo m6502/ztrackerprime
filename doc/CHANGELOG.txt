@@ -4,6 +4,23 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_25 (Alt-P / Ctrl-P rebind for pattern duplicate + paste-continuously)
+----------------------------------------------------------------------------
+
+        * Ctrl-P now opens the Song Duration popup (was Alt-P).
+
+        * Alt-P, on the Pattern Editor (F2), is paste-continuously:
+          repeatedly overwrite-paste the clipboard downward from the
+          cursor until the end of the pattern. This is the behaviour
+          Ctrl-P used to have inside F2; freeing Ctrl-P up for the
+          global Song Duration shortcut.
+
+        * Alt-P, on every other page (F11 Order List, F3 Instrument
+          Editor, F4/Shift+F4 macro/arp editors, etc.), duplicates the
+          current pattern into the next empty pattern slot and switches
+          cur_edit_pattern to it. Status: "Duplicated pattern N to M".
+          Reach it from F11 if you're on F2 (where Alt-P is fill).
+
 zt 2026_05_18 (CC Envelopes per-instrument, CCizer-aware)
 ----------------------------------------------------------------------------
 

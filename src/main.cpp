@@ -1585,9 +1585,61 @@ void global_keys(Drawable *S)
                     clear++;
                 }
                 break;
-            case SDLK_P: // song duration
-                if (kstate & KS_ALT) {
+            case SDLK_P:
+                // Ctrl-P = Song Duration popup. Moved here from Alt-P so
+                // Alt-P is free for two new pattern-management bindings:
+                //   * On F2 Pattern Editor: Alt-P = paste-continuously
+                //     (fill clipboard downward to end of pattern). The
+                //     page handler implements this; the global handler
+                //     skips Alt-P when cur_state == STATE_PEDIT.
+                //   * Everywhere else: Alt-P = duplicate current pattern
+                //     into the next empty pattern slot and switch
+                //     cur_edit_pattern to it. Reachable from F11 Order
+                //     List / F3 Instrument Editor / any other page.
+                if ((kstate & KS_CTRL) && !KS_HAS_ALT(kstate) && !(kstate & KS_SHIFT)) {
                     popup_window(UIP_SongDuration);
+                    key = Keys.getkey();
+                    clear++;
+                    break;
+                }
+                if (KS_HAS_ALT(kstate) && !(kstate & KS_CTRL) && !(kstate & KS_SHIFT)
+                    && cur_state != STATE_PEDIT) {
+                    // Duplicate current pattern to next empty slot.
+                    // Save selection globals: CClipboard::copy() reads
+                    // them, and the pattern editor's own selection must
+                    // survive an Alt-P fired from another page.
+                    int saved_selected         = selected;
+                    int saved_select_row_start = select_row_start;
+                    int saved_select_row_end   = select_row_end;
+                    int saved_select_trk_start = select_track_start;
+                    int saved_select_trk_end   = select_track_end;
+                    int src_pat                = cur_edit_pattern;
+                    selected           = 1;
+                    select_row_start   = 0;
+                    select_row_end     = song->patterns[src_pat]->length - 1;
+                    select_track_start = 0;
+                    select_track_end   = MAX_TRACKS - 1;
+                    CClipboard tempcb;
+                    tempcb.copy();
+                    SDL_Delay(50);
+                    int x = src_pat + 1;
+                    while (x < 256 && !song->patterns[x]->isempty()) x++;
+                    if (x < 256) {
+                        song->patterns[x]->resize(song->patterns[src_pat]->length);
+                        cur_edit_pattern = x;
+                        tempcb.paste(0, 0, 0); // insert
+                        sprintf(szStatmsg, "Duplicated pattern %d to %d", src_pat, x);
+                        statusmsg = szStatmsg;
+                    } else {
+                        statusmsg = "Could not find empty pattern for duplicate";
+                    }
+                    selected           = saved_selected;
+                    select_row_start   = saved_select_row_start;
+                    select_row_end     = saved_select_row_end;
+                    select_track_start = saved_select_trk_start;
+                    select_track_end   = saved_select_trk_end;
+                    status_change = 1;
+                    need_refresh++;
                     key = Keys.getkey();
                     clear++;
                 }
