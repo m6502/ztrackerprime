@@ -185,6 +185,20 @@ endif()
 target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib extlibs/lua)
 target_link_libraries(zt PRIVATE lua_static zt_zlib_static)
 
+# Linux release artifacts bundle libSDL3.so.0 next to the binary (Ubuntu 24.04
+# apt has no libsdl3-dev yet). Without $ORIGIN in the rpath, the dynamic linker
+# won't look beside the binary and `./zt` fails with
+#   "error while loading shared libraries: libSDL3.so.0: cannot open shared
+#    object file: No such file or directory"
+# even though the .so is sitting right there. macOS uses .app bundles; Windows
+# searches the exe directory for DLLs natively. Linux is the only platform
+# that needs this.
+if(UNIX AND NOT APPLE)
+  set_target_properties(zt PROPERTIES
+    BUILD_RPATH   "$ORIGIN"
+    INSTALL_RPATH "$ORIGIN")
+endif()
+
 if(MSVC)
   target_compile_options(zt PRIVATE /W3 /MP /wd4103)
 else()

@@ -4,6 +4,17 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt (unreleased)
+----------------------------------------------------------------------------
+
+        * Linux: set rpath to $ORIGIN on the zt binary so the bundled
+          libSDL3.so.0 (shipped next to the binary in the release
+          artifact, because Ubuntu 24.04 apt has no libsdl3-dev) is
+          found at runtime. Previously running ./zt from the unpacked
+          tarball failed with "error while loading shared libraries:
+          libSDL3.so.0: cannot open shared object file" unless the
+          user knew to set LD_LIBRARY_PATH=. first.
+
 zt 2026_05_25 (Alt-P / Ctrl-P rebind for pattern duplicate + paste-continuously)
 ----------------------------------------------------------------------------
 
