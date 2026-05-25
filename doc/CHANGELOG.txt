@@ -4,7 +4,7 @@ Legend
    +  - Feature add
    *  - Fix/change
 
-zt (unreleased)
+zt 2026_05_25_2 (Linux: bundled libSDL3.so.0 found at runtime via rpath=$ORIGIN)
 ----------------------------------------------------------------------------
 
         * Linux: set rpath to $ORIGIN on the zt binary so the bundled
