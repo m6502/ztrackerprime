@@ -2,6 +2,7 @@
 #include "platform/undo.h"
 #include "ccizer.h"
 #include "keybindings.h"
+#include "keyjazz_map.h"
 
 // KS_META stub for Cmd key support (SDL3 maps macOS Cmd to SDL_KMOD_GUI).
 // Currently keybuffer does not translate GUI -> KS_META, so KS_META is a
@@ -1752,37 +1753,10 @@ void CUI_Patterneditor::update()
         if (cur_inst >= 0 && cur_inst < MAX_INSTS &&
             song->instruments[cur_inst]) {
           int jazz_note = -1;
-          switch (scancode) {
-          case SDL_SCANCODE_Q: jazz_note = 12*base_octave;          break;
-          case SDL_SCANCODE_2: jazz_note = (12*base_octave)+1;      break;
-          case SDL_SCANCODE_W: jazz_note = (12*base_octave)+2;      break;
-          case SDL_SCANCODE_3: jazz_note = (12*base_octave)+3;      break;
-          case SDL_SCANCODE_E: jazz_note = (12*base_octave)+4;      break;
-          case SDL_SCANCODE_R: jazz_note = (12*base_octave)+5;      break;
-          case SDL_SCANCODE_5: jazz_note = (12*base_octave)+6;      break;
-          case SDL_SCANCODE_T: jazz_note = (12*base_octave)+7;      break;
-          case SDL_SCANCODE_6: jazz_note = (12*base_octave)+8;      break;
-          case SDL_SCANCODE_Y: jazz_note = (12*base_octave)+9;      break;
-          case SDL_SCANCODE_7: jazz_note = (12*base_octave)+10;     break;
-          case SDL_SCANCODE_U: jazz_note = (12*base_octave)+11;     break;
-          case SDL_SCANCODE_I: jazz_note = (12*base_octave)+12;     break;
-          case SDL_SCANCODE_9: jazz_note = (12*base_octave)+1+12;   break;
-          case SDL_SCANCODE_O: jazz_note = (12*base_octave)+2+12;   break;
-          case SDL_SCANCODE_0: jazz_note = (12*base_octave)+3+12;   break;
-          case SDL_SCANCODE_P: jazz_note = (12*base_octave)+4+12;   break;
-          case SDL_SCANCODE_Z: jazz_note = 12*(base_octave-1);      break;
-          case SDL_SCANCODE_S: jazz_note = (12*(base_octave-1))+1;  break;
-          case SDL_SCANCODE_X: jazz_note = (12*(base_octave-1))+2;  break;
-          case SDL_SCANCODE_D: jazz_note = (12*(base_octave-1))+3;  break;
-          case SDL_SCANCODE_C: jazz_note = (12*(base_octave-1))+4;  break;
-          case SDL_SCANCODE_V: jazz_note = (12*(base_octave-1))+5;  break;
-          case SDL_SCANCODE_G: jazz_note = (12*(base_octave-1))+6;  break;
-          case SDL_SCANCODE_B: jazz_note = (12*(base_octave-1))+7;  break;
-          case SDL_SCANCODE_H: jazz_note = (12*(base_octave-1))+8;  break;
-          case SDL_SCANCODE_N: jazz_note = (12*(base_octave-1))+9;  break;
-          case SDL_SCANCODE_J: jazz_note = (12*(base_octave-1))+10; break;
-          case SDL_SCANCODE_M: jazz_note = (12*(base_octave-1))+11; break;
-          default: break;
+          {
+            KeyjazzLayout kjl = zt_config_globals.keyjazz_piano_layout ? KJ_PIANO : KJ_TRACKER;
+            int kjoff = keyjazz_offset(scancode, kjl);
+            if (kjoff != KJ_NOT_A_NOTE) jazz_note = 12*base_octave + kjoff;
           }
           if (jazz_note >= 0 && jazz_note <= 0x7F &&
               !jazz_note_is_active((int)key)) {
@@ -3402,46 +3376,19 @@ case SDLK_DELETE:
                     default: break;
                     }
                     break;
-                    case T_NOTE: 
+                    case T_NOTE:
+                      // Musical note keys come from the shared keyjazz table
+                      // (keyjazz_map.h) so the tracker vs Ableton/Logic-piano
+                      // layout is one toggle, not four hand-copied switches.
+                      // Special / editing keys (Note Off, peek-play, ...) stay
+                      // in the switch below; they are never note keys in either
+                      // layout, so keyjazz_offset returns KJ_NOT_A_NOTE for them.
+                      {
+                        KeyjazzLayout kjl = zt_config_globals.keyjazz_piano_layout ? KJ_PIANO : KJ_TRACKER;
+                        int kjoff = keyjazz_offset(scancode, kjl);
+                        if (kjoff != KJ_NOT_A_NOTE) set_note = 12*base_octave + kjoff;
+                      }
                       switch(scancode) {
-                        /* TOP ROW */
-                      case SDL_SCANCODE_Q: set_note = 12*base_octave;         break;
-                      case SDL_SCANCODE_2: set_note = (12*base_octave)+1;     break;
-                      case SDL_SCANCODE_W: set_note = (12*base_octave)+2;     break;
-                      case SDL_SCANCODE_3: set_note = (12*base_octave)+3;     break;
-                      case SDL_SCANCODE_E: set_note = (12*base_octave)+4;     break;
-                      case SDL_SCANCODE_R: set_note = (12*base_octave)+5;     break;
-                      case SDL_SCANCODE_5: set_note = (12*base_octave)+6;     break;
-                      case SDL_SCANCODE_T: set_note = (12*base_octave)+7;     break;
-                      case SDL_SCANCODE_6: set_note = (12*base_octave)+8;     break;
-                      case SDL_SCANCODE_Y: set_note = (12*base_octave)+9;     break;
-                      case SDL_SCANCODE_7: set_note = (12*base_octave)+10;    break;
-                      case SDL_SCANCODE_U: set_note = (12*base_octave)+11;    break;
-                      case SDL_SCANCODE_I: set_note = (12*base_octave)+12;    break;
-                      case SDL_SCANCODE_9: set_note = (12*base_octave)+1+12;  break;
-                      case SDL_SCANCODE_O: set_note = (12*base_octave)+2+12;  break;
-                      case SDL_SCANCODE_0: set_note = (12*base_octave)+3+12;  break;
-                      case SDL_SCANCODE_P: set_note = (12*base_octave)+4+12;  break;
-                      
-                      
-                      // <Manu> Repurpose these keys
-                      //case SDLK_LEFTBRACKET: set_note = (12*base_octave)+5+12;  break;
-                      //case SDLK_RIGHTBRACKET: set_note = (12*base_octave)+6+12;  break;
-
-
-                        /* BOTTOM ROW */
-                      case SDL_SCANCODE_Z: set_note = 12*(base_octave-1);     break;
-                      case SDL_SCANCODE_S: set_note = (12*(base_octave-1))+1; break;
-                      case SDL_SCANCODE_X: set_note = (12*(base_octave-1))+2; break;
-                      case SDL_SCANCODE_D: set_note =(12*(base_octave-1))+3;  break;
-                      case SDL_SCANCODE_C: set_note =(12*(base_octave-1))+4;  break;
-                      case SDL_SCANCODE_V: set_note = (12*(base_octave-1))+5; break;
-                      case SDL_SCANCODE_G: set_note = (12*(base_octave-1))+6; break;
-                      case SDL_SCANCODE_B: set_note = (12*(base_octave-1))+7; break;
-                      case SDL_SCANCODE_H: set_note = (12*(base_octave-1))+8; break;
-                      case SDL_SCANCODE_N: set_note = (12*(base_octave-1))+9; break;
-                      case SDL_SCANCODE_J: set_note = (12*(base_octave-1))+10;break;
-                      case SDL_SCANCODE_M: set_note = (12*(base_octave-1))+11;break;
                         /* EDITING KEYS */
                         // Switch is on scancode (see line 2920); use
                         // SDL_SCANCODE_* here too. Mixing SDLK_* into a

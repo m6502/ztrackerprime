@@ -1,6 +1,15 @@
 |L|%==|H|Pattern Editing|L|==%|U|
 
  Spacebar    : Turns Edit (or "Keyjazz") mode on or off
+ Keyjazz keys: Default is the classic tracker layout (Q-row = upper
+               octave, Z-row = lower octave). The "PianoKey" checkbox in
+               the F2 F2 Pattern Editor Options switches to the Ableton
+               Live / Logic "Musical Typing" layout instead: the home row
+               A S D F G H J K (L ;) are the white keys and the row above
+               W E T Y U (O P) are the black keys -- one piano octave
+               climbing rightward. The choice persists in zt.conf
+               (keyjazz_piano=) and applies to the Pattern, Instrument and
+               Arpeggio editors.
  4/8         : peek play the current note/row
  Home/End    : Just try them
  PgUp/PgDn   : Up/down 16 rows
@@ -118,7 +127,9 @@
                   to the line that documents it. Tab / Shift-Tab navigate
                   between section headers.
  F2             : Pattern editor - Pressing F2 again while in the pattern
-                  editing screen brings up the pattern settings.
+                  editing screen brings up the pattern settings, including
+                  the "PianoKey" toggle (tracker vs Ableton/Logic keyjazz
+                  layout).
  F3             : Instrument editor
  SHIFT-F2       : Shortcuts & MIDI Mappings (unified per-action grid:
                   Keyboard | MIDI1 | MIDI2 | MIDI3). Up/Dn/Lt/Rt move,

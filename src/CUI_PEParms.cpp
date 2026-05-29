@@ -113,6 +113,15 @@ CUI_PEParms::CUI_PEParms(void) {
         cb_cc_draw_overwrite->y = (start_y / 8) + 18;
         cb_cc_draw_overwrite->xsize = 3;
         cb_cc_draw_overwrite->value = &zt_config_globals.cc_draw_overwrite;
+
+        // Keyjazz piano layout (Ableton Live / Logic). OFF = tracker layout.
+        cb_keyjazz_piano = new CheckBox;
+        UI->add_element(cb_keyjazz_piano, 10);
+        cb_keyjazz_piano->frame = 1;
+        cb_keyjazz_piano->x = (start_x / 8) + 17 + 32;
+        cb_keyjazz_piano->y = (start_y / 8) + 18;
+        cb_keyjazz_piano->xsize = 3;
+        cb_keyjazz_piano->value = &zt_config_globals.keyjazz_piano_layout;
 }
 
 void CUI_PEParms::enter(void) {
@@ -142,6 +151,8 @@ void CUI_PEParms::enter(void) {
     cb->value = &drawmode_val;
     cb = (CheckBox *)UI->get_element(9);
     cb->value = &zt_config_globals.cc_draw_overwrite;
+    cb = (CheckBox *)UI->get_element(10);
+    cb->value = &zt_config_globals.keyjazz_piano_layout;
 }
 
 void CUI_PEParms::leave(void) {
@@ -194,6 +205,10 @@ void CUI_PEParms::update() {
         UIP_Patterneditor->mode = (drawmode_val) ? PEM_MOUSEDRAW : PEM_REGULARKEYS;
         if (UIP_Patterneditor->mode == PEM_REGULARKEYS) midiInQueue.clear();
     }
+
+    cb = (CheckBox *)UI->get_element(10);
+    if (cb->changed)
+        zt_config_globals.keyjazz_piano_layout = *(cb->value);
 
     // Live drawing while the popup is open. With DrawMode on, forward
     // mouse activity to the pattern editor when the cursor is outside
@@ -254,6 +269,8 @@ void CUI_PEParms::draw(Drawable *S) {
     cb_drawmode->y = (start_y / 8) + 18;
     cb_cc_draw_overwrite->x = (start_x / 8) + 17 + 16;
     cb_cc_draw_overwrite->y = (start_y / 8) + 18;
+    cb_keyjazz_piano->x = (start_x / 8) + 17 + 32;
+    cb_keyjazz_piano->y = (start_y / 8) + 18;
 
 
     if (S->lock()==0) {
@@ -280,6 +297,9 @@ void CUI_PEParms::draw(Drawable *S) {
         // CC drawbar overwrite-protect toggle. Label width matches the
         // StepEdit / RecVeloc pattern on row 14.
         print(start_x + col(23),start_y + row(18),"CCOver:",COLORS.Text,S);
+        // Keyjazz piano-layout (Ableton/Logic) toggle, mirrors RecVeloc's
+        // column on row 14. Chip at col 49, label colon lands at col 47.
+        print(start_x + col(39),start_y + row(18),"PianoKey:",COLORS.Text,S);
         UI->full_refresh();
         UI->draw(S);
         S->unlock();

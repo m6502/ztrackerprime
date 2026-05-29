@@ -132,3 +132,17 @@ add_executable(test_ccenv
 target_include_directories(test_ccenv PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_ccenv PRIVATE cxx_std_17)
 add_test(NAME ccenv COMMAND test_ccenv)
+
+# Shared keyjazz note table (keyjazz_map.h). Regression-guards the tracker
+# layout byte-for-byte after the four-switch -> one-function refactor, and
+# locks in the Ableton/Logic piano layout + the two layouts' mutual exclusivity.
+# SDL-free: scancodes come from tests/sdl_stub.h.
+add_executable(test_keyjazz_map
+    test_keyjazz_map.cpp
+)
+target_include_directories(test_keyjazz_map PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/tests"
+)
+target_compile_features(test_keyjazz_map PRIVATE cxx_std_17)
+add_test(NAME keyjazz_map COMMAND test_keyjazz_map)
