@@ -171,6 +171,17 @@ else()
 endif()
 add_test(NAME sample_load COMMAND test_sample_load)
 
+# Sample voice DSP (sample_voice.h): pitch-from-note, fractional advance
+# with forward loop wrap / end-of-sample, linear interpolation, stereo
+# channel selection. SDL-free (header + src/sample.cpp only).
+add_executable(test_sample_voice
+    test_sample_voice.cpp
+    "${CMAKE_SOURCE_DIR}/src/sample.cpp"
+)
+target_include_directories(test_sample_voice PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_sample_voice PRIVATE cxx_std_17)
+add_test(NAME sample_voice COMMAND test_sample_voice)
+
 # Shared keyjazz note table (keyjazz_map.h). Regression-guards the tracker
 # layout byte-for-byte after the four-switch -> one-function refactor, and
 # locks in the Ableton/Logic piano layout + the two layouts' mutual exclusivity.
