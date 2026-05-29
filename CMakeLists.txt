@@ -109,6 +109,8 @@ set(ZT_SOURCES
   src/OutputDevices.cpp
   src/platform.cpp
   src/playback.cpp
+  src/sample.cpp
+  src/sample_load.cpp
   src/skins.cpp
   src/zlib_wrapper.cpp
   src/ztfile-io.cpp
