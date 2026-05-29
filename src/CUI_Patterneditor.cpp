@@ -3386,7 +3386,41 @@ case SDLK_DELETE:
                       {
                         KeyjazzLayout kjl = zt_config_globals.keyjazz_piano_layout ? KJ_PIANO : KJ_TRACKER;
                         int kjoff = keyjazz_offset(scancode, kjl);
-                        if (kjoff != KJ_NOT_A_NOTE) set_note = 12*base_octave + kjoff;
+                        if (kjoff != KJ_NOT_A_NOTE) {
+                          set_note = 12*base_octave + kjoff;
+                        } else if (kjl == KJ_PIANO) {
+                          // Logic / Ableton "Musical Typing" transport controls,
+                          // scoped to the note column so they never shadow text
+                          // or effect-column input. The [ ] (and KP * /) octave
+                          // keys keep working everywhere regardless -- see the
+                          // switch(key) near the top of the handler; this only
+                          // ADDS Z/X as a second octave control in piano mode.
+                          switch (scancode) {
+                          case SDL_SCANCODE_Z:  // octave down
+                            if (base_octave > BASE_OCTAVE_MIN) base_octave--;
+                            sprintf(szStatmsg, "Octave: %d", base_octave);
+                            statusmsg = szStatmsg; status_change = 1; need_refresh++;
+                            break;
+                          case SDL_SCANCODE_X:  // octave up
+                            if (base_octave < BASE_OCTAVE_MAX) base_octave++;
+                            sprintf(szStatmsg, "Octave: %d", base_octave);
+                            statusmsg = szStatmsg; status_change = 1; need_refresh++;
+                            break;
+                          case SDL_SCANCODE_C:  // velocity down
+                            keyjazz_velocity -= KEYJAZZ_VELOCITY_STEP;
+                            if (keyjazz_velocity < 1) keyjazz_velocity = 1;
+                            sprintf(szStatmsg, "KeyJazz velocity: %d", keyjazz_velocity);
+                            statusmsg = szStatmsg; status_change = 1; need_refresh++;
+                            break;
+                          case SDL_SCANCODE_V:  // velocity up
+                            keyjazz_velocity += KEYJAZZ_VELOCITY_STEP;
+                            if (keyjazz_velocity > 127) keyjazz_velocity = 127;
+                            sprintf(szStatmsg, "KeyJazz velocity: %d", keyjazz_velocity);
+                            statusmsg = szStatmsg; status_change = 1; need_refresh++;
+                            break;
+                          default: break;
+                          }
+                        }
                       }
                       switch(scancode) {
                         /* EDITING KEYS */
@@ -3645,16 +3679,25 @@ case SDLK_DELETE:
               }
             }
             
+            // Piano (Ableton/Logic) keyjazz: a played note carries the current
+            // keyjazz velocity (set by C/V) into the volume column. It's written
+            // regardless of the RecVeloc toggle so the velocity is always
+            // "added" in piano mode, as requested.
+            if (zt_config_globals.keyjazz_piano_layout && set_note < 0x80 && p1 == -1)
+              p1 = (short int)keyjazz_velocity;
+            short int rec_vol =
+              (zt_config_globals.record_velocity || zt_config_globals.keyjazz_piano_layout) ? p1 : (short int)(-1);
+
             if (set_note != 0xFF) {
               if (key_jazz==0) {
                 if (noplay==0 ) {
                   if (set_note<0x80)
-                    song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,cur_inst,zt_config_globals.record_velocity?p1:(-1),-1,-1,-1);
+                    song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,cur_inst,rec_vol,-1,-1,-1);
                   else
-                    song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,MAX_INSTS,zt_config_globals.record_velocity?p1:(-1),-1,-1,-1);
+                    song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,MAX_INSTS,rec_vol,-1,-1,-1);
                 } else {
                   if ((e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row)))
-                    song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,-1,zt_config_globals.record_velocity?p1:(-1),-1,-1,-1);
+                    song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->update_event(cur_edit_row,set_note,-1,rec_vol,-1,-1,-1);
                 }
                 
                 step++;

@@ -203,6 +203,7 @@ int cur_inst = 0;
 const char *col_desc[41];
 
 int base_octave = BASE_OCTAVE_DEFAULT ;
+int keyjazz_velocity = KEYJAZZ_VELOCITY_DEFAULT ;
 int cur_step = DEFAULT_CURSOR_STEP ;
 
 int keypress=0;

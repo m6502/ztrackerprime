@@ -13,12 +13,21 @@ label `PianoKey:`); conf key `keyjazz_piano`; test suite
 - Upper range = **extend through L ; ' and O P** (white to F, black to D#).
 - Scope = **all note-entry pages** (Pattern + Instrument + Arpeggio editors).
 
-**Follow-up not in this PR (and not committed to):** Logic Musical Typing's
-*control* keys -- C/V velocity, Tab sustain, 1/2 pitch bend, 3-8 modulation.
-These would collide with existing always-on pattern-editor editing keys and
-need their own collision-resolution + scoping decision. NOTE: Z/X octave-shift
-is explicitly NOT wanted (the user confirmed Z/X must not change octave in
-piano mode); zTracker keeps its own octave + record-velocity controls.
+**Transport controls (added 2026-05-28, note-column only in piano mode):**
+- Z / X = octave down / up (the existing `[` `]` octave keys keep working
+  everywhere too — Z/X are an *additional* control, scoped to the note column
+  so they don't shadow text/effect-column input).
+- C / V = decrease / increase a session `keyjazz_velocity` global (step 8,
+  clamp 1..127), shown in the status bar.
+- Notes entered in piano mode carry `keyjazz_velocity` into the volume column,
+  written regardless of the RecVeloc toggle.
+
+Implemented in the `T_NOTE` case of `CUI_Patterneditor.cpp` (so they're
+note-column-scoped); `keyjazz_velocity` lives in `main.cpp` / `zt.h` next to
+`base_octave`.
+
+**Still NOT done (not requested yet):** Tab sustain, 1/2 pitch bend, 3-8
+modulation.
 
 ---
 

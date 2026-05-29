@@ -147,6 +147,12 @@ static inline void zt_text_input_stop(void) {
 #define BASE_OCTAVE_MAX                 9
 #define BASE_OCTAVE_DEFAULT             4
 
+// Keyjazz velocity used by the Ableton/Logic piano keyjazz layout: C lowers,
+// V raises it (clamped 1..127) and it is written into the volume column of
+// notes entered in piano mode. Plain session global like base_octave.
+#define KEYJAZZ_VELOCITY_DEFAULT        100
+#define KEYJAZZ_VELOCITY_STEP           8
+
 #define DEFAULT_CURSOR_STEP             1
 
 #define EDIT_LOCK_TIMEOUT               800 // ms
@@ -707,6 +713,7 @@ extern int cur_edit_pattern;
 extern int cur_edit_track_disp;
 extern int cur_edit_column;
 extern int base_octave ;
+extern int keyjazz_velocity ;
 extern int cur_step;
 
 // CC drawmode -- when non-zero, the Pattern Editor's MIDI-in handler

@@ -15,16 +15,26 @@ zt 2026_05_28 (Ableton/Logic piano keyjazz layout toggle in F2 F2)
           are the black keys -- a b c... one piano octave climbing
           rightward (a=C, w=C#, s=D, e=D#, d=E, ...). For users who
           keyjazz in those DAWs and want the same feel in zTracker.
-          In piano mode Z and X are inert -- they do NOT enter notes and
-          do NOT change the octave; use zTracker's existing octave
-          controls. (The number row is also unused in piano mode, since
-          the black keys come from W/E/T/Y/U/O/P.)
+
+        + Logic / Ableton "Musical Typing" transport controls in piano
+          mode, on the note column:
+            Z / X  -- octave down / up (in addition to the [ ] keys,
+                      which keep working everywhere as before).
+            C / V  -- decrease / increase the keyjazz velocity. The new
+                      value is shown in the status bar ("KeyJazz
+                      velocity: NN") so you can see what notes will use
+                      going forward. Step is 8, clamped 1..127.
+          Notes played/entered in piano mode are written to the pattern
+          with that keyjazz velocity in the volume column (regardless of
+          the RecVeloc toggle). The number row is unused in piano mode
+          since the black keys come from W/E/T/Y/U/O/P.
 
         + The layout applies to all note-entry paths -- Pattern Editor
           cell entry + draw-mode audition, Instrument Editor audition,
           and the Arpeggio Editor keyjazz slot -- and persists in zt.conf
           as keyjazz_piano=yes/no. Default off = no change for existing
-          songs or muscle memory.
+          songs or muscle memory. (The Z/X octave + C/V velocity controls
+          are Pattern Editor note-column only.)
 
         * Internal: the keyjazz keyboard->note layout, previously
           hand-copied as four separate switch statements, is now a single
