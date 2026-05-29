@@ -123,6 +123,7 @@ static void format_ccval(unsigned char v, char buf[4]) {
 #include "preset_data.h"
 #include "preset_selector.h"
 #include "page_sync.h"
+#include "keyjazz_map.h"
 
 static int  ar_preset_index = 0;
 // Set by ArPresetSelector::OnSelect when Enter/Space lands on a preset.
@@ -142,40 +143,11 @@ static bool ar_preset_just_applied = false;
 // noteOff via the shared infrastructure.
 
 static int ar_keyjazz_offset_for_scancode(int sc) {
-    switch (sc) {
-        // Top row -- upper octave (12*base_octave + 0..16)
-        case SDL_SCANCODE_Q: return 0;
-        case SDL_SCANCODE_2: return 1;
-        case SDL_SCANCODE_W: return 2;
-        case SDL_SCANCODE_3: return 3;
-        case SDL_SCANCODE_E: return 4;
-        case SDL_SCANCODE_R: return 5;
-        case SDL_SCANCODE_5: return 6;
-        case SDL_SCANCODE_T: return 7;
-        case SDL_SCANCODE_6: return 8;
-        case SDL_SCANCODE_Y: return 9;
-        case SDL_SCANCODE_7: return 10;
-        case SDL_SCANCODE_U: return 11;
-        case SDL_SCANCODE_I: return 12;
-        case SDL_SCANCODE_9: return 13;
-        case SDL_SCANCODE_O: return 14;
-        case SDL_SCANCODE_0: return 15;
-        case SDL_SCANCODE_P: return 16;
-        // Bottom row -- lower octave (12*(base_octave-1) + 0..11)
-        case SDL_SCANCODE_Z: return -12;
-        case SDL_SCANCODE_S: return -11;
-        case SDL_SCANCODE_X: return -10;
-        case SDL_SCANCODE_D: return -9;
-        case SDL_SCANCODE_C: return -8;
-        case SDL_SCANCODE_V: return -7;
-        case SDL_SCANCODE_G: return -6;
-        case SDL_SCANCODE_B: return -5;
-        case SDL_SCANCODE_H: return -4;
-        case SDL_SCANCODE_N: return -3;
-        case SDL_SCANCODE_J: return -2;
-        case SDL_SCANCODE_M: return -1;
-    }
-    return -127;
+    // Delegates to the shared keyjazz table so the Arpeggio editor honors the
+    // same tracker-vs-piano layout toggle as the Pattern / Instrument editors.
+    // KJ_NOT_A_NOTE == -127, so the existing `off != -127` callers keep working.
+    KeyjazzLayout kjl = zt_config_globals.keyjazz_piano_layout ? KJ_PIANO : KJ_TRACKER;
+    return keyjazz_offset(sc, kjl);
 }
 
 // SDL scancode -> SDLK_* mapping for the keyjazz keys, so we can call
@@ -211,6 +183,13 @@ static int ar_keyjazz_keysym_for_scancode(int sc) {
         case SDL_SCANCODE_G: return SDLK_G;
         case SDL_SCANCODE_H: return SDLK_H;
         case SDL_SCANCODE_J: return SDLK_J;
+        // Extra keys recruited by the piano (Ableton/Logic) layout.
+        case SDL_SCANCODE_A:          return SDLK_A;
+        case SDL_SCANCODE_F:          return SDLK_F;
+        case SDL_SCANCODE_K:          return SDLK_K;
+        case SDL_SCANCODE_L:          return SDLK_L;
+        case SDL_SCANCODE_SEMICOLON:  return SDLK_SEMICOLON;
+        case SDL_SCANCODE_APOSTROPHE: return SDLK_APOSTROPHE;
     }
     return 0;
 }

@@ -254,6 +254,7 @@ ZTConf::ZTConf() {
     default_directory[0] = '\0';
     record_velocity = 1;
     cc_draw_overwrite = 0;  // default OFF: protect existing drawbars
+    keyjazz_piano_layout = 0;  // default OFF: classic tracker keyjazz layout
     post_load_page = POST_LOAD_PATTERN_EDIT;
     note_audition_step_mode = ZT_NAS_EDITSTEP;
     ccizer_folder[0] = '\0';
@@ -360,7 +361,8 @@ int ZTConf::load()
   centered_editing = getFlag("centered_edit");
   record_velocity = getFlag("record_velocity");
   if (Config->get("cc_draw_overwrite")) cc_draw_overwrite = getFlag("cc_draw_overwrite");
-  
+  if (Config->get("keyjazz_piano")) keyjazz_piano_layout = getFlag("keyjazz_piano");
+
   if(Config->get("default_directory"))                strcpy(default_directory, Config->get("default_directory"));
   if(Config->get("autoload_ztfile_filename"))         strcpy(autoload_ztfile_filename, Config->get("autoload_ztfile_filename"));
 
@@ -495,6 +497,11 @@ int ZTConf::save() {
         Config->set("cc_draw_overwrite","yes");
     else
         Config->set("cc_draw_overwrite","no");
+
+    if (keyjazz_piano_layout)
+        Config->set("keyjazz_piano","yes");
+    else
+        Config->set("keyjazz_piano","no");
 
     if (midi_in_sync)
         Config->set("midi_in_sync","yes");

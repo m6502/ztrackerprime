@@ -4,6 +4,44 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_28 (Ableton/Logic piano keyjazz layout toggle in F2 F2)
+----------------------------------------------------------------------------
+
+        + New "PianoKey" checkbox in the F2 F2 Pattern Editor Options.
+          OFF (default) keeps the classic tracker keyjazz layout
+          (Q-row = upper octave, Z-row = lower octave). ON switches to
+          the Ableton Live / Logic "Musical Typing" layout: the home row
+          A S D F G H J K (L ; ') are the white keys and W E T Y U (O P)
+          are the black keys -- a b c... one piano octave climbing
+          rightward (a=C, w=C#, s=D, e=D#, d=E, ...). For users who
+          keyjazz in those DAWs and want the same feel in zTracker.
+
+        + Logic / Ableton "Musical Typing" transport controls in piano
+          mode, on the note column:
+            Z / X  -- octave down / up (in addition to the [ ] keys,
+                      which keep working everywhere as before).
+            C / V  -- decrease / increase the keyjazz velocity. The new
+                      value is shown in the status bar ("KeyJazz
+                      velocity: NN") so you can see what notes will use
+                      going forward. Step is 8, clamped 1..127.
+          Notes played/entered in piano mode are written to the pattern
+          with that keyjazz velocity in the volume column (regardless of
+          the RecVeloc toggle). The number row is unused in piano mode
+          since the black keys come from W/E/T/Y/U/O/P.
+
+        + The layout applies to all note-entry paths -- Pattern Editor
+          cell entry + draw-mode audition, Instrument Editor audition,
+          and the Arpeggio Editor keyjazz slot -- and persists in zt.conf
+          as keyjazz_piano=yes/no. Default off = no change for existing
+          songs or muscle memory. (The Z/X octave + C/V velocity controls
+          are Pattern Editor note-column only.)
+
+        * Internal: the keyjazz keyboard->note layout, previously
+          hand-copied as four separate switch statements, is now a single
+          shared table (src/keyjazz_map.h) with a unit-test suite
+          (tests/test_keyjazz_map.cpp, the 12th CTest target) that
+          regression-guards the tracker layout byte-for-byte.
+
 zt 2026_05_25_2 (Linux: bundled libSDL3.so.0 found at runtime via rpath=$ORIGIN)
 ----------------------------------------------------------------------------
 

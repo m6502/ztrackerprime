@@ -100,6 +100,10 @@ class ZTConf {
         // accidentally overwritten when you cycle to a new CC. When 1,
         // mouse-drag overwrites any prior effect on the row.
         int cc_draw_overwrite;
+        // 0 (default) = classic tracker keyjazz layout (Q-row + Z-row octaves).
+        // 1 = Ableton Live / Logic "Musical Typing" piano layout: home row is
+        // the white keys, the row above is the black keys. See keyjazz_map.h.
+        int keyjazz_piano_layout;
         int post_load_page;        // E_post_load_page — page to switch to after a successful load
         char window_icon[MAX_PATH + 1];
         // How far the cursor advances after the 4 / 8 audition keys

@@ -79,4 +79,46 @@ typedef uint16_t SDL_Keymod;
 #define SDLK_PAGEUP    ((unsigned int)0x40000056)
 #define SDLK_PAGEDOWN  ((unsigned int)0x40000057)
 
+// SDL3 physical scancodes (real values from SDL_scancode.h) — used by the
+// keyjazz_map test so the shared note table can be exercised SDL-free.
+#define SDL_SCANCODE_A 4
+#define SDL_SCANCODE_B 5
+#define SDL_SCANCODE_C 6
+#define SDL_SCANCODE_D 7
+#define SDL_SCANCODE_E 8
+#define SDL_SCANCODE_F 9
+#define SDL_SCANCODE_G 10
+#define SDL_SCANCODE_H 11
+#define SDL_SCANCODE_I 12
+#define SDL_SCANCODE_J 13
+#define SDL_SCANCODE_K 14
+#define SDL_SCANCODE_L 15
+#define SDL_SCANCODE_M 16
+#define SDL_SCANCODE_N 17
+#define SDL_SCANCODE_O 18
+#define SDL_SCANCODE_P 19
+#define SDL_SCANCODE_Q 20
+#define SDL_SCANCODE_R 21
+#define SDL_SCANCODE_S 22
+#define SDL_SCANCODE_T 23
+#define SDL_SCANCODE_U 24
+#define SDL_SCANCODE_V 25
+#define SDL_SCANCODE_W 26
+#define SDL_SCANCODE_X 27
+#define SDL_SCANCODE_Y 28
+#define SDL_SCANCODE_Z 29
+#define SDL_SCANCODE_1 30
+#define SDL_SCANCODE_2 31
+#define SDL_SCANCODE_3 32
+#define SDL_SCANCODE_4 33
+#define SDL_SCANCODE_5 34
+#define SDL_SCANCODE_6 35
+#define SDL_SCANCODE_7 36
+#define SDL_SCANCODE_8 37
+#define SDL_SCANCODE_9 38
+#define SDL_SCANCODE_0 39
+#define SDL_SCANCODE_SEMICOLON  51
+#define SDL_SCANCODE_APOSTROPHE 52
+#define SDL_SCANCODE_GRAVE      53
+
 #endif // ZT_SDL_STUB_H

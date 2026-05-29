@@ -396,6 +396,10 @@ class CUI_PEParms : public CUI_Page {
         // drawbars are protected from accidental overwrite.
         CheckBox *cb_cc_draw_overwrite ;
 
+        // Keyjazz layout toggle. OFF = classic tracker layout, ON = Ableton
+        // Live / Logic piano layout (home row = white keys). See keyjazz_map.h.
+        CheckBox *cb_keyjazz_piano ;
+
         ValueSlider *vs_speedup ;
 
         CUI_PEParms();
