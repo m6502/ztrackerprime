@@ -16,10 +16,12 @@ zt 2026_05_29 (Instrument Editor: Create 16 channels for a MIDI device)
 
         + Two ways to trigger it:
             - Press F3 again while already on the Instrument Editor to open
-              the new Instrument Editor Options popup (shows the device
-              name + a "Create 16 Channels" button; Enter confirms, Esc
-              cancels). Mirrors the F2-again Pattern Editor Options popup.
-            - Alt+G in the Instrument Editor does it directly.
+              a popup that lists the open MIDI Out devices: pick one
+              (Up/Dn), then Enter or the "Create 16 Channels" button
+              generates them; Esc cancels. No need to assign a device
+              elsewhere first. Mirrors the F2-again Pattern Editor popup.
+            - Alt+G in the Instrument Editor does it directly using the
+              current instrument's device.
 
         + Non-destructive: only EMPTY instrument slots are used, so existing
           instruments are never overwritten. A slot counts as empty when it

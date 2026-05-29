@@ -717,9 +717,12 @@ extern int base_octave ;
 extern int keyjazz_velocity ;
 
 // Instrument Editor helper: fill the next up-to-16 empty instrument slots with
-// the current instrument's MIDI device on channels 1..16, named
-// "<device> Channel 01".."<device> Channel 16". Writes a summary to szStatmsg /
-// statusmsg and returns how many instruments were created. See CUI_InstEditor.cpp.
+// the given MIDI device on channels 1..16, named "<device> Channel 01" ..
+// "<device> Channel 16". Writes a summary to szStatmsg / statusmsg and returns
+// how many instruments were created. The _for_current_device wrapper uses the
+// current instrument's device (Alt+G shortcut); the F3-again popup passes the
+// device picked in its in-dialog list. See CUI_InstEditor.cpp.
+int inst_create_16_channels_for_device(unsigned int dev);
 int inst_create_16_channels_for_current_device(void);
 extern int cur_step;
 

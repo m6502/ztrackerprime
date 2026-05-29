@@ -55,17 +55,14 @@ static bool inst_slot_available(instrument *in) {
     return true;
 }
 
-// Fill the next up-to-16 empty instrument slots with the current instrument's
-// MIDI device, on channels 1..16, named "<device> Channel 01".."Channel 16".
-// Non-destructive: only writes into available slots (never overwrites). Returns
-// the number of instruments created.
-int inst_create_16_channels_for_current_device(void) {
-    if (!song || cur_inst < 0 || cur_inst >= MAX_INSTS || !song->instruments[cur_inst])
-        return 0;
-
-    unsigned int dev = song->instruments[cur_inst]->midi_device;
-    if (dev >= MidiOut->numOuputDevices) {
-        sprintf(szStatmsg, "Assign a MIDI Out device to this instrument first");
+// Fill the next up-to-16 empty instrument slots with the given MIDI device, on
+// channels 1..16, named "<device> Channel 01".."Channel 16". Non-destructive:
+// only writes into available slots (never overwrites). Returns the number of
+// instruments created.
+int inst_create_16_channels_for_device(unsigned int dev) {
+    if (!song) return 0;
+    if (dev >= MidiOut->numOuputDevices || MidiOut->outputDevices[dev] == NULL) {
+        sprintf(szStatmsg, "Pick a MIDI Out device first");
         statusmsg = szStatmsg; need_refresh++;
         return 0;
     }
@@ -105,6 +102,14 @@ int inst_create_16_channels_for_current_device(void) {
         sprintf(szStatmsg, "Created 16 channels for %s", devname);
     statusmsg = szStatmsg; need_refresh++;
     return created;
+}
+
+// Convenience wrapper for the Alt+G shortcut: use the current instrument's
+// device. (The F3-again popup lets you pick any open device directly.)
+int inst_create_16_channels_for_current_device(void) {
+    if (!song || cur_inst < 0 || cur_inst >= MAX_INSTS || !song->instruments[cur_inst])
+        return 0;
+    return inst_create_16_channels_for_device(song->instruments[cur_inst]->midi_device);
 }
 
 void BTNCLK_ToggleNoteRetrig(UserInterfaceElement *b) {

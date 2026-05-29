@@ -411,11 +411,13 @@ class CUI_PEParms : public CUI_Page {
 };
 
 // Instrument Editor options popup (press F3 again while on the Instrument
-// Editor). Single action: "Create 16 Channels" for the current instrument's
-// MIDI device. Mirrors the CUI_PEParms F2-again popup pattern.
+// Editor). Pick a MIDI Out device from the in-dialog list, then "Create 16
+// Channels" generates 16 instruments (channels 1..16) for it. Mirrors the
+// CUI_PEParms F2-again popup pattern.
 class CUI_IEParms : public CUI_Page {
     public:
-        Button *btn_create16 ;
+        ListBox *dev_list ;     // in-dialog MIDI Out device picker
+        Button  *btn_create16 ;
 
         CUI_IEParms();
 
@@ -423,6 +425,10 @@ class CUI_IEParms : public CUI_Page {
         void leave(void);
         void update(void);
         void draw(Drawable *S);
+
+        // Generate 16 channel-instruments for the device highlighted in
+        // dev_list, then close the popup. Called by the button and by Enter.
+        void do_create(void);
 };
 
 class CUI_PEVol : public CUI_Page {
