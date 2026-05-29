@@ -79,6 +79,13 @@ class ZTConf {
         int autosave_interval_seconds;
         int midi_clock; // default_midiclock;
         int midi_stop_start; // default_midistopstart;
+        // Sample playback (optional). 0 (default) = pure MIDI: no audio
+        // device is opened and the SampleOutputDevice is not registered,
+        // so MIDI-only users are completely unaffected. 1 = open the SDL
+        // audio backend at startup and register the sample voice mixer as
+        // an output device. The --load-sample CLI flag forces this on for
+        // the session.
+        int audio_enabled;
         int instrument_global_volume;
         int cur_edit_mode;
         int default_tpb;

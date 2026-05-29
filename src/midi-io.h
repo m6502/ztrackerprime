@@ -229,6 +229,11 @@ class midiOut {
             if (dev>=numOuputDevices) return;
             outputDevices[dev]->progChange(program,bank,chan);
         }
+        // OUTPUTDEVICE_TYPE_* of a device (NONE for an out-of-range index).
+        inline int get_type(unsigned int dev) {
+            if (dev>=numOuputDevices) return OUTPUTDEVICE_TYPE_NONE;
+            return outputDevices[dev]->type;
+        }
         inline void sendCC(unsigned int dev,unsigned char cc, unsigned char value,unsigned char chan) {
             if (dev>=numOuputDevices) return;
             outputDevices[dev]->sendCC(cc,value,chan);

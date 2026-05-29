@@ -258,6 +258,12 @@
                               (sets midi_in_sync + midi_in_sync_chase_
                               tempo so the song tempo follows incoming
                               F8 MIDI clock from that port).
+       --load-sample <file>   Load a WAV into sample slot 0 and route
+                              instrument 1 to it, turning audio on for
+                              this session. Play notes on instrument 1
+                              to hear the sample player. (Audio is off by
+                              default; the zt.conf audio_enabled key turns
+                              it on permanently.)
 
  Examples:
    zt mysong.zt
