@@ -23,12 +23,15 @@ A tour of every page zTracker' currently has, in the order you'll typically meet
 
 ```sh
 mkdir -p docs/screenshots
+# Linux / Windows: the executable sits directly in build/Program/
 ./build/Program/zt --headless --script tests/scripts/all-pages.txt
+# macOS: the build produces an .app bundle, so point at the executable inside it
+./build/Program/zt.app/Contents/MacOS/zt --headless --script tests/scripts/all-pages.txt
 ```
 
 ### Pattern Editor — `F2`
 
-The home base. Every track is a vertical column of `note · instrument · volume · effect` events; horizontal motion picks the column, vertical motion picks the row. Multi-channel MIDI out, real-time BPM/TPB changes, the row-highlighting + lowlighting that lets you stay oriented in non-4/4 patterns, the Replicate / Clone / Humanize / Interpolate operations ported from Paketti, the `Ctrl+Shift+§` CC drawmode that records incoming MIDI CC into pattern rows as `Sxxyy` effects.
+The home base. Every track is a vertical column of `note · instrument · volume · effect` events; horizontal motion picks the column, vertical motion picks the row. Multi-channel MIDI out, real-time BPM/TPB changes, the row-highlighting + lowlighting that lets you stay oriented in non-4/4 patterns, the Replicate / Clone / Humanize / Interpolate operations ported from Paketti, the `Ctrl+Shift+§` CC drawmode that records incoming MIDI CC into pattern rows as `Sxxyy` effects. Pressing `F2` again opens the Pattern Editor Options popup, which includes the **PianoKey** toggle — switch the note-entry keymap from the classic tracker layout to the Ableton Live / Logic "Musical Typing" piano layout (home row = white keys, row above = black keys); in that mode `Z`/`X` shift the octave and `C`/`V` change the keyjazz velocity that's written into the volume column.
 
 ![Pattern Editor](docs/screenshots/01-pattern-editor.png)
 
@@ -40,7 +43,7 @@ Section-aware help text covering every shortcut. F1 toggles in/out of Help; Tab 
 
 ### Instrument Editor — `F3`
 
-Per-instrument MIDI device, channel, program, bank-select, transpose, and the per-instrument CCizer Bank assignment that ties an instrument to a specific Paketti `.txt` (so the CC Console at Shift+F3 auto-loads the right slider set when you change instruments).
+Per-instrument MIDI device, channel, program, bank-select, transpose, and the per-instrument CCizer Bank assignment that ties an instrument to a specific Paketti `.txt` (so the CC Console at Shift+F3 auto-loads the right slider set when you change instruments). Pressing `F3` again opens a popup with **Create 16 Channels**: pick a MIDI Out device from the in-dialog list and it fills the next 16 empty instrument slots with that device on channels 1–16, named "`<device> Channel 01`" … "`<device> Channel 16`" (e.g. "IAC Bus 1 Channel 01"). Non-destructive — existing instruments are never overwritten. `Alt+G` does the same directly using the current instrument's device.
 
 ![Instrument Editor](docs/screenshots/04-instrument-editor.png)
 
@@ -262,6 +265,8 @@ New pages and editors:
 
 - **About page (Alt+F12)** — credits, version, project links.
 
+- **Create 16 Channels (F3 again / Alt+G)** — pressing F3 while already on the Instrument Editor opens a popup with an in-dialog MIDI Out device picker; choosing a device fills the next 16 empty instrument slots with that device on channels 1–16, named "`<device> Channel 01`" … "`Channel 16`". Non-destructive (only empty slots are used). Alt+G runs it directly using the current instrument's device.
+
 
 Pattern editing additions:
 
@@ -272,6 +277,8 @@ Pattern editing additions:
 - **Interpolate (Ctrl+I)** — interpolate values across a selection (note, vol, or fx param), with a sensible fallback when no selection column applies.
 
 - **Multichannel MIDI export** — exporting `.mid` writes one track per channel instead of flattening everything onto one track.
+
+- **PianoKey keyjazz layout** — a toggle in the Pattern Editor Options (F2 again) switches note entry from the classic tracker layout to the Ableton Live / Logic "Musical Typing" piano layout: home row `A S D F G H J K (L ; ')` = white keys, row above `W E T Y U (O P)` = black keys. In piano mode `Z`/`X` shift the octave and `C`/`V` decrease/increase the keyjazz velocity (shown in the status bar and written into the volume column). Default off; persists in `zt.conf` as `keyjazz_piano`.
 
 - **Centered editing mode** — keep the current row pinned at the centre of the pattern view as the cursor moves.
 
