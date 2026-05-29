@@ -14,11 +14,11 @@ void AddPlugin(midiOut *mout, OutputDevice *o)
 
 void InitializePlugins(midiOut *mout)
 {
-    // MIDI devices first, so their indices match midiOutGetNumDevs() order --
-    // the device picker and saved selections index by position. Audio plugins
-    // are appended AFTER, so enabling _ENABLE_AUDIO never shifts a MIDI device
-    // index (the selection-breaking bug the enable-audio spike found when the
-    // audio plugins sat at indices 0,1 ahead of MIDI).
+    // MIDI devices first, so their indices -- which instruments persist in .zt
+    // as midi_device, and which the device picker shows -- stay stable whether
+    // or not audio is enabled. Audio output devices are appended AFTER, so
+    // enabling _ENABLE_AUDIO never shifts a MIDI index (the selection-breaking
+    // bug the enable-audio spike found with audio plugins at indices 0,1).
     unsigned int i = mout->numOuputDevices;
     unsigned int devs = midiOutGetNumDevs();
     unsigned int total = i+devs;
@@ -28,6 +28,16 @@ void InitializePlugins(midiOut *mout)
     }
 
 #ifdef _ENABLE_AUDIO
+    // Sample voice mixer first (when enabled), so the sampler's "first audio
+    // device" lookup resolves to it. Opened immediately so the backend can
+    // pump it. Opt-in via zt.conf audio_enabled / --load-sample.
+    if (zt_config_globals.audio_enabled) {
+        SampleOutputDevice *smp = new SampleOutputDevice();
+        smp->open();
+        AddPlugin(mout, smp);
+    }
+    // Fun-sounds generators (Ctrl+Alt+F finds TestTone by name). Always
+    // registered, never opened until the easter egg asks.
     AddPlugin(mout, new NoiseOutputDevice());
     AddPlugin(mout, new TestToneOutputDevice());
 #endif
@@ -194,12 +204,14 @@ int MidiOutputDevice::sendSysEx(const unsigned char *bytes, int len) {
 
 
 
-#ifdef _ENABLE_AUDIO    
+#ifdef _ENABLE_AUDIO
 
+#include "sample_voice.h"
 
 ///////
 //
-// TestTone plugin - Plays a square wave at fixed freq
+// TestTone plugin - the Ctrl+Alt+F fun-sounds generator. A square-ish 8-bit
+// wave written byte-wise into the S16 stream, so it aliases into a warble.
 //
 
 TestToneOutputDevice::TestToneOutputDevice()
@@ -214,7 +226,6 @@ TestToneOutputDevice::TestToneOutputDevice()
         wave[i]=0;
     for(i=128;i<256;i++)
         wave[i]=0x7F;
-    //smp = NULL;
 }
 
 
@@ -223,14 +234,12 @@ TestToneOutputDevice::~TestToneOutputDevice() {
 
 
 int TestToneOutputDevice::open(void) {
-    //smp = Mix_LoadWAV("sound.wav");
     opened = 1;
     return 0;
 }
 
 
 int TestToneOutputDevice::close(void) {
-    //Mix_FreeChunk(smp);
     opened = 0;
     return 0;
 }
@@ -247,7 +256,6 @@ void TestToneOutputDevice::send(unsigned int msg) {
 }
 void TestToneOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
     makenoise=1;
-    //Mix_PlayChannel(-1,smp,0);
 }
 void TestToneOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
     makenoise=0;
@@ -261,12 +269,10 @@ void TestToneOutputDevice::progChange(int program, int bank, unsigned char chan)
 void TestToneOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
 }
 void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
-    //Mix_PlayChannelTimed()
-    
         if (makenoise) {
         for(int i=0;i<len;i++) {
             stream[i] = wave[wavec&0xFF];
-            wavec++; 
+            wavec++;
         }
     }
 }
@@ -275,7 +281,7 @@ void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
 
 ///////
 //
-// NoiseMaker plugin - Makes random static
+// NoiseMaker plugin - the fun-sounds static generator (sibling of TestTone).
 //
 
 
@@ -323,6 +329,129 @@ void NoiseOutputDevice::work( void *udata, Uint8 *stream, int len) {
         for(int i=0;i<len;i++) {
             stream[i] = rand()&0x3F;
         }
+    }
+}
+
+
+///////
+//
+// SampleOutputDevice - software sampler. Plays PCM from song->samples[]
+// polyphonically, pitched from the note relative to each sample's root.
+//
+
+SampleOutputDevice::SampleOutputDevice() {
+    type = OUTPUTDEVICE_TYPE_AUDIO;
+    strcpy(szName, "Sample Player");
+    for (int v = 0; v < ZT_SAMPLE_MAX_VOICES; v++) voices[v].active = false;
+    for (int c = 0; c < 16; c++) sample_for_chan[c] = -1;
+}
+
+SampleOutputDevice::~SampleOutputDevice() {
+}
+
+int SampleOutputDevice::open(void)  { opened = 1; return 0; }
+int SampleOutputDevice::close(void) { opened = 0; return 0; }
+
+void SampleOutputDevice::all_voices_off_locked() {
+    for (int v = 0; v < ZT_SAMPLE_MAX_VOICES; v++) voices[v].active = false;
+}
+
+void SampleOutputDevice::reset(void) {
+    {
+        std::lock_guard<std::mutex> lk(mtx);
+        all_voices_off_locked();
+        for (int c = 0; c < 16; c++) sample_for_chan[c] = -1;
+    }
+    OutputDevice::reset(); // clears notestates
+}
+
+void SampleOutputDevice::hardpanic(void) {
+    panic();
+}
+
+void SampleOutputDevice::send(unsigned int /*msg*/) {}
+
+// program = sample-pool index for this channel (-1 / out-of-range clears it).
+void SampleOutputDevice::progChange(int program, int /*bank*/, unsigned char chan) {
+    std::lock_guard<std::mutex> lk(mtx);
+    sample_for_chan[chan & 15] = (program >= 0 && program < ZTM_MAX_SAMPLES) ? program : -1;
+}
+
+void SampleOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+    std::lock_guard<std::mutex> lk(mtx);
+    int idx = sample_for_chan[chan & 15];
+    if (idx < 0 || !song || !song->samples[idx] || song->samples[idx]->isempty())
+        return;
+    const zt_sample *s = song->samples[idx];
+
+    // find a free voice, else steal the one nearest its end (largest pos)
+    int slot = -1; double worst = -1.0;
+    for (int v = 0; v < ZT_SAMPLE_MAX_VOICES; v++) {
+        if (!voices[v].active) { slot = v; break; }
+        if (voices[v].pos > worst) { worst = voices[v].pos; slot = v; }
+    }
+    voice &vo = voices[slot];
+    vo.smp    = s;
+    vo.pos    = 0.0;
+    vo.step   = zt_voice_step(s, (int)note, ZT_SAMPLE_OUT_RATE);
+    vo.note   = note;
+    vo.chan   = chan;
+    vo.vel    = vol;
+    vo.active = true;
+}
+
+void SampleOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char /*vol*/) {
+    std::lock_guard<std::mutex> lk(mtx);
+    // One-shot/looped: a note-off stops matching voices. (No release tail
+    // in this first cut; the editor PR can add loop-release behaviour.)
+    for (int v = 0; v < ZT_SAMPLE_MAX_VOICES; v++) {
+        if (voices[v].active && voices[v].note == note && voices[v].chan == chan)
+            voices[v].active = false;
+    }
+}
+
+void SampleOutputDevice::afterTouch(unsigned char, unsigned char, unsigned char) {}
+
+// Live pitch-bend: scale every active voice on the channel. value is the
+// raw 14-bit wheel (0x2000 = center); map to +/- 2 semitones.
+void SampleOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+    std::lock_guard<std::mutex> lk(mtx);
+    double semis = ((double)value - 8192.0) / 8192.0 * 2.0;
+    double bend  = pow(2.0, semis / 12.0);
+    for (int v = 0; v < ZT_SAMPLE_MAX_VOICES; v++) {
+        if (voices[v].active && voices[v].chan == chan && voices[v].smp) {
+            double base = zt_voice_step(voices[v].smp, (int)voices[v].note, ZT_SAMPLE_OUT_RATE);
+            voices[v].step = base * bend;
+        }
+    }
+}
+
+void SampleOutputDevice::sendCC(unsigned char, unsigned char, unsigned char) {}
+
+// Audio callback thread. Writes interleaved S16 stereo, `len` bytes total
+// (= len/4 frames). Always writes every frame (silence when no voice), so
+// the uninitialised mix buffer never leaks garbage.
+void SampleOutputDevice::work(void * /*udata*/, Uint8 *stream, int len) {
+    std::lock_guard<std::mutex> lk(mtx);
+    short int *out = (short int *)stream;
+    int frames = len / (int)(2 * sizeof(short int));
+
+    for (int f = 0; f < frames; f++) {
+        double accL = 0.0, accR = 0.0;
+        for (int v = 0; v < ZT_SAMPLE_MAX_VOICES; v++) {
+            voice &vo = voices[v];
+            if (!vo.active || !vo.smp) continue;
+            double g = (double)vo.vel / 127.0;
+            accL += g * (double)zt_voice_read(vo.smp, vo.pos, 0);
+            accR += g * (double)zt_voice_read(vo.smp, vo.pos, 1);
+            bool active = true;
+            vo.pos = zt_voice_advance(vo.smp, vo.pos, vo.step, &active);
+            vo.active = active;
+        }
+        if (accL >  32767.0) accL =  32767.0; if (accL < -32768.0) accL = -32768.0;
+        if (accR >  32767.0) accR =  32767.0; if (accR < -32768.0) accR = -32768.0;
+        out[f * 2 + 0] = (short int)accL;
+        out[f * 2 + 1] = (short int)accR;
     }
 }
 
