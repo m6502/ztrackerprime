@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+#
+# build-win32-macos.sh -- cross-compile the Windows 32-bit (XP-compatible)
+# zt.exe FROM macOS, using Homebrew's mingw-w64 toolchain.
+#
+# This is the local equivalent of the "Windows x86 (XP-compat, MinGW)" job in
+# .github/workflows/build.yml. Same toolchain settings, same XP target, same
+# static-runtime link -- it just runs on your Mac instead of an Ubuntu runner,
+# so you get a Windows build without GitHub Actions, Wine, or a Windows box.
+#
+# What it produces:
+#   build-win32-macos/Program/zt.exe              (the binary)
+#   dist/ztrackerprime-windows-x86-xp/            (binary + SDL3.dll + assets)
+#
+# Prerequisites (install once):
+#   brew install mingw-w64 cmake ninja
+#
+# Usage:
+#   ./build-win32-macos.sh            # configure + build + stage
+#   ./build-win32-macos.sh --clean    # wipe the build dir first
+#   ./build-win32-macos.sh --run      # also try to launch the result under Wine
+#
+# Environment overrides:
+#   SDL3_VERSION     SDL3 release to fetch (default 3.4.4 -- matches CI)
+#   LIBPNG_VERSION   passed to fetch-extlibs.sh (default 1.6.44)
+#   ZLIB_VERSION     passed to fetch-extlibs.sh (default 1.3.1)
+#   BUILD_DIR        build directory (default build-win32-macos)
+#   MINGW_PREFIX     toolchain prefix (default i686-w64-mingw32)
+#
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$script_dir"
+
+: "${SDL3_VERSION:=3.4.4}"
+: "${LIBPNG_VERSION:=1.6.44}"
+: "${ZLIB_VERSION:=1.3.1}"
+: "${BUILD_DIR:=build-win32-macos}"
+: "${MINGW_PREFIX:=i686-w64-mingw32}"
+
+run_after_build=0
+do_clean=0
+for arg in "$@"; do
+  case "$arg" in
+    --clean) do_clean=1 ;;
+    --run)   run_after_build=1 ;;
+    --help|-h)
+      sed -n '2,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *) echo "Unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# This script is macOS-specific. On Linux use the CI recipe; on Windows use
+# build-win32.sh.
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "build-win32-macos.sh is for macOS. On Linux/Windows use the other build-*.sh scripts." >&2
+  exit 1
+fi
+
+# --- 1. Verify the cross toolchain is present ------------------------------
+CC_BIN="${MINGW_PREFIX}-gcc"
+CXX_BIN="${MINGW_PREFIX}-g++"
+RC_BIN="${MINGW_PREFIX}-windres"
+missing_tools=0
+for t in "$CC_BIN" "$CXX_BIN" "$RC_BIN" cmake ninja curl tar; do
+  if ! command -v "$t" >/dev/null 2>&1; then
+    echo "  missing: $t" >&2
+    missing_tools=1
+  fi
+done
+if [[ "$missing_tools" -ne 0 ]]; then
+  echo "" >&2
+  echo "Install the prerequisites with:  brew install mingw-w64 cmake ninja" >&2
+  exit 1
+fi
+
+# Homebrew's mingw-w64 ships posix-thread compilers under the plain names
+# (no -posix suffix like Ubuntu). The sysroot is reported by the compiler.
+SYSROOT="$("$CXX_BIN" -print-sysroot)"
+if [[ -z "$SYSROOT" || ! -d "$SYSROOT" ]]; then
+  # Fall back to the conventional Homebrew Cellar layout.
+  SYSROOT="$(dirname "$(dirname "$(command -v "$CXX_BIN")")")/toolchain-i686"
+fi
+echo "[build-win32-macos] toolchain: $("$CXX_BIN" --version | head -1)"
+echo "[build-win32-macos] sysroot:   $SYSROOT"
+
+# --- 2. Populate extlibs (libpng + zlib) if needed -------------------------
+# Lua is committed; libpng/zlib are fetched (same as CI). Skip if already there.
+if [[ ! -f extlibs/libpng/png.c || ! -f extlibs/zlib/adler32.c ]]; then
+  echo "[build-win32-macos] fetching extlibs (libpng $LIBPNG_VERSION, zlib $ZLIB_VERSION)..."
+  LIBPNG_VERSION="$LIBPNG_VERSION" ZLIB_VERSION="$ZLIB_VERSION" \
+    bash .github/scripts/fetch-extlibs.sh
+else
+  echo "[build-win32-macos] extlibs already present, skipping fetch."
+fi
+
+# --- 3. Fetch the SDL3 MinGW devel package (i686) --------------------------
+SDL3_ROOT="$script_dir/sdl3-mingw"
+SDL3_DIR="$SDL3_ROOT/SDL3-${SDL3_VERSION}/${MINGW_PREFIX}"
+if [[ ! -d "$SDL3_DIR" ]]; then
+  echo "[build-win32-macos] downloading SDL3 $SDL3_VERSION MinGW devel..."
+  mkdir -p "$SDL3_ROOT"
+  ( cd "$SDL3_ROOT"
+    tarball="SDL3-devel-${SDL3_VERSION}-mingw.tar.gz"
+    if [[ ! -f "$tarball" ]]; then
+      curl -fL --retry 5 --retry-delay 5 --retry-all-errors \
+           --connect-timeout 30 --max-time 600 \
+           -O "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/${tarball}"
+    fi
+    tar xf "$tarball"
+  )
+fi
+if [[ ! -d "$SDL3_DIR" ]]; then
+  echo "ERROR: SDL3 i686 prefix not found at $SDL3_DIR after download." >&2
+  find "$SDL3_ROOT" -maxdepth 4 -print | head -50 >&2
+  exit 1
+fi
+SDL3_INCLUDE="$SDL3_DIR/include"
+SDL3_LIBRARY="$SDL3_DIR/lib/libSDL3.dll.a"
+SDL3_DLL="$SDL3_DIR/bin/SDL3.dll"
+echo "[build-win32-macos] SDL3:      $SDL3_DIR"
+
+# --- 4. Generate the CMake toolchain file ----------------------------------
+# Mirrors .github/workflows/build.yml's i686 XP toolchain, adapted for the
+# Homebrew compiler names (no -posix suffix) and the Homebrew sysroot.
+TOOLCHAIN_FILE="$script_dir/toolchain-mingw-i686-macos.cmake"
+cat > "$TOOLCHAIN_FILE" <<EOF
+# Auto-generated by build-win32-macos.sh -- do not edit by hand.
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR i686)
+set(TOOLCHAIN_PREFIX ${MINGW_PREFIX})
+set(CMAKE_C_COMPILER   \${TOOLCHAIN_PREFIX}-gcc)
+set(CMAKE_CXX_COMPILER \${TOOLCHAIN_PREFIX}-g++)
+set(CMAKE_RC_COMPILER  \${TOOLCHAIN_PREFIX}-windres)
+set(CMAKE_FIND_ROOT_PATH "${SYSROOT}")
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+# XP target: 0x0501 == Windows XP
+add_compile_definitions(_WIN32_WINNT=0x0501 WINVER=0x0501)
+# Static-link the MinGW C++/pthread runtime so zt.exe does not depend on
+# libwinpthread-1.dll / libgcc_s_*-1.dll / libstdc++-6.dll sitting next to it.
+add_link_options(-static -static-libgcc -static-libstdc++)
+EOF
+echo "[build-win32-macos] wrote $TOOLCHAIN_FILE"
+
+# --- 5. Configure + build --------------------------------------------------
+if [[ "$do_clean" -eq 1 ]]; then
+  rm -rf "$BUILD_DIR"
+fi
+
+cmake -S . -B "$BUILD_DIR" -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=TRUE \
+  -DSDL3_INCLUDE_DIR="$SDL3_INCLUDE" \
+  -DSDL3_LIBRARY="$SDL3_LIBRARY"
+
+cmake --build "$BUILD_DIR" --config Release -j
+
+EXE="$BUILD_DIR/Program/zt.exe"
+if [[ ! -f "$EXE" ]]; then
+  echo "ERROR: build completed but $EXE not found." >&2
+  exit 1
+fi
+
+# --- 6. Stage a self-contained dist folder ---------------------------------
+DIST="dist/ztrackerprime-windows-x86-xp"
+rm -rf "$DIST"
+mkdir -p "$DIST"
+cp "$EXE"          "$DIST/"
+cp "$SDL3_DLL"     "$DIST/"
+cp zt.conf         "$DIST/"
+cp -R skins        "$DIST/"
+cp -R doc          "$DIST/"
+[[ -d assets/ccizer ]] && cp -R assets/ccizer "$DIST/"
+[[ -d assets/syx ]]    && cp -R assets/syx    "$DIST/"
+
+echo ""
+echo "[build-win32-macos] DONE"
+echo "  exe:  $EXE  ($(/usr/bin/stat -f%z "$EXE") bytes)"
+echo "  dist: $DIST/"
+file "$EXE"
+
+if [[ "$run_after_build" -eq 1 ]]; then
+  if command -v wine >/dev/null 2>&1; then
+    echo "[build-win32-macos] launching under Wine..."
+    ( cd "$DIST" && wine zt.exe ) || true
+  else
+    echo "[build-win32-macos] --run requested but Wine is not installed (brew install --cask wine-stable)."
+  fi
+fi
