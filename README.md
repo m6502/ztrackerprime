@@ -355,8 +355,6 @@ Removed things:
 
 - Initial information screen has been removed.
 
-- VUMeters can't be enabled. It's been broken forever, and I don't use it - Will reenable if / when it's fixed.
-
 - 8 bit .png files are not supported anymore.
 
 - Comments when exporting .mid files have been removed (I needed them to be as small as possible).
@@ -369,8 +367,6 @@ Removed things:
 
 
 Broken / known limitations:
-
-- VUMeters are still disabled (see above).
 
 - Column-size view modes are stubbed out — only "Big" view is currently active.
 
