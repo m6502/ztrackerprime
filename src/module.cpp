@@ -84,6 +84,10 @@ instrument::instrument(int p)
 
   ccizer_bank[0] = '\0';
 
+  // No sample linked by default -- instruments are MIDI-only until a
+  // sample is explicitly assigned.
+  sample_index = -1;
+
   // CC envelope slots default to "unused" (cc=0xFF, num_nodes=0).
   // The Shift+F6 editor populates them on demand.
   for (int e = 0; e < ZTM_INST_MAX_ENVELOPES; e++) {
@@ -784,6 +788,11 @@ void zt_module::init(void)
     for(i=0;i<ZTM_MAX_INSTS;i++)
         instruments[i] = new instrument(i);
 
+    // Sample pool starts empty -- slots are allocated lazily on WAV load
+    // or .zt SMPL-chunk load.
+    for(i=0;i<ZTM_MAX_SAMPLES;i++)
+        samples[i] = NULL;
+
     for(i=0;i<ZTM_MAX_TRACKS;i++)
         track_mute[i] = 0;
 
@@ -830,6 +839,13 @@ void zt_module::de_init(void) {
         if (this->instruments[i])
             delete this->instruments[i];
         this->instruments[i] = NULL;
+    }
+
+    // delete samples (frees each sample's PCM via ~zt_sample)
+    for(i=0;i<ZTM_MAX_SAMPLES;i++) {
+        if (this->samples[i])
+            delete this->samples[i];
+        this->samples[i] = NULL;
     }
 
     // delete songmessage
