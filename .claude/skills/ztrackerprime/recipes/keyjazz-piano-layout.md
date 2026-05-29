@@ -6,18 +6,19 @@ label `PianoKey:`); conf key `keyjazz_piano`; test suite
 `tests/test_keyjazz_map.cpp` (12th CTest target).
 
 **Decisions taken (from the user, 2026-05-28):**
-- Z-row in piano mode = **match Logic exactly**: Z/X/C/V are NOT note keys
-  (Logic uses Z/X for octave shift, C/V for velocity). Only the home row +
-  the row above are notes in piano mode.
+- Z-row in piano mode = Z/X/C/V are NOT note keys. Per the user (2026-05-28):
+  **in piano mode Z and X are inert — they do NOT enter notes and do NOT
+  change the octave.** Only the home row + the row above are notes; the normal
+  zTracker octave controls still drive base_octave.
 - Upper range = **extend through L ; ' and O P** (white to F, black to D#).
 - Scope = **all note-entry pages** (Pattern + Instrument + Arpeggio editors).
 
-**Follow-up not in this PR:** the rest of Logic Musical Typing's *control*
-keys -- Z/X octave shift, C/V velocity, Tab sustain, 1/2 pitch bend, 3-8
-modulation. These collide with existing always-on pattern-editor editing keys
-and need their own collision-resolution + scoping decision; the note layout
-ships first. zTracker already has base_octave +/- and record-velocity, so some
-of those Logic controls map to existing features.
+**Follow-up not in this PR (and not committed to):** Logic Musical Typing's
+*control* keys -- C/V velocity, Tab sustain, 1/2 pitch bend, 3-8 modulation.
+These would collide with existing always-on pattern-editor editing keys and
+need their own collision-resolution + scoping decision. NOTE: Z/X octave-shift
+is explicitly NOT wanted (the user confirmed Z/X must not change octave in
+piano mode); zTracker keeps its own octave + record-velocity controls.
 
 ---
 

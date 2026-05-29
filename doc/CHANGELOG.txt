@@ -15,9 +15,10 @@ zt 2026_05_28 (Ableton/Logic piano keyjazz layout toggle in F2 F2)
           are the black keys -- a b c... one piano octave climbing
           rightward (a=C, w=C#, s=D, e=D#, d=E, ...). For users who
           keyjazz in those DAWs and want the same feel in zTracker.
-          Z/X/C/V are deliberately left free in piano mode (Logic/Live
-          use them for octave-shift and velocity; zTracker keeps its own
-          base_octave controls).
+          In piano mode Z and X are inert -- they do NOT enter notes and
+          do NOT change the octave; use zTracker's existing octave
+          controls. (The number row is also unused in piano mode, since
+          the black keys come from W/E/T/Y/U/O/P.)
 
         + The layout applies to all note-entry paths -- Pattern Editor
           cell entry + draw-mode audition, Instrument Editor audition,

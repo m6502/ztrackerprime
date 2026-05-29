@@ -7,9 +7,11 @@
                Live / Logic "Musical Typing" layout instead: the home row
                A S D F G H J K (L ;) are the white keys and the row above
                W E T Y U (O P) are the black keys -- one piano octave
-               climbing rightward. The choice persists in zt.conf
-               (keyjazz_piano=) and applies to the Pattern, Instrument and
-               Arpeggio editors.
+               climbing rightward. In piano mode Z and X are inert --
+               they do NOT enter notes and do NOT change the octave (use
+               the normal octave controls). The choice persists in
+               zt.conf (keyjazz_piano=) and applies to the Pattern,
+               Instrument and Arpeggio editors.
  4/8         : peek play the current note/row
  Home/End    : Just try them
  PgUp/PgDn   : Up/down 16 rows
