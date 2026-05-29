@@ -190,7 +190,7 @@ Builds and downloads
 
 CMake-based, cross-platform CI runs on every push and PR for Linux x86_64, Windows x64 (MSVC), Windows x86 (MinGW, XP-compatible), macOS arm64 and macOS x86_64. Pushing a `v*` tag also packages the binaries into a draft GitHub Release with `.tar.gz` / `.zip` / `.dmg` artifacts ready for download.
 
-External libraries (zlib, libpng, SDL3, Lua) are vendored and statically linked — there are no DLLs to ship next to the executable. SDL3 on macOS comes from Homebrew (`brew install sdl3`); on Windows and Linux it is built/linked through the CI matrix.
+External libraries are vendored: zlib, libpng and Lua are statically linked into the executable. SDL3 is dynamically linked — on macOS it comes from Homebrew (`brew install sdl3`), and the Linux / Windows release artifacts ship the SDL3 shared library (`libSDL3.so.0` / `SDL3.dll`) next to the binary (the Linux build sets `rpath=$ORIGIN` so the bundled `libSDL3.so.0` is found at runtime).
 
 
 So, what's new / different from the original zTracker? Here's a somewhat complete (but not really complete) list of the most important changes:
@@ -240,7 +240,7 @@ Program behavior changes:
 
 - Load and Save screens now use all the available space to display their list entries, and have an improved X size. The file list shows `.mid` files alongside `.zt`.
 
-- After a successful load you land on the Instrument Editor (F3) by default. The destination is configurable in Global Config (Ctrl+F12 → Post-Load Page) — pick Pattern Editor (F2) or Song Configuration (F11) instead if you prefer.
+- After a successful load you land on the Pattern Editor (F2) by default. The destination is configurable in Global Config (Ctrl+F12 → Post-Load Page) — pick Instrument Editor (F3) or Song Configuration (F11) instead if you prefer.
 
 - Auto-save: songs are auto-saved every N seconds (configurable in Global Config; default 60 s). Set to 0 to disable.
 
