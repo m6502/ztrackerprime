@@ -334,6 +334,7 @@ enum state {
   STATE_CONFIG,
   STATE_ORDER,
   STATE_PEDIT_WIN,
+  STATE_IEDIT_WIN,
   STATE_HELP,
   STATE_LOAD,
   STATE_SAVE,
@@ -714,6 +715,12 @@ extern int cur_edit_track_disp;
 extern int cur_edit_column;
 extern int base_octave ;
 extern int keyjazz_velocity ;
+
+// Instrument Editor helper: fill the next up-to-16 empty instrument slots with
+// the current instrument's MIDI device on channels 1..16, named
+// "<device> Channel 01".."<device> Channel 16". Writes a summary to szStatmsg /
+// statusmsg and returns how many instruments were created. See CUI_InstEditor.cpp.
+int inst_create_16_channels_for_current_device(void);
 extern int cur_step;
 
 // CC drawmode -- when non-zero, the Pattern Editor's MIDI-in handler

@@ -4,6 +4,30 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_29 (Instrument Editor: Create 16 channels for a MIDI device)
+----------------------------------------------------------------------------
+
+        + New "Create 16 Channels" action in the Instrument Editor (F3).
+          It takes the current instrument's MIDI Out device and fills the
+          next up-to-16 EMPTY instrument slots with that device on channels
+          1..16, named "<device> Channel 01" .. "<device> Channel 16"
+          (e.g. "IAC Bus 1 Channel 01" .. "IAC Bus 1 Channel 16"). Great
+          for setting up a multitimbral device fast.
+
+        + Two ways to trigger it:
+            - Press F3 again while already on the Instrument Editor to open
+              the new Instrument Editor Options popup (shows the device
+              name + a "Create 16 Channels" button; Enter confirms, Esc
+              cancels). Mirrors the F2-again Pattern Editor Options popup.
+            - Alt+G in the Instrument Editor does it directly.
+
+        + Non-destructive: only EMPTY instrument slots are used, so existing
+          instruments are never overwritten. A slot counts as empty when it
+          has no device, no name, and default patch/bank (the channel field
+          is ignored, since the engine pre-seeds channels 1..16 onto the
+          first 16 slots as a convenience). Assign a device to the current
+          instrument first (Alt+1..0); the source instrument is preserved.
+
 zt 2026_05_28 (Ableton/Logic piano keyjazz layout toggle in F2 F2)
 ----------------------------------------------------------------------------
 

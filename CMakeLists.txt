@@ -121,6 +121,7 @@ set(ZT_SOURCES
   src/CUI_PEFindReplace.cpp
   src/CUI_PENature.cpp
   src/CUI_PEParms.cpp
+  src/CUI_IEParms.cpp
   src/CUI_PEVol.cpp
   src/CUI_Playsong.cpp
   src/CUI_RUSure.cpp

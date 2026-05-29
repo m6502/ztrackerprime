@@ -410,6 +410,21 @@ class CUI_PEParms : public CUI_Page {
         void draw(Drawable *S);
 };
 
+// Instrument Editor options popup (press F3 again while on the Instrument
+// Editor). Single action: "Create 16 Channels" for the current instrument's
+// MIDI device. Mirrors the CUI_PEParms F2-again popup pattern.
+class CUI_IEParms : public CUI_Page {
+    public:
+        Button *btn_create16 ;
+
+        CUI_IEParms();
+
+        void enter(void);
+        void leave(void);
+        void update(void);
+        void draw(Drawable *S);
+};
+
 class CUI_PEVol : public CUI_Page {
 public:
 

@@ -346,6 +346,7 @@ CUI_PaletteEditor *UIP_PaletteEditor = NULL;
 CUI_Config *UIP_Config = NULL;
 CUI_Patterneditor *UIP_Patterneditor = NULL;
 CUI_PEParms *UIP_PEParms = NULL;
+CUI_IEParms *UIP_IEParms = NULL;
 CUI_PEVol *UIP_PEVol = NULL;
 CUI_PENature *UIP_PENature = NULL;
 CUI_PEFindReplace *UIP_PEFindReplace = NULL;
@@ -1277,6 +1278,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_CCEnvelopeEditor = new CUI_CCEnvelopeEditor;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
+    UIP_IEParms = new CUI_IEParms;
     UIP_PEVol = new CUI_PEVol;
     UIP_SliderInput = new CUI_SliderInput;
     UIP_NewSong = new CUI_NewSong;
@@ -1960,8 +1962,15 @@ void global_keys(Drawable *S)
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_IEDIT:
-            switch_page(UIP_InstEditor);
-            doredraw++; clear++;
+            if (cur_state == STATE_IEDIT) {
+                // Already on the Instrument Editor -> F3 again opens the
+                // options popup (Create 16 Channels), mirroring F2-again.
+                popup_window(UIP_IEParms); clear++;
+                doredraw++;
+            } else {
+                switch_page(UIP_InstEditor);
+                doredraw++; clear++;
+            }
             break;
         // ------------------------------------------------------------------------
         case CMD_SWITCH_ORDERLIST:
@@ -2629,6 +2638,7 @@ int postAction ()
     delete UIP_Sysconfig;
     delete UIP_Patterneditor;
     delete UIP_PEParms;
+    delete UIP_IEParms;
     delete UIP_SliderInput;
     delete UIP_NewSong;
     delete UIP_RUSure;
@@ -3721,6 +3731,7 @@ int initSDL(void)
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
+    UIP_IEParms = new CUI_IEParms;
     UIP_PEVol = new CUI_PEVol;
     UIP_PENature = new CUI_PENature;
     UIP_PEFindReplace = new CUI_PEFindReplace;

@@ -134,7 +134,16 @@
                   editing screen brings up the pattern settings, including
                   the "PianoKey" toggle (tracker vs Ableton/Logic keyjazz
                   layout).
- F3             : Instrument editor
+ F3             : Instrument editor. Pressing F3 again (while already on it)
+                  opens the Instrument Editor Options popup with a
+                  "Create 16 Channels" action: it takes the current
+                  instrument's MIDI Out device and fills the next 16 empty
+                  instrument slots with channels 1-16, named
+                  "<device> Channel 01" .. "<device> Channel 16" (e.g.
+                  "IAC Bus 1 Channel 01"). Non-destructive: existing
+                  instruments are never overwritten. Alt+G does the same
+                  thing directly without the popup. (Assign a device first
+                  via Alt+1..0.)
  SHIFT-F2       : Shortcuts & MIDI Mappings (unified per-action grid:
                   Keyboard | MIDI1 | MIDI2 | MIDI3). Up/Dn/Lt/Rt move,
                   Enter edits, Backspace clears, Ctrl+S saves both
