@@ -6,3 +6,7 @@
 /build-windows/
 __pycache__/
 *.pyc
+/build-win32-macos/
+/sdl3-mingw/
+/toolchain-mingw-i686-macos.cmake
+/dist/ztrackerprime-windows-x86-xp/
