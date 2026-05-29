@@ -234,7 +234,7 @@ Program behavior changes:
 
 - Default pattern size is 64 instead of 128.
 
-- Program doesn't allow the user to set a resolution lower than 1024x700 and will increase the X, Y or both of them if necessary.
+- Program doesn't allow the user to set a resolution lower than 840x480 and will increase the X, Y or both of them if necessary.
 
 - Play view draws as many channels as it can fit within the horizontal resolution, instead of a fixed number of them.
 
