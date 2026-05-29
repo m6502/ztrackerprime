@@ -11,7 +11,7 @@ I don't know if there are any zTracker users remaining out there, but as I'm pre
 
 *Please be advised that I can't guarantee this version works better for you than the original*
 
-Everyone does have his own tastes, routines and circumstances. zTracker' behaves nearly flawlessly for me and I like it better than the original. But in your case this could be a different history. It is a good idea to check the following list to understand what this fork is about.
+Everyone has their own tastes, workflows and circumstances. zTracker' behaves nearly flawlessly for me and I like it better than the original. But in your case this could be a different story. It is a good idea to check the following list to understand what this fork is about.
 
 There's also the possibility that I misunderstood how something worked and "fixing" it I broke it, or that I have changed the way something works that could have been activated by just pressing a key. Who knows?
 
@@ -65,7 +65,7 @@ The unified keybindings + MIDI-mappings page. Each action shows its bound key an
 
 ![Shortcuts & MIDI Mappings](docs/screenshots/07-shortcuts-and-midi-mappings.png)
 
-### CC Console — `Shift+F3`
+### Paketti CCizer — `Shift+F3`
 
 Paketti CCizer file picker on the left, slider/knob grid on the right. Loading a `.txt` parses the slot definitions; each slot becomes a real ValueSlider widget (mouse-clickable, keyboard-adjustable). Tweaking a slider sends its CC (or 14-bit Pitch Bend, for `PB` slots) on the current channel. `L` enters MIDI Learn for the focused slot; `B` assigns the loaded file as the current instrument's CCizer Bank.
 
