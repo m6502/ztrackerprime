@@ -35,6 +35,83 @@ void BTNCLK_InitInstrumentsOne(UserInterfaceElement*) {
     need_refresh++; 
 }
 
+// A slot is "available" to receive a generated channel instrument if it
+// carries no real user data: no MIDI device, blank name, default patch / bank,
+// and no CCizer bank. We deliberately IGNORE the channel field -- the
+// instrument constructor pre-seeds channels 1..16 onto slots 0..15 as a
+// convenience, so a strict isempty() (which counts that as data) would treat a
+// fresh song's slots 1..15 as "used" and scatter the 16 instruments past slot
+// 16. Ignoring channel lets a fresh song fill slots 0..15 consecutively.
+static bool inst_slot_available(instrument *in) {
+    // Default values mirror module.cpp's ZTM_INST_DEFAULT_* (those macros are
+    // local to module.cpp): no device = 0xff, patch = -1, bank = -1.
+    if (!in) return false;
+    if (in->midi_device != 0xff) return false;
+    if (in->patch       != -1)   return false;
+    if (in->bank        != -1)   return false;
+    if (in->ccizer_bank[0] != '\0') return false;
+    for (int i = 0; i < ZTM_INSTTITLE_MAXLEN - 1; i++)
+        if (in->title[i] != ' ') return false;
+    return true;
+}
+
+// Fill the next up-to-16 empty instrument slots with the given MIDI device, on
+// channels 1..16, named "<device> Channel 01".."Channel 16". Non-destructive:
+// only writes into available slots (never overwrites). Returns the number of
+// instruments created.
+int inst_create_16_channels_for_device(unsigned int dev) {
+    if (!song) return 0;
+    if (dev >= MidiOut->numOuputDevices || MidiOut->outputDevices[dev] == NULL) {
+        sprintf(szStatmsg, "Pick a MIDI Out device first");
+        statusmsg = szStatmsg; need_refresh++;
+        return 0;
+    }
+
+    // Match the device-list display: prefer a user alias, else the device name.
+    const char *alias   = MidiOut->outputDevices[dev]->alias;
+    const char *name    = MidiOut->outputDevices[dev]->szName;
+    const char *devname = (alias != NULL && strlen(alias) > 1) ? alias : name;
+
+    int created = 0;
+    for (int i = 0; i < MAX_INSTS && created < 16; i++) {
+        instrument *in = song->instruments[i];
+        if (!inst_slot_available(in)) continue;
+
+        in->midi_device = (unsigned char)dev;
+        in->channel     = (unsigned char)created;   // 0..15 == MIDI channel 1..16
+
+        // "<device> Channel NN". The title field is a fixed, space-padded
+        // buffer (the UI expects spaces, not a short C string), so build into a
+        // temp and copy. Device part is capped so " Channel NN" always fits.
+        char nm[ZTM_INSTTITLE_MAXLEN];
+        snprintf(nm, sizeof(nm), "%.13s Channel %02d", devname, created + 1);
+        memset(in->title, ' ', ZTM_INSTTITLE_MAXLEN);
+        size_t n = strlen(nm);
+        if (n > ZTM_INSTTITLE_MAXLEN - 1) n = ZTM_INSTTITLE_MAXLEN - 1;
+        memcpy(in->title, nm, n);
+        in->title[ZTM_INSTTITLE_MAXLEN - 1] = 0;
+        in->MarkAsUsed();
+        created++;
+    }
+
+    if (created == 0)
+        sprintf(szStatmsg, "No empty instrument slots available");
+    else if (created < 16)
+        sprintf(szStatmsg, "Created %d channels for %s (no more empty slots)", created, devname);
+    else
+        sprintf(szStatmsg, "Created 16 channels for %s", devname);
+    statusmsg = szStatmsg; need_refresh++;
+    return created;
+}
+
+// Convenience wrapper for the Alt+G shortcut: use the current instrument's
+// device. (The F3-again popup lets you pick any open device directly.)
+int inst_create_16_channels_for_current_device(void) {
+    if (!song || cur_inst < 0 || cur_inst >= MAX_INSTS || !song->instruments[cur_inst])
+        return 0;
+    return inst_create_16_channels_for_device(song->instruments[cur_inst]->midi_device);
+}
+
 void BTNCLK_ToggleNoteRetrig(UserInterfaceElement *b) {
     Button *btn;
     btn = (Button *)b;
@@ -338,6 +415,11 @@ void CUI_InstEditor::update() {
                     case SDLK_9: dev_sel(8,mds); act++; break;
                     case SDLK_0: dev_sel(9,mds); act++; break;
                     case SDLK_T: BTNCLK_ToggleTrackerMode(this->trackerModeButton); act++; break;
+                    // Alt+G -- "Generate 16": create 16 instruments for the
+                    // current instrument's MIDI device, one per channel 1..16,
+                    // into the next empty slots. Same action as the F3-again
+                    // popup's button.
+                    case SDLK_G: inst_create_16_channels_for_current_device(); act++; break;
                     }
                     break;
             case KS_NO_SHIFT_KEYS:
