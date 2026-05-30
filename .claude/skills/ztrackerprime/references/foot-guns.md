@@ -73,3 +73,22 @@ When you add a new page whose ESC has dedicated meaning, **add its `STATE_*` to 
 ## Saturated ring buffer with `head == tail`
 
 `KeyBuffer` originally checked `head != tail` to gate read/peek. Fails when the buffer is exactly full (head wraps back to tail). Fix: gate on `cursize > 0`. If you write a fixed-capacity ring with two pointers, also keep a count.
+
+## `zt_module::save(fn)` ignores its `fn` argument
+
+`save(char *fn, int compressed)` copies `fn` into a static `ls_filename`, then **reassigns `fn = (char*)&this->filename[0]`** — so bytes are written to `this->filename`, *not* the path you passed. The real app sets `song->filename` (Save dialog / load path) before calling `save()`. Call `save()` from a test/harness with a fresh module and it opens an empty path, `ofstream` fails, and **no file is written** (returns -1 silently).
+
+`load(char *fn)` is the opposite — it *does* honour its `fn` argument. The asymmetry is the trap. (Cost real time on the sample-chunk save/load harness: the save produced no file until `filename` was set.)
+
+## `zt_module::load()` needs the full app initialised
+
+`load()` dereferences globals that only exist once `initSDL()` is well underway — `ztPlayer->...`, `UIP_InstEditor`, `cur_edit_pattern`, etc. Calling it early in `main` (e.g. a startup self-test, before `ztPlayer` / the `UIP_*` pages exist) **segfaults inside `load()`**, not in your code. There is no easy "load a song headless before the UI exists" path. To exercise load/save logic in isolation, test the chunk codec directly (SDL-free, mirror the reader/writer — see `test_ccbn_roundtrip`) rather than driving the real `load()`.
+
+## Adding a backward-compatible `.zt` chunk
+
+The `.zt` format is `[4-byte id][4-byte int size][payload]` per chunk; `readblock` consumes the whole payload regardless of recognition, so **unknown chunks are skipped automatically** — that's what makes additive chunks forward-compatible. The recipe, proven by `CCBN` (PR #84):
+
+- **Write** with a `build_<thing>()` filling a `CDataBuf` via `pushusi/pushuc/pushui/write`, then `writeblock("TAG", ...)`. `writeblock` flushes the buffer after each chunk, so a per-item loop emitting many same-tag chunks (one per record, like `ZTin` per instrument) is fine.
+- **Read** in the `load()` dispatch loop: `if (cmp_hd(&header[0], "TAG")) { ... }`. Bounds-check *every* field — a corrupt length must never drive an allocation; `readblock` already caps one chunk at **64 MB**, so split large payloads (one chunk per sample, etc.) to stay under it.
+- **Emit nothing when empty** so files without the feature stay byte-identical, and keep new per-record fields in a *parallel* chunk (CCBN-style) rather than editing an existing record's layout.
+- **Test** by mirroring the reader/writer byte-for-byte in an SDL-free `Buf` (the `test_ccbn_roundtrip` convention) — `CDataBuf.cpp` pulls in SDL, so the test can't use it directly.
