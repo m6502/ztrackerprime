@@ -13,7 +13,7 @@ triggers:
 
 # zTracker Prime Development Skill
 
-> **Last verified: 2026-05-02.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
+> **Last verified: 2026-05-30.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
 >
 > **What lives elsewhere on purpose:** the open-PR list and merged landmarks are NOT in this skill — they go stale fast. For current state run `gh pr list --repo m6502/ztrackerprime` (open) or `gh pr list --repo m6502/ztrackerprime --state merged --limit 30` (recent landings). The skill stays timeless: architecture, invariants, foot-guns, conventions.
 
@@ -72,7 +72,7 @@ ctest --output-on-failure      # unit-test harness (Linux CI runs this)
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 |
 | `assets/ccizer/` | Bundled CCizer banks (sc88st, microfreak, minilogue, monologue, Prophet6, deepmind6, waldorf_blofeld, tb03, se02, pro800, polyend_*, midi_control_example) — copied from Paketti. README.md documents the format. |
 | `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` = `F0 7E 7F 06 01 F7` for first-test handshakes. README.md documents the librarian workflow. |
-| `tests/` | CTest unit-test executables — 8 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_macro` |
+| `tests/` | CTest unit-test executables — 12 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`. (Count drifts as suites are added — `ctest` is the source of truth.) |
 | `doc/help.txt` | In-app F1 help — update when adding keybinds or CLI flags |
 | `doc/CHANGELOG.txt` | Release notes, chronological |
 | `.github/workflows/build.yml` | 5-platform CI matrix; Linux job runs `ctest` |
@@ -84,19 +84,20 @@ For the live PR queue: `gh pr list --repo m6502/ztrackerprime`.
 | Key | Page | Notes |
 |---|---|---|
 | F1 | Help | |
-| F2 | Pattern Editor | F2 again from PE → PEParms |
-| F3 | Instrument Editor | F3 row 11 shows `CCizer Bank: <basename>` (per-instrument bank) |
+| F2 | Pattern Editor | F2 again from PE → PEParms. **F2 F2 toggles "PianoKey"** — the Ableton/Logic piano keyjazz layout (PR #135, `keyjazz_piano_layout`). |
+| F3 | Instrument Editor | F3 row 11 shows `CCizer Bank: <basename>` (per-instrument bank). **F3 again → "Create 16 Channels"** popup: fills the next empty instrument slots with the current device on ch 1..16 (PR #136). |
 | F4 | MIDI Macro Editor | A macro whose name ends in `.syx` is dispatched as a SysEx file send by the playback engine; data grid is ignored (hint shown). |
 | **Shift+F2** | **Shortcuts & MIDI Mappings** | Was Shift+F3 historically; moved 2026-04-30 to free the slot for CC Console. |
 | **Shift+F3** | **CC Console** | Loads CCizer `.txt`, sliders/knobs send CC out, `L` to MIDI Learn, `B` to assign as current instrument's bank. |
 | Shift+F4 | Arpeggio Editor | |
 | F5 | Play Song | |
 | **Shift+F5** | **SysEx Librarian** | Lists `.syx` files. Enter sends. Incoming SysEx auto-saved as `recv_<timestamp>.syx`. |
+| **Shift+F6** | **CC Envelope Editor** | Per-instrument, CCizer-aware CC envelopes (Schism-style). New page, PR #132. Persisted in the optional `INSE` chunk; editor loads/saves `.env` presets from a configurable folder. |
 | F6 / F7 / F8 / F9 | Play Pattern / From Cursor / Stop / Panic | |
 | F10 | Song Message Editor | |
 | F11 | Song Configuration / Order | |
 | F12 | System Configuration | Includes `CCizer Folder` text input (binds to `ccizer_folder` zt.conf key). |
-| **Ctrl+Shift+§** | **CC drawmode toggle** | While ON, incoming CC writes `Sxxyy` and PB writes `Wxxxx` at the cursor row. Per-session UNDO_SAVE. `[CC DRAW]` badge shown top-right of Pattern Editor while active. |
+| **Ctrl+Shift+§** | **CC drawmode toggle** | While ON, incoming CC writes `Sxxyy` and PB writes `Wxxxx` at the cursor row. Per-session UNDO_SAVE. `[CC DRAW]` badge shown top-right of Pattern Editor while active. Extended by PRs #123–#129: **mouse drag-to-draw** drawbars (`MD_CC_DRAW`), CCizer-slot cycling, one-key arm-and-draw, double-click reset, `Ctrl+F2` slot cycle, keyjazz audition while mouse-drawing. Windows fires the toggle via `Ctrl+Shift+`` ` ``. |
 
 ## Coordinate system
 
@@ -133,7 +134,7 @@ Seven-PR feature stack landed end of April 2026 wiring Paketti-style CCizer bank
 
 **Cross-platform status** (verified 2026-05-02):
 - SysEx send: works on macOS (CoreMIDI `MIDIPacketListAdd`), Windows (WinMM `midiOutLongMsg` + MHDR_DONE poll, PR #87), Linux (ALSA `snd_seq_ev_set_sysex`).
-- SysEx receive: works on macOS (CoreMIDI read_proc parsing F0..F7) and Windows (`MIM_LONGDATA` accumulator, PR #90). Linux ALSA-in is still stubbed at the platform layer — receive on Linux is the remaining gap.
+- SysEx receive: works on macOS (CoreMIDI read_proc parsing F0..F7) and Windows (`MIM_LONGDATA` accumulator, PR #90). Initial **Linux ALSA MIDI input** landed in PR #113 (marked "needs hardware verification") — so the Linux-in platform layer is no longer a bare stub, but confirm SysEx-receive-on-Linux against that path on real hardware before relying on it.
 - Audit cluster (PRs #87–#93) hardened the foundation: Windows MHDR_DONE polling, macOS heap-alloc on receive, recv_seq survives restart, recv rotation, *.syx macro caching at load, lifetime docs, CCBN roundtrip test.
 
 **Test suites added**:
