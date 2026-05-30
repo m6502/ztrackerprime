@@ -38,6 +38,7 @@
  *
  ******/
 #include <stdarg.h>
+#include <new>
 #include "zt.h"
 #include "sysex_macro.h"
 
@@ -413,6 +414,59 @@ void zt_module::build_arpeggio(CDataBuf *buf, int num) {
 
 /*************************************************************************
  *
+ * NAME  zt_module::build_sample()
+ *
+ * DESCRIPTION
+ *   Serialise one pool sample into `buf` for a SMPL chunk. One chunk
+ *   per occupied pool slot (mirrors the one-ZTin-per-instrument shape),
+ *   which keeps each chunk's PCM under readblock's 64 MB cap.
+ *
+ *   Layout (all little-endian / native, like every other zt chunk):
+ *     uint16 pool_index
+ *     uint16 name_len
+ *     bytes  name        (name_len)
+ *     uint8  channels    (1 or 2)
+ *     uint8  root_note
+ *     uint8  flags
+ *     int8   finetune
+ *     uint8  default_vol
+ *     uint32 rate
+ *     uint32 loop_start
+ *     uint32 loop_end
+ *     uint32 frames
+ *     int16  pcm[frames * channels]   (interleaved)
+ *
+ ******/
+void zt_module::build_sample(CDataBuf *buf, int num) {
+    zt_sample *s = this->samples[num];
+
+    unsigned short len = (unsigned short)strlen(s->name);
+    if (len >= ZTM_SAMPLENAME_MAXLEN)
+        len = ZTM_SAMPLENAME_MAXLEN - 1;
+
+    buf->pushusi((unsigned short)num);
+    buf->pushusi(len);
+    buf->write(s->name, len);
+
+    buf->pushuc(s->channels);
+    buf->pushuc(s->root_note);
+    buf->pushuc(s->flags);
+    buf->pushc((char)s->finetune);
+    buf->pushuc(s->default_vol);
+    buf->pushui(s->rate);
+    buf->pushui(s->loop_start);
+    buf->pushui(s->loop_end);
+    buf->pushui(s->frames);
+
+    if (s->pcm && s->frames) {
+        buf->write((const char *)s->pcm,
+                   (int)(s->frames * (unsigned int)s->channels * sizeof(short int)));
+    }
+    return;
+}
+
+/*************************************************************************
+ *
  * NAME  zt_module::build_MIDI_macro()
  *
  * SYNOPSIS
@@ -732,6 +786,38 @@ int zt_module::save(char *fn, int compressed)
         }
     }
 
+    // SMPL: one optional chunk per occupied sample-pool slot (PCM lives
+    // here). Skipped by older zTracker (unrecognized chunk -> harmless).
+    // Nothing is written when the pool is empty, so MIDI-only songs save
+    // byte-identically to before samples existed.
+    for (i = 0; i < ZTM_MAX_SAMPLES; i++) {
+        if (this->samples[i] && !this->samples[i]->isempty()) {
+            build_sample(&buffer, i);
+            writeblock("SMPL", &buffer, compressed, f, lpDS);
+        }
+    }
+
+    // SMIX: optional per-instrument links into the sample pool (CCBN-style
+    // parallel chunk). Only emitted when an instrument actually links to a
+    // sample. Format: int16 count, then {uint8 inst_idx, int16 sample_index}.
+    {
+        short int count = 0;
+        for (i = 0; i < ZTM_MAX_INSTS; i++) {
+            if (this->instruments[i] && this->instruments[i]->sample_index >= 0)
+                count++;
+        }
+        if (count > 0) {
+            buffer.pushsi(count);
+            for (i = 0; i < ZTM_MAX_INSTS; i++) {
+                if (!this->instruments[i] || this->instruments[i]->sample_index < 0)
+                    continue;
+                buffer.pushuc((unsigned char)i);
+                buffer.pushsi(this->instruments[i]->sample_index);
+            }
+            writeblock("SMIX", &buffer, compressed, f, lpDS);
+        }
+    }
+
 
     for(i=0;i<ZTM_MAX_ARPEGGIOS;i++) {
         if (this->arpeggios[i] && !this->arpeggios[i]->isempty()) {
@@ -962,6 +1048,130 @@ int zt_module::load_arpeggio(CDataBuf *buf) {
     // all is well, install the arpeggio
     this->arpeggios[num]=arp;
     return 0;
+}
+
+/*************************************************************************
+ *
+ * NAME  zt_module::load_sample()
+ *
+ * DESCRIPTION
+ *   Load one SMPL chunk into the sample pool. Layout in build_sample().
+ *   Every field is bounds-checked: a corrupt frames/channels value can
+ *   never request an allocation larger than the chunk payload that
+ *   readblock already capped at 64 MB. On any anomaly we keep whatever
+ *   loaded cleanly and surface a status warning rather than failing the
+ *   whole song load (matches the CCBN reader's posture).
+ *
+ ******/
+void zt_module::load_sample(CDataBuf *buf, const char *fn) {
+    int payload   = buf->getsize();
+    int truncated = 0;
+
+    unsigned short idx     = buf->getusi();
+    unsigned short namelen = buf->getusi();
+
+    char name[ZTM_SAMPLENAME_MAXLEN];
+    unsigned int nstore = 0;
+    for (unsigned short b = 0; b < namelen; b++) {
+        char c = buf->getch();
+        if (nstore < ZTM_SAMPLENAME_MAXLEN - 1)
+            name[nstore++] = c;
+    }
+    name[nstore] = '\0';
+
+    unsigned char  channels    = buf->getuch();
+    unsigned char  root_note   = buf->getuch();
+    unsigned char  flags       = buf->getuch();
+    signed char    finetune    = (signed char)buf->getch();
+    unsigned char  default_vol = buf->getuch();
+    unsigned int   rate        = buf->getui();
+    unsigned int   loop_start  = buf->getui();
+    unsigned int   loop_end    = buf->getui();
+    unsigned int   frames      = buf->getui();
+
+    if (channels != 1 && channels != 2) { channels = 1; truncated = 1; }
+
+    // Bound the frame count against the bytes actually left in the chunk
+    // so a bogus `frames` can't drive a giant allocation.
+    int consumed  = 2 + 2 + (int)namelen + 5 + 16; /* hdr fields, see build_sample */
+    int remaining = payload - consumed;
+    if (remaining < 0) remaining = 0;
+    unsigned int max_frames =
+        (unsigned int)remaining / ((unsigned int)channels * (unsigned int)sizeof(short int));
+    if (frames > max_frames) { frames = max_frames; truncated = 1; }
+
+    if (idx >= ZTM_MAX_SAMPLES) {
+        setstatusstr("Warning: SMPL chunk in %s has out-of-range pool index "
+                     "%u; sample dropped.", fn, (unsigned)idx);
+        return;
+    }
+
+    // Read PCM into a fresh buffer (interleaved S16).
+    unsigned int total = frames * (unsigned int)channels;
+    short int   *pcm   = NULL;
+    if (total) {
+        pcm = new (std::nothrow) short int[total];
+        if (pcm) {
+            for (unsigned int i = 0; i < total; i++)
+                pcm[i] = buf->getsi();
+        } else {
+            truncated = 1;
+            frames    = 0;
+        }
+    }
+
+    // Install (replacing any existing sample in this slot).
+    if (this->samples[idx]) {
+        delete this->samples[idx];
+        this->samples[idx] = NULL;
+    }
+    zt_sample *s = new zt_sample();
+    snprintf(s->name, sizeof(s->name), "%s", name);
+    s->channels    = channels;
+    s->root_note   = root_note;
+    s->flags       = flags;
+    s->finetune    = finetune;
+    s->default_vol = default_vol;
+    s->rate        = rate ? rate : 44100;
+    s->loop_start  = loop_start;
+    s->loop_end    = loop_end;
+    if (pcm) {
+        s->pcm    = pcm;   /* ownership transferred to the sample */
+        s->frames = frames;
+    }
+    this->samples[idx] = s;
+
+    if (truncated)
+        setstatusstr("Warning: SMPL chunk in %s looks truncated "
+                     "(payload %d B); sample may be incomplete.", fn, payload);
+    return;
+}
+
+/*************************************************************************
+ *
+ * NAME  zt_module::load_sample_index_map()
+ *
+ * DESCRIPTION
+ *   Load the SMIX chunk: per-instrument links into the sample pool.
+ *   CCBN-style parallel chunk so the instrument record format is
+ *   untouched. Layout:
+ *     int16 count
+ *     repeat count: uint8 inst_idx, int16 sample_index
+ *
+ ******/
+void zt_module::load_sample_index_map(CDataBuf *buf) {
+    short int count = buf->getsi();
+    if (count < 0 || count > ZTM_MAX_INSTS)
+        return;
+    for (short int k = 0; k < count; k++) {
+        unsigned char inst_idx = buf->getuch();
+        short int     sidx     = buf->getsi();
+        if (inst_idx < ZTM_MAX_INSTS && this->instruments[inst_idx]) {
+            if (sidx >= -1 && sidx < ZTM_MAX_SAMPLES)
+                this->instruments[inst_idx]->sample_index = sidx;
+        }
+    }
+    return;
 }
 
 /*************************************************************************
@@ -1300,6 +1510,8 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "ZTpp")) { load_ZT_pattern_properties(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTin")) { load_ZT_instrument(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTev")) { load_ZT_event_list(&buffer); recognized_chunks++; saw_event_list = 1; }
+            if (cmp_hd(&header[0], "SMPL")) { load_sample(&buffer, fn); recognized_chunks++; }
+            if (cmp_hd(&header[0], "SMIX")) { load_sample_index_map(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "INSE")) {
                 // Per-instrument CC envelopes chunk (see save side for
                 // layout). Bounds-checked at every step; on malformed

@@ -44,6 +44,7 @@
 #include <fstream>
 
 #include "platform.h"
+#include "sample.h"
 
 
 class CDataBuf ;
@@ -184,6 +185,13 @@ public:
   // when the instrument plays a note (pattern + keyjazz both). Persisted
   // in the optional INSE chunk; old zTracker skips it.
   inst_envelope envelopes[ZTM_INST_MAX_ENVELOPES];
+
+  // Optional link into the song's sample pool (module::samples[]). -1 = no
+  // sample (pure MIDI instrument, the default). >=0 = index of the sample
+  // this instrument plays when routed to the sample-output device. Persisted
+  // in the optional SMIX chunk (CCBN-style parallel chunk); old zTracker
+  // skips it and loads the instrument as MIDI-only (forward-compat).
+  signed short int sample_index;
 
 } ;
 
@@ -365,6 +373,11 @@ class zt_module
         
         pattern *patterns[ZTM_MAX_PATTERNS];
         instrument *instruments[ZTM_MAX_INSTS];
+        // Song-level PCM sample pool. NULL slot = empty. Instruments link in
+        // via instrument::sample_index. Persisted via the optional SMPL
+        // chunks (one per occupied slot). Empty pool => no chunks written =>
+        // byte-identical saves for MIDI-only songs.
+        zt_sample *samples[ZTM_MAX_SAMPLES];
         int orderlist[ZTM_ORDERLIST_LEN];
 
         zt_mutex_handle hEditMutex;
@@ -414,6 +427,9 @@ class zt_module
         void build_song_message(CDataBuf *buf);           /* SMSG - song message */
         void build_MIDI_macro(CDataBuf *buf, int num);  /* MMAC - midi macro */
         void build_arpeggio(CDataBuf *buf, int num);  /* ARPG - arpeggio */
+        void build_sample(CDataBuf *buf, int num);  /* SMPL - one pool sample */
+        void load_sample(CDataBuf *buf, const char *fn);  /* SMPL - one pool sample */
+        void load_sample_index_map(CDataBuf *buf);  /* SMIX - per-inst sample link */
         //void build_PATT(CDataBuf *buf);  /* PATT - pattern */
         //void build_INST(CDataBuf *buf);  /* INST - instrument */
         //void build_TMUT(CDataBuf *buf);  /* TMUT - track mutes */
