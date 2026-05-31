@@ -239,16 +239,29 @@ void CUI_LuaConsole::draw(Drawable *S)
                 fx2, row(sb_top + sb_rows) - 1, console_bg);
 
     // --- Scrollback lines (newest at bottom) ---
+    // Clip each line to the visible width so long echoes/output don't draw
+    // past the right border. A trailing '>' marks a line that was cut off
+    // (the input line scrolls horizontally; scrollback can't, so we flag it).
+    const int sb_x1  = frame_x1() + 1;
+    const int sb_max = frame_x2() - sb_x1;   // chars that fit, ending before the border
     const int bottom_idx = g_lua.line_count - g_lua.scroll_off;
     const int top_idx    = bottom_idx - sb_rows;
     for (int i = 0; i < sb_rows; i++) {
         int line_idx = top_idx + i;
-        if (line_idx >= 0 && line_idx < g_lua.line_count) {
+        if (line_idx >= 0 && line_idx < g_lua.line_count && sb_max > 0) {
             int ring = line_idx % LUA_CONSOLE_MAX_LINES;
             const char *text = g_lua.lines[ring];
             if (text && text[0]) {
-                printBG(col(frame_x1() + 1), row(sb_top + i),
-                        text, console_fg, console_bg, S);
+                char vbuf[LUA_CONSOLE_LINE_LEN];
+                int n = (int)strlen(text);
+                bool cut = (n > sb_max);
+                if (n > sb_max) n = sb_max;
+                if (n > (int)sizeof(vbuf) - 1) n = (int)sizeof(vbuf) - 1;
+                memcpy(vbuf, text, (size_t)n);
+                if (cut && n > 0) vbuf[n - 1] = '>';   // truncation marker
+                vbuf[n] = '\0';
+                printBG(col(sb_x1), row(sb_top + i),
+                        vbuf, console_fg, console_bg, S);
             }
         }
     }
