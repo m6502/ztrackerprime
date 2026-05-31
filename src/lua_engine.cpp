@@ -252,6 +252,45 @@ static int l_zt_print_fn(lua_State *L)
     return l_zt_print(L);
 }
 
+// --- notifiers: zt.on(event, fn) / zt.off(event) / zt.fire(event [,arg]) ----
+// Built-in events fired from the main loop: "idle" (every frame), "play",
+// "stop", "row" (arg = current row). Custom event names work too via fire().
+static int l_on(lua_State *L)
+{
+    const char *ev = luaL_checkstring(L, 1);
+    luaL_checktype(L, 2, LUA_TFUNCTION);
+    lua_getfield(L, LUA_REGISTRYINDEX, "zt_notifiers");   // t
+    lua_getfield(L, -1, ev);                              // t[ev]
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        lua_newtable(L);                                  // new list
+        lua_pushvalue(L, -1);                             // dup
+        lua_setfield(L, -3, ev);                          // t[ev] = list
+    }
+    int n = (int)lua_rawlen(L, -1);
+    lua_pushvalue(L, 2);                                  // the function
+    lua_rawseti(L, -2, n + 1);                            // list[n+1] = fn
+    lua_pop(L, 2);                                        // list, t
+    return 0;
+}
+static int l_off(lua_State *L)   // clear all callbacks for an event
+{
+    const char *ev = luaL_checkstring(L, 1);
+    lua_getfield(L, LUA_REGISTRYINDEX, "zt_notifiers");
+    lua_pushnil(L);
+    lua_setfield(L, -2, ev);
+    lua_pop(L, 1);
+    return 0;
+}
+static int l_fire(lua_State *L)  // zt.fire(event [, arg])
+{
+    const char *ev = luaL_checkstring(L, 1);
+    bool has_arg = !lua_isnoneornil(L, 2);
+    long arg = has_arg ? (long)luaL_checkinteger(L, 2) : 0;
+    g_lua.fire(ev, arg, has_arg);
+    return 0;
+}
+
 // ===========================================================================
 // Object layer — Renoise-style proxies with dot-property access.
 //   zt.song            properties: bpm, tpb, name, cur_pattern, cur_track,
@@ -1124,6 +1163,33 @@ void ZtLuaEngine::print_line(const char *text)
     // (scroll_off stays; caller should reset it on Enter)
 }
 
+void ZtLuaEngine::fire(const char *event, long arg, bool has_arg)
+{
+    if (!L || !event) return;
+    lua_getfield(L, LUA_REGISTRYINDEX, "zt_notifiers");   // notifiers table
+    if (!lua_istable(L, -1)) { lua_pop(L, 1); return; }
+    lua_getfield(L, -1, event);                           // notifiers[event]
+    if (!lua_istable(L, -1)) { lua_pop(L, 2); return; }
+    int n = (int)lua_rawlen(L, -1);
+    for (int i = 1; i <= n; i++) {
+        lua_rawgeti(L, -1, i);                            // fn
+        if (lua_isfunction(L, -1)) {
+            int nargs = 0;
+            if (has_arg) { lua_pushinteger(L, (lua_Integer)arg); nargs = 1; }
+            if (lua_pcall(L, nargs, 0, 0) != LUA_OK) {
+                const char *err = lua_tostring(L, -1);
+                char msg[LUA_CONSOLE_LINE_LEN];
+                snprintf(msg, sizeof(msg), "[notifier:%s] %s", event, err ? err : "?");
+                print_line(msg);
+                lua_pop(L, 1);                            // pop error
+            }
+        } else {
+            lua_pop(L, 1);                                // not a function
+        }
+    }
+    lua_pop(L, 2);                                        // list, table
+}
+
 bool ZtLuaEngine::init()
 {
     if (L) return true;  // already init'd
@@ -1142,6 +1208,11 @@ bool ZtLuaEngine::init()
     lua_setglobal(L, "print");
 
     registerBindings();
+
+    // Notifier registry: a table  event-name -> { fn1, fn2, ... }  kept in
+    // the Lua registry so zt.on()/zt.off()/fire() can find it.
+    lua_newtable(L);
+    lua_setfield(L, LUA_REGISTRYINDEX, "zt_notifiers");
 
     // Prelude: Renoise-style introspection helpers (rprint / oprint / dump)
     // plus a help() that documents the zt.* API. Kept here as a Lua string so
@@ -1230,6 +1301,7 @@ bool ZtLuaEngine::init()
         "      print('  ' .. objdocs.midimacro)\n"
         "      print('  ' .. objdocs.arpeggio)\n"
         "      print('Helpers: zt.note_name(60)->\"C-5\", zt.note_value(\"C-5\")->60 ; zt.load(path), zt.save(path)')\n"
+        "      print('Notifiers: zt.on(event,fn) / zt.off(event) / zt.fire(event[,arg]).  events: idle, play, stop, row')\n"
         "      print('Consts: zt.MAX_PATTERNS/TRACKS/INSTRUMENTS/ORDERS/MIDIMACROS/ARPEGGIOS, NOTE_*, MIDDLE_C, BREAK, SKIP, MACRO_END/PARAM')\n"
         "      print('  e.g.  zt.song.bpm=140   zt.cell(0,0).note = zt.note_value(\"C-5\")   zt.orders[0]=2   zt.transport:play()')\n"
         "      print('Introspect: rprint(zt) dumps all, oprint(t) lists one level, help(\"name\") for one.')\n"
@@ -1442,6 +1514,9 @@ void ZtLuaEngine::registerBindings()
     lua_pushcfunction(L, l_note_value);   lua_setfield(L, -2, "note_value");
     lua_pushcfunction(L, l_load);         lua_setfield(L, -2, "load");
     lua_pushcfunction(L, l_save);         lua_setfield(L, -2, "save");
+    lua_pushcfunction(L, l_on);           lua_setfield(L, -2, "on");
+    lua_pushcfunction(L, l_off);          lua_setfield(L, -2, "off");
+    lua_pushcfunction(L, l_fire);         lua_setfield(L, -2, "fire");
 
     // Singletons: zt.song, zt.transport, zt.orders.
     lua_newuserdatauv(L, 1, 0);

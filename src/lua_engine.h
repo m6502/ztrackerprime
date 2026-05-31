@@ -48,6 +48,13 @@ public:
     // Execute a string of Lua code; output/errors go to scrollback
     void execute(const char *code);
 
+    // Fire any Lua callbacks registered for `event` (via zt.on). `arg` is
+    // passed to each callback when has_arg is true (e.g. the row number for
+    // the "row" event). Safe to call when nothing is registered. Called
+    // from the main loop for "idle"/"play"/"stop"/"row"; also reachable
+    // from Lua via zt.fire() for custom events / testing.
+    void fire(const char *event, long arg = 0, bool has_arg = false);
+
     // Append a line of text to the scrollback
     void print_line(const char *text);
 

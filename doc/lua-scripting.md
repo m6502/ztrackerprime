@@ -56,6 +56,25 @@ dump = rprint       -- alias
 `rprint(zt)` lists the entire API and `rprint(_G)` walks the globals
 (depth-limited so it won't hang).
 
+## Notifiers (react to events)
+
+Register Lua callbacks that fire from the main loop:
+
+```lua
+zt.on("row", function(r) zt.status("row " .. r) end)  -- playhead advanced
+zt.on("play",  function() print("started") end)
+zt.on("stop",  function() print("stopped") end)
+zt.on("idle",  function() --[[ every frame; keep it cheap ]] end)
+zt.off("row")                       -- remove all callbacks for an event
+zt.fire("my_event", 42)             -- fire a custom (or built-in) event yourself
+```
+
+Built-in events: **`idle`** (every frame), **`play`** / **`stop`** (transport
+transitions), **`row`** (arg = current playing row). Multiple callbacks per
+event are allowed. A callback that errors prints to the console and the others
+still run; a callback that loops forever stalls the app (same trade-off as any
+Lua call here).
+
 ## Self-test (every feature, runnable)
 
 `lua/selftest.lua` exercises the whole `zt.*` API with PASS/FAIL checks. Run it:
