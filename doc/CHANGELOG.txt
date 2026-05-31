@@ -4,6 +4,34 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_31 (AltGr behaves like Alt for keyboard shortcuts)
+----------------------------------------------------------------------------
+
+        * AltGr (right-Alt on EU/ISO layouts, Finnish included) now acts
+          EXACTLY like plain Alt for every shortcut. Reported on KDE Neon
+          (noble) X11: AltGr+P popped Song Duration instead of doing the
+          Alt+P action, because KDE/X11 delivers AltGr as a synthetic
+          Ctrl+right-Alt combo, which the dispatcher saw as Ctrl+Alt+P
+          (= Song Duration), while the Alt-only bindings (paste-cont. in
+          the Pattern Editor / duplicate-pattern elsewhere) never fired.
+
+        * Fixed at the source in keybuffer.cpp: when AltGr is in play
+          (SDL_KMOD_MODE set, or right-Alt held without left-Alt) the
+          modifier state is normalised to KS_ALT and the stray KS_CTRL is
+          dropped. Genuine Ctrl+Alt chords are pressed with the LEFT Alt
+          (Ctrl+Alt+L Lua, Ctrl+Alt+K keybindings, Ctrl+Alt+N new song,
+          Ctrl+Alt+Q quit) and are left untouched. Scoped to non-Apple;
+          macOS right-Option keeps its existing behaviour.
+
+        ! Reminder, unchanged: "copy pattern -> next empty slot -> jump
+          to it" is Ctrl+Shift+D (Clone Pattern) inside the F2 Pattern
+          Editor. The Alt+P duplicate variant only fires OUTSIDE the
+          Pattern Editor by design (in F2, Alt+P is paste-continuously).
+
+        * test_keybuffer: added 5 AltGr cases (MODE, RALT-alone,
+          synthetic LCTRL+RALT, genuine LCTRL+LALT preserved, LCTRL-only
+          unaffected). sdl_stub.h gains SDL_KMOD_MODE + SDLK_L.
+
 zt 2026_05_29 (Instrument Editor: Create 16 channels for a MIDI device)
 ----------------------------------------------------------------------------
 
