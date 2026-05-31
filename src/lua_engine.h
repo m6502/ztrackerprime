@@ -29,6 +29,16 @@ public:
     int  history_count;
     int  history_pos;  // -1 = not browsing
 
+    // Tab-completion cycling state. When several candidates share the typed
+    // prefix and the prefix itself can't advance, repeated Tab cycles through
+    // the candidates one at a time (real autocomplete, not just a dump).
+    bool tab_cycle_active;
+    int  tab_cycle_start;          // input index where the completed word begins
+    int  tab_cycle_index;          // candidate currently inserted
+    int  tab_cycle_n;              // number of candidates
+    char tab_cycle_table[128];     // table path ("" for globals, "zt", ...)
+    char tab_cycle_keys[128][64];  // the candidate keys (sorted)
+
     ZtLuaEngine();
     ~ZtLuaEngine();
 
