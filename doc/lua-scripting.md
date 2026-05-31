@@ -22,10 +22,67 @@ key_switch_lua_console: ctrl+alt+l
 - **PgUp/PgDn** — scroll scrollback
 - **Backspace** — delete character left of cursor
 - **Delete** — clear entire input line
+- **Tab** — completion. It advances by the longest common prefix; when the
+  prefix can't advance and several candidates remain, it lists them once and
+  **repeated Tab cycles** through them (the input line shows the current
+  candidate). A unique match completes fully and appends `(` for functions.
+
+## Everything in `zt.*` is a FUNCTION — call it with `()`
+
+The single most common stumble: typing `zt.cur_instrument` (or
+`print(zt.cur_instrument)`) prints `function: 0x...`. That's the function
+*object*, not a value — you have to **call** it:
+
+```lua
+zt.cur_instrument()          --> 5       (the console prints return values)
+print(zt.cur_instrument())   --> 5
+zt.get_bpm()                 --> 138
+```
+
+The console flags this for you: a bare function result prints with a
+`-- a function; add () to call it, or help()` hint.
+
+## Introspection (Renoise-style helpers)
+
+```lua
+help()              -- list the whole zt.* API with signatures
+help("cur_row")     -- one-line help for a single function
+rprint(zt)          -- recursively dump a table (keys, values, nested) — cycle-safe
+oprint(zt)          -- list one level: each key with its type
+dump = rprint       -- alias
+```
+
+`rprint`/`oprint` mirror the Renoise/Paketti helpers of the same name, so
+`rprint(zt)` lists the entire API and `rprint(_G)` walks the globals
+(depth-limited so it won't hang).
+
+## Object API (Renoise-style, dot properties)
+
+In addition to the flat `zt.get_*/set_*` functions, there are proxy objects
+with **dot-property access** (read *and* write — no parentheses):
+
+```lua
+-- the song (a singleton object)
+zt.song.bpm                 --> 138
+zt.song.bpm = 145           -- writes it (and reschedules playback)
+zt.song.tpb
+zt.song.name = "My Tune"
+zt.song.cur_pattern, zt.song.cur_track, zt.song.cur_row, zt.song.cur_instrument
+
+-- instruments (zt.instrument(i); i defaults to the current instrument)
+local ins = zt.instrument(2)
+print(ins.name, ins.channel, ins.device)
+ins.name = "Bass"
+-- properties: name, channel, device, transpose, bank, volume, patch, index
+```
+
+This is the layer to reach for when you have Renoise/Paketti muscle memory.
+The flat functions still work; the objects are just nicer. (Tracks and
+patterns get the same treatment in a follow-up.)
 
 ## API Reference
 
-All functions are in the `zt` table:
+All functions are in the `zt` table (call them with `()`):
 
 ### Pattern Access
 ```lua

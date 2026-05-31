@@ -252,15 +252,166 @@ static int l_zt_print_fn(lua_State *L)
 }
 
 // ===========================================================================
+// Object layer — Renoise-style proxies with dot-property access.
+//   zt.song            properties: bpm, tpb, name, cur_pattern, cur_track,
+//                      cur_row, cur_instrument          (all read/write)
+//   zt.instrument(i)   properties: name, channel, device, transpose, bank,
+//                      volume, patch, index            (index read-only;
+//                      i defaults to the current instrument)
+// The flat zt.get_*/set_* functions still work; these are the nicer layer
+// the user reached for ("zt.cur_track.name" / Renoise muscle memory).
+// ===========================================================================
+
+#define ZT_MT_SONG       "zt.song"
+#define ZT_MT_INSTRUMENT "zt.instrument"
+
+// ---- zt.song (singleton; all state lives in C globals) --------------------
+static int song_index(lua_State *L)
+{
+    const char *k = luaL_checkstring(L, 2);
+    if (!song) { lua_pushnil(L); return 1; }
+    if (!strcmp(k, "bpm"))            { lua_pushinteger(L, song->bpm); return 1; }
+    if (!strcmp(k, "tpb"))            { lua_pushinteger(L, song->tpb); return 1; }
+    if (!strcmp(k, "name"))           { lua_pushstring(L, (const char *)song->title); return 1; }
+    if (!strcmp(k, "cur_pattern"))    { lua_pushinteger(L, cur_edit_pattern); return 1; }
+    if (!strcmp(k, "cur_track"))      { lua_pushinteger(L, cur_edit_track); return 1; }
+    if (!strcmp(k, "cur_row"))        { lua_pushinteger(L, cur_edit_row); return 1; }
+    if (!strcmp(k, "cur_instrument")) { lua_pushinteger(L, cur_inst); return 1; }
+    return luaL_error(L, "zt.song has no field '%s' (try help('song'))", k);
+}
+
+static int song_newindex(lua_State *L)
+{
+    const char *k = luaL_checkstring(L, 2);
+    if (!song) return 0;
+    if (!strcmp(k, "bpm")) {
+        song->bpm = (int)luaL_checkinteger(L, 3);
+        if (ztPlayer) ztPlayer->set_speed();
+        return 0;
+    }
+    if (!strcmp(k, "tpb")) {
+        song->tpb = (int)luaL_checkinteger(L, 3);
+        if (ztPlayer) ztPlayer->set_speed();
+        return 0;
+    }
+    if (!strcmp(k, "name")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy((char *)song->title, v, ZTM_SONGTITLE_MAXLEN - 1);
+        song->title[ZTM_SONGTITLE_MAXLEN - 1] = '\0';
+        return 0;
+    }
+    if (!strcmp(k, "cur_pattern")) {
+        int p = (int)luaL_checkinteger(L, 3);
+        if (p >= 0 && p < ZTM_MAX_PATTERNS) { cur_edit_pattern = p; need_refresh++; }
+        return 0;
+    }
+    if (!strcmp(k, "cur_track")) {
+        int t = (int)luaL_checkinteger(L, 3);
+        if (t >= 0 && t < ZTM_MAX_TRACKS) { cur_edit_track = t; need_refresh++; }
+        return 0;
+    }
+    if (!strcmp(k, "cur_row")) {
+        int r = (int)luaL_checkinteger(L, 3);
+        if (song->patterns[cur_edit_pattern] && r >= 0 &&
+            r < song->patterns[cur_edit_pattern]->length) { cur_edit_row = r; need_refresh++; }
+        return 0;
+    }
+    if (!strcmp(k, "cur_instrument")) {
+        int i = (int)luaL_checkinteger(L, 3);
+        if (i >= 0 && i < ZTM_MAX_INSTS) { cur_inst = i; need_refresh++; }
+        return 0;
+    }
+    return luaL_error(L, "zt.song has no writable field '%s'", k);
+}
+
+static int song_tostring(lua_State *L)
+{
+    if (song) lua_pushfstring(L, "zt.song <%s> bpm=%d tpb=%d",
+                              (const char *)song->title, song->bpm, song->tpb);
+    else      lua_pushliteral(L, "zt.song <no song>");
+    return 1;
+}
+
+// ---- zt.instrument(i) -----------------------------------------------------
+static instrument *inst_at(int i)
+{
+    if (!song || i < 0 || i >= ZTM_MAX_INSTS) return nullptr;
+    return song->instruments[i];
+}
+
+static int l_instrument(lua_State *L)
+{
+    int i = (int)luaL_optinteger(L, 1, cur_inst);
+    if (i < 0 || i >= ZTM_MAX_INSTS)
+        return luaL_error(L, "instrument index %d out of range (0..%d)",
+                          i, ZTM_MAX_INSTS - 1);
+    int *p = (int *)lua_newuserdatauv(L, sizeof(int), 0);
+    *p = i;
+    luaL_setmetatable(L, ZT_MT_INSTRUMENT);
+    return 1;
+}
+
+static int inst_index(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index")) { lua_pushinteger(L, i); return 1; }
+    instrument *ins = inst_at(i);
+    if (!ins) return luaL_error(L, "instrument %d is empty", i);
+    if (!strcmp(k, "name"))      { lua_pushstring(L, (const char *)ins->title); return 1; }
+    if (!strcmp(k, "channel"))   { lua_pushinteger(L, ins->channel); return 1; }
+    if (!strcmp(k, "device"))    { lua_pushinteger(L, ins->midi_device); return 1; }
+    if (!strcmp(k, "transpose")) { lua_pushinteger(L, ins->transpose); return 1; }
+    if (!strcmp(k, "bank"))      { lua_pushinteger(L, ins->bank); return 1; }
+    if (!strcmp(k, "volume"))    { lua_pushinteger(L, ins->default_volume); return 1; }
+    if (!strcmp(k, "patch"))     { lua_pushinteger(L, ins->patch); return 1; }
+    return luaL_error(L, "instrument has no field '%s' (try help('instrument'))", k);
+}
+
+static int inst_newindex(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    const char *k = luaL_checkstring(L, 2);
+    instrument *ins = inst_at(i);
+    if (!ins) return luaL_error(L, "instrument %d is empty", i);
+    if (!strcmp(k, "name")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy((char *)ins->title, v, ZTM_INSTTITLE_MAXLEN - 1);
+        ins->title[ZTM_INSTTITLE_MAXLEN - 1] = '\0';
+        return 0;
+    }
+    if (!strcmp(k, "channel"))   { ins->channel        = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "device"))    { ins->midi_device    = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "transpose")) { ins->transpose      = (signed char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "bank"))      { ins->bank           = (short)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "volume"))    { ins->default_volume = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "patch"))     { ins->patch          = (signed char)luaL_checkinteger(L, 3); return 0; }
+    return luaL_error(L, "instrument has no writable field '%s'", k);
+}
+
+static int inst_tostring(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    instrument *ins = inst_at(i);
+    if (ins) lua_pushfstring(L, "zt.instrument(%d) <%s>", i, (const char *)ins->title);
+    else     lua_pushfstring(L, "zt.instrument(%d) <empty>", i);
+    return 1;
+}
+
+// ===========================================================================
 // ZtLuaEngine implementation
 // ===========================================================================
 
 ZtLuaEngine::ZtLuaEngine()
     : L(nullptr), line_count(0), scroll_off(0),
-      history_count(0), history_pos(-1)
+      history_count(0), history_pos(-1),
+      tab_cycle_active(false), tab_cycle_start(0),
+      tab_cycle_index(0), tab_cycle_n(0)
 {
     memset(lines,   0, sizeof(lines));
     memset(history, 0, sizeof(history));
+    tab_cycle_table[0] = '\0';
+    memset(tab_cycle_keys, 0, sizeof(tab_cycle_keys));
 }
 
 ZtLuaEngine::~ZtLuaEngine()
@@ -297,8 +448,100 @@ bool ZtLuaEngine::init()
 
     registerBindings();
 
-    print_line("[Lua] Lua 5.4 ready. Type Lua code and press Enter.");
-    print_line("[Lua] Tab completes; type 'zt.' and press Tab to list the API.");
+    // Prelude: Renoise-style introspection helpers (rprint / oprint / dump)
+    // plus a help() that documents the zt.* API. Kept here as a Lua string so
+    // it lives alongside the bindings and needs no bundled .lua file.
+    static const char *prelude =
+        "do\n"
+        "  local function sorted_keys(t)\n"
+        "    local ks = {}\n"
+        "    for k in pairs(t) do ks[#ks+1] = k end\n"
+        "    table.sort(ks, function(a,b) return tostring(a) < tostring(b) end)\n"
+        "    return ks\n"
+        "  end\n"
+        "  -- rprint(t): recursive dump of a table's keys and values (Renoise\n"
+        "  -- style). Depth-limited and cycle-safe so rprint(_G) won't hang.\n"
+        "  function rprint(t, indent, seen, depth)\n"
+        "    if type(t) ~= 'table' then print(tostring(t)) return end\n"
+        "    indent = indent or '' ; seen = seen or {} ; depth = depth or 0\n"
+        "    if seen[t] then print(indent .. '<cycle>') return end\n"
+        "    seen[t] = true\n"
+        "    for _, k in ipairs(sorted_keys(t)) do\n"
+        "      local v = t[k] ; local tv = type(v)\n"
+        "      if tv == 'table' and depth < 5 then\n"
+        "        print(indent .. tostring(k) .. ' = {')\n"
+        "        rprint(v, indent .. '  ', seen, depth + 1)\n"
+        "        print(indent .. '}')\n"
+        "      else\n"
+        "        print(indent .. tostring(k) .. ' = ' .. tostring(v) .. '  (' .. tv .. ')')\n"
+        "      end\n"
+        "    end\n"
+        "    seen[t] = nil\n"
+        "  end\n"
+        "  -- oprint(t): one level, lists each key with its type (Renoise style).\n"
+        "  function oprint(t)\n"
+        "    if type(t) ~= 'table' then print(type(t) .. ': ' .. tostring(t)) return end\n"
+        "    for _, k in ipairs(sorted_keys(t)) do\n"
+        "      print('  ' .. tostring(k) .. '  (' .. type(t[k]) .. ')')\n"
+        "    end\n"
+        "  end\n"
+        "  dump = rprint\n"
+        "  local docs = {\n"
+        "    {'get_note','get_note(pattern, track, row) -> note   read a note cell (0 = empty)'},\n"
+        "    {'set_note','set_note(pattern, track, row, note [,inst [,vol]])   write a note cell'},\n"
+        "    {'get_pattern_length','get_pattern_length(pattern) -> rows'},\n"
+        "    {'set_pattern_length','set_pattern_length(pattern, rows)'},\n"
+        "    {'play','play()   start playback from the current pattern'},\n"
+        "    {'stop','stop()   stop playback'},\n"
+        "    {'play_pattern','play_pattern()   loop the current pattern'},\n"
+        "    {'get_bpm','get_bpm() -> bpm'},\n"
+        "    {'set_bpm','set_bpm(bpm)'},\n"
+        "    {'get_tpb','get_tpb() -> ticks-per-beat'},\n"
+        "    {'set_tpb','set_tpb(tpb)'},\n"
+        "    {'cur_pattern','cur_pattern() -> current pattern index'},\n"
+        "    {'cur_track','cur_track() -> current track index'},\n"
+        "    {'cur_row','cur_row() -> current row'},\n"
+        "    {'cur_instrument','cur_instrument() -> current instrument index'},\n"
+        "    {'set_cur_pattern','set_cur_pattern(p)'},\n"
+        "    {'set_cur_row','set_cur_row(r)'},\n"
+        "    {'midi_note_on','midi_note_on(device, note, channel [,velocity=127])'},\n"
+        "    {'midi_note_off','midi_note_off(device, note, channel)'},\n"
+        "    {'status','status(text)   show a status-bar message'},\n"
+        "    {'print','print(...)   print to this console'},\n"
+        "  }\n"
+        "  local objdocs = {\n"
+        "    song = 'zt.song  properties (read/write): bpm, tpb, name, cur_pattern, cur_track, cur_row, cur_instrument',\n"
+        "    instrument = 'zt.instrument(i)  properties: name, channel, device, transpose, bank, volume, patch, index  (i defaults to current)',\n"
+        "  }\n"
+        "  function help(what)\n"
+        "    if what == nil then\n"
+        "      print('zt.* are FUNCTIONS -- call them with ()   e.g.  zt.cur_instrument()')\n"
+        "      for _, d in ipairs(docs) do print('  zt.' .. d[2]) end\n"
+        "      print('Objects (dot access, read & write):')\n"
+        "      print('  ' .. objdocs.song)\n"
+        "      print('  ' .. objdocs.instrument)\n"
+        "      print('  e.g.  zt.song.bpm = 140   print(zt.instrument(2).name)')\n"
+        "      print('Introspect: rprint(zt) dumps all, oprint(t) lists one level, help(\"name\") for one.')\n"
+        "      return\n"
+        "    end\n"
+        "    local name = tostring(what):gsub('^zt%.', '')\n"
+        "    if objdocs[name] then print('  ' .. objdocs[name]) return end\n"
+        "    for _, d in ipairs(docs) do\n"
+        "      if d[1] == name then print('  zt.' .. d[2]) return end\n"
+        "    end\n"
+        "    print(\"no help for '\" .. name .. \"' -- try help() for the full list\")\n"
+        "  end\n"
+        "end\n";
+    if (luaL_dostring(L, prelude) != LUA_OK) {
+        const char *err = lua_tostring(L, -1);
+        char msg[LUA_CONSOLE_LINE_LEN];
+        snprintf(msg, sizeof(msg), "[Lua] prelude error: %s", err ? err : "(nil)");
+        print_line(msg);
+        lua_pop(L, 1);
+    }
+
+    print_line("[Lua] Lua 5.4 ready. zt.* are functions -- CALL them: zt.cur_instrument()");
+    print_line("[Lua] help() lists the API. rprint(zt)/oprint(zt) inspect. Tab cycles completions.");
 
     return true;
 }
@@ -361,12 +604,23 @@ void ZtLuaEngine::execute(const char *code)
         return;
     }
 
-    // Print any returned values
+    // Print any returned values. If a result is a function, append a hint —
+    // this is the #1 stumble: `zt.cur_instrument` prints "function: 0x..",
+    // because it's the function itself; you have to CALL it with ().
     int nret = lua_gettop(L) - nresults_before;
     for (int i = 1; i <= nret; i++) {
+        int slot = nresults_before + i;
+        bool is_fn = lua_isfunction(L, slot);
         size_t len;
-        const char *s = luaL_tolstring(L, nresults_before + i, &len);
-        print_line(s);
+        const char *s = luaL_tolstring(L, slot, &len);
+        if (is_fn) {
+            char msg[LUA_CONSOLE_LINE_LEN];
+            snprintf(msg, sizeof(msg),
+                     "%s   -- a function; add () to call it, or help()", s);
+            print_line(msg);
+        } else {
+            print_line(s);
+        }
         lua_pop(L, 1);
     }
     if (nret > 0) lua_pop(L, nret);
@@ -407,6 +661,27 @@ void ZtLuaEngine::registerBindings()
     // Status / output
     lua_pushcfunction(L, l_status);            lua_setfield(L, -2, "status");
     lua_pushcfunction(L, l_zt_print_fn);       lua_setfield(L, -2, "print");
+
+    // --- Object layer (Renoise-style dot properties) -----------------------
+    // Metatables live in the registry; creating them here leaves the `zt`
+    // table on top of the stack untouched (each newmetatable push is popped).
+    luaL_newmetatable(L, ZT_MT_SONG);
+    lua_pushcfunction(L, song_index);     lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, song_newindex);  lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, song_tostring);  lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    luaL_newmetatable(L, ZT_MT_INSTRUMENT);
+    lua_pushcfunction(L, inst_index);     lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, inst_newindex);  lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, inst_tostring);  lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    // zt.instrument(i) constructor + the zt.song singleton object.
+    lua_pushcfunction(L, l_instrument);   lua_setfield(L, -2, "instrument");
+    lua_newuserdatauv(L, 1, 0);
+    luaL_setmetatable(L, ZT_MT_SONG);
+    lua_setfield(L, -2, "song");
 
     lua_setglobal(L, "zt");
 }
@@ -517,6 +792,25 @@ void ZtLuaEngine::print_api_list()
     print_line("[Lua] Tab to complete any identifier. Esc/F2 to close.");
 }
 
+// Replace input[start..cursor-1] with `replacement`, preserving the tail
+// after the original cursor. Updates *pcursor. Returns false if it wouldn't
+// fit in `cap` bytes.
+static bool apply_completion(char *input, int cap, int *pcursor,
+                            int start, int cursor, const char *replacement)
+{
+    int len      = (int)strlen(input);
+    int repl_len = (int)strlen(replacement);
+    int tail_len = len - cursor;
+    if (start + repl_len + tail_len >= cap) return false;
+    if (tail_len > 0)
+        memmove(input + start + repl_len, input + cursor, (size_t)tail_len + 1);
+    else
+        input[start + repl_len] = '\0';
+    memcpy(input + start, replacement, (size_t)repl_len);
+    *pcursor = start + repl_len;
+    return true;
+}
+
 bool ZtLuaEngine::tab_complete(char *input, int cap, int *pcursor)
 {
     if (!L || !input || !pcursor) return false;
@@ -549,6 +843,25 @@ bool ZtLuaEngine::tab_complete(char *input, int cap, int *pcursor)
         table_path[tn] = '\0';
         key_prefix = last_dot + 1;
     }
+
+    // --- Cycling: a repeated Tab with no edits since the last completion
+    //     advances to the next candidate (real autocomplete feel). We detect
+    //     "no edits" by the word at the cursor still being exactly the
+    //     candidate we last inserted, at the same start position.
+    if (tab_cycle_active && tab_cycle_n > 1 && start == tab_cycle_start &&
+        strcmp(table_path, tab_cycle_table) == 0 &&
+        strcmp(key_prefix, tab_cycle_keys[tab_cycle_index]) == 0) {
+        tab_cycle_index = (tab_cycle_index + 1) % tab_cycle_n;
+        char repl[256];
+        if (table_path[0])
+            snprintf(repl, sizeof(repl), "%s.%s", table_path,
+                     tab_cycle_keys[tab_cycle_index]);
+        else
+            snprintf(repl, sizeof(repl), "%s", tab_cycle_keys[tab_cycle_index]);
+        return apply_completion(input, cap, pcursor, start, cursor, repl);
+    }
+    // Any non-continuation Tab starts fresh.
+    tab_cycle_active = false;
 
     // If the user typed "zt." alone and hit Tab, show the full API.
     bool prefix_empty = (key_prefix[0] == '\0');
@@ -589,33 +902,27 @@ bool ZtLuaEngine::tab_complete(char *input, int cap, int *pcursor)
         lcp = j;
     }
 
-    // Determine the full replacement — "table.prefix"
     char replacement[256];
+
+    // --- Single match: complete fully, append "(" if it's a function. ----
     if (n == 1) {
-        // Single match: check if it's a function → append "(".
         lua_getfield(L, -1, keys[0]);
         bool is_fn = lua_isfunction(L, -1);
         lua_pop(L, 1);
-
+        lua_pop(L, 1); // the table we walked
         if (table_path[0])
             snprintf(replacement, sizeof(replacement), "%s.%s%s",
                      table_path, keys[0], is_fn ? "(" : "");
         else
             snprintf(replacement, sizeof(replacement), "%s%s",
                      keys[0], is_fn ? "(" : "");
-    } else {
-        // Multiple — apply the longest common prefix only.
-        char common[64];
-        if (lcp > (int)sizeof(common) - 1) lcp = (int)sizeof(common) - 1;
-        memcpy(common, keys[0], (size_t)lcp);
-        common[lcp] = '\0';
+        return apply_completion(input, cap, pcursor, start, cursor, replacement);
+    }
+    lua_pop(L, 1); // the table we walked
 
-        if (table_path[0])
-            snprintf(replacement, sizeof(replacement), "%s.%s", table_path, common);
-        else
-            snprintf(replacement, sizeof(replacement), "%s", common);
-
-        // Print the candidates so the user sees what's available.
+    // Helper: print the candidate list, two-column wrapped.
+    // (Captures keys/n by reference; both are in scope here.)
+    auto list_candidates = [&]() {
         char line[LUA_CONSOLE_LINE_LEN];
         line[0] = ' '; line[1] = ' '; line[2] = '\0';
         int col = 2;
@@ -631,22 +938,40 @@ bool ZtLuaEngine::tab_complete(char *input, int cap, int *pcursor)
             col += klen + 2;
         }
         if (col > 2) print_line(line);
+    };
+
+    // --- Multiple matches: first advance by the longest common prefix. ---
+    int prefix_len = (int)strlen(key_prefix);
+    if (lcp > prefix_len) {
+        char common[64];
+        if (lcp > (int)sizeof(common) - 1) lcp = (int)sizeof(common) - 1;
+        memcpy(common, keys[0], (size_t)lcp);
+        common[lcp] = '\0';
+        if (table_path[0])
+            snprintf(replacement, sizeof(replacement), "%s.%s", table_path, common);
+        else
+            snprintf(replacement, sizeof(replacement), "%s", common);
+        list_candidates();   // show where the prefix can still branch
+        return apply_completion(input, cap, pcursor, start, cursor, replacement);
     }
-    lua_pop(L, 1); // the table we walked
 
-    // Apply replacement in `input`: replace bytes [start..cursor-1] with
-    // `replacement`, preserving everything after the original cursor.
-    int repl_len = (int)strlen(replacement);
-    int tail_len = len - cursor;
-    int new_len  = start + repl_len + tail_len;
-    if (new_len >= cap) return false;
-
-    if (tail_len > 0)
-        memmove(input + start + repl_len, input + cursor, (size_t)tail_len + 1);
+    // --- Prefix can't advance: begin cycling. Store the candidate set, list
+    //     it once, and insert the first candidate. The continuation check at
+    //     the top of this function advances through the rest on later Tabs. ---
+    tab_cycle_active = true;
+    tab_cycle_start  = start;
+    tab_cycle_n      = (n > 128) ? 128 : n;
+    snprintf(tab_cycle_table, sizeof(tab_cycle_table), "%s", table_path);
+    for (int i = 0; i < tab_cycle_n; i++) {
+        strncpy(tab_cycle_keys[i], keys[i], 63);
+        tab_cycle_keys[i][63] = '\0';
+    }
+    tab_cycle_index = 0;
+    list_candidates();
+    if (table_path[0])
+        snprintf(replacement, sizeof(replacement), "%s.%s",
+                 table_path, tab_cycle_keys[0]);
     else
-        input[start + repl_len] = '\0';
-    memcpy(input + start, replacement, (size_t)repl_len);
-
-    *pcursor = start + repl_len;
-    return (repl_len != span);
+        snprintf(replacement, sizeof(replacement), "%s", tab_cycle_keys[0]);
+    return apply_completion(input, cap, pcursor, start, cursor, replacement);
 }
