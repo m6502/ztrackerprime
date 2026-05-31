@@ -56,6 +56,30 @@ dump = rprint       -- alias
 `rprint(zt)` lists the entire API and `rprint(_G)` walks the globals
 (depth-limited so it won't hang).
 
+## Object API (Renoise-style, dot properties)
+
+In addition to the flat `zt.get_*/set_*` functions, there are proxy objects
+with **dot-property access** (read *and* write — no parentheses):
+
+```lua
+-- the song (a singleton object)
+zt.song.bpm                 --> 138
+zt.song.bpm = 145           -- writes it (and reschedules playback)
+zt.song.tpb
+zt.song.name = "My Tune"
+zt.song.cur_pattern, zt.song.cur_track, zt.song.cur_row, zt.song.cur_instrument
+
+-- instruments (zt.instrument(i); i defaults to the current instrument)
+local ins = zt.instrument(2)
+print(ins.name, ins.channel, ins.device)
+ins.name = "Bass"
+-- properties: name, channel, device, transpose, bank, volume, patch, index
+```
+
+This is the layer to reach for when you have Renoise/Paketti muscle memory.
+The flat functions still work; the objects are just nicer. (Tracks and
+patterns get the same treatment in a follow-up.)
+
 ## API Reference
 
 All functions are in the `zt` table (call them with `()`):

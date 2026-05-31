@@ -252,6 +252,153 @@ static int l_zt_print_fn(lua_State *L)
 }
 
 // ===========================================================================
+// Object layer — Renoise-style proxies with dot-property access.
+//   zt.song            properties: bpm, tpb, name, cur_pattern, cur_track,
+//                      cur_row, cur_instrument          (all read/write)
+//   zt.instrument(i)   properties: name, channel, device, transpose, bank,
+//                      volume, patch, index            (index read-only;
+//                      i defaults to the current instrument)
+// The flat zt.get_*/set_* functions still work; these are the nicer layer
+// the user reached for ("zt.cur_track.name" / Renoise muscle memory).
+// ===========================================================================
+
+#define ZT_MT_SONG       "zt.song"
+#define ZT_MT_INSTRUMENT "zt.instrument"
+
+// ---- zt.song (singleton; all state lives in C globals) --------------------
+static int song_index(lua_State *L)
+{
+    const char *k = luaL_checkstring(L, 2);
+    if (!song) { lua_pushnil(L); return 1; }
+    if (!strcmp(k, "bpm"))            { lua_pushinteger(L, song->bpm); return 1; }
+    if (!strcmp(k, "tpb"))            { lua_pushinteger(L, song->tpb); return 1; }
+    if (!strcmp(k, "name"))           { lua_pushstring(L, (const char *)song->title); return 1; }
+    if (!strcmp(k, "cur_pattern"))    { lua_pushinteger(L, cur_edit_pattern); return 1; }
+    if (!strcmp(k, "cur_track"))      { lua_pushinteger(L, cur_edit_track); return 1; }
+    if (!strcmp(k, "cur_row"))        { lua_pushinteger(L, cur_edit_row); return 1; }
+    if (!strcmp(k, "cur_instrument")) { lua_pushinteger(L, cur_inst); return 1; }
+    return luaL_error(L, "zt.song has no field '%s' (try help('song'))", k);
+}
+
+static int song_newindex(lua_State *L)
+{
+    const char *k = luaL_checkstring(L, 2);
+    if (!song) return 0;
+    if (!strcmp(k, "bpm")) {
+        song->bpm = (int)luaL_checkinteger(L, 3);
+        if (ztPlayer) ztPlayer->set_speed();
+        return 0;
+    }
+    if (!strcmp(k, "tpb")) {
+        song->tpb = (int)luaL_checkinteger(L, 3);
+        if (ztPlayer) ztPlayer->set_speed();
+        return 0;
+    }
+    if (!strcmp(k, "name")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy((char *)song->title, v, ZTM_SONGTITLE_MAXLEN - 1);
+        song->title[ZTM_SONGTITLE_MAXLEN - 1] = '\0';
+        return 0;
+    }
+    if (!strcmp(k, "cur_pattern")) {
+        int p = (int)luaL_checkinteger(L, 3);
+        if (p >= 0 && p < ZTM_MAX_PATTERNS) { cur_edit_pattern = p; need_refresh++; }
+        return 0;
+    }
+    if (!strcmp(k, "cur_track")) {
+        int t = (int)luaL_checkinteger(L, 3);
+        if (t >= 0 && t < ZTM_MAX_TRACKS) { cur_edit_track = t; need_refresh++; }
+        return 0;
+    }
+    if (!strcmp(k, "cur_row")) {
+        int r = (int)luaL_checkinteger(L, 3);
+        if (song->patterns[cur_edit_pattern] && r >= 0 &&
+            r < song->patterns[cur_edit_pattern]->length) { cur_edit_row = r; need_refresh++; }
+        return 0;
+    }
+    if (!strcmp(k, "cur_instrument")) {
+        int i = (int)luaL_checkinteger(L, 3);
+        if (i >= 0 && i < ZTM_MAX_INSTS) { cur_inst = i; need_refresh++; }
+        return 0;
+    }
+    return luaL_error(L, "zt.song has no writable field '%s'", k);
+}
+
+static int song_tostring(lua_State *L)
+{
+    if (song) lua_pushfstring(L, "zt.song <%s> bpm=%d tpb=%d",
+                              (const char *)song->title, song->bpm, song->tpb);
+    else      lua_pushliteral(L, "zt.song <no song>");
+    return 1;
+}
+
+// ---- zt.instrument(i) -----------------------------------------------------
+static instrument *inst_at(int i)
+{
+    if (!song || i < 0 || i >= ZTM_MAX_INSTS) return nullptr;
+    return song->instruments[i];
+}
+
+static int l_instrument(lua_State *L)
+{
+    int i = (int)luaL_optinteger(L, 1, cur_inst);
+    if (i < 0 || i >= ZTM_MAX_INSTS)
+        return luaL_error(L, "instrument index %d out of range (0..%d)",
+                          i, ZTM_MAX_INSTS - 1);
+    int *p = (int *)lua_newuserdatauv(L, sizeof(int), 0);
+    *p = i;
+    luaL_setmetatable(L, ZT_MT_INSTRUMENT);
+    return 1;
+}
+
+static int inst_index(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index")) { lua_pushinteger(L, i); return 1; }
+    instrument *ins = inst_at(i);
+    if (!ins) return luaL_error(L, "instrument %d is empty", i);
+    if (!strcmp(k, "name"))      { lua_pushstring(L, (const char *)ins->title); return 1; }
+    if (!strcmp(k, "channel"))   { lua_pushinteger(L, ins->channel); return 1; }
+    if (!strcmp(k, "device"))    { lua_pushinteger(L, ins->midi_device); return 1; }
+    if (!strcmp(k, "transpose")) { lua_pushinteger(L, ins->transpose); return 1; }
+    if (!strcmp(k, "bank"))      { lua_pushinteger(L, ins->bank); return 1; }
+    if (!strcmp(k, "volume"))    { lua_pushinteger(L, ins->default_volume); return 1; }
+    if (!strcmp(k, "patch"))     { lua_pushinteger(L, ins->patch); return 1; }
+    return luaL_error(L, "instrument has no field '%s' (try help('instrument'))", k);
+}
+
+static int inst_newindex(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    const char *k = luaL_checkstring(L, 2);
+    instrument *ins = inst_at(i);
+    if (!ins) return luaL_error(L, "instrument %d is empty", i);
+    if (!strcmp(k, "name")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy((char *)ins->title, v, ZTM_INSTTITLE_MAXLEN - 1);
+        ins->title[ZTM_INSTTITLE_MAXLEN - 1] = '\0';
+        return 0;
+    }
+    if (!strcmp(k, "channel"))   { ins->channel        = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "device"))    { ins->midi_device    = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "transpose")) { ins->transpose      = (signed char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "bank"))      { ins->bank           = (short)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "volume"))    { ins->default_volume = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "patch"))     { ins->patch          = (signed char)luaL_checkinteger(L, 3); return 0; }
+    return luaL_error(L, "instrument has no writable field '%s'", k);
+}
+
+static int inst_tostring(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    instrument *ins = inst_at(i);
+    if (ins) lua_pushfstring(L, "zt.instrument(%d) <%s>", i, (const char *)ins->title);
+    else     lua_pushfstring(L, "zt.instrument(%d) <empty>", i);
+    return 1;
+}
+
+// ===========================================================================
 // ZtLuaEngine implementation
 // ===========================================================================
 
@@ -362,14 +509,23 @@ bool ZtLuaEngine::init()
         "    {'status','status(text)   show a status-bar message'},\n"
         "    {'print','print(...)   print to this console'},\n"
         "  }\n"
+        "  local objdocs = {\n"
+        "    song = 'zt.song  properties (read/write): bpm, tpb, name, cur_pattern, cur_track, cur_row, cur_instrument',\n"
+        "    instrument = 'zt.instrument(i)  properties: name, channel, device, transpose, bank, volume, patch, index  (i defaults to current)',\n"
+        "  }\n"
         "  function help(what)\n"
         "    if what == nil then\n"
         "      print('zt.* are FUNCTIONS -- call them with ()   e.g.  zt.cur_instrument()')\n"
         "      for _, d in ipairs(docs) do print('  zt.' .. d[2]) end\n"
+        "      print('Objects (dot access, read & write):')\n"
+        "      print('  ' .. objdocs.song)\n"
+        "      print('  ' .. objdocs.instrument)\n"
+        "      print('  e.g.  zt.song.bpm = 140   print(zt.instrument(2).name)')\n"
         "      print('Introspect: rprint(zt) dumps all, oprint(t) lists one level, help(\"name\") for one.')\n"
         "      return\n"
         "    end\n"
         "    local name = tostring(what):gsub('^zt%.', '')\n"
+        "    if objdocs[name] then print('  ' .. objdocs[name]) return end\n"
         "    for _, d in ipairs(docs) do\n"
         "      if d[1] == name then print('  zt.' .. d[2]) return end\n"
         "    end\n"
@@ -505,6 +661,27 @@ void ZtLuaEngine::registerBindings()
     // Status / output
     lua_pushcfunction(L, l_status);            lua_setfield(L, -2, "status");
     lua_pushcfunction(L, l_zt_print_fn);       lua_setfield(L, -2, "print");
+
+    // --- Object layer (Renoise-style dot properties) -----------------------
+    // Metatables live in the registry; creating them here leaves the `zt`
+    // table on top of the stack untouched (each newmetatable push is popped).
+    luaL_newmetatable(L, ZT_MT_SONG);
+    lua_pushcfunction(L, song_index);     lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, song_newindex);  lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, song_tostring);  lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    luaL_newmetatable(L, ZT_MT_INSTRUMENT);
+    lua_pushcfunction(L, inst_index);     lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, inst_newindex);  lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, inst_tostring);  lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    // zt.instrument(i) constructor + the zt.song singleton object.
+    lua_pushcfunction(L, l_instrument);   lua_setfield(L, -2, "instrument");
+    lua_newuserdatauv(L, 1, 0);
+    luaL_setmetatable(L, ZT_MT_SONG);
+    lua_setfield(L, -2, "song");
 
     lua_setglobal(L, "zt");
 }
