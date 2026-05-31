@@ -210,6 +210,9 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j
 
+      - name: Run unit tests (incl. Lua API self-test, headless)
+        run: ctest --test-dir build --output-on-failure
+
       - name: Stage release
         run: |
           mkdir -p dist/ztrackerprime-macos-arm64
@@ -293,6 +296,9 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Release -j
+
+      - name: Run unit tests (incl. Lua API self-test, headless)
+        run: ctest --test-dir build --output-on-failure
 
       - name: Stage release
         run: |
