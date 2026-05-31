@@ -29,6 +29,7 @@ typedef uint16_t SDL_Keymod;
 #define SDL_KMOD_LGUI   0x0400
 #define SDL_KMOD_RGUI   0x0800
 #define SDL_KMOD_GUI    (SDL_KMOD_LGUI   | SDL_KMOD_RGUI)
+#define SDL_KMOD_MODE   0x4000  // AltGr (Mode) key, matches SDL3
 
 // SDLK_* values used by keybuffer.cpp's keypad-to-digit normalisation.
 // Real SDL3 values are 0x40000059..0x40000062 for KP_0..KP_9; for the
@@ -59,6 +60,7 @@ typedef uint16_t SDL_Keymod;
 // Other letter keys we pass to ListBox-style typeahead in tests.
 #define SDLK_A ((unsigned int)0x61)
 #define SDLK_B ((unsigned int)0x62)
+#define SDLK_L ((unsigned int)0x6C)
 #define SDLK_P ((unsigned int)0x70)
 #define SDLK_S ((unsigned int)0x73)
 #define SDLK_W ((unsigned int)0x77)

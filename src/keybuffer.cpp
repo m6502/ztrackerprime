@@ -170,6 +170,29 @@ void KeyBuffer::insert(KBKey key, KBMod state, unsigned char actual_char, unsign
 #else
     if (state & SDL_KMOD_GUI)
         c |= KS_META;
+    // --- AltGr == Alt (Linux/X11/Wayland + Windows) -------------------
+    // On EU/ISO layouts (Finnish included) the right-Alt key is "AltGr".
+    // Depending on the platform + keyboard layout, SDL delivers it either
+    // as SDL_KMOD_MODE, or -- on KDE/X11 setups that emulate Windows-style
+    // AltGr -- as a synthetic Ctrl + right-Alt combo. We want AltGr+<key>
+    // to behave EXACTLY like Alt+<key> for shortcut dispatch, never as a
+    // Ctrl+Alt chord. Without this, e.g. AltGr+P arrives as Ctrl+Alt+P and
+    // gets routed to Song Duration instead of paste-continuously, and the
+    // duplicate-pattern binding (which requires Ctrl absent) never fires.
+    //
+    // Detection: MODE set, OR the RIGHT Alt held without the LEFT Alt.
+    // Genuine Ctrl+Alt chords (Ctrl+Alt+L Lua, Ctrl+Alt+K keybindings,
+    // Ctrl+Alt+N new song, Ctrl+Alt+Q quit) are pressed with the LEFT Alt,
+    // so they stay untouched. When AltGr is in play, force KS_ALT on and
+    // drop the KS_CTRL that rode in with it.
+    //
+    // Scoped to non-Apple: macOS has no AltGr, and its right-Option must
+    // keep its current behaviour (Cmd handles the KS_HAS_ALT path there).
+    if ((state & SDL_KMOD_MODE) ||
+        ((state & SDL_KMOD_RALT) && !(state & SDL_KMOD_LALT))) {
+        c |=  KS_ALT;
+        c &= ~KS_CTRL;
+    }
 #endif
     if (state == KS_LAST_STATE) {
         buffer[head].actual_char = last_actual_char;

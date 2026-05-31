@@ -144,6 +144,72 @@ static void test_state_alt_alone_no_ctrl() {
     CHECK(!(s & KS_CTRL));
 }
 
+#ifndef __APPLE__
+// Non-Apple (Linux/X11/Wayland + Windows): AltGr must behave exactly
+// like plain Alt for shortcut dispatch, never as a Ctrl+Alt chord.
+// On EU/ISO layouts (Finnish) the right-Alt key is AltGr; KDE/X11 often
+// delivers it as a synthetic Ctrl + right-Alt combo, which without
+// normalisation would route AltGr+P to Song Duration (Ctrl+Alt+P)
+// instead of paste-continuously. See keybuffer.cpp's AltGr==Alt block.
+
+// AltGr delivered as the SDL Mode modifier -> KS_ALT, no KS_CTRL.
+static void test_altgr_mode_maps_to_alt_only() {
+    KeyBuffer kb;
+    kb.insert(SDLK_P, SDL_KMOD_MODE);
+    (void)kb.checkkey();
+    int s = (int)kb.getstate();
+    CHECK(s & KS_ALT);
+    CHECK(!(s & KS_CTRL));
+    CHECK(KS_HAS_ALT(s));
+}
+
+// AltGr delivered Windows-style as Ctrl + right-Alt -> Ctrl stripped,
+// leaving plain KS_ALT. This is the KDE-Neon-X11 symptom case.
+static void test_altgr_synthetic_ctrl_ralt_strips_ctrl() {
+    KeyBuffer kb;
+    kb.insert(SDLK_P, SDL_KMOD_LCTRL | SDL_KMOD_RALT);
+    (void)kb.checkkey();
+    int s = (int)kb.getstate();
+    CHECK(s & KS_ALT);
+    CHECK(!(s & KS_CTRL));
+    CHECK(KS_HAS_ALT(s));
+}
+
+// Right-Alt alone (clean AltGr) -> KS_ALT, no KS_CTRL.
+static void test_altgr_ralt_alone_is_alt() {
+    KeyBuffer kb;
+    kb.insert(SDLK_P, SDL_KMOD_RALT);
+    (void)kb.checkkey();
+    int s = (int)kb.getstate();
+    CHECK(s & KS_ALT);
+    CHECK(!(s & KS_CTRL));
+}
+
+// CRITICAL: a genuine Ctrl+Alt chord uses the LEFT Alt and must be
+// preserved -- Ctrl+Alt+L (Lua console) etc. depend on KS_CTRL+KS_ALT
+// both being set. The AltGr normalisation must NOT touch this.
+static void test_genuine_left_ctrl_alt_preserved() {
+    KeyBuffer kb;
+    kb.insert(SDLK_L, SDL_KMOD_LCTRL | SDL_KMOD_LALT);
+    (void)kb.checkkey();
+    int s = (int)kb.getstate();
+    CHECK(s & KS_CTRL);
+    CHECK(s & KS_ALT);
+    CHECK(!KS_HAS_ALT(s)); // Ctrl present => KS_HAS_ALT is false, by design
+}
+
+// Plain left-Ctrl alone stays Ctrl-only (no spurious Alt from the AltGr
+// path) -- guards against the normalisation over-reaching.
+static void test_left_ctrl_alone_unaffected() {
+    KeyBuffer kb;
+    kb.insert(SDLK_S, SDL_KMOD_LCTRL);
+    (void)kb.checkkey();
+    int s = (int)kb.getstate();
+    CHECK(s & KS_CTRL);
+    CHECK(!(s & KS_ALT));
+}
+#endif
+
 #ifdef __APPLE__
 // macOS-only: Cmd (SDL_KMOD_GUI) maps to BOTH KS_META and KS_ALT so
 // that Cmd+key works wherever Alt+key does. The KS_HAS_ALT macro
@@ -263,6 +329,13 @@ int main() {
     test_state_ctrl_only();
     test_state_shift_ctrl();
     test_state_alt_alone_no_ctrl();
+#ifndef __APPLE__
+    test_altgr_mode_maps_to_alt_only();
+    test_altgr_synthetic_ctrl_ralt_strips_ctrl();
+    test_altgr_ralt_alone_is_alt();
+    test_genuine_left_ctrl_alt_preserved();
+    test_left_ctrl_alone_unaffected();
+#endif
 #ifdef __APPLE__
     test_macos_cmd_maps_to_meta_and_alt();
     test_macos_cmd_shift_does_not_set_ctrl();
