@@ -314,6 +314,7 @@ static int mm_command_for_state(int state) {
     switch (state) {
         case STATE_PEDIT:         return CMD_SWITCH_PEDIT;
         case STATE_IEDIT:         return CMD_SWITCH_IEDIT;
+        case STATE_PLAY:          return CMD_PLAY;         // F5 lands on the Play Song page
         case STATE_SONG_CONFIG:   return CMD_SWITCH_SONGCONF;
         case STATE_SONG_MESSAGE:  return CMD_SWITCH_SONGMSG;
         case STATE_MIDIMACEDIT:   return CMD_SWITCH_MIDIMACEDIT;
