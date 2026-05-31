@@ -1083,7 +1083,12 @@ static int l_save(lua_State *L)   // zt.save("song.zt" [, compressed=true]) -> o
     const char *path = luaL_checkstring(L, 1);
     int compressed = lua_isnoneornil(L, 2) ? 1 : (lua_toboolean(L, 2) ? 1 : 0);
     if (!song) { lua_pushboolean(L, 0); return 1; }
-    int rc = song->save((char *)path, compressed);
+    // zt_module::save() writes to this->filename and ignores its fn arg, so
+    // point the song's filename at the requested path first (this is also
+    // the "save as" behaviour: the song adopts the new filename).
+    strncpy((char *)song->filename, path, ZTM_FILENAME_MAXLEN - 1);
+    song->filename[ZTM_FILENAME_MAXLEN - 1] = '\0';
+    int rc = song->save(NULL, compressed);
     lua_pushboolean(L, rc >= 0);
     return 1;
 }

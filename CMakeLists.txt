@@ -401,6 +401,9 @@ if(APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/assets/syx"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/syx"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+      "${CMAKE_SOURCE_DIR}/assets/lua"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/lua"
     VERBATIM
   )
 else()
@@ -418,6 +421,8 @@ else()
           "${CMAKE_SOURCE_DIR}/assets/ccizer" "$<TARGET_FILE_DIR:zt>/ccizer"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/assets/syx" "$<TARGET_FILE_DIR:zt>/syx"
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/assets/lua" "$<TARGET_FILE_DIR:zt>/lua"
   )
 endif()
 
