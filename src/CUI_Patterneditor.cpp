@@ -1161,6 +1161,39 @@ void CUI_Patterneditor::leave(void)
 // ------------------------------------------------------------------------------------------------
 //
 //
+
+// Block-function "select one beat" gesture (help: Block Functions).
+// Bound to BOTH Ctrl-D and Alt-D so it sits naturally alongside its
+// Ctrl-keyed siblings (Ctrl-B/E/U) while keeping the Impulse-Tracker
+// Alt-D muscle memory. Press repeatedly to extend the selection one
+// highlight-increment "beat" at a time down the current track.
+static void pe_select_one_beat()
+{
+  if ( selected &&
+       select_row_start == cur_edit_row &&
+       select_track_start == cur_edit_track &&
+       select_track_end == cur_edit_track ) {
+    select_row_start = cur_edit_row;
+    if (select_row_end < cur_edit_row + zt_config_globals.highlight_increment - 1)
+      select_row_end = cur_edit_row + zt_config_globals.highlight_increment - 1;
+    else {
+      float size = (float)(select_row_end - select_row_start);
+      size /= zt_config_globals.highlight_increment;
+      select_row_end = (int) (cur_edit_row + zt_config_globals.highlight_increment * (size + 1));
+    }
+    select_track_start = cur_edit_track;
+    select_track_end = cur_edit_track;
+    selected = 1;
+  } else {
+    select_row_start = cur_edit_row;
+    select_row_end = cur_edit_row + zt_config_globals.highlight_increment - 1;
+    select_track_start = cur_edit_track;
+    select_track_end = cur_edit_track;
+    selected = 1;
+  }
+  need_refresh++;
+}
+
 void CUI_Patterneditor::update()
 {
   int old_pattern_edit_rows = PATTERN_EDIT_ROWS;
@@ -2408,6 +2441,14 @@ void CUI_Patterneditor::update()
             need_refresh++;
             break;
 
+          // Ctrl-D = "select one beat", the same gesture as Alt-D. Lives
+          // here so it lines up with the other Ctrl-keyed block-selection
+          // shortcuts (Ctrl-B/E/U) instead of being the family's odd-one-
+          // out. There is no global Ctrl-D handler, so nothing shadows it.
+          case SDLK_D:
+            pe_select_one_beat();
+            break;
+
           } ;
 
 
@@ -2866,45 +2907,8 @@ void CUI_Patterneditor::update()
             }
             break;
             
-          case SDLK_D: /* select */
-            if ( selected &&
-              select_row_start == cur_edit_row &&
-              
-              select_track_start == cur_edit_track &&
-              select_track_end == cur_edit_track ) {
-              
-              select_row_start = cur_edit_row;
-              
-              if (select_row_end < cur_edit_row + zt_config_globals.highlight_increment-1)
-                select_row_end = cur_edit_row + zt_config_globals.highlight_increment - 1;
-              else  {
-                
-                float size = (float)(select_row_end - select_row_start) ;
-
-                size /= zt_config_globals.highlight_increment;
-                
-                // <Manu> Cast
-                //select_row_end = cur_edit_row + zt_config_globals.highlight_increment*(size+1);
-                select_row_end = (int) (cur_edit_row + zt_config_globals.highlight_increment*(size+1)) ;
-              }
-              
-              select_track_start = cur_edit_track;
-              select_track_end = cur_edit_track; 
-              selected = 1;
-              need_refresh++;
-            }
-            else {
-              select_row_start = cur_edit_row;
-              select_row_end = cur_edit_row + zt_config_globals.highlight_increment - 1;
-              select_track_start = cur_edit_track;
-              select_track_end = cur_edit_track; 
-              selected = 1;
-              need_refresh++;
-              
-            }
-            
-            
-            
+          case SDLK_D: /* select one beat (also on Ctrl-D, see Ctrl block) */
+            pe_select_one_beat();
             break;
           case SDLK_R: /* Replicate at Cursor (from Paketti, ALT+R / Cmd+R) */
           {

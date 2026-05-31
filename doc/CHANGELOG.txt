@@ -4,6 +4,29 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_05_31 (Pattern Editor keymap: Ctrl-D select, Ctrl-Shift-P duration)
+----------------------------------------------------------------------------
+
+        * Ctrl-D now does "Select one beat" in the Pattern Editor, exactly
+          like Alt-D. It was the odd one out in the Block Functions family
+          (Ctrl-B/E/U are all Ctrl-keyed, but "select one beat" was Alt-D
+          only and plain Ctrl-D was unbound). Both Ctrl-D and Alt-D now
+          run the same gesture (shared pe_select_one_beat helper). Press
+          repeatedly to extend the selection one highlight increment at a
+          time.
+
+        * Song Duration in the Pattern Editor (F2) moved from Ctrl-P to
+          CTRL-SHIFT-P. Plain Ctrl-P is now deliberately free inside F2
+          (it does nothing), so it no longer steals the key from pattern
+          work and a stray AltGr / Ctrl+Alt-P can't pop the Duration
+          popup there either. On every OTHER page, Song Duration stays on
+          plain Ctrl-P as before.
+
+        ! Known, unchanged: in the Pattern Editor, Ctrl-L triggers the
+          global "Load Song" rather than the documented "select whole
+          track / pattern" block function -- the global handler shadows
+          the page binding. Left as-is for now.
+
 zt 2026_05_29 (Instrument Editor: Create 16 channels for a MIDI device)
 ----------------------------------------------------------------------------
 

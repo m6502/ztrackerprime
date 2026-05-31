@@ -1589,21 +1589,26 @@ void global_keys(Drawable *S)
                 }
                 break;
             case SDLK_P:
-                // Ctrl-P = Song Duration popup. Moved here from Alt-P so
-                // Alt-P is free for two new pattern-management bindings:
-                //   * On F2 Pattern Editor: Alt-P = paste-continuously
-                //     (fill clipboard downward to end of pattern). The
-                //     page handler implements this; the global handler
-                //     skips Alt-P when cur_state == STATE_PEDIT.
-                //   * Everywhere else: Alt-P = duplicate current pattern
-                //     into the next empty pattern slot and switch
-                //     cur_edit_pattern to it. Reachable from F11 Order
-                //     List / F3 Instrument Editor / any other page.
-                if ((kstate & KS_CTRL) && !KS_HAS_ALT(kstate) && !(kstate & KS_SHIFT)) {
-                    popup_window(UIP_SongDuration);
-                    key = Keys.getkey();
-                    clear++;
-                    break;
+                // Song Duration popup.
+                //   * Pattern Editor (F2): Ctrl-SHIFT-P. Plain Ctrl-P is
+                //     deliberately left free for pattern work there, and
+                //     keeping Song Duration behind Shift also means a stray
+                //     AltGr / Ctrl+Alt-P can't accidentally pop it.
+                //   * Every other page: plain Ctrl-P (no Shift).
+                // Alt-P is unrelated: paste-continuously in F2 / duplicate
+                // current pattern into the next empty slot elsewhere (see
+                // the KS_HAS_ALT branch below; it skips F2).
+                {
+                    bool ctrl_p   = (kstate & KS_CTRL) && !KS_HAS_ALT(kstate);
+                    bool want_dur = (cur_state == STATE_PEDIT)
+                                      ? (ctrl_p &&  (kstate & KS_SHIFT))   // F2: Ctrl-Shift-P
+                                      : (ctrl_p && !(kstate & KS_SHIFT));  // else: Ctrl-P
+                    if (want_dur) {
+                        popup_window(UIP_SongDuration);
+                        key = Keys.getkey();
+                        clear++;
+                        break;
+                    }
                 }
                 if (KS_HAS_ALT(kstate) && !(kstate & KS_CTRL) && !(kstate & KS_SHIFT)
                     && cur_state != STATE_PEDIT) {
