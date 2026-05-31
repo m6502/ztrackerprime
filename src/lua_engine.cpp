@@ -398,6 +398,204 @@ static int inst_tostring(lua_State *L)
     return 1;
 }
 
+// ---- shared note get/set (bounds-checked) ---------------------------------
+static int note_get(int p, int t, int r)
+{
+    if (!song || p < 0 || p >= ZTM_MAX_PATTERNS || !song->patterns[p]) return 0;
+    if (t < 0 || t >= ZTM_MAX_TRACKS || r < 0) return 0;
+    event *ev = song->patterns[p]->tracks[t]->get_event((unsigned short)r);
+    return ev ? ev->note : 0;
+}
+
+static void note_set(int p, int t, int r, int note, int inst, int vol)
+{
+    if (!song || p < 0 || p >= ZTM_MAX_PATTERNS || !song->patterns[p]) return;
+    if (t < 0 || t >= ZTM_MAX_TRACKS || r < 0) return;
+    song->patterns[p]->tracks[t]->update_event_safe(
+        (unsigned short)r, note, inst, vol, -1, -1, -1);
+}
+
+#define ZT_MT_PATTERN   "zt.pattern"
+#define ZT_MT_TRACK     "zt.track"
+#define ZT_MT_TRANSPORT "zt.transport"
+
+// A track proxy carries BOTH a pattern and a track index (tracks are
+// per-pattern); zt.track(t) / pattern:track(t) both produce one of these.
+struct TrackRef { int pat; int trk; };
+
+static void new_trackref(lua_State *L, int pat, int trk)
+{
+    TrackRef *tr = (TrackRef *)lua_newuserdatauv(L, sizeof(TrackRef), 0);
+    tr->pat = pat; tr->trk = trk;
+    luaL_setmetatable(L, ZT_MT_TRACK);
+}
+
+// ---- zt.track(t [, pattern]) ----------------------------------------------
+static int track_note(lua_State *L)   // tr:note(row) -> note
+{
+    TrackRef *tr = (TrackRef *)luaL_checkudata(L, 1, ZT_MT_TRACK);
+    int r = (int)luaL_checkinteger(L, 2);
+    lua_pushinteger(L, note_get(tr->pat, tr->trk, r));
+    return 1;
+}
+static int track_set_note(lua_State *L)  // tr:set_note(row, note [,inst [,vol]])
+{
+    TrackRef *tr = (TrackRef *)luaL_checkudata(L, 1, ZT_MT_TRACK);
+    int r    = (int)luaL_checkinteger(L, 2);
+    int note = (int)luaL_checkinteger(L, 3);
+    int inst = (int)luaL_optinteger(L, 4, -1);
+    int vol  = (int)luaL_optinteger(L, 5, -1);
+    note_set(tr->pat, tr->trk, r, note, inst, vol);
+    return 0;
+}
+static int track_index(lua_State *L)
+{
+    TrackRef *tr = (TrackRef *)luaL_checkudata(L, 1, ZT_MT_TRACK);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index"))    { lua_pushinteger(L, tr->trk); return 1; }
+    if (!strcmp(k, "pattern"))  { lua_pushinteger(L, tr->pat); return 1; }
+    if (!strcmp(k, "muted")) {
+        lua_pushboolean(L, song ? (song->track_mute[tr->trk] != 0) : 0);
+        return 1;
+    }
+    if (!strcmp(k, "note"))     { lua_pushcfunction(L, track_note); return 1; }
+    if (!strcmp(k, "set_note")) { lua_pushcfunction(L, track_set_note); return 1; }
+    return luaL_error(L, "zt.track has no field '%s' (try help('track'))", k);
+}
+static int track_newindex(lua_State *L)
+{
+    TrackRef *tr = (TrackRef *)luaL_checkudata(L, 1, ZT_MT_TRACK);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "muted")) {
+        bool v = lua_toboolean(L, 3);
+        if (song && tr->trk >= 0 && tr->trk < ZTM_MAX_TRACKS) {
+            song->track_mute[tr->trk] = v ? 1 : 0;
+            if (MidiOut) { if (v) MidiOut->mute_track(tr->trk);
+                           else   MidiOut->unmute_track(tr->trk); }
+            need_refresh++;
+        }
+        return 0;
+    }
+    return luaL_error(L, "zt.track has no writable field '%s'", k);
+}
+static int track_tostring(lua_State *L)
+{
+    TrackRef *tr = (TrackRef *)luaL_checkudata(L, 1, ZT_MT_TRACK);
+    lua_pushfstring(L, "zt.track(%d) [pattern %d]%s", tr->trk, tr->pat,
+                    (song && song->track_mute[tr->trk]) ? " muted" : "");
+    return 1;
+}
+static int l_track(lua_State *L)
+{
+    int t = (int)luaL_optinteger(L, 1, cur_edit_track);
+    int p = (int)luaL_optinteger(L, 2, cur_edit_pattern);
+    if (t < 0 || t >= ZTM_MAX_TRACKS)
+        return luaL_error(L, "track index %d out of range (0..%d)", t, ZTM_MAX_TRACKS - 1);
+    if (p < 0 || p >= ZTM_MAX_PATTERNS)
+        return luaL_error(L, "pattern index %d out of range (0..%d)", p, ZTM_MAX_PATTERNS - 1);
+    new_trackref(L, p, t);
+    return 1;
+}
+
+// ---- zt.pattern(p) --------------------------------------------------------
+static int pat_note(lua_State *L)     // pat:note(track, row) -> note
+{
+    int p = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
+    int t = (int)luaL_checkinteger(L, 2);
+    int r = (int)luaL_checkinteger(L, 3);
+    lua_pushinteger(L, note_get(p, t, r));
+    return 1;
+}
+static int pat_set_note(lua_State *L) // pat:set_note(track, row, note [,inst [,vol]])
+{
+    int p    = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
+    int t    = (int)luaL_checkinteger(L, 2);
+    int r    = (int)luaL_checkinteger(L, 3);
+    int note = (int)luaL_checkinteger(L, 4);
+    int inst = (int)luaL_optinteger(L, 5, -1);
+    int vol  = (int)luaL_optinteger(L, 6, -1);
+    note_set(p, t, r, note, inst, vol);
+    return 0;
+}
+static int pat_track(lua_State *L)    // pat:track(t) -> zt.track bound to this pattern
+{
+    int p = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
+    int t = (int)luaL_checkinteger(L, 2);
+    if (t < 0 || t >= ZTM_MAX_TRACKS)
+        return luaL_error(L, "track index %d out of range (0..%d)", t, ZTM_MAX_TRACKS - 1);
+    new_trackref(L, p, t);
+    return 1;
+}
+static int pat_index(lua_State *L)
+{
+    int p = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index"))  { lua_pushinteger(L, p); return 1; }
+    if (!strcmp(k, "length")) {
+        lua_pushinteger(L, (song && song->patterns[p]) ? song->patterns[p]->length : 0);
+        return 1;
+    }
+    if (!strcmp(k, "empty")) {
+        lua_pushboolean(L, (song && song->patterns[p]) ? song->patterns[p]->isempty() : 1);
+        return 1;
+    }
+    if (!strcmp(k, "note"))     { lua_pushcfunction(L, pat_note); return 1; }
+    if (!strcmp(k, "set_note")) { lua_pushcfunction(L, pat_set_note); return 1; }
+    if (!strcmp(k, "track"))    { lua_pushcfunction(L, pat_track); return 1; }
+    return luaL_error(L, "zt.pattern has no field '%s' (try help('pattern'))", k);
+}
+static int pat_newindex(lua_State *L)
+{
+    int p = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "length")) {
+        int len = (int)luaL_checkinteger(L, 3);
+        if (len < 1) len = 1;
+        if (song && song->patterns[p]) { song->patterns[p]->resize(len); need_refresh++; }
+        return 0;
+    }
+    return luaL_error(L, "zt.pattern has no writable field '%s'", k);
+}
+static int pat_tostring(lua_State *L)
+{
+    int p = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
+    int len = (song && song->patterns[p]) ? song->patterns[p]->length : 0;
+    lua_pushfstring(L, "zt.pattern(%d) length=%d", p, len);
+    return 1;
+}
+static int l_pattern(lua_State *L)
+{
+    int p = (int)luaL_optinteger(L, 1, cur_edit_pattern);
+    if (p < 0 || p >= ZTM_MAX_PATTERNS)
+        return luaL_error(L, "pattern index %d out of range (0..%d)", p, ZTM_MAX_PATTERNS - 1);
+    int *up = (int *)lua_newuserdatauv(L, sizeof(int), 0);
+    *up = p;
+    luaL_setmetatable(L, ZT_MT_PATTERN);
+    return 1;
+}
+
+// ---- zt.transport (singleton) ---------------------------------------------
+static int trans_play(lua_State *L)         { (void)L; if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 0); return 0; }
+static int trans_stop(lua_State *L)         { (void)L; if (ztPlayer) ztPlayer->stop(); return 0; }
+static int trans_play_pattern(lua_State *L) { (void)L; if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 1); return 0; }
+static int trans_panic(lua_State *L)        { (void)L; if (MidiOut) MidiOut->panic(); return 0; }
+static int trans_index(lua_State *L)
+{
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "playing"))      { lua_pushboolean(L, (ztPlayer && ztPlayer->playing) ? 1 : 0); return 1; }
+    if (!strcmp(k, "play"))         { lua_pushcfunction(L, trans_play); return 1; }
+    if (!strcmp(k, "stop"))         { lua_pushcfunction(L, trans_stop); return 1; }
+    if (!strcmp(k, "play_pattern")) { lua_pushcfunction(L, trans_play_pattern); return 1; }
+    if (!strcmp(k, "panic"))        { lua_pushcfunction(L, trans_panic); return 1; }
+    return luaL_error(L, "zt.transport has no field '%s' (try help('transport'))", k);
+}
+static int trans_tostring(lua_State *L)
+{
+    lua_pushfstring(L, "zt.transport <%s>",
+                    (ztPlayer && ztPlayer->playing) ? "playing" : "stopped");
+    return 1;
+}
+
 // ===========================================================================
 // ZtLuaEngine implementation
 // ===========================================================================
@@ -512,6 +710,9 @@ bool ZtLuaEngine::init()
         "  local objdocs = {\n"
         "    song = 'zt.song  properties (read/write): bpm, tpb, name, cur_pattern, cur_track, cur_row, cur_instrument',\n"
         "    instrument = 'zt.instrument(i)  properties: name, channel, device, transpose, bank, volume, patch, index  (i defaults to current)',\n"
+        "    pattern = 'zt.pattern(p)  props: length(rw), index, empty;  methods: :note(track,row), :set_note(track,row,note[,inst[,vol]]), :track(t)  (p defaults to current)',\n"
+        "    track = 'zt.track(t[,p])  props: index, pattern, muted(rw);  methods: :note(row), :set_note(row,note[,inst[,vol]])  (defaults to current track/pattern)',\n"
+        "    transport = 'zt.transport  prop: playing;  methods: :play(), :stop(), :play_pattern(), :panic()',\n"
         "  }\n"
         "  function help(what)\n"
         "    if what == nil then\n"
@@ -520,7 +721,10 @@ bool ZtLuaEngine::init()
         "      print('Objects (dot access, read & write):')\n"
         "      print('  ' .. objdocs.song)\n"
         "      print('  ' .. objdocs.instrument)\n"
-        "      print('  e.g.  zt.song.bpm = 140   print(zt.instrument(2).name)')\n"
+        "      print('  ' .. objdocs.pattern)\n"
+        "      print('  ' .. objdocs.track)\n"
+        "      print('  ' .. objdocs.transport)\n"
+        "      print('  e.g.  zt.song.bpm = 140   zt.pattern(0):set_note(0,0,60)   zt.transport:play()')\n"
         "      print('Introspect: rprint(zt) dumps all, oprint(t) lists one level, help(\"name\") for one.')\n"
         "      return\n"
         "    end\n"
@@ -677,11 +881,35 @@ void ZtLuaEngine::registerBindings()
     lua_pushcfunction(L, inst_tostring);  lua_setfield(L, -2, "__tostring");
     lua_pop(L, 1);
 
-    // zt.instrument(i) constructor + the zt.song singleton object.
+    luaL_newmetatable(L, ZT_MT_PATTERN);
+    lua_pushcfunction(L, pat_index);      lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, pat_newindex);   lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, pat_tostring);   lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    luaL_newmetatable(L, ZT_MT_TRACK);
+    lua_pushcfunction(L, track_index);    lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, track_newindex); lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, track_tostring); lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    luaL_newmetatable(L, ZT_MT_TRANSPORT);
+    lua_pushcfunction(L, trans_index);    lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, trans_tostring); lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    // Constructors: zt.instrument(i) / zt.pattern(p) / zt.track(t [,p]).
     lua_pushcfunction(L, l_instrument);   lua_setfield(L, -2, "instrument");
+    lua_pushcfunction(L, l_pattern);      lua_setfield(L, -2, "pattern");
+    lua_pushcfunction(L, l_track);        lua_setfield(L, -2, "track");
+
+    // Singletons: zt.song and zt.transport.
     lua_newuserdatauv(L, 1, 0);
     luaL_setmetatable(L, ZT_MT_SONG);
     lua_setfield(L, -2, "song");
+    lua_newuserdatauv(L, 1, 0);
+    luaL_setmetatable(L, ZT_MT_TRANSPORT);
+    lua_setfield(L, -2, "transport");
 
     lua_setglobal(L, "zt");
 }
