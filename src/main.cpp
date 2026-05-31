@@ -3386,7 +3386,12 @@ int action(Screen *S)
         need_refresh++;
     }
 
-    if (status_change) {
+    // Don't paint the playback status line while a modal popup (e.g. the
+    // ESC main menu) is open -- update_status() draws straight to the
+    // surface every frame during playback and would bleed over the popup,
+    // which is supposed to be on top. status_change stays set, so the
+    // status line repaints as soon as the popup closes.
+    if (status_change && window_stack.isempty()) {
         update_status(S);
     }
 
