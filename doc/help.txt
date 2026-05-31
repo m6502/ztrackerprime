@@ -61,6 +61,8 @@
  CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
  CTRL-F9         : Track Solo (mute all other tracks; repeat to unsolo all)
  ALT-H           : Humanize Velocities in selection (randomize +/- 15)
+ CTRL-SHIFT-P    : Song Duration (in the Pattern Editor; plain Ctrl-P is
+                   free here and does nothing, unlike on other pages)
 
 |L|%==|H|Block Functions|L|==%|U|
 
