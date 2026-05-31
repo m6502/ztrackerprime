@@ -17,6 +17,9 @@
 #include "keybuffer.h"
 #include "font.h"
 
+#include <string>
+#include <vector>
+
 // ---------------------------------------------------------------------------
 // Local state
 // ---------------------------------------------------------------------------
@@ -139,9 +142,9 @@ void CUI_LuaConsole::update()
         break;
 
     case SDLK_PAGEUP:
+        // scroll_off counts wrapped (visual) rows now; draw() clamps it to
+        // the real wrapped total, so we just grow it and let draw cap it.
         g_lua.scroll_off += page;
-        if (g_lua.scroll_off > g_lua.line_count - 1)
-            g_lua.scroll_off = (g_lua.line_count > 0) ? g_lua.line_count - 1 : 0;
         break;
 
     case SDLK_PAGEDOWN:
@@ -238,30 +241,38 @@ void CUI_LuaConsole::draw(Drawable *S)
     S->fillRect(fx1, row(sb_top),
                 fx2, row(sb_top + sb_rows) - 1, console_bg);
 
-    // --- Scrollback lines (newest at bottom) ---
-    // Clip each line to the visible width so long echoes/output don't draw
-    // past the right border. A trailing '>' marks a line that was cut off
-    // (the input line scrolls horizontally; scrollback can't, so we flag it).
+    // --- Scrollback lines (newest at bottom), WORD-WRAPPED ---
+    // A logical line longer than the console width wraps onto continuation
+    // rows instead of being clipped. scroll_off is measured in visual
+    // (wrapped) rows and clamped here, since only draw() knows the wrapped
+    // total.
     const int sb_x1  = frame_x1() + 1;
-    const int sb_max = frame_x2() - sb_x1;   // chars that fit, ending before the border
-    const int bottom_idx = g_lua.line_count - g_lua.scroll_off;
-    const int top_idx    = bottom_idx - sb_rows;
-    for (int i = 0; i < sb_rows; i++) {
-        int line_idx = top_idx + i;
-        if (line_idx >= 0 && line_idx < g_lua.line_count && sb_max > 0) {
-            int ring = line_idx % LUA_CONSOLE_MAX_LINES;
-            const char *text = g_lua.lines[ring];
-            if (text && text[0]) {
-                char vbuf[LUA_CONSOLE_LINE_LEN];
-                int n = (int)strlen(text);
-                bool cut = (n > sb_max);
-                if (n > sb_max) n = sb_max;
-                if (n > (int)sizeof(vbuf) - 1) n = (int)sizeof(vbuf) - 1;
-                memcpy(vbuf, text, (size_t)n);
-                if (cut && n > 0) vbuf[n - 1] = '>';   // truncation marker
-                vbuf[n] = '\0';
+    const int sb_max = frame_x2() - sb_x1;   // chars per visual row
+    if (sb_max > 0) {
+        // Expand every retained logical line into its wrapped visual rows.
+        std::vector<std::string> vis;
+        int first = g_lua.line_count - LUA_CONSOLE_MAX_LINES;
+        if (first < 0) first = 0;
+        for (int li = first; li < g_lua.line_count; ++li) {
+            const char *t = g_lua.lines[li % LUA_CONSOLE_MAX_LINES];
+            int len = t ? (int)strlen(t) : 0;
+            if (len <= 0) { vis.push_back(std::string()); continue; }
+            for (int off = 0; off < len; off += sb_max) {
+                int n = len - off; if (n > sb_max) n = sb_max;
+                vis.push_back(std::string(t + off, (size_t)n));
+            }
+        }
+        const int total = (int)vis.size();
+        int max_scroll = total - sb_rows; if (max_scroll < 0) max_scroll = 0;
+        if (g_lua.scroll_off > max_scroll) g_lua.scroll_off = max_scroll;
+        if (g_lua.scroll_off < 0) g_lua.scroll_off = 0;
+        const int bottom = total - g_lua.scroll_off;   // one past the last visible row
+        const int top    = bottom - sb_rows;
+        for (int i = 0; i < sb_rows; ++i) {
+            int vi = top + i;
+            if (vi >= 0 && vi < total && !vis[(size_t)vi].empty()) {
                 printBG(col(sb_x1), row(sb_top + i),
-                        vbuf, console_fg, console_bg, S);
+                        vis[(size_t)vi].c_str(), console_fg, console_bg, S);
             }
         }
     }
