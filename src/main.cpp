@@ -4239,6 +4239,28 @@ int main(int argc, char *argv[])
 #endif
 
     while (1) {
+      // Lua notifiers: fire play/stop on transport transitions, row on the
+      // playhead advancing, and idle every iteration. Cheap when nothing is
+      // registered (fire() bails immediately). A heavy/looping callback will
+      // stall the loop -- same trade-off as any other Lua call here.
+      {
+        static int s_prev_playing = 0;
+        static int s_prev_row     = -1;
+        if (ztPlayer) {
+          int playing = ztPlayer->playing ? 1 : 0;
+          if (playing != s_prev_playing) {
+            g_lua.fire(playing ? "play" : "stop");
+            s_prev_playing = playing;
+            if (!playing) s_prev_row = -1;
+          }
+          if (playing && ztPlayer->playing_cur_row != s_prev_row) {
+            s_prev_row = ztPlayer->playing_cur_row;
+            g_lua.fire("row", s_prev_row, true);
+          }
+        }
+        g_lua.fire("idle");
+      }
+
       CUI_Page *focus_page = NULL;
       if (!window_stack.isempty()) {
         focus_page = window_stack.top();

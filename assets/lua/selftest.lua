@@ -146,6 +146,18 @@ a:set_pitch(2, nil) ;              check("arpeggio:pitch nil empties", a:pitch(2
 a:set_cc(0, 74) ;                  eq("arpeggio:cc", a:cc(0), 74)
 a:set_ccval(0, 0, 100) ;           eq("arpeggio:ccval", a:ccval(0, 0), 100)
 
+-- ── notifiers (zt.on / zt.off / zt.fire) ─────────────────────────────
+local fired = 0
+zt.on("selftest_evt", function(x) fired = fired + (x or 1) end)
+zt.fire("selftest_evt", 5)
+eq("notifier fires with arg", fired, 5)
+zt.on("selftest_evt", function() fired = fired + 100 end)  -- second cb
+zt.fire("selftest_evt", 1)
+eq("notifier multiple callbacks", fired, 106)   -- +1 (first) +100 (second)
+zt.off("selftest_evt")
+zt.fire("selftest_evt", 5)
+eq("notifier off stops firing", fired, 106)     -- unchanged
+
 -- ── file save / load roundtrip ───────────────────────────────────────
 local tmp = (os.getenv("TMPDIR") or os.getenv("TEMP") or "/tmp") .. "/zt_selftest.zt"
 zt.song.bpm = 171
