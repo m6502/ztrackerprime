@@ -121,7 +121,25 @@ The file picker. Shows `.zt` and `.mid` files side by side, full-height list, do
 
 ### Lua Console — `Ctrl+Alt+L`
 
-Interactive Lua REPL with tab completion and a full API listing on open. Lets you script zTracker's internals — pattern operations, batch MIDI ops, automation around the file format. Output scrolls; the prompt accepts multi-line statements.
+Interactive Lua 5.4 REPL with a complete, Renoise/Paketti-style scripting API for zTracker's internals. A few lines of Lua can read, generate, play, and save a whole song. Output wraps; the prompt does input history (Up/Down) and **Tab completion** that advances by common prefix then cycles through candidates.
+
+**Introspection.** `help()` documents the whole API (`help("name")` for one); `rprint(t)` / `oprint(t)` dump tables Renoise-style. A bare function result is flagged with a "add `()` to call it" hint.
+
+**Object API (dot properties + colon methods).**
+
+- `zt.song` — `bpm`, `tpb`, `name`, `message`, `cur_pattern/track/row/instrument`
+- `zt.instrument(i)` — `name`, `channel`, `device`, `transpose`, `bank`, `volume`, `global_volume`, `default_length`, `flags`, `ccizer_bank`, and CC/pitchbend **envelopes** via `:envelope(n)` (cc/kind/nodes/loop/sustain)
+- `zt.pattern(p)` — `length`, `:note`/`:set_note`, `:track(t)`, `:cell(t,r)`
+- `zt.track(t)` — `index`, `muted`, `:note`/`:set_note`, `:cell(r)`
+- `zt.cell(t,r)` — every field: `note`, `instrument`, `volume`, `length`, `effect`, `effect_data`, `name`, `:clear()` (per-field merge)
+- `zt.orders` — the song sequence as an array (`zt.orders[i]`, `.count`, `zt.BREAK`/`zt.SKIP`)
+- `zt.transport` — `playing`, `:play()`/`:stop()`/`:play_pattern()`/`:panic()`
+- `zt.midimacro(i)` / `zt.arpeggio(i)` — the F4 / Shift+F4 slots, fully editable; `midimacro:send(device[,param])` fires one out of pattern
+- `zt.note_name`/`note_value` helpers, constants (`MAX_*`, `NOTE_*`, `MIDDLE_C`, …)
+
+**Notifiers.** `zt.on(event, fn)` / `zt.off` / `zt.fire` react to `idle` / `play` / `stop` / `row` events from the main loop.
+
+**Self-test.** `lua/selftest.lua` exercises every call (100+ checks); run it with `zt --headless --lua-test` (exit 0/1) or `dofile("lua/selftest.lua")` — it's also the `lua_api` CI test. See [`doc/lua-scripting.md`](doc/lua-scripting.md) for the full reference.
 
 ![Lua Console](docs/screenshots/17-lua-console.png)
 
@@ -255,7 +273,7 @@ New pages and editors:
 
 - **Keybindings Editor (Ctrl+Alt+K)** — view and rebind every keyboard shortcut in the app. Bindings are saved to `zt.conf` with Ctrl+S.
 
-- **Lua Console (Ctrl+Alt+L)** — interactive Lua REPL with tab completion and a full API listing on open. Lets you script zTracker's internals.
+- **Lua Console (Ctrl+Alt+L)** — interactive Lua 5.4 REPL with a complete Renoise/Paketti-style scripting API: object access to the song, instruments (+ CC envelopes), patterns, tracks, cells, the order list, transport, MIDI macros and arpeggios; `help()`/`rprint`/`oprint` introspection; Tab completion that cycles; `zt.on()` event notifiers; and a `lua/selftest.lua` (100+ checks, runs in CI via `--lua-test`). Full reference in `doc/lua-scripting.md`.
 
 - **Palette Editor (Shift+Ctrl+F12)** — live color editing of the current skin with seven presets. Changes apply immediately and save with the skin.
 

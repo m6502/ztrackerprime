@@ -156,6 +156,15 @@ ins.ccizer_bank = "microfreak.txt"
 local m = zt.midimacro(0)
 m.name = "Bank LSB"              ; print(m.empty, m.syx)
 m:set(0, 0xB0) ; m:set(1, 0x20) ; m:set(2, zt.MACRO_PARAM) ; m:set(3, zt.MACRO_END)
+m:send(0, 5)                    -- :send(device [,param]) fires it NOW (out of pattern)
+
+-- instrument CC/pitchbend envelopes (instrument:envelope(0..zt.MAX_ENVELOPES-1))
+local env = zt.instrument(0):envelope(0)
+env.cc, env.kind, env.enabled = 74, 0, true   -- kind 0=CC, 1=Pitchbend, 2=ChanPress
+env.num_nodes, env.speed = 2, 3
+env:set_node(0, 0, 64) ; env:set_node(1, 48, 127)   -- :set_node(i, tick, value)
+local tick, value = env:node(0)                     -- :node(i) -> tick, value
+-- also: loop_start/end, sustain_start/end, flags, index
 
 -- arpeggios (the Shift+F4 slots)
 local a = zt.arpeggio(0)

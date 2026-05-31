@@ -398,6 +398,11 @@ static instrument *inst_at(int i)
     return song->instruments[i];
 }
 
+// instrument:envelope(n) -> zt.envelope object. Defined further down (it
+// needs the envelope metatable); forward-declared so inst_index can hand
+// out the method.
+static int inst_envelope_m(lua_State *L);
+
 static int l_instrument(lua_State *L)
 {
     int i = (int)luaL_optinteger(L, 1, cur_inst);
@@ -428,6 +433,7 @@ static int inst_index(lua_State *L)
     if (!strcmp(k, "default_length")){ lua_pushinteger(L, ins->default_length); return 1; }
     if (!strcmp(k, "flags"))         { lua_pushinteger(L, ins->flags); return 1; }
     if (!strcmp(k, "ccizer_bank"))   { lua_pushstring(L, ins->ccizer_bank); return 1; }
+    if (!strcmp(k, "envelope"))      { lua_pushcfunction(L, inst_envelope_m); return 1; }
     return luaL_error(L, "instrument has no field '%s' (try help('instrument'))", k);
 }
 
@@ -922,6 +928,39 @@ static int mm_set(lua_State *L)   // mm:set(step, value)
     if (m && s >= 0 && s < ZTM_MIDIMACRO_MAXLEN) { m->data[s] = (unsigned short)v; need_refresh++; }
     return 0;
 }
+// mm:send(device [, param]) -- fire the macro out NOW (not via a pattern).
+// .syx macros send their cached file bytes; regular macros pack data[] into
+// MIDI messages (PARAM tokens -> param), exactly like the Z-effect.
+static int mm_send(lua_State *L)
+{
+    int i   = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
+    int dev = (int)luaL_checkinteger(L, 2);
+    int param = (int)luaL_optinteger(L, 3, 0);
+    midimacro *m = macro_at(i);
+    if (!m || !MidiOut) return 0;
+    if (name_is_syx(m->name)) {
+        if (m->syx_cache_bytes && m->syx_cache_len > 0)
+            MidiOut->sendSysEx((unsigned int)dev, m->syx_cache_bytes, m->syx_cache_len);
+        return 0;
+    }
+    unsigned int packed = 0;
+    int bc = 0;
+    for (int k = 0; k < ZTM_MIDIMACRO_MAXLEN; ++k) {
+        unsigned short v = m->data[k];
+        if (v == ZTM_MIDIMAC_END) break;
+        unsigned char b = (v == ZTM_MIDIMAC_PARAM1) ? (unsigned char)param : (unsigned char)v;
+        if (b & 0x80) {                       // status byte -> flush + restart
+            if (bc > 0) MidiOut->send((unsigned int)dev, packed);
+            packed = b; bc = 1;
+        } else {
+            if (bc == 0) continue;            // data with no running status -> skip
+            packed |= ((unsigned int)b) << (bc * 8); bc++;
+        }
+        if (bc == 3) { MidiOut->send((unsigned int)dev, packed); packed = 0; bc = 0; }
+    }
+    if (bc > 0) MidiOut->send((unsigned int)dev, packed);
+    return 0;
+}
 static int mm_index(lua_State *L)
 {
     int i = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
@@ -934,6 +973,7 @@ static int mm_index(lua_State *L)
     if (!strcmp(k, "syx"))   { lua_pushboolean(L, name_is_syx(m->name)); return 1; }
     if (!strcmp(k, "get"))   { lua_pushcfunction(L, mm_get); return 1; }
     if (!strcmp(k, "set"))   { lua_pushcfunction(L, mm_set); return 1; }
+    if (!strcmp(k, "send"))  { lua_pushcfunction(L, mm_send); return 1; }
     return luaL_error(L, "zt.midimacro has no field '%s' (try help('midimacro'))", k);
 }
 static int mm_newindex(lua_State *L)
@@ -1104,6 +1144,109 @@ static int l_arpeggio(lua_State *L)
     int *p = (int *)lua_newuserdatauv(L, sizeof(int), 0);
     *p = i;
     luaL_setmetatable(L, ZT_MT_ARPEGGIO);
+    return 1;
+}
+
+// ===========================================================================
+// zt.envelope — a per-instrument CC/pitchbend/chanpress envelope, reached
+// via instrument:envelope(n) (n = 0..MAX_ENVELOPES-1). Properties (rw):
+// cc, kind, flags, enabled, num_nodes, loop_start/end, sustain_start/end,
+// speed, index. Methods: :node(i) -> tick,value ; :set_node(i,tick,value).
+// ===========================================================================
+#define ZT_MT_ENVELOPE "zt.envelope"
+struct EnvRef { int inst; int env; };
+
+static inst_envelope *env_at(EnvRef *e)
+{
+    instrument *ins = inst_at(e->inst);
+    if (!ins || e->env < 0 || e->env >= ZTM_INST_MAX_ENVELOPES) return nullptr;
+    return &ins->envelopes[e->env];
+}
+static int env_node(lua_State *L)        // :node(i) -> tick, value
+{
+    EnvRef *e = (EnvRef *)luaL_checkudata(L, 1, ZT_MT_ENVELOPE);
+    int n = (int)luaL_checkinteger(L, 2);
+    inst_envelope *ev = env_at(e);
+    if (!ev || n < 0 || n >= ZTM_INST_ENV_MAX_NODES) { lua_pushnil(L); return 1; }
+    lua_pushinteger(L, ev->tick[n]);
+    lua_pushinteger(L, ev->value[n]);
+    return 2;
+}
+static int env_set_node(lua_State *L)    // :set_node(i, tick, value)
+{
+    EnvRef *e = (EnvRef *)luaL_checkudata(L, 1, ZT_MT_ENVELOPE);
+    int n    = (int)luaL_checkinteger(L, 2);
+    int tick = (int)luaL_checkinteger(L, 3);
+    int val  = (int)luaL_checkinteger(L, 4);
+    inst_envelope *ev = env_at(e);
+    if (ev && n >= 0 && n < ZTM_INST_ENV_MAX_NODES) {
+        ev->tick[n] = (unsigned short)tick;
+        ev->value[n] = (unsigned char)val;
+        need_refresh++;
+    }
+    return 0;
+}
+static int env_index(lua_State *L)
+{
+    EnvRef *e = (EnvRef *)luaL_checkudata(L, 1, ZT_MT_ENVELOPE);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index")) { lua_pushinteger(L, e->env); return 1; }
+    inst_envelope *ev = env_at(e);
+    if (!ev) return luaL_error(L, "envelope %d not available", e->env);
+    if (!strcmp(k, "cc"))            { lua_pushinteger(L, ev->cc); return 1; }
+    if (!strcmp(k, "kind"))          { lua_pushinteger(L, ev->kind); return 1; }
+    if (!strcmp(k, "flags"))         { lua_pushinteger(L, ev->flags); return 1; }
+    if (!strcmp(k, "enabled"))       { lua_pushboolean(L, (ev->flags & ZTM_INSTENVF_ENABLED) != 0); return 1; }
+    if (!strcmp(k, "num_nodes"))     { lua_pushinteger(L, ev->num_nodes); return 1; }
+    if (!strcmp(k, "loop_start"))    { lua_pushinteger(L, ev->loop_start); return 1; }
+    if (!strcmp(k, "loop_end"))      { lua_pushinteger(L, ev->loop_end); return 1; }
+    if (!strcmp(k, "sustain_start")) { lua_pushinteger(L, ev->sustain_start); return 1; }
+    if (!strcmp(k, "sustain_end"))   { lua_pushinteger(L, ev->sustain_end); return 1; }
+    if (!strcmp(k, "speed"))         { lua_pushinteger(L, ev->speed); return 1; }
+    if (!strcmp(k, "node"))          { lua_pushcfunction(L, env_node); return 1; }
+    if (!strcmp(k, "set_node"))      { lua_pushcfunction(L, env_set_node); return 1; }
+    return luaL_error(L, "zt.envelope has no field '%s' (try help('envelope'))", k);
+}
+static int env_newindex(lua_State *L)
+{
+    EnvRef *e = (EnvRef *)luaL_checkudata(L, 1, ZT_MT_ENVELOPE);
+    const char *k = luaL_checkstring(L, 2);
+    inst_envelope *ev = env_at(e);
+    if (!ev) return luaL_error(L, "envelope %d not available", e->env);
+    if (!strcmp(k, "enabled")) {
+        if (lua_toboolean(L, 3)) ev->flags |= ZTM_INSTENVF_ENABLED;
+        else                     ev->flags &= ~ZTM_INSTENVF_ENABLED;
+        need_refresh++; return 0;
+    }
+    int v = (int)luaL_checkinteger(L, 3);
+    if (!strcmp(k, "cc"))            { ev->cc            = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "kind"))          { ev->kind          = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "flags"))         { ev->flags         = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "num_nodes"))     { if (v < 0) v = 0; if (v > ZTM_INST_ENV_MAX_NODES) v = ZTM_INST_ENV_MAX_NODES; ev->num_nodes = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "loop_start"))    { ev->loop_start    = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "loop_end"))      { ev->loop_end      = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "sustain_start")) { ev->sustain_start = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "sustain_end"))   { ev->sustain_end   = (unsigned char)v; need_refresh++; return 0; }
+    if (!strcmp(k, "speed"))         { ev->speed         = (unsigned short)(v < 1 ? 1 : v); need_refresh++; return 0; }
+    return luaL_error(L, "zt.envelope has no writable field '%s'", k);
+}
+static int env_tostring(lua_State *L)
+{
+    EnvRef *e = (EnvRef *)luaL_checkudata(L, 1, ZT_MT_ENVELOPE);
+    inst_envelope *ev = env_at(e);
+    lua_pushfstring(L, "zt.envelope(inst %d, %d) cc=%d nodes=%d", e->inst, e->env,
+                    ev ? ev->cc : -1, ev ? ev->num_nodes : 0);
+    return 1;
+}
+static int inst_envelope_m(lua_State *L)   // instrument:envelope(n)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_INSTRUMENT);
+    int n = (int)luaL_checkinteger(L, 2);
+    if (n < 0 || n >= ZTM_INST_MAX_ENVELOPES)
+        return luaL_error(L, "envelope index %d out of range (0..%d)", n, ZTM_INST_MAX_ENVELOPES - 1);
+    EnvRef *e = (EnvRef *)lua_newuserdatauv(L, sizeof(EnvRef), 0);
+    e->inst = i; e->env = n;
+    luaL_setmetatable(L, ZT_MT_ENVELOPE);
     return 1;
 }
 
@@ -1283,8 +1426,9 @@ bool ZtLuaEngine::init()
         "    transport = 'zt.transport  prop: playing;  methods: :play(), :stop(), :play_pattern(), :panic()',\n"
         "    cell = 'zt.cell(track,row[,pat]) / pattern:cell(t,r) / track:cell(r)  props (rw): note, instrument, volume, length, effect, effect_data;  ro: name, empty, pattern, track, row;  method :clear()',\n"
         "    orders = 'zt.orders  array: zt.orders[i] = pattern (rw), .count, #zt.orders;  pattern markers zt.BREAK / zt.SKIP',\n"
-        "    midimacro = 'zt.midimacro(i)  props: name (rw), empty, syx, index;  methods :get(step), :set(step,value)  (tokens zt.MACRO_END / zt.MACRO_PARAM)',\n"
+        "    midimacro = 'zt.midimacro(i)  props: name (rw), empty, syx, index;  methods :get(step), :set(step,value), :send(device[,param])  (tokens zt.MACRO_END / zt.MACRO_PARAM)',\n"
         "    arpeggio = 'zt.arpeggio(i)  props (rw): name, speed, length, repeat_pos, num_cc;  methods :pitch(s)/:set_pitch(s,off), :cc(l)/:set_cc(l,n), :ccval(l,s)/:set_ccval(l,s,v)',\n"
+        "    envelope = 'instrument:envelope(n)  props (rw): cc, kind, flags, enabled, num_nodes, loop_start/end, sustain_start/end, speed;  methods :node(i)->tick,value / :set_node(i,tick,value)',\n"
         "  }\n"
         "  function help(what)\n"
         "    if what == nil then\n"
@@ -1300,6 +1444,7 @@ bool ZtLuaEngine::init()
         "      print('  ' .. objdocs.orders)\n"
         "      print('  ' .. objdocs.midimacro)\n"
         "      print('  ' .. objdocs.arpeggio)\n"
+        "      print('  ' .. objdocs.envelope)\n"
         "      print('Helpers: zt.note_name(60)->\"C-5\", zt.note_value(\"C-5\")->60 ; zt.load(path), zt.save(path)')\n"
         "      print('Notifiers: zt.on(event,fn) / zt.off(event) / zt.fire(event[,arg]).  events: idle, play, stop, row')\n"
         "      print('Consts: zt.MAX_PATTERNS/TRACKS/INSTRUMENTS/ORDERS/MIDIMACROS/ARPEGGIOS, NOTE_*, MIDDLE_C, BREAK, SKIP, MACRO_END/PARAM')\n"
@@ -1502,6 +1647,12 @@ void ZtLuaEngine::registerBindings()
     lua_pushcfunction(L, arp_tostring); lua_setfield(L, -2, "__tostring");
     lua_pop(L, 1);
 
+    luaL_newmetatable(L, ZT_MT_ENVELOPE);
+    lua_pushcfunction(L, env_index);    lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, env_newindex); lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, env_tostring); lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
     // Constructors: zt.instrument(i) / zt.pattern(p) / zt.track(t [,p]) /
     // zt.cell(track,row[,pattern]) + the note-name helpers.
     lua_pushcfunction(L, l_instrument);   lua_setfield(L, -2, "instrument");
@@ -1542,6 +1693,7 @@ void ZtLuaEngine::registerBindings()
     lua_pushinteger(L, 0x101);             lua_setfield(L, -2, "SKIP");
     lua_pushinteger(L, ZTM_MAX_MIDIMACROS);lua_setfield(L, -2, "MAX_MIDIMACROS");
     lua_pushinteger(L, ZTM_MAX_ARPEGGIOS); lua_setfield(L, -2, "MAX_ARPEGGIOS");
+    lua_pushinteger(L, ZTM_INST_MAX_ENVELOPES); lua_setfield(L, -2, "MAX_ENVELOPES");
     lua_pushinteger(L, ZTM_MIDIMAC_END);   lua_setfield(L, -2, "MACRO_END");
     lua_pushinteger(L, ZTM_MIDIMAC_PARAM1);lua_setfield(L, -2, "MACRO_PARAM");
 
