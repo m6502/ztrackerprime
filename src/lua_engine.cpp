@@ -9,6 +9,7 @@
 #include "playback.h"
 #include "module.h"
 #include "midi-io.h"
+#include "CDataBuf.h"   // song message text buffer (zt.song.message)
 
 #include <string.h>
 #include <stdio.h>
@@ -277,6 +278,16 @@ static int song_index(lua_State *L)
     if (!strcmp(k, "cur_track"))      { lua_pushinteger(L, cur_edit_track); return 1; }
     if (!strcmp(k, "cur_row"))        { lua_pushinteger(L, cur_edit_row); return 1; }
     if (!strcmp(k, "cur_instrument")) { lua_pushinteger(L, cur_inst); return 1; }
+    if (!strcmp(k, "message")) {
+        if (song->songmessage && song->songmessage->songmessage &&
+            song->songmessage->songmessage->getbuffer()) {
+            CDataBuf *b = song->songmessage->songmessage;
+            int n = b->getsize();
+            if (n > 0 && b->getbuffer()[n - 1] == '\0') n--;   // drop the stored null
+            lua_pushlstring(L, b->getbuffer(), (size_t)(n < 0 ? 0 : n));
+        } else lua_pushliteral(L, "");
+        return 1;
+    }
     return luaL_error(L, "zt.song has no field '%s' (try help('song'))", k);
 }
 
@@ -321,6 +332,15 @@ static int song_newindex(lua_State *L)
         if (i >= 0 && i < ZTM_MAX_INSTS) { cur_inst = i; need_refresh++; }
         return 0;
     }
+    if (!strcmp(k, "message")) {
+        size_t len; const char *v = luaL_checklstring(L, 3, &len);
+        if (!song->songmessage) song->songmessage = new songmsg();
+        CDataBuf *b = song->songmessage->songmessage;
+        b->flush();
+        if (len) b->write((char *)v, (int)len);
+        b->pushc((char)0);   // null-terminate, matching the loader
+        return 0;
+    }
     return luaL_error(L, "zt.song has no writable field '%s'", k);
 }
 
@@ -363,8 +383,12 @@ static int inst_index(lua_State *L)
     if (!strcmp(k, "device"))    { lua_pushinteger(L, ins->midi_device); return 1; }
     if (!strcmp(k, "transpose")) { lua_pushinteger(L, ins->transpose); return 1; }
     if (!strcmp(k, "bank"))      { lua_pushinteger(L, ins->bank); return 1; }
-    if (!strcmp(k, "volume"))    { lua_pushinteger(L, ins->default_volume); return 1; }
-    if (!strcmp(k, "patch"))     { lua_pushinteger(L, ins->patch); return 1; }
+    if (!strcmp(k, "volume"))        { lua_pushinteger(L, ins->default_volume); return 1; }
+    if (!strcmp(k, "patch"))         { lua_pushinteger(L, ins->patch); return 1; }
+    if (!strcmp(k, "global_volume")) { lua_pushinteger(L, ins->global_volume); return 1; }
+    if (!strcmp(k, "default_length")){ lua_pushinteger(L, ins->default_length); return 1; }
+    if (!strcmp(k, "flags"))         { lua_pushinteger(L, ins->flags); return 1; }
+    if (!strcmp(k, "ccizer_bank"))   { lua_pushstring(L, ins->ccizer_bank); return 1; }
     return luaL_error(L, "instrument has no field '%s' (try help('instrument'))", k);
 }
 
@@ -384,8 +408,17 @@ static int inst_newindex(lua_State *L)
     if (!strcmp(k, "device"))    { ins->midi_device    = (unsigned char)luaL_checkinteger(L, 3); return 0; }
     if (!strcmp(k, "transpose")) { ins->transpose      = (signed char)luaL_checkinteger(L, 3); return 0; }
     if (!strcmp(k, "bank"))      { ins->bank           = (short)luaL_checkinteger(L, 3); return 0; }
-    if (!strcmp(k, "volume"))    { ins->default_volume = (unsigned char)luaL_checkinteger(L, 3); return 0; }
-    if (!strcmp(k, "patch"))     { ins->patch          = (signed char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "volume"))        { ins->default_volume = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "patch"))         { ins->patch          = (signed char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "global_volume")) { ins->global_volume  = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "default_length")){ ins->default_length = (unsigned short)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "flags"))         { ins->flags          = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "ccizer_bank")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy(ins->ccizer_bank, v, sizeof(ins->ccizer_bank) - 1);
+        ins->ccizer_bank[sizeof(ins->ccizer_bank) - 1] = '\0';
+        return 0;
+    }
     return luaL_error(L, "instrument has no writable field '%s'", k);
 }
 
@@ -810,6 +843,252 @@ static int l_note_value(lua_State *L)  // zt.note_value("C-4") -> 60 ; "off"->0x
 }
 
 // ===========================================================================
+// zt.midimacro(i) — F4 MIDI-macro slots. name (rw), data steps via
+// :get(step)/:set(step,value), .empty/.syx/.index. data values are raw
+// (a MIDI byte, or zt.MACRO_END / zt.MACRO_PARAM tokens).
+// ===========================================================================
+#define ZT_MT_MIDIMACRO "zt.midimacro"
+#define ZT_MT_ARPEGGIO  "zt.arpeggio"
+
+static midimacro *macro_at(int i)
+{
+    if (!song || i < 0 || i >= ZTM_MAX_MIDIMACROS) return nullptr;
+    return song->midimacros[i];
+}
+static bool name_is_syx(const char *n)   // case-insensitive "*.syx", len > 4
+{
+    int L = (int)strlen(n);
+    if (L <= 4) return false;
+    const char *e = n + L - 4;
+    return (e[0] == '.') &&
+           (e[1] == 's' || e[1] == 'S') &&
+           (e[2] == 'y' || e[2] == 'Y') &&
+           (e[3] == 'x' || e[3] == 'X');
+}
+static int mm_get(lua_State *L)   // mm:get(step) -> data value
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
+    int s = (int)luaL_checkinteger(L, 2);
+    midimacro *m = macro_at(i);
+    if (!m || s < 0 || s >= ZTM_MIDIMACRO_MAXLEN) { lua_pushinteger(L, ZTM_MIDIMAC_END); return 1; }
+    lua_pushinteger(L, m->data[s]);
+    return 1;
+}
+static int mm_set(lua_State *L)   // mm:set(step, value)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
+    int s = (int)luaL_checkinteger(L, 2);
+    int v = (int)luaL_checkinteger(L, 3);
+    midimacro *m = macro_at(i);
+    if (m && s >= 0 && s < ZTM_MIDIMACRO_MAXLEN) { m->data[s] = (unsigned short)v; need_refresh++; }
+    return 0;
+}
+static int mm_index(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index")) { lua_pushinteger(L, i); return 1; }
+    midimacro *m = macro_at(i);
+    if (!m) return luaL_error(L, "midimacro %d is empty", i);
+    if (!strcmp(k, "name"))  { lua_pushstring(L, m->name); return 1; }
+    if (!strcmp(k, "empty")) { lua_pushboolean(L, m->isempty()); return 1; }
+    if (!strcmp(k, "syx"))   { lua_pushboolean(L, name_is_syx(m->name)); return 1; }
+    if (!strcmp(k, "get"))   { lua_pushcfunction(L, mm_get); return 1; }
+    if (!strcmp(k, "set"))   { lua_pushcfunction(L, mm_set); return 1; }
+    return luaL_error(L, "zt.midimacro has no field '%s' (try help('midimacro'))", k);
+}
+static int mm_newindex(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
+    const char *k = luaL_checkstring(L, 2);
+    midimacro *m = macro_at(i);
+    if (!m) return luaL_error(L, "midimacro %d is empty", i);
+    if (!strcmp(k, "name")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy(m->name, v, ZTM_MIDIMACRONAME_MAXLEN - 1);
+        m->name[ZTM_MIDIMACRONAME_MAXLEN - 1] = '\0';
+        need_refresh++;
+        return 0;
+    }
+    return luaL_error(L, "zt.midimacro has no writable field '%s'", k);
+}
+static int mm_tostring(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_MIDIMACRO);
+    midimacro *m = macro_at(i);
+    lua_pushfstring(L, "zt.midimacro(%d) <%s>", i, m ? m->name : "?");
+    return 1;
+}
+static int l_midimacro(lua_State *L)
+{
+    int i = (int)luaL_checkinteger(L, 1);
+    if (i < 0 || i >= ZTM_MAX_MIDIMACROS)
+        return luaL_error(L, "midimacro index %d out of range (0..%d)", i, ZTM_MAX_MIDIMACROS - 1);
+    // Slots start NULL; materialise on reference like the F4 editor does
+    // (an empty macro stays out of saves/dispatch via isempty()).
+    if (song && !song->midimacros[i]) song->midimacros[i] = new midimacro;
+    int *p = (int *)lua_newuserdatauv(L, sizeof(int), 0);
+    *p = i;
+    luaL_setmetatable(L, ZT_MT_MIDIMACRO);
+    return 1;
+}
+
+// ===========================================================================
+// zt.arpeggio(i) — Shift-F4 arpeggio slots. name/speed/length/repeat_pos/
+// num_cc (rw), .empty/.index; methods :pitch(step)/:set_pitch(step,offset)
+// (offset is a signed semitone delta, nil = empty), :cc(lane)/:set_cc,
+// :ccval(lane,step)/:set_ccval.
+// ===========================================================================
+static arpeggio *arp_at(int i)
+{
+    if (!song || i < 0 || i >= ZTM_MAX_ARPEGGIOS) return nullptr;
+    return song->arpeggios[i];
+}
+static int arp_pitch(lua_State *L)    // :pitch(step) -> offset or nil
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    int s = (int)luaL_checkinteger(L, 2);
+    arpeggio *a = arp_at(i);
+    if (!a || s < 0 || s >= ZTM_ARPEGGIO_LEN || a->pitch[s] == ZTM_ARP_EMPTY_PITCH) { lua_pushnil(L); return 1; }
+    lua_pushinteger(L, (int)(short)a->pitch[s]);
+    return 1;
+}
+static int arp_set_pitch(lua_State *L) // :set_pitch(step, offset|nil)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    int s = (int)luaL_checkinteger(L, 2);
+    arpeggio *a = arp_at(i);
+    if (a && s >= 0 && s < ZTM_ARPEGGIO_LEN) {
+        if (lua_isnoneornil(L, 3)) a->pitch[s] = ZTM_ARP_EMPTY_PITCH;
+        else a->pitch[s] = (unsigned short)(short)luaL_checkinteger(L, 3);
+        need_refresh++;
+    }
+    return 0;
+}
+static int arp_cc(lua_State *L)        // :cc(lane) -> CC number
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    int lane = (int)luaL_checkinteger(L, 2);
+    arpeggio *a = arp_at(i);
+    if (!a || lane < 0 || lane >= ZTM_ARPEGGIO_NUM_CC) { lua_pushnil(L); return 1; }
+    lua_pushinteger(L, a->cc[lane]);
+    return 1;
+}
+static int arp_set_cc(lua_State *L)    // :set_cc(lane, ccnum)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    int lane = (int)luaL_checkinteger(L, 2);
+    int v = (int)luaL_checkinteger(L, 3);
+    arpeggio *a = arp_at(i);
+    if (a && lane >= 0 && lane < ZTM_ARPEGGIO_NUM_CC) { a->cc[lane] = (unsigned char)v; need_refresh++; }
+    return 0;
+}
+static int arp_ccval(lua_State *L)     // :ccval(lane, step) -> value or nil
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    int lane = (int)luaL_checkinteger(L, 2);
+    int s = (int)luaL_checkinteger(L, 3);
+    arpeggio *a = arp_at(i);
+    if (!a || lane < 0 || lane >= ZTM_ARPEGGIO_NUM_CC || s < 0 || s >= ZTM_ARPEGGIO_LEN ||
+        a->ccval[lane][s] == ZTM_ARP_EMPTY_CCVAL) { lua_pushnil(L); return 1; }
+    lua_pushinteger(L, a->ccval[lane][s]);
+    return 1;
+}
+static int arp_set_ccval(lua_State *L) // :set_ccval(lane, step, value|nil)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    int lane = (int)luaL_checkinteger(L, 2);
+    int s = (int)luaL_checkinteger(L, 3);
+    arpeggio *a = arp_at(i);
+    if (a && lane >= 0 && lane < ZTM_ARPEGGIO_NUM_CC && s >= 0 && s < ZTM_ARPEGGIO_LEN) {
+        if (lua_isnoneornil(L, 4)) a->ccval[lane][s] = ZTM_ARP_EMPTY_CCVAL;
+        else a->ccval[lane][s] = (unsigned char)luaL_checkinteger(L, 4);
+        need_refresh++;
+    }
+    return 0;
+}
+static int arp_index(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    const char *k = luaL_checkstring(L, 2);
+    if (!strcmp(k, "index")) { lua_pushinteger(L, i); return 1; }
+    arpeggio *a = arp_at(i);
+    if (!a) return luaL_error(L, "arpeggio %d is empty", i);
+    if (!strcmp(k, "name"))       { lua_pushstring(L, a->name); return 1; }
+    if (!strcmp(k, "speed"))      { lua_pushinteger(L, a->speed); return 1; }
+    if (!strcmp(k, "length"))     { lua_pushinteger(L, a->length); return 1; }
+    if (!strcmp(k, "repeat_pos")) { lua_pushinteger(L, a->repeat_pos); return 1; }
+    if (!strcmp(k, "num_cc"))     { lua_pushinteger(L, a->num_cc); return 1; }
+    if (!strcmp(k, "empty"))      { lua_pushboolean(L, a->isempty()); return 1; }
+    if (!strcmp(k, "pitch"))      { lua_pushcfunction(L, arp_pitch); return 1; }
+    if (!strcmp(k, "set_pitch"))  { lua_pushcfunction(L, arp_set_pitch); return 1; }
+    if (!strcmp(k, "cc"))         { lua_pushcfunction(L, arp_cc); return 1; }
+    if (!strcmp(k, "set_cc"))     { lua_pushcfunction(L, arp_set_cc); return 1; }
+    if (!strcmp(k, "ccval"))      { lua_pushcfunction(L, arp_ccval); return 1; }
+    if (!strcmp(k, "set_ccval"))  { lua_pushcfunction(L, arp_set_ccval); return 1; }
+    return luaL_error(L, "zt.arpeggio has no field '%s' (try help('arpeggio'))", k);
+}
+static int arp_newindex(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    const char *k = luaL_checkstring(L, 2);
+    arpeggio *a = arp_at(i);
+    if (!a) return luaL_error(L, "arpeggio %d is empty", i);
+    if (!strcmp(k, "name")) {
+        const char *v = luaL_checkstring(L, 3);
+        strncpy(a->name, v, ZTM_ARPEGGIONAME_MAXLEN - 1);
+        a->name[ZTM_ARPEGGIONAME_MAXLEN - 1] = '\0';
+        need_refresh++; return 0;
+    }
+    int v = (int)luaL_checkinteger(L, 3);
+    if (!strcmp(k, "speed"))      { a->speed = v < 1 ? 1 : v; need_refresh++; return 0; }
+    if (!strcmp(k, "length"))     { if (v < 0) v = 0; if (v > ZTM_ARPEGGIO_LEN) v = ZTM_ARPEGGIO_LEN; a->length = v; need_refresh++; return 0; }
+    if (!strcmp(k, "repeat_pos")) { a->repeat_pos = v; need_refresh++; return 0; }
+    if (!strcmp(k, "num_cc"))     { if (v < 0) v = 0; if (v > ZTM_ARPEGGIO_NUM_CC) v = ZTM_ARPEGGIO_NUM_CC; a->num_cc = v; need_refresh++; return 0; }
+    return luaL_error(L, "zt.arpeggio has no writable field '%s'", k);
+}
+static int arp_tostring(lua_State *L)
+{
+    int i = *(int *)luaL_checkudata(L, 1, ZT_MT_ARPEGGIO);
+    arpeggio *a = arp_at(i);
+    lua_pushfstring(L, "zt.arpeggio(%d) <%s> len=%d", i, a ? a->name : "?", a ? a->length : 0);
+    return 1;
+}
+static int l_arpeggio(lua_State *L)
+{
+    int i = (int)luaL_checkinteger(L, 1);
+    if (i < 0 || i >= ZTM_MAX_ARPEGGIOS)
+        return luaL_error(L, "arpeggio index %d out of range (0..%d)", i, ZTM_MAX_ARPEGGIOS - 1);
+    // Slots start NULL; materialise on reference like the Shift-F4 editor
+    // (an empty arpeggio stays out of saves/dispatch via isempty()).
+    if (song && !song->arpeggios[i]) song->arpeggios[i] = new arpeggio;
+    int *p = (int *)lua_newuserdatauv(L, sizeof(int), 0);
+    *p = i;
+    luaL_setmetatable(L, ZT_MT_ARPEGGIO);
+    return 1;
+}
+
+// ---- file load / save -----------------------------------------------------
+static int l_load(lua_State *L)   // zt.load("song.zt") -> ok
+{
+    const char *path = luaL_checkstring(L, 1);
+    if (!song) { lua_pushboolean(L, 0); return 1; }
+    int rc = song->load((char *)path);
+    need_refresh++;
+    lua_pushboolean(L, rc >= 0);
+    return 1;
+}
+static int l_save(lua_State *L)   // zt.save("song.zt" [, compressed=true]) -> ok
+{
+    const char *path = luaL_checkstring(L, 1);
+    int compressed = lua_isnoneornil(L, 2) ? 1 : (lua_toboolean(L, 2) ? 1 : 0);
+    if (!song) { lua_pushboolean(L, 0); return 1; }
+    int rc = song->save((char *)path, compressed);
+    lua_pushboolean(L, rc >= 0);
+    return 1;
+}
+
+// ===========================================================================
 // ZtLuaEngine implementation
 // ===========================================================================
 
@@ -921,13 +1200,15 @@ bool ZtLuaEngine::init()
         "    {'print','print(...)   print to this console'},\n"
         "  }\n"
         "  local objdocs = {\n"
-        "    song = 'zt.song  properties (read/write): bpm, tpb, name, cur_pattern, cur_track, cur_row, cur_instrument',\n"
-        "    instrument = 'zt.instrument(i)  properties: name, channel, device, transpose, bank, volume, patch, index  (i defaults to current)',\n"
+        "    song = 'zt.song  properties (rw): bpm, tpb, name, message, cur_pattern, cur_track, cur_row, cur_instrument',\n"
+        "    instrument = 'zt.instrument(i)  props (rw): name, channel, device, transpose, bank, volume, global_volume, default_length, flags, ccizer_bank; ro: index  (i defaults to current)',\n"
         "    pattern = 'zt.pattern(p)  props: length(rw), index, empty;  methods: :note(track,row), :set_note(track,row,note[,inst[,vol]]), :track(t)  (p defaults to current)',\n"
         "    track = 'zt.track(t[,p])  props: index, pattern, muted(rw);  methods: :note(row), :set_note(row,note[,inst[,vol]])  (defaults to current track/pattern)',\n"
         "    transport = 'zt.transport  prop: playing;  methods: :play(), :stop(), :play_pattern(), :panic()',\n"
         "    cell = 'zt.cell(track,row[,pat]) / pattern:cell(t,r) / track:cell(r)  props (rw): note, instrument, volume, length, effect, effect_data;  ro: name, empty, pattern, track, row;  method :clear()',\n"
         "    orders = 'zt.orders  array: zt.orders[i] = pattern (rw), .count, #zt.orders;  pattern markers zt.BREAK / zt.SKIP',\n"
+        "    midimacro = 'zt.midimacro(i)  props: name (rw), empty, syx, index;  methods :get(step), :set(step,value)  (tokens zt.MACRO_END / zt.MACRO_PARAM)',\n"
+        "    arpeggio = 'zt.arpeggio(i)  props (rw): name, speed, length, repeat_pos, num_cc;  methods :pitch(s)/:set_pitch(s,off), :cc(l)/:set_cc(l,n), :ccval(l,s)/:set_ccval(l,s,v)',\n"
         "  }\n"
         "  function help(what)\n"
         "    if what == nil then\n"
@@ -941,8 +1222,10 @@ bool ZtLuaEngine::init()
         "      print('  ' .. objdocs.cell)\n"
         "      print('  ' .. objdocs.transport)\n"
         "      print('  ' .. objdocs.orders)\n"
-        "      print('Helpers: zt.note_name(60)->\"C-5\", zt.note_value(\"C-5\")->60  (zTracker octave = note/12)')\n"
-        "      print('Consts: zt.MAX_PATTERNS/MAX_TRACKS/MAX_INSTRUMENTS/MAX_ORDERS, NOTE_EMPTY/CUT/OFF, MIDDLE_C, BREAK, SKIP')\n"
+        "      print('  ' .. objdocs.midimacro)\n"
+        "      print('  ' .. objdocs.arpeggio)\n"
+        "      print('Helpers: zt.note_name(60)->\"C-5\", zt.note_value(\"C-5\")->60 ; zt.load(path), zt.save(path)')\n"
+        "      print('Consts: zt.MAX_PATTERNS/TRACKS/INSTRUMENTS/ORDERS/MIDIMACROS/ARPEGGIOS, NOTE_*, MIDDLE_C, BREAK, SKIP, MACRO_END/PARAM')\n"
         "      print('  e.g.  zt.song.bpm=140   zt.cell(0,0).note = zt.note_value(\"C-5\")   zt.orders[0]=2   zt.transport:play()')\n"
         "      print('Introspect: rprint(zt) dumps all, oprint(t) lists one level, help(\"name\") for one.')\n"
         "      return\n"
@@ -1130,14 +1413,30 @@ void ZtLuaEngine::registerBindings()
     lua_pushcfunction(L, orders_tostring); lua_setfield(L, -2, "__tostring");
     lua_pop(L, 1);
 
+    luaL_newmetatable(L, ZT_MT_MIDIMACRO);
+    lua_pushcfunction(L, mm_index);     lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, mm_newindex);  lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, mm_tostring);  lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
+    luaL_newmetatable(L, ZT_MT_ARPEGGIO);
+    lua_pushcfunction(L, arp_index);    lua_setfield(L, -2, "__index");
+    lua_pushcfunction(L, arp_newindex); lua_setfield(L, -2, "__newindex");
+    lua_pushcfunction(L, arp_tostring); lua_setfield(L, -2, "__tostring");
+    lua_pop(L, 1);
+
     // Constructors: zt.instrument(i) / zt.pattern(p) / zt.track(t [,p]) /
     // zt.cell(track,row[,pattern]) + the note-name helpers.
     lua_pushcfunction(L, l_instrument);   lua_setfield(L, -2, "instrument");
     lua_pushcfunction(L, l_pattern);      lua_setfield(L, -2, "pattern");
     lua_pushcfunction(L, l_track);        lua_setfield(L, -2, "track");
     lua_pushcfunction(L, l_cell);         lua_setfield(L, -2, "cell");
+    lua_pushcfunction(L, l_midimacro);    lua_setfield(L, -2, "midimacro");
+    lua_pushcfunction(L, l_arpeggio);     lua_setfield(L, -2, "arpeggio");
     lua_pushcfunction(L, l_note_name);    lua_setfield(L, -2, "note_name");
     lua_pushcfunction(L, l_note_value);   lua_setfield(L, -2, "note_value");
+    lua_pushcfunction(L, l_load);         lua_setfield(L, -2, "load");
+    lua_pushcfunction(L, l_save);         lua_setfield(L, -2, "save");
 
     // Singletons: zt.song, zt.transport, zt.orders.
     lua_newuserdatauv(L, 1, 0);
@@ -1161,6 +1460,10 @@ void ZtLuaEngine::registerBindings()
     lua_pushinteger(L, 60);                lua_setfield(L, -2, "MIDDLE_C");
     lua_pushinteger(L, 0x100);             lua_setfield(L, -2, "BREAK");
     lua_pushinteger(L, 0x101);             lua_setfield(L, -2, "SKIP");
+    lua_pushinteger(L, ZTM_MAX_MIDIMACROS);lua_setfield(L, -2, "MAX_MIDIMACROS");
+    lua_pushinteger(L, ZTM_MAX_ARPEGGIOS); lua_setfield(L, -2, "MAX_ARPEGGIOS");
+    lua_pushinteger(L, ZTM_MIDIMAC_END);   lua_setfield(L, -2, "MACRO_END");
+    lua_pushinteger(L, ZTM_MIDIMAC_PARAM1);lua_setfield(L, -2, "MACRO_PARAM");
 
     lua_setglobal(L, "zt");
 }

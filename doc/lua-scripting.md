@@ -113,6 +113,29 @@ zt.note_value("F#3")             --> 42
 -- zt.MAX_PATTERNS (256), zt.MAX_TRACKS (64), zt.MAX_INSTRUMENTS (100), zt.MAX_ORDERS (256)
 -- zt.NOTE_EMPTY (0x80), zt.NOTE_CUT (0x81), zt.NOTE_OFF (0x82), zt.MIDDLE_C (60)
 -- zt.BREAK (0x100), zt.SKIP (0x101)
+
+-- song message (the F10 text)
+zt.song.message = "made with zTracker"   ;  print(zt.song.message)
+
+-- more instrument fields (on the same object as #148)
+local ins = zt.instrument(0)
+ins.global_volume, ins.default_length, ins.flags = 110, 24, 0
+ins.ccizer_bank = "microfreak.txt"
+
+-- MIDI macros (the F4 slots)  -- referencing a slot creates it
+local m = zt.midimacro(0)
+m.name = "Bank LSB"              ; print(m.empty, m.syx)
+m:set(0, 0xB0) ; m:set(1, 0x20) ; m:set(2, zt.MACRO_PARAM) ; m:set(3, zt.MACRO_END)
+
+-- arpeggios (the Shift+F4 slots)
+local a = zt.arpeggio(0)
+a.name, a.length, a.speed, a.repeat_pos = "up", 3, 2, 0
+a:set_pitch(0, 0) ; a:set_pitch(1, 4) ; a:set_pitch(2, 7)   -- semitone offsets (nil = empty)
+a.num_cc = 1 ; a:set_cc(0, 74) ; a:set_ccval(0, 0, 100)
+
+-- file load / save
+zt.save("backup.zt")             -- zt.save(path [, compressed=true]) -> ok
+-- zt.load("song.zt")            -- replaces the current song; returns ok
 ```
 
 These are the layer to reach for when you have Renoise/Paketti muscle
