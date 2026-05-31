@@ -230,8 +230,17 @@ CUI_PaletteEditor::~CUI_PaletteEditor(void) {
 void CUI_PaletteEditor::rebuild_preset_list(void) {
     num_presets = 0;
 
-    // 1. Static palette presets (palettes/*.conf next to the binary).
-    for (int i = 0; i < NUM_STATIC_PRESETS && num_presets < 64; ++i) {
+    // 1. Static palette presets (palettes/*.conf next to the binary),
+    //    listed alphabetically by label. (Labels are Title Case, so a
+    //    plain strcmp is already alphabetical; selection is by path, not
+    //    index, so reordering the display is safe.)
+    int order[NUM_STATIC_PRESETS];
+    for (int i = 0; i < NUM_STATIC_PRESETS; ++i) order[i] = i;
+    std::sort(order, order + NUM_STATIC_PRESETS, [](int a, int b) {
+        return strcmp(g_palette_presets[a].label, g_palette_presets[b].label) < 0;
+    });
+    for (int k = 0; k < NUM_STATIC_PRESETS && num_presets < 64; ++k) {
+        int i = order[k];
         snprintf(preset_label[num_presets], sizeof(preset_label[0]),
                  "%s", g_palette_presets[i].label);
 #if defined(_WIN32)
