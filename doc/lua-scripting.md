@@ -91,12 +91,49 @@ print(t:note(0))                 -- :note(row)
 -- transport (singleton)
 print(zt.transport.playing)      -- read-only bool
 zt.transport:play()              -- :play() :stop() :play_pattern() :panic()
+
+-- cells: FULL per-cell access (note, instrument, volume, length, effect, effect_data)
+local c = zt.cell(0, 0)          -- zt.cell(track, row [,pattern]); also pat:cell(t,r), trk:cell(r)
+c.note   = zt.note_value("C-5")  -- 60 in zTracker's octave convention (octave = note/12)
+c.instrument = 2
+c.volume = 100
+c.effect, c.effect_data = 0x53, 0x1234
+print(c.name, c.note, c.empty)   -- "C-5", 60, false ; .pattern/.track/.row are read-only
+c:clear()                        -- empty the cell
+-- empty cells read back sentinels: note 0x80 (zt.NOTE_EMPTY), inst 0xFF, vol 0x80
+
+-- order list (the song's pattern sequence)
+zt.orders[0] = 2                 -- play pattern 2 first
+print(zt.orders[0], zt.orders.count, #zt.orders)
+zt.orders[1] = zt.BREAK          -- 0x100 end-of-song (zt.SKIP = 0x101)
+
+-- note names + constants
+zt.note_name(60)                 --> "C-5"   (also "^^^" cut, "===" off, "..." empty)
+zt.note_value("F#3")             --> 42
+-- zt.MAX_PATTERNS (256), zt.MAX_TRACKS (64), zt.MAX_INSTRUMENTS (100), zt.MAX_ORDERS (256)
+-- zt.NOTE_EMPTY (0x80), zt.NOTE_CUT (0x81), zt.NOTE_OFF (0x82), zt.MIDDLE_C (60)
+-- zt.BREAK (0x100), zt.SKIP (0x101)
 ```
 
 These are the layer to reach for when you have Renoise/Paketti muscle
 memory. The flat `zt.get_*/set_*` functions still work; the objects are
-just nicer. Note properties use dot access (`pat.length`); methods use the
-colon call (`pat:note(0,0)`), Renoise-style.
+just nicer. Note properties use dot access (`pat.length`, `cell.note`);
+methods use the colon call (`pat:note(0,0)`, `cell:clear()`), Renoise-style.
+
+### Example: generate a pattern from Lua
+
+```lua
+local pat = zt.pattern(0)
+pat.length = 64
+for row = 0, pat.length - 1, 4 do            -- a note every 4th row
+  local c = pat:cell(0, row)
+  c.note = zt.MIDDLE_C
+  c.instrument = zt.song.cur_instrument
+  c.volume = 96
+end
+zt.orders[0] = 0
+zt.transport:play_pattern()
+```
 
 ## API Reference
 
