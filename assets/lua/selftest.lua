@@ -146,6 +146,23 @@ a:set_pitch(2, nil) ;              check("arpeggio:pitch nil empties", a:pitch(2
 a:set_cc(0, 74) ;                  eq("arpeggio:cc", a:cc(0), 74)
 a:set_ccval(0, 0, 100) ;           eq("arpeggio:ccval", a:ccval(0, 0), 100)
 
+-- ── midimacro :send + instrument CC envelopes ───────────────────────
+check("midimacro:send callable", type(zt.midimacro(0).send) == "function")
+eq("MAX_ENVELOPES", zt.MAX_ENVELOPES, 32)
+local env = zt.instrument(1):envelope(0)
+env.cc = 74 ;          eq("envelope.cc", env.cc, 74)
+env.kind = 0 ;         eq("envelope.kind", env.kind, 0)
+env.enabled = true ;   check("envelope.enabled", env.enabled == true)
+env.num_nodes = 2 ;    eq("envelope.num_nodes", env.num_nodes, 2)
+env.speed = 3 ;        eq("envelope.speed", env.speed, 3)
+env.loop_start = 0 ; env.loop_end = 1 ; eq("envelope.loop_end", env.loop_end, 1)
+env:set_node(0, 0, 64) ; env:set_node(1, 48, 127)
+local t0, v0 = env:node(0)
+eq("envelope:node tick", t0, 0) ; eq("envelope:node value", v0, 64)
+local t1, v1 = env:node(1)
+eq("envelope:node tick 1", t1, 48) ; eq("envelope:node value 1", v1, 127)
+eq("envelope.index", env.index, 0)
+
 -- ── notifiers (zt.on / zt.off / zt.fire) ─────────────────────────────
 local fired = 0
 zt.on("selftest_evt", function(x) fired = fired + (x or 1) end)
