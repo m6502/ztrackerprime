@@ -42,6 +42,70 @@ ctest --output-on-failure      # unit-test harness (Linux CI runs this)
 
 `scripts/zt-screenshot.sh` (macOS) launches zt.app and captures F1/F2/F3/F11/F12/Ctrl+F12 via `screencapture -R` + AppleScript. Output at `/tmp/zt-shots/`. Use it to self-verify layout changes.
 
+### Headless screenshot recipe (verified macOS, no extra deps)
+
+When `zt-screenshot.sh` can't be used (e.g. it relies on the `Quartz`
+Python module, which is **not** present in the system `python3` on a
+stock Mac — `ModuleNotFoundError: No module named 'Quartz'`), this
+dependency-free sequence reliably captures zt's actual rendering:
+
+```sh
+# 1. Relaunch a fresh binary (kill the old instance first, or you screenshot stale pixels)
+pkill -f "zt.app/Contents/MacOS/zt"; sleep 1
+open build/Program/zt.app && sleep 2
+
+# 2. Bring zt to the front — screencapture grabs whatever is frontmost, and
+#    `open` does NOT guarantee focus over the terminal you launched it from
+osascript -e 'tell application "zt" to activate' \
+  || osascript -e 'tell application "System Events" to set frontmost of (first process whose name is "zt") to true'
+sleep 2
+
+# 3. Capture. Full-screen is the robust fallback; -o omits the window shadow, -x silences the shutter
+screencapture -o -x /tmp/zt_shot.png
+```
+
+Then `Read` the PNG to eyeball it. Foot-guns learned the hard way:
+- **`cp` is interactive.** A bare `cp src dst` prompts `overwrite? (y/n)`
+  and, with no tty answer, **silently does NOT overwrite** — your swap
+  never happened. Use `/bin/cp -f` for any scripted overwrite.
+- **`open` then capture grabs the terminal**, not zt, unless you
+  `activate` zt first (step 2). The first capture attempt usually shows
+  iTerm — bring zt forward and recapture.
+- A backgrounded `python3 - <<'PY' ... Quartz ...` window-id lookup will
+  fail on stock macOS; don't depend on it. Full-screen `screencapture`
+  needs no window id.
+
+### Screenshotting a specific palette / skin without driving the UI
+
+To verify how a palette `.conf` (e.g. `palettes/hotdog_stand.conf`) or a
+skin renders, you don't have to click through the Palette Editor. The
+startup colours come from the skin named in `zt.conf` (`skin: default`),
+loaded from `<bundle>/skins/<name>/colors.conf` — **same slot format** as
+`palettes/*.conf`. So:
+
+```sh
+RES=build/Program/zt.app/Contents/Resources
+/bin/cp -f "$RES/skins/default/colors.conf" /tmp/colors_backup.conf   # back up
+/bin/cp -f "$RES/palettes/hotdog_stand.conf" "$RES/skins/default/colors.conf"  # swap in
+# ... relaunch + capture per the recipe above ...
+/bin/cp -f /tmp/colors_backup.conf "$RES/skins/default/colors.conf"   # ALWAYS restore
+```
+
+`COLORS.Background` is the full-screen fill (`main.cpp` `fillRect(0,0,…,COLORS.Background)`),
+so a wrong `Background` value shows instantly. Note that palettes/skins
+are copied into the bundle by a CMake POST_BUILD step — edit the **source**
+`palettes/*.conf` (repo root) and rebuild to propagate; editing only the
+bundle copy is for throwaway verification and must be restored.
+
+Palette gotcha (PR: Hotdog Stand): `scripts/import-schism-palettes.py`
+maps Schism colour **index 1** to `Background`, but some Schism palettes
+(Hotdog Stand) put the desktop fill on **index 2** — the importer left
+Background black and Lowlight yellow, so the desktop was black and, worse,
+black `Text` on a black desktop was invisible. Frames draw with **both**
+`Lowlight` (top/left) and `Highlight` (bottom/right), so a `Lowlight` that
+equals `Background` makes half of every frame vanish. Hand-tune imported
+palettes against an actual screenshot; don't trust the 16→18 slot mapping.
+
 ## Key files
 
 | File | Purpose |

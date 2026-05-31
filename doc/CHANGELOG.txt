@@ -31,6 +31,32 @@ zt 2026_05_31 (AltGr behaves like Alt for keyboard shortcuts)
         * test_keybuffer: added 5 AltGr cases (MODE, RALT-alone,
           synthetic LCTRL+RALT, genuine LCTRL+LALT preserved, LCTRL-only
           unaffected). sdl_stub.h gains SDL_KMOD_MODE + SDLK_L.
+zt 2026_05_31 (Pattern Editor keymap: Ctrl-D select, Ctrl-Shift-P duration)
+----------------------------------------------------------------------------
+
+        * The whole Block Functions family now works on Ctrl, matching the
+          F1 help. These gestures (mark begin / mark end / unselect /
+          select one beat) historically existed ONLY on Alt-B/E/U/D even
+          though help.txt documented them as Ctrl-keyed -- so muscle memory
+          and the help both failed. Ctrl-B, Ctrl-E, Ctrl-U and Ctrl-D now
+          run the same gestures as their Alt counterparts (shared
+          pe_block_set_begin / pe_block_set_end / pe_select_one_beat
+          helpers; Alt forms still work too). Press Ctrl-D / Alt-D
+          repeatedly to extend the selection one highlight increment at a
+          time. Exception: Ctrl-L stays the global "Load Song", so "select
+          whole track / pattern" remains on Alt-L (noted in the help).
+
+        * Song Duration in the Pattern Editor (F2) moved from Ctrl-P to
+          CTRL-SHIFT-P. Plain Ctrl-P is now deliberately free inside F2
+          (it does nothing), so it no longer steals the key from pattern
+          work and a stray AltGr / Ctrl+Alt-P can't pop the Duration
+          popup there either. On every OTHER page, Song Duration stays on
+          plain Ctrl-P as before.
+
+        ! Known, unchanged: in the Pattern Editor, Ctrl-L triggers the
+          global "Load Song" rather than the documented "select whole
+          track / pattern" block function -- the global handler shadows
+          the page binding. Left as-is for now.
 
 zt 2026_05_29 (Instrument Editor: Create 16 channels for a MIDI device)
 ----------------------------------------------------------------------------

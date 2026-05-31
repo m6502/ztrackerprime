@@ -306,6 +306,46 @@ static int mm_first_selectable(int from, int delta) {
     return 0;
 }
 
+// The ESC menu is a popup overlay, so when enter() runs cur_state still
+// holds the page it was opened over. Map that page to its switch-command
+// so reopening the menu lands the highlight on the current view instead
+// of snapping back to the top. Returns the matching CMD_SWITCH_* or 0.
+static int mm_command_for_state(int state) {
+    switch (state) {
+        case STATE_PEDIT:         return CMD_SWITCH_PEDIT;
+        case STATE_IEDIT:         return CMD_SWITCH_IEDIT;
+        case STATE_PLAY:          return CMD_PLAY;         // F5 lands on the Play Song page
+        case STATE_SONG_CONFIG:   return CMD_SWITCH_SONGCONF;
+        case STATE_SONG_MESSAGE:  return CMD_SWITCH_SONGMSG;
+        case STATE_MIDIMACEDIT:   return CMD_SWITCH_MIDIMACEDIT;
+        case STATE_ARPEDIT:       return CMD_SWITCH_ARPEDIT;
+        case STATE_HELP:          return CMD_SWITCH_HELP;
+        case STATE_ABOUT:         return CMD_SWITCH_ABOUT;
+        case STATE_LOAD:          return CMD_SWITCH_LOAD;
+        case STATE_SAVE:          return CMD_SWITCH_SAVE;
+        case STATE_SYSTEM_CONFIG: return CMD_SWITCH_SYSCONF;
+        case STATE_CONFIG:        return CMD_SWITCH_CONFIG;
+        case STATE_PALETTE_EDITOR:return CMD_SWITCH_PALETTE;
+        case STATE_KEYBINDINGS:   return CMD_SWITCH_KEYBINDINGS;
+        case STATE_CCCONSOLE:     return CMD_SWITCH_CCCONSOLE;
+        case STATE_SYSEX_LIB:     return CMD_SWITCH_SYSEX_LIB;
+        case STATE_LUA_CONSOLE:   return CMD_SWITCH_LUA_CONSOLE;
+        default:                  return 0;
+    }
+}
+
+// Index of the menu row that switches to the given page, or the first
+// selectable row if there's no match (e.g. opened over the Order list).
+static int mm_entry_for_state(int state) {
+    int cmd = mm_command_for_state(state);
+    if (cmd) {
+        for (int i = 0; i < MM_COUNT; i++)
+            if (MM_ENTRIES[i].kind == MM_CMD && MM_ENTRIES[i].command == cmd)
+                return i;
+    }
+    return mm_first_selectable(0, 1);
+}
+
 CUI_MainMenu::CUI_MainMenu(void) {
     UI = new UserInterface;
     cur_sel = mm_first_selectable(0, 1);
@@ -316,7 +356,10 @@ CUI_MainMenu::~CUI_MainMenu(void) {
 
 void CUI_MainMenu::enter(void) {
     need_refresh = 1;
-    cur_sel = mm_first_selectable(0, 1);
+    // Highlight the row for the page we were opened over, so reopening
+    // the menu is "dynamic" (lands on the current view) rather than
+    // always resetting to the first row.
+    cur_sel = mm_entry_for_state(cur_state);
 }
 
 void CUI_MainMenu::leave(void) {
