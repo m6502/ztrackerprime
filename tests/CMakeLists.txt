@@ -146,3 +146,14 @@ target_include_directories(test_keyjazz_map PRIVATE
 )
 target_compile_features(test_keyjazz_map PRIVATE cxx_std_17)
 add_test(NAME keyjazz_map COMMAND test_keyjazz_map)
+
+# Full Lua API self-test. Unlike the SDL-free unit tests above, this drives
+# the REAL zt binary headless (--lua-test) against a scratch song, running
+# lua/selftest.lua and asserting exit 0 (every check passed). Covers the
+# entire zt.* Lua surface end-to-end.
+if(TARGET zt)
+    add_test(NAME lua_api COMMAND $<TARGET_FILE:zt> --headless --lua-test)
+    set_tests_properties(lua_api PROPERTIES
+        WORKING_DIRECTORY "$<TARGET_FILE_DIR:zt>"
+        LABELS "lua")
+endif()

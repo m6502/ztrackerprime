@@ -56,6 +56,17 @@ dump = rprint       -- alias
 `rprint(zt)` lists the entire API and `rprint(_G)` walks the globals
 (depth-limited so it won't hang).
 
+## Self-test (every feature, runnable)
+
+`lua/selftest.lua` exercises the whole `zt.*` API with PASS/FAIL checks. Run it:
+
+```sh
+zt --headless --lua-test     # CI-friendly: prints PASS/FAIL, exits 0 (ok) / 1 (fail)
+```
+or in the console (Ctrl+Alt+L): `dofile("lua/selftest.lua")`. It also runs as the
+`lua_api` test under `ctest`. The script is readable — it's the quickest way to
+see exactly what every call does and returns.
+
 ## Object API (Renoise-style, dot properties)
 
 In addition to the flat `zt.get_*/set_*` functions, there are proxy objects

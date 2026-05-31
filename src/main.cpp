@@ -3870,6 +3870,10 @@ struct ZtCliArgs {
     // --script to drive the running app to a chosen state and exit.
     bool        headless        = false;
     const char *script_path     = NULL;
+    // --lua-test runs the bundled lua/selftest.lua against a scratch song
+    // and exits 0 (all checks passed) / 1 (failures). Pairs with --headless
+    // for CI. Output (PASS/FAIL per check) goes to stdout.
+    bool        lua_test        = false;
 };
 
 static void zt_print_cli_help(const char *progname) {
@@ -3905,13 +3909,18 @@ static void zt_print_cli_help(const char *progname) {
         "                              'shot <png-path>', 'quit'. See\n"
         "                              docs/headless-script.md for the full\n"
         "                              command set.\n"
+        "      --lua-test              Run the bundled Lua API self-test\n"
+        "                              (lua/selftest.lua) against a scratch\n"
+        "                              song and exit 0 (all checks passed) /\n"
+        "                              1 (failures). Pair with --headless.\n"
         "\n"
         "Examples:\n"
         "  %s mysong.zt\n"
         "  %s --midi-in \"IAC Driver Bus 1\"\n"
         "  %s --midi-clock 0 mysong.zt\n"
-        "  %s --headless --script tests/scripts/smoke.txt\n",
-        progname, progname, progname, progname, progname);
+        "  %s --headless --script tests/scripts/smoke.txt\n"
+        "  %s --headless --lua-test\n",
+        progname, progname, progname, progname, progname, progname);
 }
 
 // Strip leading '-' or '--' so we accept "-midi-in" or "--midi-in" --
@@ -3991,6 +4000,7 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         if (r > 0) { out->midi_clock_port = value; continue; }
 
         if (zt_cli_match_flag(a, "headless")) { out->headless = true; continue; }
+        if (zt_cli_match_flag(a, "lua-test")) { out->lua_test = true; continue; }
         r = zt_cli_match_flag_with_value(argc, argv, &i, "script", &value);
         if (r < 0) return -1;
         if (r > 0) { out->script_path = value; continue; }
@@ -4003,6 +4013,36 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         if (!out->song_filename) out->song_filename = a;
     }
     return 0;
+}
+
+// Run the bundled Lua self-test against the (scratch) song and return a
+// process exit code: 0 if every check passed, 1 otherwise. The test's
+// print() output is captured in the engine scrollback; we dump it to
+// stdout so CI / the user can read the PASS/FAIL lines.
+static int zt_run_lua_selftest(void) {
+    if (!g_lua.init()) {                 // already inited in initSDL(); no-op then
+        fprintf(stderr, "lua-test: engine init failed\n");
+        return 1;
+    }
+    lua_State *L = g_lua.L;
+    g_lua.line_count = 0;                // drop the startup banner so only
+    g_lua.scroll_off = 0;                // the test output is dumped
+    int rc = luaL_dofile(L, "lua/selftest.lua");
+    int start = g_lua.line_count - LUA_CONSOLE_MAX_LINES;
+    if (start < 0) start = 0;
+    for (int i = start; i < g_lua.line_count; ++i)
+        fprintf(stdout, "%s\n", g_lua.lines[i % LUA_CONSOLE_MAX_LINES]);
+    if (rc != LUA_OK) {
+        const char *err = lua_tostring(L, -1);
+        fprintf(stderr, "lua-test: error: %s\n", err ? err : "(nil)");
+        return 1;
+    }
+    lua_getglobal(L, "SELFTEST_FAILURES");
+    int fails = (int)lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    fprintf(stdout, "lua-test: %s (%d failure%s)\n",
+            fails == 0 ? "PASS" : "FAIL", fails, fails == 1 ? "" : "s");
+    return fails == 0 ? 0 : 1;
 }
 
 // Resolve a MIDI in port spec to an index in MidiIn->midiInDev[].
@@ -4128,6 +4168,13 @@ int main(int argc, char *argv[])
 
   if (!initSDL()) {
     return -1;
+  }
+
+  // --lua-test: initSDL() has created the song + Lua engine, which is all
+  // the self-test needs. Run it now (before GFX / skin / window setup, so a
+  // headless box with no display still works) and exit with its pass/fail.
+  if (cli_args.lua_test) {
+    return zt_run_lua_selftest();
   }
 
   // CLI MIDI handling. Runs after initSDL because that's where MidiIn
