@@ -7,13 +7,17 @@ Legend
 zt 2026_05_31 (Pattern Editor keymap: Ctrl-D select, Ctrl-Shift-P duration)
 ----------------------------------------------------------------------------
 
-        * Ctrl-D now does "Select one beat" in the Pattern Editor, exactly
-          like Alt-D. It was the odd one out in the Block Functions family
-          (Ctrl-B/E/U are all Ctrl-keyed, but "select one beat" was Alt-D
-          only and plain Ctrl-D was unbound). Both Ctrl-D and Alt-D now
-          run the same gesture (shared pe_select_one_beat helper). Press
+        * The whole Block Functions family now works on Ctrl, matching the
+          F1 help. These gestures (mark begin / mark end / unselect /
+          select one beat) historically existed ONLY on Alt-B/E/U/D even
+          though help.txt documented them as Ctrl-keyed -- so muscle memory
+          and the help both failed. Ctrl-B, Ctrl-E, Ctrl-U and Ctrl-D now
+          run the same gestures as their Alt counterparts (shared
+          pe_block_set_begin / pe_block_set_end / pe_select_one_beat
+          helpers; Alt forms still work too). Press Ctrl-D / Alt-D
           repeatedly to extend the selection one highlight increment at a
-          time.
+          time. Exception: Ctrl-L stays the global "Load Song", so "select
+          whole track / pattern" remains on Alt-L (noted in the help).
 
         * Song Duration in the Pattern Editor (F2) moved from Ctrl-P to
           CTRL-SHIFT-P. Plain Ctrl-P is now deliberately free inside F2

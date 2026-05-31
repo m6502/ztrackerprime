@@ -1194,6 +1194,54 @@ static void pe_select_one_beat()
   need_refresh++;
 }
 
+// Block-function "set begin" / "set end" gestures (help: Block Functions).
+// Historically these lived only on Alt-B / Alt-E even though the help
+// documents them as Ctrl-B / Ctrl-E. Extracted here so BOTH modifiers can
+// run the same gesture (see the Ctrl switch and the Alt switch below).
+static void pe_block_set_begin()
+{
+  int temp;
+  if (!selected) {
+    selected = 1;
+    select_row_start = cur_edit_row;
+    select_row_end = cur_edit_row;
+    select_track_start = cur_edit_track;
+    select_track_end = cur_edit_track;
+  } else {
+    select_row_start = cur_edit_row;
+    select_track_start = cur_edit_track;
+    if (select_track_start > select_track_end) {
+      temp = select_track_start; select_track_start = select_track_end; select_track_end = temp;
+    }
+    if (select_row_start > select_row_end) {
+      temp = select_row_start; select_row_start = select_row_end; select_row_end = temp;
+    }
+  }
+  need_refresh++;
+}
+
+static void pe_block_set_end()
+{
+  int temp;
+  if (!selected) {
+    selected = 1;
+    select_row_start = cur_edit_row;
+    select_row_end = cur_edit_row;
+    select_track_start = cur_edit_track;
+    select_track_end = cur_edit_track;
+  } else {
+    select_row_end = cur_edit_row;
+    select_track_end = cur_edit_track;
+    if (select_track_start > select_track_end) {
+      temp = select_track_start; select_track_start = select_track_end; select_track_end = temp;
+    }
+    if (select_row_start > select_row_end) {
+      temp = select_row_start; select_row_start = select_row_end; select_row_end = temp;
+    }
+  }
+  need_refresh++;
+}
+
 void CUI_Patterneditor::update()
 {
   int old_pattern_edit_rows = PATTERN_EDIT_ROWS;
@@ -2441,11 +2489,24 @@ void CUI_Patterneditor::update()
             need_refresh++;
             break;
 
-          // Ctrl-D = "select one beat", the same gesture as Alt-D. Lives
-          // here so it lines up with the other Ctrl-keyed block-selection
-          // shortcuts (Ctrl-B/E/U) instead of being the family's odd-one-
-          // out. There is no global Ctrl-D handler, so nothing shadows it.
-          case SDLK_D:
+          // Block Functions family on Ctrl, matching the F1 help. These
+          // gestures historically existed only on Alt-B/E/U/D even though
+          // help.txt documents them as Ctrl-keyed; bind the Ctrl forms too
+          // so the documented shortcuts actually work. None of B/E/U/D has
+          // a global handler, so nothing shadows them. (Ctrl-L is the one
+          // exception: it's the global Load Song, so "select track/pattern"
+          // stays on Alt-L -- see the help note.)
+          case SDLK_B:        // Mark begin of select block
+            pe_block_set_begin();
+            break;
+          case SDLK_E:        // Mark end of select block
+            pe_block_set_end();
+            break;
+          case SDLK_U:        // Unselect block
+            selected = 0;
+            need_refresh++;
+            break;
+          case SDLK_D:        // Select one beat (same gesture as Alt-D)
             pe_select_one_beat();
             break;
 
@@ -2813,51 +2874,11 @@ void CUI_Patterneditor::update()
               need_refresh++;
             }
             break;
-          case SDLK_B:  // Set Select Begin block
-            if (!selected) {    
-              selected = 1;
-              select_row_start = cur_edit_row;
-              select_row_end = cur_edit_row;
-              select_track_start = cur_edit_track;
-              select_track_end = cur_edit_track;
-            } else {
-              select_row_start = cur_edit_row;
-              select_track_start = cur_edit_track;
-              if (select_track_start > select_track_end) {
-                temp = select_track_start;
-                select_track_start = select_track_end;
-                select_track_end = temp;
-              }
-              if (select_row_start > select_row_end){
-                temp = select_row_start;
-                select_row_start = select_row_end;
-                select_row_end = temp;
-              }
-            }
-            need_refresh++;
+          case SDLK_B:  // Set Select Begin block (also on Ctrl-B)
+            pe_block_set_begin();
             break;
-          case SDLK_E: // Set Block End
-            if (!selected) {    
-              selected = 1;
-              select_row_start = cur_edit_row;
-              select_row_end = cur_edit_row;
-              select_track_start = cur_edit_track;
-              select_track_end = cur_edit_track;
-            } else {
-              select_row_end = cur_edit_row;
-              select_track_end = cur_edit_track;
-              if (select_track_start > select_track_end) {
-                temp = select_track_start;
-                select_track_start = select_track_end;
-                select_track_end = temp;
-              }
-              if (select_row_start > select_row_end){
-                temp = select_row_start;
-                select_row_start = select_row_end;
-                select_row_end = temp;
-              }
-            }                   
-            need_refresh++;
+          case SDLK_E: // Set Block End (also on Ctrl-E)
+            pe_block_set_end();
             break;
             
             

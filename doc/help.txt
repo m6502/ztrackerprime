@@ -66,11 +66,12 @@
 
 |L|%==|H|Block Functions|L|==%|U|
 
- CTRL-B : Marks the beginning of a select block.
- CTRL-E : Marks the end of a select block.
- CTRL-L : Select whole track, pressing it again will select the entire
-          pattern.
- CTRL-U : Unselect block
+ CTRL-B / ALT-B : Marks the beginning of a select block.
+ CTRL-E / ALT-E : Marks the end of a select block.
+ ALT-L  : Select whole track, pressing it again will select the entire
+          pattern. (Use ALT-L here, not CTRL-L: plain CTRL-L is the
+          global "Load Song".)
+ CTRL-U / ALT-U : Unselect block
  CTRL-D / ALT-D : Select one beat (press multiple times to select next beats)
 
  CTRL-C : Copy the selected block to the clipboard.
