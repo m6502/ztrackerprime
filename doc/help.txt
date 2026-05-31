@@ -61,15 +61,18 @@
  CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
  CTRL-F9         : Track Solo (mute all other tracks; repeat to unsolo all)
  ALT-H           : Humanize Velocities in selection (randomize +/- 15)
+ CTRL-SHIFT-P    : Song Duration (in the Pattern Editor; plain Ctrl-P is
+                   free here and does nothing, unlike on other pages)
 
 |L|%==|H|Block Functions|L|==%|U|
 
- CTRL-B : Marks the beginning of a select block.
- CTRL-E : Marks the end of a select block.
- CTRL-L : Select whole track, pressing it again will select the entire
-          pattern.
- CTRL-U : Unselect block
- ALT-D  : Select one beat (press multiple times to select next beats)
+ CTRL-B / ALT-B : Marks the beginning of a select block.
+ CTRL-E / ALT-E : Marks the end of a select block.
+ ALT-L  : Select whole track, pressing it again will select the entire
+          pattern. (Use ALT-L here, not CTRL-L: plain CTRL-L is the
+          global "Load Song".)
+ CTRL-U / ALT-U : Unselect block
+ CTRL-D / ALT-D : Select one beat (press multiple times to select next beats)
 
  CTRL-C : Copy the selected block to the clipboard.
  CTRL-V : Paste the contents of the clipboard to the cursor location.
@@ -197,7 +200,8 @@
  ALT-F12        : About
  CTRL-S         : Save Song
  CTRL-ALT-N     : New Song
- CTRL-P         : Song Duration
+ CTRL-P         : Song Duration. (On Pattern Editor F2 this is
+                  CTRL-SHIFT-P instead; plain Ctrl-P is free there.)
  ALT-P          : Duplicate current pattern to next empty pattern
                   slot and switch to it. (On Pattern Editor F2,
                   Alt-P is paste-continuously instead - see above.)
