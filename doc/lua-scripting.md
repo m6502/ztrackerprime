@@ -74,11 +74,29 @@ local ins = zt.instrument(2)
 print(ins.name, ins.channel, ins.device)
 ins.name = "Bass"
 -- properties: name, channel, device, transpose, bank, volume, patch, index
+
+-- patterns (zt.pattern(p); p defaults to the current pattern)
+local pat = zt.pattern(0)
+pat.length                       -- property (read/write); also .index, .empty
+pat:set_note(0, 0, 60)           -- :set_note(track, row, note [,inst [,vol]])
+print(pat:note(0, 0))            --> 60   :note(track, row)
+local trk = pat:track(0)         -- a track bound to this pattern
+
+-- tracks (zt.track(t [,pattern]); default current track + current pattern)
+local t = zt.track(0)
+t.muted = true                   -- property (read/write); also .index, .pattern
+t:set_note(0, 60)                -- :set_note(row, note [,inst [,vol]])
+print(t:note(0))                 -- :note(row)
+
+-- transport (singleton)
+print(zt.transport.playing)      -- read-only bool
+zt.transport:play()              -- :play() :stop() :play_pattern() :panic()
 ```
 
-This is the layer to reach for when you have Renoise/Paketti muscle memory.
-The flat functions still work; the objects are just nicer. (Tracks and
-patterns get the same treatment in a follow-up.)
+These are the layer to reach for when you have Renoise/Paketti muscle
+memory. The flat `zt.get_*/set_*` functions still work; the objects are
+just nicer. Note properties use dot access (`pat.length`); methods use the
+colon call (`pat:note(0,0)`), Renoise-style.
 
 ## API Reference
 
