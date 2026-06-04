@@ -40,6 +40,7 @@
 #include "zt.h"
 #include "ccenv_advance.h"
 #include "sysex_macro.h"
+#include "pattern_guard.h"
 #include <algorithm>
 #include <stdint.h>
 
@@ -631,6 +632,15 @@ void player::play(int row, int pattern,int pm, int loopmode)
 
   prepare_play(row,pattern,pm,loopmode);
 
+  // prepare_play() bails out (see its `if (cur_pattern > 0xFF) return;`) when
+  // the order resolves to "no pattern" -- cur_pattern holds the 0x100 empty
+  // marker (or higher). It leaves us here without clearing that, and
+  // playback() would then index song->patterns[cur_pattern] past the
+  // 256-entry array -> wild pointer -> bus error. There's nothing to play, so
+  // don't start. (Repro: F6 after clicking an empty order slot on F11; also
+  // reachable via Ableton-Link transport-follow auto-play.) Shares the bound
+  // check with the OrderEditor fix via pattern_guard.h.
+  if (!zt_pattern_index_playable(cur_pattern)) return;
 
   //  play_buffer[cur_buf]->reset();
   //  play_buffer[cur_buf]->insert(0,ET_MSTART,0); // First event is MIDI Start

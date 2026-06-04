@@ -1,5 +1,10 @@
 #include "OrderEditor.h"
 #include "zt.h"
+#include "pattern_guard.h"
+
+// Keep the dependency-free guard constant locked to the real array size.
+static_assert(ZT_PATTERN_GUARD_COUNT == ZTM_MAX_PATTERNS,
+              "pattern_guard count must match patterns[] size (ZTM_MAX_PATTERNS)");
 
 
 // ------------------------------------------------------------------------------------------------
@@ -60,7 +65,12 @@ int OrderEditor::mouseupdate(int cur_element) {
                 cursor_x = clicked_col - 4;
             }
             cur_edit_order = new_order;
-            cur_edit_pattern = song->orderlist[new_order];
+            // Clicking an empty/skip order slot must NOT load its sentinel
+            // (0x100 / 0x101) into cur_edit_pattern -- that would later index
+            // patterns[] out of bounds (bus error). Keep the current pattern
+            // on a sentinel, matching the other guarded order paths below.
+            cur_edit_pattern = zt_orderlist_select_pattern(song->orderlist[new_order],
+                                                           cur_edit_pattern);
             Keys.getkey();
             need_redraw++;
             need_refresh++;

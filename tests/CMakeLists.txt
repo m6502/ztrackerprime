@@ -147,6 +147,16 @@ target_include_directories(test_keyjazz_map PRIVATE
 target_compile_features(test_keyjazz_map PRIVATE cxx_std_17)
 add_test(NAME keyjazz_map COMMAND test_keyjazz_map)
 
+# Pattern-index guard (pattern_guard.h). Regression test for the bus error
+# where an empty-order sentinel (0x100) reached patterns[] as an index. Pure
+# header, no SDL / module.h.
+add_executable(test_pattern_guard
+    test_pattern_guard.cpp
+)
+target_include_directories(test_pattern_guard PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_pattern_guard PRIVATE cxx_std_17)
+add_test(NAME pattern_guard COMMAND test_pattern_guard)
+
 # Full Lua API self-test. Unlike the SDL-free unit tests above, this drives
 # the REAL zt binary headless (--lua-test) against a scratch song, running
 # lua/selftest.lua and asserting exit 0 (every check passed). Covers the
