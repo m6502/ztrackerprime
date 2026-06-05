@@ -3008,6 +3008,31 @@ void mousedownbuttonhandler(SDL_MouseButtonEvent *e) {
     MousePressY = LastY;
 }
 
+// Synthetic mouse injection for the headless script driver (zt_headless.cpp).
+// Moves the cursor to (x, y) in internal-resolution pixels and, if button !=
+// 0, queues a left-button DOWN (down=1) or UP (down=0) into the same Keys FIFO
+// and bMouseIsDown / MousePress* state the real SDL handlers use -- so widgets
+// can't tell a scripted click from a hardware one. With button == 0 it only
+// moves the cursor (for hover / drag-path setup).
+void zt_inject_mouse(int down, int button, int x, int y) {
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x >= INTERNAL_RESOLUTION_X) x = INTERNAL_RESOLUTION_X - 1;
+    if (y >= INTERNAL_RESOLUTION_Y) y = INTERNAL_RESOLUTION_Y - 1;
+    LastX = x;
+    LastY = y;
+    if (!button) return;
+    if (down) {
+        Keys.insert((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT));
+        bMouseIsDown = true;
+    } else {
+        Keys.insert((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT));
+        bMouseIsDown = false;
+    }
+    MousePressX = LastX;
+    MousePressY = LastY;
+}
+
 void mousewheelhandler(SDL_MouseWheelEvent *e) {
     if (!e) {
         return;
