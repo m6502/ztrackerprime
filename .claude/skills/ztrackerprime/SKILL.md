@@ -42,12 +42,49 @@ ctest --output-on-failure      # unit-test harness (Linux CI runs this)
 
 `scripts/zt-screenshot.sh` (macOS) launches zt.app and captures F1/F2/F3/F11/F12/Ctrl+F12 via `screencapture -R` + AppleScript. Output at `/tmp/zt-shots/`. Use it to self-verify layout changes.
 
-### Headless screenshot recipe (verified macOS, no extra deps)
+### Headless framebuffer screenshots
 
-When `zt-screenshot.sh` can't be used (e.g. it relies on the `Quartz`
-Python module, which is **not** present in the system `python3` on a
-stock Mac — `ModuleNotFoundError: No module named 'Quartz'`), this
-dependency-free sequence reliably captures zt's actual rendering:
+zt has a **built-in windowless renderer** that dumps its real framebuffer to a
+PNG — no window, no compositor, no screen-recording permission. This is the
+most reliable way to verify page layout and the only method that works in
+headless / remote / CI contexts.
+
+```sh
+# Script = one command per line. Commands:
+#   key <chord>        e.g. key F11, key shift+F3, key ctrl+s, key space
+#   mousemove <x> <y>  /  mousedown <x> <y>  /  mouseup <x> <y>
+#   click <x> <y>      full left click (DOWN then UP on separate frames)
+#   wait <ms>          let update()/draw() run a few frames
+#   shot <path>        dump the current framebuffer to PNG
+#   quit               tear down cleanly (always end with this)
+# Coords are internal-resolution pixels — the col()/row() space, col(N)=N*8.
+cat > /tmp/f11.script <<'EOF'
+wait 400
+key F11
+wait 400
+shot /tmp/f11.png
+quit
+EOF
+build/Program/zt.app/Contents/MacOS/zt --headless --script /tmp/f11.script
+# then Read /tmp/f11.png to eyeball it
+```
+
+`--headless` sets `SDL_HINT_VIDEO_DRIVER=dummy`, so it runs anywhere (no
+display needed). The binary reads `zt.conf` relative to its location
+(`Contents/Resources/zt.conf` for a `.app`) — edit that file to set up
+preconditions (enabled flags, loaded song, etc.) before driving the UI.
+
+**Mouse injection** (commands above) makes mouse-only controls testable. Many
+F11 checkboxes/sliders are NOT in the keyboard Tab cycle (F11's Tab only toggles
+title↔order-list), so drive them with `click <x> <y>`. Coordinates are
+internal-resolution pixels — the same `col(N)=N*8` / `row(M)=M*8` space the
+widgets use — so a checkbox the page positions at `cb->x`/`cb->y` is clicked at
+`click <cb->x * 8> <cb->y * 8>` (aim a pixel or two inside it). Capture a `shot`
+before and after to diff the resulting state change. Because `click` defers its
+button-up to the next pump, a checkbox latches on DOWN and toggles on UP exactly
+as it does under a real click.
+`click` spans two frames (widgets latch on DOWN, act on UP), so a `wait` after
+it before `shot` is good practice.
 
 ```sh
 # 1. Relaunch a fresh binary (kill the old instance first, or you screenshot stale pixels)
@@ -224,7 +261,7 @@ These rules are non-negotiable. Every one of them was learned the hard way durin
 
 7. **Pages whose own ESC handler matters add their `STATE_*` to the global ESC exclusion list** in `main.cpp::global_keys` (the list with `STATE_HELP / ABOUT / LUA_CONSOLE / SONG_MESSAGE / KEYBINDINGS`). Otherwise the global handler eats ESC first and the page's "ESC cancels capture" hint is a lie. PR #95 was a one-line fix for `STATE_KEYBINDINGS`.
 
-8. **Visual verification before claiming done.** Build green + ctest green ≠ "the page works." Launch the binary, send the F-key, capture the window, drive each user-visible key (arrow, Tab, Space, Enter, Esc, click), diff the screenshots. If you cannot do that step, say so explicitly — don't ship hope.
+8. **Visual verification before claiming done.** Build green + ctest green ≠ "the page works." Use the **headless framebuffer screenshots** (`--headless --script ... shot`, see "Launching the app") when you need to visually verify features. Drive each user-visible control: `key` for F-keys / arrows / Tab / Space / Enter / Esc, and `click <x> <y>` for mouse-only widgets, then `shot` and `Read` the PNG.  If you genuinely cannot do it, say so explicitly — don't ship hope.
 
 The full list-pane construction pattern (with code) lives in [`references/list-pane-idiom.md`](references/list-pane-idiom.md). Read it before adding any new page that has a list, a grid, or both.
 

@@ -21,9 +21,12 @@
 
 // Pulled from main.cpp -- the global key ring and the "user requested
 // quit" flag. We don't pull main.cpp's full surface in here; just the
-// two symbols the script driver needs to talk to.
+// symbols the script driver needs to talk to.
 extern KeyBuffer Keys;
 extern int       do_exit;
+// Synthetic mouse injection (defined in main.cpp). Reuses the exact Keys /
+// bMouseIsDown / MousePress* path the real SDL handlers use.
+extern void      zt_inject_mouse(int down, int button, int x, int y);
 
 // ---------------------------------------------------------------------------
 // Module-local state.
@@ -38,6 +41,15 @@ static bool        g_script_done      = false;
 // SDL_GetTicks so it tracks wall time, not frame count -- robust against
 // frame-rate changes.
 static Uint64      g_wait_until_ms    = 0;
+
+// A `click` must span two frames: the page's update() processes the DOWN on
+// one frame and the UP on the next (a real click is never down+up within a
+// single frame, and widgets like CheckBox latch on DOWN then act on UP). So
+// `click` injects DOWN immediately and defers the matching UP to the next
+// pump via this pending state.
+static bool        g_pending_click_up = false;
+static int         g_click_up_x       = 0;
+static int         g_click_up_y       = 0;
 
 // ---------------------------------------------------------------------------
 // CLI plumbing.
@@ -202,6 +214,31 @@ static void exec_command(SDL_Surface *frame_surface, const char *cmd, char *args
         Keys.insert(k, m, 0, 0);
         return;
     }
+    // Mouse commands. All take pixel coordinates in zt's internal resolution
+    // (the same space col()/row() produce: col(N)=N*8, row(N)=N*8).
+    //   mousemove <x> <y>   move the cursor (hover / drag-path setup)
+    //   mousedown <x> <y>   press left button at (x,y)
+    //   mouseup   <x> <y>   release left button at (x,y)
+    //   click     <x> <y>   move + DOWN now, UP next frame (a full click)
+    if (!strcmp(cmd, "mousemove") || !strcmp(cmd, "mousedown") ||
+        !strcmp(cmd, "mouseup")   || !strcmp(cmd, "click")) {
+        int x = 0, y = 0;
+        if (sscanf(args, "%d %d", &x, &y) != 2) {
+            fprintf(stderr, "zt: --script: '%s' needs '<x> <y>' on line %d\n",
+                    cmd, g_script_lineno);
+            return;
+        }
+        if      (!strcmp(cmd, "mousemove")) zt_inject_mouse(0, 0, x, y);
+        else if (!strcmp(cmd, "mousedown")) zt_inject_mouse(1, 1, x, y);
+        else if (!strcmp(cmd, "mouseup"))   zt_inject_mouse(0, 1, x, y);
+        else { // click: DOWN now, UP deferred to next frame
+            zt_inject_mouse(1, 1, x, y);
+            g_pending_click_up = true;
+            g_click_up_x = x;
+            g_click_up_y = y;
+        }
+        return;
+    }
     // `wait <ms>`
     if (!strcmp(cmd, "wait")) {
         long ms = strtol(args, NULL, 10);
@@ -235,6 +272,11 @@ static void exec_command(SDL_Surface *frame_surface, const char *cmd, char *args
 
 void zt_headless_pump(SDL_Surface *frame_surface) {
     if (!g_active || g_script_done || !g_script_fp) return;
+    if (g_pending_click_up) {
+        g_pending_click_up = false;
+        zt_inject_mouse(0, 1, g_click_up_x, g_click_up_y);
+        return;
+    }
     if (g_wait_until_ms && SDL_GetTicks() < g_wait_until_ms) return;
     g_wait_until_ms = 0;
 
@@ -263,7 +305,9 @@ void zt_headless_pump(SDL_Surface *frame_surface) {
 
         exec_command(frame_surface, p, args);
 
-        if (g_wait_until_ms || g_script_done) return;
+        // `click` queues the DOWN and sets g_pending_click_up; return so this
+        // frame processes the DOWN before we inject the UP next pump.
+        if (g_wait_until_ms || g_script_done || g_pending_click_up) return;
     }
 
     // EOF: stop driving the loop. The main loop continues to render

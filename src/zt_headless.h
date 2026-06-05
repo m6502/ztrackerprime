@@ -17,6 +17,16 @@
 //                                                   key ctrl+s,
 //                                                   key down, key tab,
 //                                                   key space, key return)
+//                       mousemove <x> <y>    move the cursor to pixel (x,y)
+//                       mousedown <x> <y>    press left button at (x,y)
+//                       mouseup   <x> <y>    release left button at (x,y)
+//                       click     <x> <y>    full left click at (x,y); the
+//                                            DOWN and UP land on separate
+//                                            frames like a real click, so
+//                                            widgets (checkboxes, sliders,
+//                                            buttons) respond. Coordinates are
+//                                            zt internal-resolution pixels
+//                                            (col(N)=row(N)=N*8).
 //                       wait <ms>            sleep this thread for <ms>
 //                                            milliseconds (lets the page's
 //                                            update() / draw() run a few
