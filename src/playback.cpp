@@ -636,7 +636,7 @@ void player::play(int row, int pattern,int pm, int loopmode)
   //  play_buffer[cur_buf]->insert(0,ET_MSTART,0); // First event is MIDI Start
 
   if(song->flag_SendMidiStopStart) MidiOut->sendGlobal(0xFA);
-  SDL_Delay(20);
+  //SDL_Delay(20);
 
   starts = 1;
 
