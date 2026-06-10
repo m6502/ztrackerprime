@@ -5,6 +5,7 @@
  *************************************************************************/
 
 #include "ableton_link.h"
+#include "phase_chase.h"
 
 #include <cmath>   // lround
 
@@ -241,7 +242,7 @@ static void link_arm_play(int row, int pattern, int pm) {
 // if Link was disabled while waiting). play_immediately, not play: play() would defer
 // right back to us.
 //
-// ableton_link_offset_ms fires that many ms BEFORE the downbeat: a peer
+// sync_offset_ms fires that many ms BEFORE the downbeat: a peer
 // monitoring zt through an audio chain (Live's Overall Latency) renders our
 // notes that much late, and Link cannot discover a peer's local latency, so
 // the user dials the rig's value once and zt's whole timeline runs early by
@@ -256,7 +257,7 @@ static void link_fire_quantized(void) {
     double ph = be_phase();
     if (ph < 0.0) return;
     bool fire = (ph < g_play_phase);   // wrapped past the downbeat
-    int offset_ms = zt_config_globals.ableton_link_offset_ms;
+    int offset_ms = zt_config_globals.sync_offset_ms;
     if (!fire && offset_ms > 0) {
         double tempo = be_tempo();
         if (tempo > 0.0) {
@@ -274,7 +275,7 @@ static void link_fire_quantized(void) {
         // engine to the new offset.
         double tempo = be_tempo();
         double off_beats = (tempo > 0.0)
-            ? (double)zt_config_globals.ableton_link_offset_ms * tempo / 60000.0
+            ? (double)zt_config_globals.sync_offset_ms * tempo / 60000.0
             : 0.0;
         g_chase_anchor = be_beats() + off_beats;
         g_chase_valid  = true;
@@ -315,7 +316,7 @@ static void link_chase_phase(void) {
     // The offset enters the setpoint HERE, from the live conf value, so
     // dragging the F11 slider during playback shifts the target and the
     // loop slews onto it.
-    double off_beats = (double)zt_config_globals.ableton_link_offset_ms * tempo / 60000.0;
+    double off_beats = (double)zt_config_globals.sync_offset_ms * tempo / 60000.0;
     int played = ztPlayer->played_subticks;   // one advisory read
     if (!g_chase_valid) {
         g_chase_anchor = beats - played / 96.0 + off_beats;
@@ -324,25 +325,9 @@ static void link_chase_phase(void) {
     }
     double exact_us   = 60000000.0 / (96.0 * tempo);
     double expected   = (beats - g_chase_anchor + off_beats) * 96.0;   // subticks
-    // pos_err, not err_us: <mach/error.h> (via CoreMIDI) #defines err_us.
-    double pos_err    = (expected - (double)played) * exact_us;
     double nominal_us = (double)(ztPlayer->subtick_len_ms + ztPlayer->subtick_len_mms);
-    double feedback   = pos_err / 64.0;
-    // Tiered authority: |error| beyond 10 ms is a deliberate move (offset
-    // slider, tempo step) and may slew at 12% of real time -- the output is
-    // MIDI, so a brief rush/drag while the user turns a knob is harmless,
-    // and even a full-scale 500 ms move locks in ~4 s (171 ms in ~1.4 s).
-    // Inside 10 ms (steady-state lock) corrections stay at 0.3%, far below
-    // audibility.
-    double fb_max     = exact_us * ((pos_err > 10000.0 || pos_err < -10000.0) ? 0.12 : 0.003);
-    if (feedback >  fb_max) feedback =  fb_max;
-    if (feedback < -fb_max) feedback = -fb_max;
-    // Positive error = engine behind = needs a SHORTER subtick.
-    double skew = (exact_us - nominal_us) - feedback;
-    double skew_max = exact_us * 0.15;
-    if (skew >  skew_max) skew =  skew_max;
-    if (skew < -skew_max) skew = -skew_max;
-    ztPlayer->chase_skew_us = (int)lround(skew);
+    ztPlayer->chase_skew_us =
+        phase_chase_step(expected, played, exact_us, nominal_us);
 }
 
 // Does NOT join the session here -- the first zt_ableton_link_pump() does,
