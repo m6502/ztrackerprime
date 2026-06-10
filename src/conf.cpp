@@ -219,6 +219,10 @@ ZTConf::ZTConf() {
     work_directory[0] = '\0';
     midi_in_sync = 0; // flag_midiinsync
     midi_in_sync_chase_tempo = 0; // off by default; requires midi_in_sync
+    ableton_link_enable = 0;            // Ableton Link off by default (no surprise LAN traffic)
+    ableton_link_start_stop_sync = 1;   // transport (play/stop) sharing on by default; only takes effect once ableton_link_enable is on
+    ableton_link_quantum = 4;           // one bar of 4/4
+    ableton_link_offset_ms = 0;         // fire quantized starts early by this much
     auto_send_panic = 1; // flag_autosendpanic
     highlight_increment = 8;
     lowlight_increment = 8;
@@ -353,6 +357,21 @@ int ZTConf::load()
   if (Config->get("send_panic_on_stop"))              auto_send_panic = getFlag("send_panic_on_stop");
   if (Config->get("midi_in_sync"))                    midi_in_sync = getFlag("midi_in_sync");
   if (Config->get("midi_in_sync_chase_tempo"))        midi_in_sync_chase_tempo = getFlag("midi_in_sync_chase_tempo");
+  if (Config->get("ableton_link_enable"))             ableton_link_enable = getFlag("ableton_link_enable");
+  if (Config->get("ableton_link_start_stop_sync"))    ableton_link_start_stop_sync = getFlag("ableton_link_start_stop_sync");
+  if (Config->get("ableton_link_quantum"))            ableton_link_quantum = atoi(Config->get("ableton_link_quantum"));
+  if (Config->get("ableton_link_offset_ms"))          ableton_link_offset_ms = atoi(Config->get("ableton_link_offset_ms"));
+
+  // Ableton Link wins if both Link and MIDI Sync are enabled
+  if (ableton_link_enable) {
+    midi_in_sync = 0;
+    midi_in_sync_chase_tempo = 0;
+  }
+
+  if (ableton_link_quantum < 1)  ableton_link_quantum = 4;
+  if (ableton_link_quantum > 16) ableton_link_quantum = 16;
+  if (ableton_link_offset_ms < 0)   ableton_link_offset_ms = 0;
+  if (ableton_link_offset_ms > 500) ableton_link_offset_ms = 500;
   
   full_screen = getFlag("fullscreen");                
   step_editing = getFlag("step_editing");
@@ -512,6 +531,13 @@ int ZTConf::save() {
         Config->set("midi_in_sync_chase_tempo","yes");
     else
         Config->set("midi_in_sync_chase_tempo","no");
+
+    Config->set("ableton_link_enable", ableton_link_enable ? "yes" : "no");
+    Config->set("ableton_link_start_stop_sync", ableton_link_start_stop_sync ? "yes" : "no");
+    sprintf(s, "%d", ableton_link_quantum);
+    Config->set("ableton_link_quantum", s);
+    sprintf(s, "%d", ableton_link_offset_ms);
+    Config->set("ableton_link_offset_ms", s);
 
     if (full_screen)
         Config->set("fullscreen","yes");

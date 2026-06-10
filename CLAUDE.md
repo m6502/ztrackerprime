@@ -6,6 +6,14 @@ For deeper material — recipes, foot-gun details, effect reference, glossary, c
 
 ---
 
+# Coding Standards
+
+- **Zero-noise comments:** Do not comment on obvious code, functions, or variable names.
+- **Comment limits:** Only add comments if a block contains complex, non-obvious algorithmic logic or tricky workarounds.
+- **Refactoring:** If the code is so weird it needs a paragraph of explanation, refactor it to be self-documenting instead.
+
+---
+
 ## Repository overview
 
 **zTracker Prime** (m6502/ztrackerprime) is Manuel Montoto's maintained fork of zTracker — an Impulse-Tracker-inspired MIDI tracker originally by Christopher Micali (2000–2001) with contributions from Daniel Kahlin. Manuel brought it to SDL 3 and cross-platform (Windows XP through 11, macOS, Linux).

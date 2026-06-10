@@ -90,6 +90,12 @@ jobs:
           set -euo pipefail
           bash .github/scripts/fetch-extlibs.sh
 
+      - name: Fetch Ableton Link
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-ableton-link.sh
+
       - name: Cache SDL3 source tarball
         id: cache-sdl3-src
         uses: actions/cache@v4
@@ -201,6 +207,12 @@ jobs:
           set -euo pipefail
           bash .github/scripts/fetch-extlibs.sh
 
+      - name: Fetch Ableton Link
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-ableton-link.sh
+
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
@@ -287,6 +299,12 @@ jobs:
         run: |
           set -euo pipefail
           bash .github/scripts/fetch-extlibs.sh
+
+      - name: Fetch Ableton Link
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/fetch-ableton-link.sh
 
       - name: Configure
         run: |
@@ -435,6 +453,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$(pwd)/toolchain-mingw-i686.cmake" \
             -DCMAKE_BUILD_TYPE=Release \
+            -DZT_ENABLE_ABLETON_LINK=OFF \
             -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" \
             -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
 
@@ -529,8 +548,13 @@ jobs:
       - name: Configure (MSVC x64)
         shell: pwsh
         run: |
+          # Ableton Link OFF on Windows for now (no Link fetch step on this
+          # job; the wrapper builds as a stub). Enabling Link on MSVC x64 is a
+          # follow-up — Link supports it, but it needs CI verification we can't
+          # do from the macOS dev box.
           cmake -S . -B build -A x64 `
             -DCMAKE_BUILD_TYPE=Release `
+            -DZT_ENABLE_ABLETON_LINK=OFF `
             -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" `
             -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
 

@@ -70,6 +70,21 @@ class ZTConf {
         int autoload_ztfile;
         int midi_in_sync; // flag_midiinsync
         int midi_in_sync_chase_tempo; // slave bpm to incoming 0xF8 MIDI Clock
+
+        // Enables joining Ableton Link sessions and follow tempo
+        int ableton_link_enable;
+        int ableton_link_start_stop_sync;
+        // Bar length in beats (4 = one bar of 4/4) used for beat-phase alignment
+        // and quantized (bar-aligned) launch.
+        int ableton_link_quantum;
+        // ableton_link_offset_ms fires the quantized start that many ms
+        // BEFORE the Link downbeat, so notes rendered through a peer's
+        // monitored audio chain (e.g. Live's Overall Latency) SOUND on the
+        // grid. Link has no way to discover a peer's local audio latency, so
+        // this is a one-time per-rig setting.
+        // 0 = fire exactly on the beat.
+        // Recommended to set this to the audio latency value shown in Live settings
+        int ableton_link_offset_ms;
         int auto_send_panic; // flag_autosendpanic
         int highlight_increment;
         int lowlight_increment;

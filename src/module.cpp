@@ -769,9 +769,16 @@ zt_module::~zt_module() {
 
 
 
+// Bumped on every zt_module::init() -- i.e. whenever the song context is
+// rebuilt (startup, File > New, song load). Observers (the Ableton Link
+// glue's pump) watch it to invalidate state that refers to the old song,
+// e.g. a pending quantized start.
+int zt_song_generation = 0;
+
 void zt_module::init(void)
 {
     int i;
+    zt_song_generation++;
     memset(title,0,ZTM_SONGTITLE_MAXLEN);
     memset(filename,0,ZTM_FILENAME_MAXLEN);
     

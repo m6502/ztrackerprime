@@ -79,6 +79,7 @@
 #include "zt_crash.h"
 #include "midi_mappings.h"
 #include "ccizer.h"
+#include "ableton_link.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -2617,6 +2618,8 @@ int postAction ()
     if (MidiOut) MidiOut->panic();
     if (clipboard) delete clipboard;
 
+    zt_ableton_link_teardown();
+
     zt_timer_stop(keytimer);
 
     if (UI_Toolbar) {
@@ -3014,6 +3017,11 @@ void mousedownbuttonhandler(SDL_MouseButtonEvent *e) {
 // and bMouseIsDown / MousePress* state the real SDL handlers use -- so widgets
 // can't tell a scripted click from a hardware one. With button == 0 it only
 // moves the cursor (for hover / drag-path setup).
+//
+// Sets LastX/LastY DIRECTLY (not via zt_update_mouse_position) because the
+// script speaks internal-resolution pixels -- the same space col()/row() and
+// checkclick() use -- whereas zt_update_mouse_position scales from *window*
+// coords and would double-map under a non-1 zoom.
 void zt_inject_mouse(int down, int button, int x, int y) {
     if (x < 0) x = 0;
     if (y < 0) y = 0;
@@ -3437,6 +3445,9 @@ int action(Screen *S)
     // nothing is armed (walks a 64-slot array, skips empty entries).
     zt_audition_env_pump();
 
+    // Ableton Link sync if enabled
+    zt_ableton_link_pump();
+
 #ifdef DEBUG
     playbuff1_bg->setvalue(ztPlayer->play_buffer[0]->size);
     playbuff2_bg->setvalue(ztPlayer->play_buffer[1]->size);
@@ -3723,6 +3734,8 @@ int initSDL(void)
   song = new zt_module(zt_config_globals.default_tpb, zt_config_globals.default_bpm);
 
   ztPlayer = new player(1,zt_config_globals.prebuffer_rows, song); // 1ms resolution;
+
+  zt_ableton_link_startup();   // construct Link, apply saved quantum/tempo, join if enabled
 
     ///////////////////////////////////////////////////////////////////////
     // Here we set the highlight and lowlight according to either specific
@@ -4234,6 +4247,10 @@ int main(int argc, char *argv[])
           MidiIn->AddDevice(idx);
           zt_config_globals.midi_in_sync             = 1;
           zt_config_globals.midi_in_sync_chase_tempo = 1;
+          // Explicit CLI intent wins the two-tempo-masters exclusion: clear
+          // the conf's Link flag so the first Link pump never joins (the join
+          // happens in the pump, after this point).
+          zt_config_globals.ableton_link_enable      = 0;
           fprintf(stderr, "zt: opened MIDI clock source [%d] %s "
                           "(sync + tempo chase enabled)\n",
                   idx, MidiIn->midiInDev[idx]->szName);

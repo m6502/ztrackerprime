@@ -95,6 +95,8 @@ class CUI_Songconfig : public CUI_Page {
         int rev_tpb_tab[97];
         int tpb_tab[9];// = ;
 
+        int last_bpm_seen;
+
         CUI_Songconfig();
 
         void enter(void);
