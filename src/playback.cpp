@@ -44,7 +44,6 @@
 #include <algorithm>
 #include <stdint.h>
 
-int mctr = 0;
 
 #define TARGET_RESOLUTION 1         // 1-millisecond target resolution
 
@@ -74,23 +73,6 @@ void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD_PTR dwUser, DWORD_P
   ztPlayer->counter += ztPlayer->wTimerRes*1000;
 
   if (ztPlayer->counter >= (ztPlayer->subtick_len_ms+ztPlayer->subtick_add+ztPlayer->chase_adj)) {
-
-    if (zt_config_globals.midi_in_sync) {
-
-      if (mctr >= 4) {
-
-        if (g_midi_in_clocks_received) {
-        
-          g_midi_in_clocks_received--;
-          mctr = 0;
-        }
-        else {
-        
-          //goto skip ;
-        }
-      }
-      else mctr++;
-    }
 
     ztPlayer->counter = 0;
     ztPlayer->played_subticks++;
@@ -566,8 +548,6 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
     chase_skew_us = 0;
     chase_err_us = 0;
     chase_adj = 0;
-
-    mctr = 0;
 
     skip = 0xFFF;
     this->tpb = song->tpb;

@@ -222,7 +222,7 @@ ZTConf::ZTConf() {
     ableton_link_enable = 0;            // Ableton Link off by default (no surprise LAN traffic)
     ableton_link_start_stop_sync = 1;   // transport (play/stop) sharing on by default; only takes effect once ableton_link_enable is on
     ableton_link_quantum = 4;           // one bar of 4/4
-    ableton_link_offset_ms = 0;         // fire quantized starts early by this much
+    sync_offset_ms = 0;                 // play this many ms early under external sync
     auto_send_panic = 1; // flag_autosendpanic
     highlight_increment = 8;
     lowlight_increment = 8;
@@ -360,7 +360,8 @@ int ZTConf::load()
   if (Config->get("ableton_link_enable"))             ableton_link_enable = getFlag("ableton_link_enable");
   if (Config->get("ableton_link_start_stop_sync"))    ableton_link_start_stop_sync = getFlag("ableton_link_start_stop_sync");
   if (Config->get("ableton_link_quantum"))            ableton_link_quantum = atoi(Config->get("ableton_link_quantum"));
-  if (Config->get("ableton_link_offset_ms"))          ableton_link_offset_ms = atoi(Config->get("ableton_link_offset_ms"));
+  if (Config->get("ableton_link_offset_ms"))          sync_offset_ms = atoi(Config->get("ableton_link_offset_ms")); // legacy key
+  if (Config->get("sync_offset_ms"))                  sync_offset_ms = atoi(Config->get("sync_offset_ms"));
 
   // Ableton Link wins if both Link and MIDI Sync are enabled
   if (ableton_link_enable) {
@@ -370,8 +371,8 @@ int ZTConf::load()
 
   if (ableton_link_quantum < 1)  ableton_link_quantum = 4;
   if (ableton_link_quantum > 16) ableton_link_quantum = 16;
-  if (ableton_link_offset_ms < 0)   ableton_link_offset_ms = 0;
-  if (ableton_link_offset_ms > 500) ableton_link_offset_ms = 500;
+  if (sync_offset_ms < 0)   sync_offset_ms = 0;
+  if (sync_offset_ms > 500) sync_offset_ms = 500;
   
   full_screen = getFlag("fullscreen");                
   step_editing = getFlag("step_editing");
@@ -536,8 +537,8 @@ int ZTConf::save() {
     Config->set("ableton_link_start_stop_sync", ableton_link_start_stop_sync ? "yes" : "no");
     sprintf(s, "%d", ableton_link_quantum);
     Config->set("ableton_link_quantum", s);
-    sprintf(s, "%d", ableton_link_offset_ms);
-    Config->set("ableton_link_offset_ms", s);
+    sprintf(s, "%d", sync_offset_ms);
+    Config->set("sync_offset_ms", s);
 
     if (full_screen)
         Config->set("fullscreen","yes");
