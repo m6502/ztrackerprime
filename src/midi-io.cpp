@@ -40,6 +40,7 @@
 #include "zt.h"
 #include "midi_mappings.h"
 #include "sysex_inq.h"
+#include "midi_clock_sync.h"
 
 
 /*
@@ -329,7 +330,6 @@ void miq::clear(void) {
     qhead = qtail = 0;
     qelems = 0;
 }
-int g_midi_in_clocks_received = 0;
 
 
 
@@ -349,8 +349,6 @@ int mim_longerror = 0 ;
 void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
 
     unsigned char msg;
-    int song_pos_ptr;
-    static int queued_row, queued_order;
 //	LPMIDIHDR		lpMIDIHeader;
 //	unsigned char *	ptr;
 
@@ -450,105 +448,27 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
               }
           }
 
-          if (zt_config_globals.midi_in_sync)
-              switch(msg) {
-                case 0xF8: // MIDI CLOCK
-                    g_midi_in_clocks_received++;
-                    // Tempo chase: derive BPM from the rolling average of
-                    // 24 clock intervals (= one quarter note) and push the
-                    // result into the live player without mutating
-                    // song->bpm. Gated on midi_in_sync_chase_tempo so users
-                    // who want only transport sync (Start/Stop/SPP) are
-                    // unaffected. Only active while playing — Logic sends
-                    // clocks even when stopped.
-                    if (zt_config_globals.midi_in_sync_chase_tempo
-                        && ztPlayer && ztPlayer->playing) {
-                        // File-local state — only written from this MIDI-in
-                        // callback thread, so no cross-thread locking needed
-                        // for the ring itself.
-                        static Uint64 s_last_clock_ms = 0;
-                        static int    s_ring[24] = {0};
-                        static int    s_ring_idx = 0;
-                        static int    s_ring_count = 0;
-                        static int    s_last_pushed_bpm = 0;
-
-                        Uint64 now = SDL_GetTicks();
-                        if (s_last_clock_ms != 0) {
-                            int interval = (int)(now - s_last_clock_ms);
-                            // Sanity window: 24..2500 BPM range expressed
-                            // as per-clock ms (60000/(24*bpm)).
-                            if (interval > 0 && interval < 1000) {
-                                s_ring[s_ring_idx] = interval;
-                                s_ring_idx = (s_ring_idx + 1) % 24;
-                                if (s_ring_count < 24) s_ring_count++;
-                                if (s_ring_count == 24) {
-                                    int sum = 0;
-                                    for (int i = 0; i < 24; ++i) sum += s_ring[i];
-                                    // 24 intervals == one beat, so BPM =
-                                    // 60_000 ms / sum_ms.
-                                    int bpm = (sum > 0) ? (60000 / sum) : 0;
-                                    if (bpm >= 20 && bpm <= 500
-                                        && bpm != s_last_pushed_bpm) {
-                                        ztPlayer->chase_external_tempo(bpm);
-                                        s_last_pushed_bpm = bpm;
-                                    }
-                                }
-                            } else {
-                                // Out-of-range interval — treat as dropout,
-                                // reset the ring so we rebuild a clean
-                                // average once clocks resume.
-                                s_ring_count = 0;
-                                s_ring_idx = 0;
-                                s_last_pushed_bpm = 0;
-                            }
-                        }
-                        s_last_clock_ms = now;
-                    }
-                    break;
-
-                case 0xF2: // MIDI SONG POSITION POINTER
-                    song_pos_ptr = (dwParam1&0x7F0000)>>9 |
-                                   (dwParam1&0x7F00)>>8;
-                    if (ztPlayer->calc_pos(song_pos_ptr,&queued_row,&queued_order)) {
-                        queued_row=0;
-                        queued_order=0;
-                    }
-#if 0
-                    sprintf(szStatmsg, "SONG POS 0x%04x --> row %d order %d",song_pos_ptr,queued_row,queued_order);
-                    statusmsg = szStatmsg;
-                    status_change = 1;
-                    need_refresh++; 
-#endif
-                    break;
-                case 0xFA: // MIDI START
-                    queued_row=0;
-                    queued_order=0;
-                    /* fall thru */
-                case 0xFB: // MIDI CONTINUE
-                    if (ztPlayer->playing)
-                        ztPlayer->stop();
-                    g_midi_in_clocks_received = 0;
-                    if (queued_row || queued_order) {
-                        // we have a queued row and order, play from that position.
-                        ztPlayer->play(queued_row,queued_order,3);
-                    } else {
-                        if (song->orderlist[0] < 0x100) {
-                            // if there are patterns in the orderlist,
-                            // play song from the start.
-                            ztPlayer->play(0,cur_edit_pattern,1); 
-                        } else {
-                            // otherwise loop the current pattern
-                            ztPlayer->play(0,cur_edit_pattern,0);
-                        }
-                    }
-                    break;
-                case 0xFC: // MIDI STOP
-                    g_midi_in_clocks_received=0;
-                    ztPlayer->stop();
-                    break;
-                default:
-                    break;
-              }
+          // External-sync messages: this callback runs on the platform MIDI
+          // thread, so it only RECORDS what arrived (plain-int counters,
+          // same advisory contract as player::stop_count). All decisions --
+          // starting/stopping the player, tempo estimation, phase lock --
+          // happen in zt_midi_clock_pump() on the main thread.
+          switch(msg) {
+            case 0xF8: // MIDI CLOCK
+                g_mclk_clocks++;
+                g_mclk_last_clock_ms = (unsigned)SDL_GetTicks();
+                break;
+            case 0xF2: // MIDI SONG POSITION POINTER
+                g_mclk_spp_raw = (dwParam1&0x7F0000)>>9 |
+                                 (dwParam1&0x7F00)>>8;
+                g_mclk_spp_seq++;
+                break;
+            case 0xFA: g_mclk_start_req++;    break; // MIDI START
+            case 0xFB: g_mclk_continue_req++; break; // MIDI CONTINUE
+            case 0xFC: g_mclk_stop_req++;     break; // MIDI STOP
+            default:
+                break;
+          }
 
           break;
         case MIM_MOREDATA:

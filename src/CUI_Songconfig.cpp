@@ -187,7 +187,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs->xsize = 28;
         vs->min = 0;
         vs->max = 500;
-        vs->value = zt_config_globals.ableton_link_offset_ms;
+        vs->value = zt_config_globals.sync_offset_ms;
 
         oe = new OrderEditor;
         UI->add_element(oe,9);
@@ -220,7 +220,7 @@ void CUI_Songconfig::enter(void) {
     vs = (ValueSlider *)UI->get_element(10);
     if (vs) vs->value = zt_config_globals.note_audition_step_mode;
     vs = (ValueSlider *)UI->get_element(13);
-    if (vs) vs->value = zt_config_globals.ableton_link_offset_ms;
+    if (vs) vs->value = zt_config_globals.sync_offset_ms;
 
     // F11 toggle: pressing F11 while already on Songconfig flips focus
     // between OrderEditor (id 9) and Title (id 0) on every press, so the
@@ -332,10 +332,10 @@ void CUI_Songconfig::update()
     }
     vs = (ValueSlider *)UI->get_element(13);
     if (vs && vs->from_input) vs->from_input = 0;
-    if (vs && vs->value != zt_config_globals.ableton_link_offset_ms) {
-        zt_config_globals.ableton_link_offset_ms = vs->value;
+    if (vs && vs->value != zt_config_globals.sync_offset_ms) {
+        zt_config_globals.sync_offset_ms = vs->value;
     } else if (vs) {
-        vs->value = zt_config_globals.ableton_link_offset_ms;
+        vs->value = zt_config_globals.sync_offset_ms;
     }
 
     vs = (ValueSlider *)UI->get_element(6);
@@ -457,7 +457,7 @@ void CUI_Songconfig::draw(Drawable *S) {
         // Ableton Link block. Labels right-align to col 18 like the rest.
         print(row(6),col(base_y+16),"Ableton Link",COLORS.Text,S);
         print(row(3),col(base_y+17),"Link Start/Stop",COLORS.Text,S);
-        print(row(4),col(base_y+18),"Link Offset ms",COLORS.Text,S);
+        print(row(4),col(base_y+18),"Sync Offset ms",COLORS.Text,S);
         {
             char linkstat[96];
             if (!zt_ableton_link_available()) {

@@ -80,6 +80,7 @@
 #include "midi_mappings.h"
 #include "ccizer.h"
 #include "ableton_link.h"
+#include "midi_clock_sync.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -3447,6 +3448,9 @@ int action(Screen *S)
 
     // Ableton Link sync if enabled
     zt_ableton_link_pump();
+
+    // MIDI clock slave sync if enabled (mutually exclusive with Link)
+    zt_midi_clock_pump();
 
 #ifdef DEBUG
     playbuff1_bg->setvalue(ztPlayer->play_buffer[0]->size);
