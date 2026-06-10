@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "keybuffer.h"
+#include "lua_engine.h"
 
 // Pulled from main.cpp -- the global key ring and the "user requested
 // quit" flag. We don't pull main.cpp's full surface in here; just the
@@ -211,7 +212,21 @@ static void exec_command(SDL_Surface *frame_surface, const char *cmd, char *args
         KBKey k = 0;
         KBMod m = 0;
         if (!parse_keychord(args, &k, &m)) return;
-        Keys.insert(k, m, 0, 0);
+        // Letters/digits also carry their scancode: note entry (keyjazz)
+        // and other layout-position paths match on Keys.getcode(), not the
+        // keycode, and a real SDL keydown always provides both.
+        unsigned int code = 0;
+        if (k >= 'a' && k <= 'z')      code = SDL_SCANCODE_A + (unsigned int)(k - 'a');
+        else if (k >= '1' && k <= '9') code = SDL_SCANCODE_1 + (unsigned int)(k - '1');
+        else if (k == '0')             code = SDL_SCANCODE_0;
+        Keys.insert(k, m, 0, code);
+        return;
+    }
+    // `lua <code>` -- run a line through the embedded Lua engine, same as
+    // typing it into the Ctrl+Alt+L console. Lets scripts set up state the
+    // key/mouse surface can't reach (e.g. zt.instrument(0).device = 1).
+    if (!strcmp(cmd, "lua")) {
+        g_lua.execute(args);
         return;
     }
     // Mouse commands. All take pixel coordinates in zt's internal resolution

@@ -147,6 +147,17 @@ target_include_directories(test_keyjazz_map PRIVATE
 target_compile_features(test_keyjazz_map PRIVATE cxx_std_17)
 add_test(NAME keyjazz_map COMMAND test_keyjazz_map)
 
+add_executable(test_ableton_link
+    test_ableton_link.cpp
+)
+target_include_directories(test_ableton_link PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/tests"
+)
+target_compile_definitions(test_ableton_link PRIVATE ZT_TEST_NO_SDL)
+target_compile_features(test_ableton_link PRIVATE cxx_std_17)
+add_test(NAME ableton_link COMMAND test_ableton_link)
+
 # Full Lua API self-test. Unlike the SDL-free unit tests above, this drives
 # the REAL zt binary headless (--lua-test) against a scratch song, running
 # lua/selftest.lua and asserting exit 0 (every check passed). Covers the

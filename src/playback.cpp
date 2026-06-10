@@ -40,6 +40,7 @@
 #include "zt.h"
 #include "ccenv_advance.h"
 #include "sysex_macro.h"
+#include "ableton_link.h"
 #include <algorithm>
 #include <stdint.h>
 
@@ -72,7 +73,7 @@ void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD_PTR dwUser, DWORD_P
 
   ztPlayer->counter += ztPlayer->wTimerRes*1000;
 
-  if (ztPlayer->counter >= (ztPlayer->subtick_len_ms+ztPlayer->subtick_add)) {
+  if (ztPlayer->counter >= (ztPlayer->subtick_len_ms+ztPlayer->subtick_add+ztPlayer->chase_adj)) {
 
     if (zt_config_globals.midi_in_sync) {
 
@@ -92,6 +93,12 @@ void CALLBACK player_callback(UINT wTimerID, UINT msg, DWORD_PTR dwUser, DWORD_P
     }
 
     ztPlayer->counter = 0;
+    ztPlayer->played_subticks++;
+
+    ztPlayer->chase_err_us += ztPlayer->chase_skew_us;
+    if (ztPlayer->chase_err_us >= 1000)       { ztPlayer->chase_adj = 1000;  ztPlayer->chase_err_us -= 1000; }
+    else if (ztPlayer->chase_err_us <= -1000) { ztPlayer->chase_adj = -1000; ztPlayer->chase_err_us += 1000; }
+    else                                      { ztPlayer->chase_adj = 0; }
 
     if (ztPlayer->play_buffer[0]->ready_to_play && ztPlayer->play_buffer[1]->ready_to_play) SDL_Delay(0);
 
@@ -250,6 +257,11 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
     this->song = ztm;
     this->wTimerRes = res;
     this->fillbuff = this->playing = this->counter = this->wTimerID = 0;
+    this->stop_count = 0;
+    this->played_subticks = 0;
+    this->chase_skew_us = 0;
+    this->chase_err_us = 0;
+    this->chase_adj = 0;
     this->ztTimerID = 0;
     this->playback_start_ms = 0;
 //  this->hr_timer = new hires_timer;
@@ -547,9 +559,13 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
     cur_row = row-1;
     cur_pattern = pattern;
 
-    cur_subtick = 0;        
+    cur_subtick = 0;
     counter = 0;
     clock_count = 0;
+    played_subticks = 0;
+    chase_skew_us = 0;
+    chase_err_us = 0;
+    chase_adj = 0;
 
     mctr = 0;
 
@@ -608,14 +624,15 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void player::play(int row, int pattern,int pm, int loopmode)
+void player::play(int row, int pattern, int pm, int loopmode)
 {
-// <Manu> esta comprobacion no es necesaria ? [EN: is this check unnecessary?]
+    if (zt_ableton_link_defer_play(row, pattern, pm))
+        return;   // armed: the Link glue calls play_immediately() at the next downbeat
+    play_immediately(row, pattern, pm, loopmode);
+}
 
-/*    if (song->orderlist[pattern] == 0x100) 
-        return;
-*/
-
+void player::play_immediately(int row, int pattern,int pm, int loopmode)
+{
 
   if(song->orderlist[pattern] == 0x101) {
 
@@ -631,12 +648,10 @@ void player::play(int row, int pattern,int pm, int loopmode)
 
   prepare_play(row,pattern,pm,loopmode);
 
-
   //  play_buffer[cur_buf]->reset();
   //  play_buffer[cur_buf]->insert(0,ET_MSTART,0); // First event is MIDI Start
 
   if(song->flag_SendMidiStopStart) MidiOut->sendGlobal(0xFA);
-  //SDL_Delay(20);
 
   starts = 1;
 
@@ -756,6 +771,7 @@ void player::play_current_note()
 //
 void player::stop(void)
 {
+    stop_count++;
     playing = 0;
     pinit = 0;
     lock_mutex(song->hEditMutex);

@@ -4,6 +4,14 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_09 (Ableton Link support)
+----------------------------------------------------------------------------
+
+        + Ableton Link support. zt can join a Link session on the local
+          network and keep tempo and transport in sync with
+          Ableton Live and other Link-aware apps. OFF by default; toggle from
+          F11 (Song Configuration). See the "Ableton Link" section in F1 help.
+
 zt 2026_05_31 (AltGr behaves like Alt for keyboard shortcuts)
 ----------------------------------------------------------------------------
 

@@ -187,6 +187,29 @@ class player {
         int subtick_mode,clock_mode;
 
         int playing;
+        // Monotonic count of stop() calls. Observers (the Ableton Link glue's
+        // per-frame pump) watch it to react to ANY stop -- including the
+        // counter-thread song-end stop and prepare_play's internal restart --
+        // without the player knowing about them. Plain int on purpose: bumped
+        // from the timer thread, read advisorily from the main thread.
+        int stop_count;
+        // Phase-chase observer surface, same contract as stop_count: the
+        // player stays sync-protocol-agnostic and just exposes its position
+        // plus one advisory knob. played_subticks counts subticks since
+        // play start (timer thread writes, pump reads); chase_skew_us is a
+        // signed per-subtick length adjustment in microseconds (pump writes,
+        // timer thread reads) that an external phase lock uses to slew the
+        // engine onto a shared timeline. 0 = run at nominal speed.
+        //
+        // The 1 ms timer can't resolve a sub-ms threshold change (the
+        // subtick delta-sigma would re-absorb it), so the skew accrues in
+        // chase_err_us per subtick and pays out as whole +/-1 ms quanta in
+        // chase_adj -- average added length == chase_skew_us exactly.
+        // chase_err_us/chase_adj are timer-thread-private.
+        int played_subticks;
+        int chase_skew_us;
+        int chase_err_us;
+        int chase_adj;
         int fillbuff;
         int light_counter;
         int skip;
@@ -218,6 +241,9 @@ class player {
         
         void prepare_play(int row, int pattern,int pm, int loopmode);
         void play(int row, int pattern, int pm, int loopmode=1);
+        // Immediate start, bypassing play()'s Ableton Link quantize defer.
+        // Only the Link glue's downbeat fire should call this directly.
+        void play_immediately(int row, int pattern, int pm, int loopmode=1);
         void play_current_row();
         void play_current_note();
         void stop(void);

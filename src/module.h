@@ -344,6 +344,10 @@ class songmsg
 };
 
 
+// Bumped on every zt_module::init() (startup / File > New / song load).
+// Lets per-frame observers notice the song context was rebuilt.
+extern int zt_song_generation;
+
 class zt_module
 {
     public:

@@ -33,6 +33,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ZT_ENABLE_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitizer (GCC/Clang)" OFF)
 
+# Sync tempo/transport with Ableton Link peers on the LAN. When ON and the
+# vendored Link source tree is present (extlibs/link/, fetched by
+# .github/scripts/fetch-ableton-link.sh), zt links Ableton::Link and compiles
+# the real wrapper. When OFF or the tree is absent, the wrapper builds as a
+# safe stub so the binary still works without Link.
+option(ZT_ENABLE_ABLETON_LINK "Sync tempo/transport with Ableton Link peers on the LAN" ON)
+
 set(ZT_WINDOWS_LIB_DIR "${CMAKE_SOURCE_DIR}/extlibs" CACHE PATH "Directory containing Windows SDL libraries (.lib/.dll)")
 set(SDL3_INCLUDE_DIR "" CACHE PATH "Path containing SDL3/SDL.h (or SDL.h with SDL3 include root)")
 set(SDL3_LIBRARY "" CACHE FILEPATH "Full path to SDL3 library (libSDL3*.a/.so/.dylib or SDL3.lib)")
@@ -154,6 +161,7 @@ set(ZT_SOURCES
   src/sysex_macro.cpp
   src/ccenv_io.cpp
   src/CUI_CCEnvelopeEditor.cpp
+  src/ableton_link.cpp
   src/zt_headless.cpp
 )
 
@@ -185,6 +193,24 @@ else()
 endif()
 target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib extlibs/lua)
 target_link_libraries(zt PRIVATE lua_static zt_zlib_static)
+
+# --- Ableton Link ------------------------------------------------------------
+# Link ships an Ableton::Link IMPORTED INTERFACE target via AbletonLinkConfig
+# .cmake that carries include dirs, per-platform compile defs, and link libs.
+# We link it only when ZT_ENABLE_ABLETON_LINK is ON AND the source tree is
+# present. ZT_HAS_ABLETON_LINK then flips src/ableton_link.cpp from its
+# stub to the real implementation. MinGW is excluded: the XP target pins
+# _WIN32_WINNT=0x0501 and asio's Windows backend needs Vista+ APIs.
+set(ZT_ABLETON_LINK_AVAILABLE OFF)
+if(ZT_ENABLE_ABLETON_LINK AND NOT MINGW
+   AND EXISTS "${CMAKE_SOURCE_DIR}/extlibs/link/AbletonLinkConfig.cmake")
+  include("${CMAKE_SOURCE_DIR}/extlibs/link/AbletonLinkConfig.cmake")
+  target_link_libraries(zt PRIVATE Ableton::Link)
+  target_compile_definitions(zt PRIVATE ZT_HAS_ABLETON_LINK)
+  set(ZT_ABLETON_LINK_AVAILABLE ON)
+endif()
+message(STATUS "Ableton Link: ${ZT_ABLETON_LINK_AVAILABLE}")
+# -----------------------------------------------------------------------------
 
 # Linux release artifacts bundle libSDL3.so.0 next to the binary (Ubuntu 24.04
 # apt has no libsdl3-dev yet). Without $ORIGIN in the rpath, the dynamic linker

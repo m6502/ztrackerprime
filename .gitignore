@@ -10,3 +10,7 @@ __pycache__/
 /sdl3-mingw/
 /toolchain-mingw-i686-macos.cmake
 /dist/ztrackerprime-windows-x86-xp/
+# Ableton Link source tree — fetched on demand by
+# .github/scripts/fetch-ableton-link.sh, never committed (same policy as the
+# libpng/zlib extlibs). Keeps the ~2k-file Link+asio checkout out of git.
+/extlibs/link/

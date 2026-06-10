@@ -268,6 +268,25 @@
    zt --midi-in "IAC Driver Bus 1"
    zt --midi-clock 0 mysong.zt
 
+|L|%==|H|Ableton Link|L|==%|U|
+
+ Ableton Link keeps zTracker's tempo in sync with other Link-aware
+ apps on the same network (Ableton Live, etc). It is OFF by default.
+ Toggle it from F11 (Song Configuration):
+
+   Ableton Link    : Join the Link session. While on, zt's BPM follows
+                     the shared session tempo (even while stopped, so you
+                     press play already in sync), and changing BPM in F11
+                     proposes that tempo to every peer.
+   Link Start/Stop : (on by default) Also share transport.
+   Link Offset ms  : Play this many ms EARLY (0-500, default 0). A DAW
+                     monitoring zt's MIDI through its audio chain renders
+                     the notes late by its audio latency (Live:
+                     Preferences > Audio > Overall Latency), and Link has
+                     no way to discover that value. Set it here once and
+                     zt's notes SOUND on the grid - no track delay or
+                     reduced-latency mode needed in the DAW.
+
 |L|%==|H|Troubleshooting|L|==%|U|
 
  Timing issues:

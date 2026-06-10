@@ -1,6 +1,7 @@
 
 #include "zt.h"
 #include "OrderEditor.h"
+#include "ableton_link.h"
 
 CUI_Songconfig::CUI_Songconfig(void) {
     ValueSlider *vs;
@@ -11,6 +12,8 @@ CUI_Songconfig::CUI_Songconfig(void) {
 //    CommentEditor *ce;
 
     int base_y = TRACKS_ROW_Y;
+
+    last_bpm_seen = -1;
 
     tpb_tab[0] = 2;
     tpb_tab[1] = 4;
@@ -50,8 +53,8 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs->x = 20; 
         vs->y = base_y+2; 
         vs->xsize=28;
-        vs->min = 60;
-        vs->max = 240;
+        vs->min = 20;
+        vs->max = 500;
         vs->value = song->bpm;
     // END Test Slider
     /* Initialize TPB Slider 2 */
@@ -159,6 +162,33 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs->max = ZT_NAS_EDITSTEP;
         vs->value = zt_config_globals.note_audition_step_mode;
 
+        // Ableton Link
+        cb = new CheckBox;
+        UI->add_element(cb, 11);
+        cb->frame = 0;
+        cb->x = 20;
+        cb->y = base_y + 16;
+        cb->xsize = 3;
+        cb->value = &zt_config_globals.ableton_link_enable;
+
+        cb = new CheckBox;
+        UI->add_element(cb, 12);
+        cb->frame = 0;
+        cb->x = 20;
+        cb->y = base_y + 17;
+        cb->xsize = 3;
+        cb->value = &zt_config_globals.ableton_link_start_stop_sync;
+
+        vs = new ValueSlider;
+        UI->add_element(vs, 13);
+        vs->frame = 0;
+        vs->x = 20;
+        vs->y = base_y + 18;
+        vs->xsize = 28;
+        vs->min = 0;
+        vs->max = 500;
+        vs->value = zt_config_globals.ableton_link_offset_ms;
+
         oe = new OrderEditor;
         UI->add_element(oe,9);
         oe->x = 59;
@@ -172,6 +202,7 @@ void CUI_Songconfig::enter(void) {
     need_refresh = 1;
     vs = (ValueSlider *)UI->get_element(1);
     vs->value = song->bpm;
+    last_bpm_seen = song->bpm;   // baseline the user-vs-external BPM disambiguator
     vs = (ValueSlider *)UI->get_element(2);
     vs->value = rev_tpb_tab[song->tpb];
 
@@ -188,6 +219,8 @@ void CUI_Songconfig::enter(void) {
     // hand-editing zt.conf and reloading).
     vs = (ValueSlider *)UI->get_element(10);
     if (vs) vs->value = zt_config_globals.note_audition_step_mode;
+    vs = (ValueSlider *)UI->get_element(13);
+    if (vs) vs->value = zt_config_globals.ableton_link_offset_ms;
 
     // F11 toggle: pressing F11 while already on Songconfig flips focus
     // between OrderEditor (id 9) and Title (id 0) on every press, so the
@@ -235,7 +268,7 @@ void CUI_Songconfig::update()
     UI->update();
     vs = (ValueSlider *)UI->get_element(1);
     if (vs->from_input) vs->from_input = 0;  // BPM slider takes any [min,max]; clamp already applied
-    if (vs->value != song->bpm) {
+    if (vs->value != last_bpm_seen) {
         song->bpm = vs->value;
         ztPlayer->set_speed();
 
@@ -243,9 +276,17 @@ void CUI_Songconfig::update()
             zt_config_globals.highlight_increment = song->tpb;
         if(!zt_config_globals.lowlight_increment)
             zt_config_globals.lowlight_increment = song->tpb >> 1 / song->tpb / 2;
-       
+
         file_changed++;
+    } else if (song->bpm != vs->value) {
+        // song->bpm changed underneath us (the Ableton Link tempo pump in the
+        // main loop follows the session tempo) -> move the slider to match so
+        // the F11 BPM display tracks Ableton instead of snapping it back.
+        vs->value = song->bpm;
+        vs->need_redraw++;
+        need_refresh++;
     }
+    last_bpm_seen = vs->value;
     vs = (ValueSlider *)UI->get_element(2);
     if (vs->from_input) {
         // Typed-numeric path. vs->input_value holds the raw number the
@@ -289,6 +330,14 @@ void CUI_Songconfig::update()
     } else if (vs) {
         vs->value = zt_config_globals.highlight_increment;
     }
+    vs = (ValueSlider *)UI->get_element(13);
+    if (vs && vs->from_input) vs->from_input = 0;
+    if (vs && vs->value != zt_config_globals.ableton_link_offset_ms) {
+        zt_config_globals.ableton_link_offset_ms = vs->value;
+    } else if (vs) {
+        vs->value = zt_config_globals.ableton_link_offset_ms;
+    }
+
     vs = (ValueSlider *)UI->get_element(6);
     if (vs && vs->from_input) vs->from_input = 0;
     if (vs && vs->value != zt_config_globals.lowlight_increment) {
@@ -297,12 +346,61 @@ void CUI_Songconfig::update()
         vs->value = zt_config_globals.lowlight_increment;
     }
     {
-        CheckBox *cb = (CheckBox *)UI->get_element(7);
-        if (cb && cb->changed)
-            zt_config_globals.midi_in_sync = *(cb->value);
-        cb = (CheckBox *)UI->get_element(8);
-        if (cb && cb->changed)
-            zt_config_globals.midi_in_sync_chase_tempo = *(cb->value);
+
+        static int prev_link = -1;
+        static int prev_sync = -1;
+        int link_now = zt_config_globals.ableton_link_enable;
+        int sync_now = zt_config_globals.midi_in_sync;
+
+        if (prev_link >= 0 && link_now != prev_link) {
+            if (link_now && !zt_ableton_link_available()) {
+                // Stub build: nothing to enable. Snap the toggle back off.
+                zt_config_globals.ableton_link_enable = link_now = 0;
+                statusmsg = (char*)"Ableton Link not compiled in this build";
+            } else if (link_now) {
+                // Disable MIDI In Sync (don't want both on at same time)
+                zt_config_globals.midi_in_sync = 0;
+                zt_config_globals.midi_in_sync_chase_tempo = 0;
+                sync_now = 0;
+                UI->get_element(7)->need_redraw++;
+                UI->get_element(8)->need_redraw++;
+                statusmsg = (char*)"Ableton Link enabled";
+            } else {
+                statusmsg = (char*)"Ableton Link disabled";
+            }
+            status_change = 1;
+            need_refresh++;
+        }
+
+        if (prev_sync >= 0 && sync_now != prev_sync && sync_now) {
+            // Mutual exclusion the other way: MIDI-In-Sync on kicks Link off.
+            if (zt_config_globals.ableton_link_enable) {
+                zt_config_globals.ableton_link_enable = link_now = 0;
+                UI->get_element(11)->need_redraw++;   // cross-cleared checkbox
+                statusmsg = (char*)"Ableton Link disabled (MIDI-In Sync took over)";
+                status_change = 1;
+                need_refresh++;
+            }
+        }
+
+        prev_link = zt_config_globals.ableton_link_enable;
+        prev_sync = zt_config_globals.midi_in_sync;
+
+        // Live status: peer count / session tempo move asynchronously as peers
+        // join, leave, or retempo. update() runs every frame but draw() only
+        // repaints when need_refresh != 0 — so bump it when a value we display
+        // actually changed (invariant: background state change -> need_refresh++).
+        if (zt_config_globals.ableton_link_enable) {
+            static size_t last_peers = (size_t)-1;
+            static int    last_bpm10 = -1;
+            size_t peers = zt_ableton_link_num_peers();
+            int    bpm10 = (int)(zt_ableton_link_get_tempo() * 10.0 + 0.5);
+            if (peers != last_peers || bpm10 != last_bpm10) {
+                last_peers = peers;
+                last_bpm10 = bpm10;
+                need_refresh++;
+            }
+        }
     }
     vs = (ValueSlider *)UI->get_element(10);
     if (vs) {
@@ -355,6 +453,31 @@ void CUI_Songconfig::draw(Drawable *S) {
         // colliding with the on-slider digits.
         print(row(2),col(base_y+13),"4/8 Audition Step",COLORS.Text,S);
         print(row(20),col(base_y+14),"0=stay  1=row  2=editstep",COLORS.Text,S);
+
+        // Ableton Link block. Labels right-align to col 18 like the rest.
+        print(row(6),col(base_y+16),"Ableton Link",COLORS.Text,S);
+        print(row(3),col(base_y+17),"Link Start/Stop",COLORS.Text,S);
+        print(row(4),col(base_y+18),"Link Offset ms",COLORS.Text,S);
+        {
+            char linkstat[96];
+            if (!zt_ableton_link_available()) {
+                snprintf(linkstat, sizeof(linkstat), "(not compiled in)");
+            } else if (zt_config_globals.ableton_link_enable) {
+                size_t peers = zt_ableton_link_num_peers();
+                snprintf(linkstat, sizeof(linkstat), "%d peer%s \xb3 %.1f BPM",
+                         (int)peers, peers == 1 ? "" : "s", zt_ableton_link_get_tempo());
+            } else {
+                snprintf(linkstat, sizeof(linkstat), "off");
+            }
+            // Pad to a fixed width and draw with a background fill so a shorter
+            // status (e.g. "off") fully erases the previous longer one
+            // ("N peers ... BPM"). print() only paints glyph pixels — without
+            // this the old text shows through the new, garbled. 28 cols span
+            // col 24..51, clear of the Order List at col 59.
+            char linkstat_field[40];
+            snprintf(linkstat_field, sizeof(linkstat_field), "%-28s", linkstat);
+            printBG(row(24),col(base_y+16),linkstat_field,COLORS.Highlight,COLORS.Background,S);
+        }
         // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
         print(row(59),col(11),"Order List",COLORS.Text,S);
         printchar(row(20 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);

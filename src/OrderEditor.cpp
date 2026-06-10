@@ -1,7 +1,6 @@
 #include "OrderEditor.h"
 #include "zt.h"
 
-
 // ------------------------------------------------------------------------------------------------
 //
 //
@@ -60,7 +59,9 @@ int OrderEditor::mouseupdate(int cur_element) {
                 cursor_x = clicked_col - 4;
             }
             cur_edit_order = new_order;
-            cur_edit_pattern = song->orderlist[new_order];
+            if (song->orderlist[new_order] < 0x100) {
+                cur_edit_pattern = song->orderlist[new_order];
+            }
             Keys.getkey();
             need_redraw++;
             need_refresh++;
@@ -149,8 +150,9 @@ int OrderEditor::update() {
                     if(cur_edit_order < 255 && song->orderlist[cur_edit_order + 1] != 0x100)
                     {
                         cur_edit_order++;
-                        cur_edit_pattern = song->orderlist[cur_edit_order];
-                            need_refresh++;
+                        if (song->orderlist[cur_edit_order] < 0x100)
+                            cur_edit_pattern = song->orderlist[cur_edit_order];
+                        need_refresh++;
                         need_redraw++;
                     }
                     break;
@@ -167,8 +169,9 @@ int OrderEditor::update() {
                     if(cur_edit_order > 0 && song->orderlist[cur_edit_order -1] != 0x100)
                     {
                         cur_edit_order--;
-                        cur_edit_pattern = song->orderlist[cur_edit_order];
-                            need_refresh++;
+                        if (song->orderlist[cur_edit_order] < 0x100)
+                            cur_edit_pattern = song->orderlist[cur_edit_order];
+                        need_refresh++;
                         need_redraw++;
                     }
                     break;
