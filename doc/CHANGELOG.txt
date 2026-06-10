@@ -4,6 +4,28 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_15 (MIDI clock sync rebuilt on the phase-chase controller)
+----------------------------------------------------------------------------
+
+        * MIDI In Sync now phase-locks to the received clock grid using the
+          same closed-loop controller as Ableton Link (src/phase_chase.h):
+          24 clocks/beat is a position reference, so fractional master
+          tempos no longer drift (the old rolling-average follower walked
+          ~0.3%/min against a 120.4 BPM master).
+        * The MIDI-in callback thread no longer makes decisions: it only
+          counts what arrived (clocks, Start/Continue/Stop, SPP), and the
+          main-thread pump consumes them - fixing cross-thread player
+          play()/stop() calls and timing-field writes that dated back to
+          the original implementation.
+        * "Sync Offset ms" (was "Link Offset ms") now applies to BOTH sync
+          modes: zt plays that many ms early so notes monitored through
+          the master DAW's audio chain sound on the grid. Live-dialable
+          during playback in both modes. zt.conf key: sync_offset_ms
+          (legacy ableton_link_offset_ms still read).
+        * Master clock dropout (>1 s without clocks) pauses the chase and
+          lets the engine free-run at its nominal tempo; lock re-acquires
+          automatically when clocks resume.
+
 zt 2026_06_09 (Ableton Link support)
 ----------------------------------------------------------------------------
 

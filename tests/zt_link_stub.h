@@ -1,9 +1,10 @@
-// Minimal stand-in for zt.h, used when src/ableton_link.cpp is compiled into
-// the unit test (ZT_TEST_NO_SDL). Mirrors exactly the declarations the Link
-// integration uses -- a recording fake player, a song with bpm + orderlist,
-// the three ableton_link_* conf fields, and the page-refresh globals -- so
-// the test can drive the full pump/defer logic without SDL or the real app.
-// Same pattern as tests/sdl_stub.h (see CLAUDE.md "Test harness").
+// Minimal stand-in for zt.h, used when src/ableton_link.cpp or
+// src/midi_clock_sync.cpp is compiled into a unit test (ZT_TEST_NO_SDL).
+// Mirrors exactly the declarations the sync integrations use -- a recording
+// fake player, a song with bpm + orderlist, the sync conf fields, and the
+// page-refresh globals -- so the tests can drive the full pump logic
+// without SDL or the real app. Same pattern as tests/sdl_stub.h (see
+// CLAUDE.md "Test harness").
 //
 // Definitions (not just declarations) live here: the test is a single
 // translation unit that includes ableton_link.cpp, which includes this.
@@ -52,13 +53,36 @@ struct player {
     // Mirrors the real set_speed(): adopt the song tempo as the engine's
     // nominal rate (the chase's rate-agreement guard reads it).
     void set_speed(void) { set_speed_calls++; bpm = song->bpm; }
+
+    // play(): same defer-free fake as play_immediately (the MIDI pump calls
+    // play(); the Link defer hook is irrelevant in the stub env).
+    void play(int row, int pattern, int pm, int loopmode = 1) {
+        play_immediately(row, pattern, pm, loopmode);
+    }
+
+    // chase_external_tempo(): adopt an external master's rounded tempo as
+    // the engine nominal WITHOUT touching song->bpm (the real contract).
+    int chase_external_tempo_calls = 0;
+    void chase_external_tempo(int new_bpm) {
+        chase_external_tempo_calls++;
+        if (new_bpm >= 20 && new_bpm <= 500) bpm = new_bpm;
+    }
+
+    // calc_pos(): scripted SPP -> row/order mapping for the test.
+    int calc_pos_row = 0, calc_pos_order = 0, calc_pos_ret = 0;
+    int calc_pos(int /*spp*/, int *row, int *order) {
+        *row = calc_pos_row; *order = calc_pos_order;
+        return calc_pos_ret;
+    }
 };
 
 struct zt_conf {
     int ableton_link_enable          = 0;
     int ableton_link_start_stop_sync = 0;
     int ableton_link_quantum         = 4;
-    int ableton_link_offset_ms       = 0;
+    int sync_offset_ms               = 0;
+    int midi_in_sync                 = 0;
+    int midi_in_sync_chase_tempo     = 0;
 };
 
 static player    g_test_player;

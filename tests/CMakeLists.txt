@@ -157,6 +157,24 @@ target_include_directories(test_pattern_guard PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_pattern_guard PRIVATE cxx_std_17)
 add_test(NAME pattern_guard COMMAND test_pattern_guard)
 
+add_executable(test_phase_chase
+    test_phase_chase.cpp
+)
+target_include_directories(test_phase_chase PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_phase_chase PRIVATE cxx_std_17)
+add_test(NAME phase_chase COMMAND test_phase_chase)
+
+add_executable(test_midi_clock_sync
+    test_midi_clock_sync.cpp
+)
+target_include_directories(test_midi_clock_sync PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/tests"
+)
+target_compile_definitions(test_midi_clock_sync PRIVATE ZT_TEST_NO_SDL)
+target_compile_features(test_midi_clock_sync PRIVATE cxx_std_17)
+add_test(NAME midi_clock_sync COMMAND test_midi_clock_sync)
+
 add_executable(test_ableton_link
     test_ableton_link.cpp
 )
