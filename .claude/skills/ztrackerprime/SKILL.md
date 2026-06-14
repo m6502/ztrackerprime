@@ -13,7 +13,7 @@ triggers:
 
 # zTracker Prime Development Skill
 
-> **Last verified: 2026-05-30.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
+> **Last verified: 2026-06-14.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
 >
 > **What lives elsewhere on purpose:** the open-PR list and merged landmarks are NOT in this skill — they go stale fast. For current state run `gh pr list --repo m6502/ztrackerprime` (open) or `gh pr list --repo m6502/ztrackerprime --state merged --limit 30` (recent landings). The skill stays timeless: architecture, invariants, foot-guns, conventions.
 
@@ -153,6 +153,9 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/CUI_KeyBindings.cpp` | Unified Shortcuts & MIDI Mappings page (**Shift+F2** — moved from Shift+F3 to free that slot) |
 | `src/CUI_CcConsole.cpp` | CC Console (**Shift+F3**) — Paketti CCizer file load + sliders/knobs send-out + MIDI Learn |
 | `src/CUI_SysExLibrarian.cpp` | SysEx Librarian (**Shift+F5**) — `.syx` file send + auto-capture of incoming SysEx |
+| `src/CUI_LuaConsole.cpp` | Lua Console (**Ctrl+Alt+L**) — Renoise-style interactive console over the embedded Lua engine. Tab cycling, `rprint`/`oprint`/`help`, scrollback wrapping. |
+| `src/lua_engine.{cpp,h}` | Embedded Lua API: object model (`zt`, `song`, `transport`, `pattern`, `track`, cells, order list) + notifiers (`zt.on/off/fire` for play/stop/row/idle). `lua/selftest.lua` exercises the surface via `--lua-test` (a ctest target). |
+| `src/ableton_link.{cpp,h}` | Ableton Link tempo + transport sync (PR #159). C API: `zt_ableton_link_startup/teardown/pump/defer_play/available/get_tempo`. Driven from `playback.cpp`; configured from F11 Song Config; conf keys in `conf.cpp`. |
 | `src/CUI_*.cpp` | Other pages (Sysconfig, Songconfig, Help, InstEditor, MainMenu, Playsong, etc.) |
 | `src/CUI_Page.{h,cpp}` | Base class for pages |
 | `src/UserInterface.{h,cpp}` | Widget classes — `CheckBox`, `ValueSlider`, `TextInput`, `Frame`, `Button`, `TextBox`, `ListBox`, `MidiOutDeviceOpener`, `SkinSelector`, `VUPlay`. Fix rendering bugs HERE, not in callers. |
@@ -173,7 +176,7 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 |
 | `assets/ccizer/` | Bundled CCizer banks (sc88st, microfreak, minilogue, monologue, Prophet6, deepmind6, waldorf_blofeld, tb03, se02, pro800, polyend_*, midi_control_example) — copied from Paketti. README.md documents the format. |
 | `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` = `F0 7E 7F 06 01 F7` for first-test handshakes. README.md documents the librarian workflow. |
-| `tests/` | CTest unit-test executables — 12 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`. (Count drifts as suites are added — `ctest` is the source of truth.) |
+| `tests/` | CTest unit-test executables — 13 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`. (Count drifts as suites are added — `ctest` is the source of truth.) Note the macOS CI also runs the Lua API self-test via `--lua-test` (PRs #154, #156). |
 | `doc/help.txt` | In-app F1 help — update when adding keybinds or CLI flags |
 | `doc/CHANGELOG.txt` | Release notes, chronological |
 | `.github/workflows/build.yml` | 5-platform CI matrix; Linux job runs `ctest` |
@@ -196,8 +199,9 @@ For the live PR queue: `gh pr list --repo m6502/ztrackerprime`.
 | **Shift+F6** | **CC Envelope Editor** | Per-instrument, CCizer-aware CC envelopes (Schism-style). New page, PR #132. Persisted in the optional `INSE` chunk; editor loads/saves `.env` presets from a configurable folder. |
 | F6 / F7 / F8 / F9 | Play Pattern / From Cursor / Stop / Panic | |
 | F10 | Song Message Editor | |
-| F11 | Song Configuration / Order | |
+| F11 | Song Configuration / Order | Hosts the **Ableton Link** controls (enable checkbox, start/stop-sync checkbox, quantize-offset slider). See "Ableton Link" below. |
 | F12 | System Configuration | Includes `CCizer Folder` text input (binds to `ccizer_folder` zt.conf key). |
+| **Ctrl+Alt+L** | **Lua Console** | Interactive Lua over the embedded engine. Sibling MainMenu chords: Ctrl+Alt+K (Keybindings), Ctrl+Alt+N (New Song). |
 | **Ctrl+Shift+§** | **CC drawmode toggle** | While ON, incoming CC writes `Sxxyy` and PB writes `Wxxxx` at the cursor row. Per-session UNDO_SAVE. `[CC DRAW]` badge shown top-right of Pattern Editor while active. Extended by PRs #123–#129: **mouse drag-to-draw** drawbars (`MD_CC_DRAW`), CCizer-slot cycling, one-key arm-and-draw, double-click reset, `Ctrl+F2` slot cycle, keyjazz audition while mouse-drawing. Windows fires the toggle via `Ctrl+Shift+`` ` ``. |
 
 ## Coordinate system
@@ -242,6 +246,23 @@ Seven-PR feature stack landed end of April 2026 wiring Paketti-style CCizer bank
 - `tests/test_ccizer.cpp` — 51 checks: parser, comments/blanks, out-of-range, view sidecar round-trip, MIDI byte builder, folder resolution, dir scan.
 - `tests/test_sysex_inq.cpp` — ~25 checks: empty / push-pop / FIFO / overflow / buffer-too-small / invalid input.
 - `tests/test_sysex_macro.cpp` — ~20 checks: predicate, path resolution, valid/malformed/oversized/missing file read.
+
+## Lua scripting (PRs #148–#157, 2026-05-31)
+
+An embedded Lua engine + interactive console landed across ten PRs at the end of May 2026. Treat it as a first-class subsystem.
+
+- **Engine** (`src/lua_engine.{cpp,h}`) — exposes a Renoise-flavoured object model: `zt` (top-level), `song`, `transport`, `pattern`, `track`, plus full cell access, the order list, note names, and constants. Notifier API: `zt.on(event, fn)` / `zt.off(...)` / `zt.fire(...)` for `play` / `stop` / `row` / `idle` events, pumped from the main loop. MIDI macros expose `:send()` (PR #157).
+- **Console** (`src/CUI_LuaConsole.cpp`, **Ctrl+Alt+L**) — Tab cycling, `rprint` / `oprint` / `help` helpers, Renoise-style object printing, and scrollback that wraps (PR #153) rather than clips (PR #152) long lines.
+- **Self-test** — `lua/selftest.lua` exercises the whole API surface; runs via `--lua-test` and is wired into ctest, and the **macOS** CI jobs run it (PRs #154, #156). When you add or rename a Lua binding, update `lua/selftest.lua` in the same PR — CI will catch a regression there.
+
+## Ableton Link (PR #159, merged 2026-06-10)
+
+Tempo + transport sync with Ableton Live and other Link-aware apps over the local network.
+
+- **Core** (`src/ableton_link.{cpp,h}`) — C API: `zt_ableton_link_startup` / `_teardown` / `_pump` / `_defer_play(row, pattern, pm)` / `_available` / `_get_tempo`. Pumped from `playback.cpp`; the pump can move `song->bpm` underneath the UI, so F11 re-reads it each frame.
+- **Config** (`conf.cpp`, keys persisted in `zt.conf`): `ableton_link_enable` (**OFF by default** — no surprise LAN traffic), `ableton_link_start_stop_sync` (ON by default; only effective once Link is enabled), `ableton_link_quantum` (default 4 = one bar of 4/4), `ableton_link_offset_ms` (fire quantized starts early by this much).
+- **UI** — F11 Song Configuration (`CUI_Songconfig.cpp`) hosts the enable + start/stop-sync checkboxes and the offset slider.
+- **Precedence:** if both Ableton Link and MIDI Sync are enabled, **Link wins** (`conf.cpp`).
 
 ## INVARIANTS for any new or modified page
 
