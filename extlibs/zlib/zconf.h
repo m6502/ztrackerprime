@@ -8,7 +8,13 @@
 #ifndef ZCONF_H
 #define ZCONF_H
 /* #undef Z_PREFIX */
+/* This vendored zconf.h was generated on a Unix host, where ./configure set
+   Z_HAVE_UNISTD_H. MSVC has no <unistd.h>, so guard it out there (MinGW and
+   Unix keep it). zlib's own platform-detection block further down re-enables
+   Z_HAVE_UNISTD_H wherever it's actually appropriate. */
+#ifndef _MSC_VER
 #define Z_HAVE_UNISTD_H
+#endif
 
 /*
  * If you *really* need a unique prefix for all types and library functions,

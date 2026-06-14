@@ -84,12 +84,6 @@ jobs:
             libdecor-0-dev libdbus-1-dev libibus-1.0-dev \
             libudev-dev libsndio-dev
 
-      - name: Fetch extlibs (libpng + zlib)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash .github/scripts/fetch-extlibs.sh
-
       - name: Fetch Ableton Link
         shell: bash
         run: |
@@ -201,12 +195,6 @@ jobs:
           brew update
           brew install cmake ninja pkg-config sdl3
 
-      - name: Fetch extlibs (libpng + zlib)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash .github/scripts/fetch-extlibs.sh
-
       - name: Fetch Ableton Link
         shell: bash
         run: |
@@ -294,12 +282,6 @@ jobs:
           brew update
           brew install cmake ninja pkg-config sdl3
 
-      - name: Fetch extlibs (libpng + zlib)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash .github/scripts/fetch-extlibs.sh
-
       - name: Fetch Ableton Link
         shell: bash
         run: |
@@ -386,12 +368,6 @@ jobs:
             cmake ninja-build \
             mingw-w64 mingw-w64-tools \
             curl unzip zip
-
-      - name: Fetch extlibs (libpng + zlib)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash .github/scripts/fetch-extlibs.sh
 
       - name: Cache SDL3 MinGW devel zip
         id: cache-sdl3-mingw
@@ -504,12 +480,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Fetch extlibs (libpng + zlib)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash .github/scripts/fetch-extlibs.sh
 
       - name: Cache SDL3 VC devel zip
         id: cache-sdl3-vc

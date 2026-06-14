@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # fetch-extlibs.sh
 #
-# Populate extlibs/libpng/ and extlibs/zlib/ with the exact files that
-# CMakeLists.txt (lines ~38-62) references. The upstream repo does NOT ship
-# these sources -- the maintainer's local tree has curated copies dropped in
-# manually. CI must reproduce that layout on every run.
+# MANUAL RE-VENDOR TOOL — no longer run by CI.
 #
-# Works on GitHub Actions runners with bash available (Linux, macOS, and
-# Windows via git-bash which provides curl + tar).
+# extlibs/libpng/ and extlibs/zlib/ are now committed in-tree (like extlibs/lua/),
+# so CI builds straight from the checkout and does NOT need to fetch anything.
+# This script is kept only to RE-VENDOR those sources when bumping libpng/zlib
+# versions: run it locally, review the diff, and commit the refreshed tree.
+# (Ableton Link is the exception — its sources are large and NOT committed; CI
+# fetches them via fetch-ableton-link.sh.)
+#
+# Populate extlibs/libpng/ and extlibs/zlib/ with the exact files that
+# CMakeLists.txt (lines ~38-62) references.
+#
+# Works wherever bash + curl + tar are available (Linux, macOS, and
+# Windows via git-bash).
 #
 # Env vars (supplied by the workflow, with sane defaults here):
 #   LIBPNG_VERSION   default 1.6.44
