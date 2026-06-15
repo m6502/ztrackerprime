@@ -80,6 +80,7 @@
 #include "midi_mappings.h"
 #include "ccizer.h"
 #include "ableton_link.h"
+#include "midi_clock_sync.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -3448,6 +3449,9 @@ int action(Screen *S)
     // Ableton Link sync if enabled
     zt_ableton_link_pump();
 
+    // MIDI clock slave sync if enabled (mutually exclusive with Link)
+    zt_midi_clock_pump();
+
 #ifdef DEBUG
     playbuff1_bg->setvalue(ztPlayer->play_buffer[0]->size);
     playbuff2_bg->setvalue(ztPlayer->play_buffer[1]->size);
@@ -4298,6 +4302,18 @@ int main(int argc, char *argv[])
           if (playing && ztPlayer->playing_cur_row != s_prev_row) {
             s_prev_row = ztPlayer->playing_cur_row;
             g_lua.fire("row", s_prev_row, true);
+          }
+        }
+        {
+          // "sync" on MIDI-clock lock-state transitions (off/waiting/dropout/
+          // transport/chasing/locked). arg = numeric state; the readable name
+          // and the live BPM/offset are on zt.transport.sync_*.
+          static int s_prev_sync = -1;
+          zt_sync_status ss;
+          zt_midi_clock_get_status(&ss);
+          if (ss.state != s_prev_sync) {
+            s_prev_sync = ss.state;
+            g_lua.fire("sync", ss.state, true);
           }
         }
         g_lua.fire("idle");

@@ -9,6 +9,7 @@
 #include "playback.h"
 #include "module.h"
 #include "midi-io.h"
+#include "midi_clock_sync.h"   // zt.transport.sync_* status fields
 #include "CDataBuf.h"   // song message text buffer (zt.song.message)
 
 #include <string.h>
@@ -673,6 +674,15 @@ static int trans_index(lua_State *L)
     if (!strcmp(k, "stop"))         { lua_pushcfunction(L, trans_stop); return 1; }
     if (!strcmp(k, "play_pattern")) { lua_pushcfunction(L, trans_play_pattern); return 1; }
     if (!strcmp(k, "panic"))        { lua_pushcfunction(L, trans_panic); return 1; }
+    // MIDI-clock sync status (read-only): mirrors the F11 lock meter.
+    if (!strcmp(k, "sync_state") || !strcmp(k, "sync_bpm") || !strcmp(k, "sync_offset_ms")) {
+        zt_sync_status ss;
+        zt_midi_clock_get_status(&ss);
+        if      (!strcmp(k, "sync_state"))     lua_pushstring(L, zt_sync_state_name(ss.state));
+        else if (!strcmp(k, "sync_bpm"))       lua_pushnumber(L, ss.master_bpm);
+        else                                   lua_pushnumber(L, ss.offset_ms);
+        return 1;
+    }
     return luaL_error(L, "zt.transport has no field '%s' (try help('transport'))", k);
 }
 static int trans_tostring(lua_State *L)
@@ -1423,7 +1433,7 @@ bool ZtLuaEngine::init()
         "    instrument = 'zt.instrument(i)  props (rw): name, channel, device, transpose, bank, volume, global_volume, default_length, flags, ccizer_bank; ro: index  (i defaults to current)',\n"
         "    pattern = 'zt.pattern(p)  props: length(rw), index, empty;  methods: :note(track,row), :set_note(track,row,note[,inst[,vol]]), :track(t)  (p defaults to current)',\n"
         "    track = 'zt.track(t[,p])  props: index, pattern, muted(rw);  methods: :note(row), :set_note(row,note[,inst[,vol]])  (defaults to current track/pattern)',\n"
-        "    transport = 'zt.transport  prop: playing;  methods: :play(), :stop(), :play_pattern(), :panic()',\n"
+        "    transport = 'zt.transport  props: playing, sync_state, sync_bpm, sync_offset_ms;  methods: :play(), :stop(), :play_pattern(), :panic()',\n"
         "    cell = 'zt.cell(track,row[,pat]) / pattern:cell(t,r) / track:cell(r)  props (rw): note, instrument, volume, length, effect, effect_data;  ro: name, empty, pattern, track, row;  method :clear()',\n"
         "    orders = 'zt.orders  array: zt.orders[i] = pattern (rw), .count, #zt.orders;  pattern markers zt.BREAK / zt.SKIP',\n"
         "    midimacro = 'zt.midimacro(i)  props: name (rw), empty, syx, index;  methods :get(step), :set(step,value), :send(device[,param])  (tokens zt.MACRO_END / zt.MACRO_PARAM)',\n"
@@ -1446,7 +1456,7 @@ bool ZtLuaEngine::init()
         "      print('  ' .. objdocs.arpeggio)\n"
         "      print('  ' .. objdocs.envelope)\n"
         "      print('Helpers: zt.note_name(60)->\"C-5\", zt.note_value(\"C-5\")->60 ; zt.load(path), zt.save(path)')\n"
-        "      print('Notifiers: zt.on(event,fn) / zt.off(event) / zt.fire(event[,arg]).  events: idle, play, stop, row')\n"
+        "      print('Notifiers: zt.on(event,fn) / zt.off(event) / zt.fire(event[,arg]).  events: idle, play, stop, row, sync')\n"
         "      print('Consts: zt.MAX_PATTERNS/TRACKS/INSTRUMENTS/ORDERS/MIDIMACROS/ARPEGGIOS, NOTE_*, MIDDLE_C, BREAK, SKIP, MACRO_END/PARAM')\n"
         "      print('  e.g.  zt.song.bpm=140   zt.cell(0,0).note = zt.note_value(\"C-5\")   zt.orders[0]=2   zt.transport:play()')\n"
         "      print('Introspect: rprint(zt) dumps all, oprint(t) lists one level, help(\"name\") for one.')\n"

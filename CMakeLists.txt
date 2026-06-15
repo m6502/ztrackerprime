@@ -162,6 +162,7 @@ set(ZT_SOURCES
   src/ccenv_io.cpp
   src/CUI_CCEnvelopeEditor.cpp
   src/ableton_link.cpp
+  src/midi_clock_sync.cpp
   src/zt_headless.cpp
 )
 

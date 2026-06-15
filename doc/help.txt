@@ -279,13 +279,30 @@
                      press play already in sync), and changing BPM in F11
                      proposes that tempo to every peer.
    Link Start/Stop : (on by default) Also share transport.
-   Link Offset ms  : Play this many ms EARLY (0-500, default 0). A DAW
+   Sync Offset ms  : Play this many ms EARLY (0-500, default 0). A DAW
                      monitoring zt's MIDI through its audio chain renders
                      the notes late by its audio latency (Live:
                      Preferences > Audio > Overall Latency), and Link has
                      no way to discover that value. Set it here once and
                      zt's notes SOUND on the grid - no track delay or
-                     reduced-latency mode needed in the DAW.
+                     reduced-latency mode needed in the DAW. Applies to
+                     MIDI In Sync as well, and is adjustable LIVE while
+                     playing, so it can be dialed in by ear.
+
+ MIDI In Sync (F11) slaves zt to incoming MIDI clock instead: Start /
+ Continue / Stop / Song Position Pointer drive the transport, and with
+ "Chase MIDI Tempo" on, zt phase-locks to the received clock grid the
+ same way it locks to Link - fractional master tempos hold without
+ drift. MIDI In Sync and Ableton Link are mutually exclusive (one tempo
+ master at a time).
+
+ A lock meter to the right of the "MIDI In Sync" row shows the live
+ state - waiting for clock / clock dropout / transport / chasing /
+ LOCKED - with the estimated master tempo and the current offset in ms
+ (engine behind the grid = positive). Use it to confirm the lock and to
+ dial Sync Offset by eye. The same values are scriptable from the Lua
+ console: zt.transport.sync_state / .sync_bpm / .sync_offset_ms, and a
+ "sync" notifier fires on each state change (zt.on('sync', fn)).
 
 |L|%==|H|Troubleshooting|L|==%|U|
 

@@ -12,7 +12,6 @@
 
 #define MIDI_MSG( cmd, chan, data1, data2) ( (cmd+chan) + (data1<<8) + (data2<<16)) 
 
-extern int g_midi_in_clocks_received;
 
 // Process-wide MIDI input message queue.
 //

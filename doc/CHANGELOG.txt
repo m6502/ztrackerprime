@@ -4,6 +4,96 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_15 (MIDI clock sync: hardware timestamps on macOS + lock sim test)
+----------------------------------------------------------------------------
+
+        * macOS clock arrival times now come from the CoreMIDI packet's
+          hardware host timestamp instead of sampling a software clock inside
+          the input callback (which adds OS-scheduling jitter on top of the
+          real arrival). The mach-absolute stamp is converted into the
+          SDL_GetTicks() epoch and sanity-gated against the software clock:
+          if it's absent or implausible the software clock is used, so a bad
+          stamp can never break the lock. Windows/Linux unchanged. The lock
+          benefit on real hardware is pending confirmation with a hardware
+          MIDI-clock master; the conversion math is unit-tested and the path
+          cannot regress (verified fallback).
+
+        + Closed-loop lock-quality regression test (test_midi_clock_sync):
+          models the full feedback path (engine advances at its steered rate
+          while a fractional-tempo master streams clocks) and asserts the
+          steady-state lock holds -- 120.37 BPM within <12 ms, +/-3 ms
+          timestamp jitter within <25 ms. Turns the hand-measured lock figure
+          into a CI gate.
+
+        ! New test suite test_midi_timestamp: the mach->SDL-ms conversion and
+          the plausibility gate (stale / future / garbage stamps rejected).
+
+zt 2026_06_15 (MIDI clock sync robustness: warm re-lock + snap + TSan)
+----------------------------------------------------------------------------
+
+        * Warm re-lock. A brief clock dropout now drops only the sample
+          window and KEEPS the last tempo estimate, so sync re-locks instantly
+          when clocks resume instead of cold-starting (~1 s of wander). The
+          chase still pauses during the dropout (engine free-runs at nominal).
+
+        * Snap on discontinuity. If the engine falls more than ~1 s off the
+          master grid (a main-loop stall that skipped frames, not a deliberate
+          move), the chase snaps its anchor to the current position instead of
+          slewing for seconds and audibly rushing. The half-beat catch-up and
+          the 0-500 ms Sync Offset stay deliberate moves the controller slews.
+
+        + ThreadSanitizer CI step on the Linux job: builds the test suite with
+          -fsanitize=thread and runs the threaded suites (test_sysex_stress's
+          4 producers + consumer against the SysEx queue mutex, plus the SysEx
+          queue and MIDI-clock tests). Locks in the project's thread-safety
+          posture, including the std::atomic MIDI-clock observer counters.
+
+        ! New regression tests: warm-re-lock (tempo survives a dropout) and
+          snap-on-large-jump (a ~3-beat stall snaps rather than slews).
+
+zt 2026_06_15 (Sync observability: F11 lock meter + Lua sync state)
+----------------------------------------------------------------------------
+
+        + F11 MIDI-clock lock meter. To the right of the "MIDI In Sync" row,
+          a live readout shows the lock state (waiting for clock / clock
+          dropout / transport / chasing / LOCKED), the estimated master
+          tempo, and the current position offset in ms (engine behind the
+          grid = positive). Closes the loop for dialing Sync Offset by eye
+          and for confirming a solid lock. Refreshes only when a displayed
+          value changes (same contract as the Ableton Link status line).
+
+        + Lua sync status. zt.transport.sync_state ("off"/"waiting"/
+          "dropout"/"transport"/"chasing"/"locked"), zt.transport.sync_bpm
+          and zt.transport.sync_offset_ms expose the same numbers to scripts,
+          and a new "sync" notifier fires on every lock-state transition
+          (zt.on('sync', fn); arg = numeric state).
+
+        ! Both read a single zt_midi_clock_get_status() snapshot refreshed
+          once per pump on the main thread -- no extra locking, no MIDI-thread
+          work added.
+
+zt 2026_06_15 (MIDI clock sync rebuilt on the phase-chase controller)
+----------------------------------------------------------------------------
+
+        * MIDI In Sync now phase-locks to the received clock grid using the
+          same closed-loop controller as Ableton Link (src/phase_chase.h):
+          24 clocks/beat is a position reference, so fractional master
+          tempos no longer drift (the old rolling-average follower walked
+          ~0.3%/min against a 120.4 BPM master).
+        * The MIDI-in callback thread no longer makes decisions: it only
+          counts what arrived (clocks, Start/Continue/Stop, SPP), and the
+          main-thread pump consumes them - fixing cross-thread player
+          play()/stop() calls and timing-field writes that dated back to
+          the original implementation.
+        * "Sync Offset ms" (was "Link Offset ms") now applies to BOTH sync
+          modes: zt plays that many ms early so notes monitored through
+          the master DAW's audio chain sound on the grid. Live-dialable
+          during playback in both modes. zt.conf key: sync_offset_ms
+          (legacy ableton_link_offset_ms still read).
+        * Master clock dropout (>1 s without clocks) pauses the chase and
+          lets the engine free-run at its nominal tempo; lock re-acquires
+          automatically when clocks resume.
+
 zt 2026_06_09 (Ableton Link support)
 ----------------------------------------------------------------------------
 
