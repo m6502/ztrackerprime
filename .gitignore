@@ -1,16 +1,65 @@
+# MacOS
 .DS_Store
+
+# JetBrains
+.idea/*
+cmake-build-*/
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+CMakeUserPresets.json
+
+# Build directories
 /build/
 /build-mac/
 /build-linux/
 /build-win32/
 /build-windows/
-__pycache__/
-*.pyc
 /build-win32-macos/
+
+/tests/build/
+
+/Program/
 /sdl3-mingw/
 /toolchain-mingw-i686-macos.cmake
 /dist/ztrackerprime-windows-x86-xp/
-# Ableton Link source tree — fetched on demand by
-# .github/scripts/fetch-ableton-link.sh, never committed (same policy as the
-# libpng/zlib extlibs). Keeps the ~2k-file Link+asio checkout out of git.
-/extlibs/link/
+
+__pycache__/
+*.pyc
+
+# System temporary files
+.DS_Store
+*~
+*.swp
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app

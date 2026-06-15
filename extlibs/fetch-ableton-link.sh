@@ -17,16 +17,16 @@
 #   LINK_VERSION   default Link-4.0   (a tag in github.com/Ableton/link)
 #
 # Layout produced:
-#   extlibs/link/AbletonLinkConfig.cmake
-#   extlibs/link/include/ableton/Link.hpp
-#   extlibs/link/modules/asio-standalone/asio/include/asio.hpp
+#   link/AbletonLinkConfig.cmake
+#   link/include/ableton/Link.hpp
+#   link/modules/asio-standalone/asio/include/asio.hpp
 
 set -euo pipefail
 
 : "${LINK_VERSION:=Link-4.0}"
 
 root="$(pwd)"
-dest="$root/extlibs/link"
+dest="$root/link"
 repo="https://github.com/Ableton/link.git"
 
 # If a valid tree is already present (developer already fetched, or a cached
@@ -60,9 +60,9 @@ if [ "$ok" -ne 1 ]; then
 fi
 
 required=(
-  extlibs/link/AbletonLinkConfig.cmake
-  extlibs/link/include/ableton/Link.hpp
-  extlibs/link/modules/asio-standalone/asio/include/asio.hpp
+  link/AbletonLinkConfig.cmake
+  link/include/ableton/Link.hpp
+  link/modules/asio-standalone/asio/include/asio.hpp
 )
 missing=0
 for f in "${required[@]}"; do
