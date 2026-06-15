@@ -164,6 +164,13 @@ target_include_directories(test_phase_chase PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_phase_chase PRIVATE cxx_std_17)
 add_test(NAME phase_chase COMMAND test_phase_chase)
 
+add_executable(test_midi_timestamp
+    test_midi_timestamp.cpp
+)
+target_include_directories(test_midi_timestamp PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_midi_timestamp PRIVATE cxx_std_17)
+add_test(NAME midi_timestamp COMMAND test_midi_timestamp)
+
 add_executable(test_midi_clock_sync
     test_midi_clock_sync.cpp
 )

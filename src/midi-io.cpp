@@ -41,6 +41,10 @@
 #include "midi_mappings.h"
 #include "sysex_inq.h"
 #include "midi_clock_sync.h"
+#include "midi_timestamp.h"
+#if defined(__APPLE__)
+#include <mach/mach_time.h>
+#endif
 
 
 /*
@@ -346,6 +350,29 @@ int mim_longerror = 0 ;
 
 
 
+// MIDI-clock arrival time in the SDL_GetTicks() ms epoch. On macOS the CoreMIDI
+// input shim passes the packet's mach-absolute host stamp in dwParam2; convert
+// it (the hardware arrival time is more precise than sampling a clock in this
+// callback) and sanity-gate against the software clock, falling back to it if
+// the stamp is absent or implausible -- so a bad stamp can never break the lock.
+// Other platforms (real WinMM ms, ALSA) aren't this epoch: use the soft clock.
+static inline unsigned zt_midi_clock_arrival_ms(DWORD_PTR hw_stamp) {
+    unsigned now_sdl = (unsigned)SDL_GetTicks();
+#if defined(__APPLE__)
+    uint64_t pkt = (uint64_t)hw_stamp;
+    if (pkt != 0) {
+        static mach_timebase_info_data_t tb = {0, 0};
+        if (tb.denom == 0) mach_timebase_info(&tb);
+        uint32_t cand = zt_mach_stamp_to_sdl_ms(pkt, mach_absolute_time(),
+                                                now_sdl, tb.numer, tb.denom);
+        return zt_pick_clock_stamp(cand, now_sdl, /*max_age_ms=*/2000, /*future_tol_ms=*/50);
+    }
+#else
+    (void)hw_stamp;
+#endif
+    return now_sdl;
+}
+
 void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2) {
 
     unsigned char msg;
@@ -456,7 +483,7 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
           switch(msg) {
             case 0xF8: // MIDI CLOCK
                 g_mclk_clocks++;
-                g_mclk_last_clock_ms = (unsigned)SDL_GetTicks();
+                g_mclk_last_clock_ms = zt_midi_clock_arrival_ms(dwParam2);
                 break;
             case 0xF2: // MIDI SONG POSITION POINTER
                 g_mclk_spp_raw = (dwParam1&0x7F0000)>>9 |

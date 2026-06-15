@@ -4,6 +4,30 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_15 (MIDI clock sync: hardware timestamps on macOS + lock sim test)
+----------------------------------------------------------------------------
+
+        * macOS clock arrival times now come from the CoreMIDI packet's
+          hardware host timestamp instead of sampling a software clock inside
+          the input callback (which adds OS-scheduling jitter on top of the
+          real arrival). The mach-absolute stamp is converted into the
+          SDL_GetTicks() epoch and sanity-gated against the software clock:
+          if it's absent or implausible the software clock is used, so a bad
+          stamp can never break the lock. Windows/Linux unchanged. The lock
+          benefit on real hardware is pending confirmation with a hardware
+          MIDI-clock master; the conversion math is unit-tested and the path
+          cannot regress (verified fallback).
+
+        + Closed-loop lock-quality regression test (test_midi_clock_sync):
+          models the full feedback path (engine advances at its steered rate
+          while a fractional-tempo master streams clocks) and asserts the
+          steady-state lock holds -- 120.37 BPM within <12 ms, +/-3 ms
+          timestamp jitter within <25 ms. Turns the hand-measured lock figure
+          into a CI gate.
+
+        ! New test suite test_midi_timestamp: the mach->SDL-ms conversion and
+          the plausibility gate (stale / future / garbage stamps rejected).
+
 zt 2026_06_15 (MIDI clock sync robustness: warm re-lock + snap + TSan)
 ----------------------------------------------------------------------------
 

@@ -1047,11 +1047,15 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
     return MMSYSERR_ERROR;
 }
 
-static inline void zt_coremidi_emit_data(zt_coremidi_in_handle *ctx, unsigned int packed_msg) {
+static inline void zt_coremidi_emit_data(zt_coremidi_in_handle *ctx, unsigned int packed_msg,
+                                         UInt64 host_stamp) {
     if (!ctx || !ctx->callback) {
         return;
     }
-    ctx->callback((HMIDIIN)ctx, MIM_DATA, ctx->instance, (DWORD_PTR)packed_msg, 0);
+    // dwParam2 carries the CoreMIDI packet's mach-absolute host timestamp;
+    // midi-io.cpp converts it to the SDL ms epoch for the MIDI-clock arrival
+    // time (more precise than sampling a clock in this callback). 0 = none.
+    ctx->callback((HMIDIIN)ctx, MIM_DATA, ctx->instance, (DWORD_PTR)packed_msg, (DWORD_PTR)host_stamp);
 }
 
 // Forward declaration of the SysEx queue producer; defined in
@@ -1131,7 +1135,7 @@ static inline void zt_coremidi_read_proc(const MIDIPacketList *packet_list, void
                 if (len > 2) {
                     msg |= ((unsigned int)(data[i + 2] & 0x7F)) << 16;
                 }
-                zt_coremidi_emit_data(ctx, msg);
+                zt_coremidi_emit_data(ctx, msg, packet->timeStamp);
                 i = (UInt16)(i + len);
                 continue;
             }
@@ -1141,7 +1145,7 @@ static inline void zt_coremidi_read_proc(const MIDIPacketList *packet_list, void
                 if (len == 2 && i < packet->length) {
                     unsigned int msg = (unsigned int)ctx->running_status |
                                        ((unsigned int)(data[i] & 0x7F) << 8);
-                    zt_coremidi_emit_data(ctx, msg);
+                    zt_coremidi_emit_data(ctx, msg, packet->timeStamp);
                     i++;
                     continue;
                 }
@@ -1149,7 +1153,7 @@ static inline void zt_coremidi_read_proc(const MIDIPacketList *packet_list, void
                     unsigned int msg = (unsigned int)ctx->running_status |
                                        ((unsigned int)(data[i] & 0x7F) << 8) |
                                        ((unsigned int)(data[i + 1] & 0x7F) << 16);
-                    zt_coremidi_emit_data(ctx, msg);
+                    zt_coremidi_emit_data(ctx, msg, packet->timeStamp);
                     i += 2;
                     continue;
                 }
