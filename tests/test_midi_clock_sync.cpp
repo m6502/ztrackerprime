@@ -202,6 +202,62 @@ static void test_snap_on_large_jump() {
     CHECK(s_offset_ms > -30.0 && s_offset_ms < 30.0);
 }
 
+// Closed-loop simulation: a fractional-tempo master streams clocks while the
+// engine advances played_subticks at its OWN steered rate (nominal subtick +
+// the chase's skew, exactly as the real timer does). The pump steers each ms.
+// optional `jitter_ms`: deterministically perturb the clock timestamp to model
+// input timing noise. Returns the worst |offset| (ms) seen after settling.
+static double run_closed_loop(double master_bpm, int total_ms, int jitter_ms) {
+    const double nominal_us = 5208.333;              // stub subtick (120 nominal)
+    double clock_period_ms  = 60000.0 / (24.0 * master_bpm);
+    double clock_acc = 0.0, subtick_acc_us = 0.0, worst = 0.0;
+    unsigned jseed = 12345;                          // deterministic, no rng
+    for (int ms = 0; ms < total_ms; ms++) {
+        g_test_now_ms += 1;
+        clock_acc += 1.0 / clock_period_ms;
+        while (clock_acc >= 1.0) {
+            g_mclk_clocks++;
+            unsigned stamp = g_test_now_ms;
+            if (jitter_ms) {                          // +/- jitter_ms, deterministic
+                jseed = jseed * 1103515245u + 12345u;
+                int j = (int)((jseed >> 16) % (2u * jitter_ms + 1u)) - jitter_ms;
+                stamp = (unsigned)((int)g_test_now_ms + j);
+            }
+            g_mclk_last_clock_ms = stamp;
+            clock_acc -= 1.0;
+        }
+        double actual_us = nominal_us + (double)ztPlayer->chase_skew_us;
+        if (actual_us < 1000.0) actual_us = 1000.0;
+        subtick_acc_us += 1000.0;                     // 1 ms
+        while (subtick_acc_us >= actual_us) { ztPlayer->played_subticks++; subtick_acc_us -= actual_us; }
+        zt_midi_clock_pump();
+        if (ms > total_ms / 2) {                      // measure after settling
+            double a = s_offset_ms < 0 ? -s_offset_ms : s_offset_ms;
+            if (a > worst) worst = a;
+        }
+    }
+    return worst;
+}
+
+static void test_sim_fractional_tempo_locks() {
+    reset_env();
+    g_mclk_start_req++;
+    zt_midi_clock_pump();                              // START, anchor now
+    // A fractional master the old int-BPM chase would drift on (~0.3%/min):
+    // the phase-lock holds it within a few ms of the grid.
+    double worst = run_closed_loop(120.37, 6000, /*jitter_ms=*/0);
+    CHECK(worst < 12.0);
+}
+
+static void test_sim_jittery_clock_stays_bounded() {
+    reset_env();
+    g_mclk_start_req++;
+    zt_midi_clock_pump();
+    // +/-3 ms timestamp jitter (USB / scheduler) must not unlock the chase.
+    double worst = run_closed_loop(132.5, 6000, /*jitter_ms=*/3);
+    CHECK(worst < 25.0);
+}
+
 static void test_transport_only_mode_never_touches_rate() {
     reset_env();
     zt_config_globals.midi_in_sync_chase_tempo = 0;
@@ -226,6 +282,8 @@ int main(void) {
     test_offset_shifts_setpoint();
     test_dropout_pauses_chase_then_warm_relocks();
     test_snap_on_large_jump();
+    test_sim_fractional_tempo_locks();
+    test_sim_jittery_clock_stays_bounded();
     test_transport_only_mode_never_touches_rate();
     printf("midi_clock_sync: %d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
