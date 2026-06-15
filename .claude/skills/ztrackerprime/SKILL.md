@@ -13,7 +13,7 @@ triggers:
 
 # zTracker Prime Development Skill
 
-> **Last verified: 2026-06-14.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
+> **Last verified: 2026-06-15.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
 >
 > **What lives elsewhere on purpose:** the open-PR list and merged landmarks are NOT in this skill — they go stale fast. For current state run `gh pr list --repo m6502/ztrackerprime` (open) or `gh pr list --repo m6502/ztrackerprime --state merged --limit 30` (recent landings). The skill stays timeless: architecture, invariants, foot-guns, conventions.
 
@@ -176,7 +176,7 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 |
 | `assets/ccizer/` | Bundled CCizer banks (sc88st, microfreak, minilogue, monologue, Prophet6, deepmind6, waldorf_blofeld, tb03, se02, pro800, polyend_*, midi_control_example) — copied from Paketti. README.md documents the format. |
 | `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` = `F0 7E 7F 06 01 F7` for first-test handshakes. README.md documents the librarian workflow. |
-| `tests/` | CTest unit-test executables — 13 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`. (Count drifts as suites are added — `ctest` is the source of truth.) Note the macOS CI also runs the Lua API self-test via `--lua-test` (PRs #154, #156). |
+| `tests/` | CTest unit-test executables — 14 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`, `lua_api`. The `lua_api` suite drives the real `zt` binary headless (`--headless --lua-test`) against a scratch song and runs on macOS CI (PRs #154, #156); the rest are SDL-free and run on Linux CI. (Count drifts as suites are added — `ctest -N` is the source of truth.) |
 | `doc/help.txt` | In-app F1 help — update when adding keybinds or CLI flags |
 | `doc/CHANGELOG.txt` | Release notes, chronological |
 | `.github/workflows/build.yml` | 5-platform CI matrix; Linux job runs `ctest` |
