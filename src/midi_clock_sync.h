@@ -42,4 +42,26 @@ extern std::atomic<int>      g_mclk_spp_seq;       /* bumped per 0xF2           
  * per main loop, next to zt_ableton_link_pump(). */
 void zt_midi_clock_pump(void);
 
+/* --- Sync status -----------------------------------------------------------
+ * Snapshot of the chase, refreshed once per zt_midi_clock_pump(). Read on the
+ * MAIN thread only (F11 lock meter, Lua zt.transport.sync_*), so it needs no
+ * locking -- pump and readers are the same thread. */
+enum zt_sync_state {
+    ZT_SYNC_OFF = 0,    /* MIDI In Sync disabled                              */
+    ZT_SYNC_WAITING,    /* enabled, no usable clock yet (acquiring/not playing)*/
+    ZT_SYNC_DROPOUT,    /* clock was flowing, then stopped (> dropout window)  */
+    ZT_SYNC_TRANSPORT,  /* following start/stop only (Chase MIDI Tempo off)    */
+    ZT_SYNC_CHASING,    /* phase-locking, error outside the deadband           */
+    ZT_SYNC_LOCKED      /* phase-locked, error within the deadband             */
+};
+
+struct zt_sync_status {
+    int    state;       /* zt_sync_state                                       */
+    double master_bpm;  /* estimated master tempo, 0.0 if none                 */
+    double offset_ms;   /* signed position error (engine behind = +); 0 unless chasing */
+};
+
+void        zt_midi_clock_get_status(zt_sync_status *out);
+const char *zt_sync_state_name(int state);   /* "off" / "waiting" / ... / "locked" */
+
 #endif /* ZT_MIDI_CLOCK_SYNC_H */

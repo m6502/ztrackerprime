@@ -54,6 +54,10 @@ static int      s_last_nominal_bpm = 0;
 static int      s_anchor_clocks = 0;
 static bool     s_chase_valid   = false;
 
+// User-facing status (F11 lock meter + Lua), refreshed at the end of the pump.
+static int      s_state     = ZT_SYNC_OFF;
+static double   s_offset_ms = 0.0;          // signed position error, 0 unless chasing
+
 // Transport request baselines + the queued SPP position (mirrors the old
 // static queued_row/queued_order in midi-io.cpp: SPP sets it, START zeroes
 // it, CONTINUE plays from it, and it persists across CONTINUEs).
@@ -145,10 +149,12 @@ static void mclk_chase(unsigned now, int clocks, unsigned last_clock) {
         // behavior where the tempo ring was gated on this flag).
         ztPlayer->chase_skew_us = 0;
         s_chase_valid = false;
+        s_offset_ms   = 0.0;
         return;
     }
     if (!ztPlayer->playing || s_tempo_est <= 0.0) {
         ztPlayer->chase_skew_us = 0;
+        s_offset_ms = 0.0;
         return;
     }
     // Keep the engine nominal on the rounded master tempo (the old
@@ -164,6 +170,7 @@ static void mclk_chase(unsigned now, int clocks, unsigned last_clock) {
         // anchor at the current position so the lock is drift-only.
         s_anchor_clocks = clocks - ztPlayer->played_subticks / 4;
         s_chase_valid   = true;
+        s_offset_ms     = 0.0;
         return;
     }
     // Expected position: 4 subticks per clock, plus intra-clock
@@ -184,6 +191,9 @@ static void mclk_chase(unsigned now, int clocks, unsigned last_clock) {
     double nominal_us = (double)(ztPlayer->subtick_len_ms + ztPlayer->subtick_len_mms);
     ztPlayer->chase_skew_us = phase_chase_step(expected, ztPlayer->played_subticks,
                                                exact_us, nominal_us);
+    // Position error for the status readout (same quantity phase_chase_step
+    // feeds back on): engine behind the master grid = positive.
+    s_offset_ms = (expected - (double)ztPlayer->played_subticks) * exact_us / 1000.0;
 }
 
 void zt_midi_clock_pump(void) {
@@ -198,6 +208,8 @@ void zt_midi_clock_pump(void) {
         s_last_spp_seq = g_mclk_spp_seq;
         s_chase_valid  = false;
         mclk_reset_estimate();
+        s_state     = ZT_SYNC_OFF;
+        s_offset_ms = 0.0;
         return;
     }
     unsigned now = mclk_now_ms();
@@ -214,4 +226,37 @@ void zt_midi_clock_pump(void) {
     mclk_consume_transport(clocks);
     mclk_update_estimate(now, clocks, last_clock);
     mclk_chase(now, clocks, last_clock);
+
+    // Derive the user-facing lock state (F11 meter + Lua) from the snapshot.
+    bool clocks_recent = (last_clock != 0) && ((now - last_clock) <= MCLK_DROPOUT_MS);
+    if (!clocks_recent) {
+        s_state = (last_clock == 0) ? ZT_SYNC_WAITING : ZT_SYNC_DROPOUT;
+    } else if (!zt_config_globals.midi_in_sync_chase_tempo) {
+        s_state = ZT_SYNC_TRANSPORT;
+    } else if (s_tempo_est <= 0.0 || !ztPlayer->playing) {
+        s_state = ZT_SYNC_WAITING;
+    } else {
+        double err_us = s_offset_ms * 1000.0;
+        s_state = (err_us <= PHASE_CHASE_DEADBAND_US && err_us >= -PHASE_CHASE_DEADBAND_US)
+                  ? ZT_SYNC_LOCKED : ZT_SYNC_CHASING;
+    }
+}
+
+void zt_midi_clock_get_status(zt_sync_status *out) {
+    if (!out) return;
+    out->state      = s_state;
+    out->master_bpm = s_tempo_est;
+    out->offset_ms  = s_offset_ms;
+}
+
+const char *zt_sync_state_name(int state) {
+    switch (state) {
+        case ZT_SYNC_WAITING:   return "waiting";
+        case ZT_SYNC_DROPOUT:   return "dropout";
+        case ZT_SYNC_TRANSPORT: return "transport";
+        case ZT_SYNC_CHASING:   return "chasing";
+        case ZT_SYNC_LOCKED:    return "locked";
+        case ZT_SYNC_OFF:
+        default:                return "off";
+    }
 }

@@ -2,6 +2,7 @@
 #include "zt.h"
 #include "OrderEditor.h"
 #include "ableton_link.h"
+#include "midi_clock_sync.h"
 
 CUI_Songconfig::CUI_Songconfig(void) {
     ValueSlider *vs;
@@ -401,6 +402,26 @@ void CUI_Songconfig::update()
                 need_refresh++;
             }
         }
+
+        // MIDI clock lock meter: state / master BPM / offset all move every
+        // frame while slaved. Same contract as the Link block above -- repaint
+        // only when a displayed value actually changed (quantized so sub-0.1
+        // jitter doesn't force a redraw every frame).
+        {
+            static int    last_sstate = -1;
+            static int    last_sbpm10  = -1;
+            static int    last_soff10  = -1000000;
+            zt_sync_status ss;
+            zt_midi_clock_get_status(&ss);
+            int sbpm10 = (int)(ss.master_bpm * 10.0 + 0.5);
+            int soff10 = (int)(ss.offset_ms  * 10.0 + (ss.offset_ms >= 0 ? 0.5 : -0.5));
+            if (ss.state != last_sstate || sbpm10 != last_sbpm10 || soff10 != last_soff10) {
+                last_sstate = ss.state;
+                last_sbpm10 = sbpm10;
+                last_soff10 = soff10;
+                need_refresh++;
+            }
+        }
     }
     vs = (ValueSlider *)UI->get_element(10);
     if (vs) {
@@ -477,6 +498,26 @@ void CUI_Songconfig::draw(Drawable *S) {
             char linkstat_field[40];
             snprintf(linkstat_field, sizeof(linkstat_field), "%-28s", linkstat);
             printBG(row(24),col(base_y+16),linkstat_field,COLORS.Highlight,COLORS.Background,S);
+        }
+        // MIDI-clock lock meter on the "MIDI In Sync" row: lock state +
+        // estimated master tempo + signed offset (engine behind = +). Same
+        // fixed-width / printBG erase trick and 28-col span as the Link status.
+        {
+            zt_sync_status ss;
+            zt_midi_clock_get_status(&ss);
+            char m[64];
+            switch (ss.state) {
+                case ZT_SYNC_WAITING:   snprintf(m,sizeof(m),"waiting for clock"); break;
+                case ZT_SYNC_DROPOUT:   snprintf(m,sizeof(m),"clock dropout"); break;
+                case ZT_SYNC_TRANSPORT: snprintf(m,sizeof(m),"transport \xb3 %.1f BPM", ss.master_bpm); break;
+                case ZT_SYNC_CHASING:   snprintf(m,sizeof(m),"chasing \xb3 %.1f BPM \xb3 %+.1f ms", ss.master_bpm, ss.offset_ms); break;
+                case ZT_SYNC_LOCKED:    snprintf(m,sizeof(m),"LOCKED \xb3 %.1f BPM \xb3 %+.1f ms", ss.master_bpm, ss.offset_ms); break;
+                case ZT_SYNC_OFF:
+                default:                m[0] = '\0'; break;
+            }
+            char field[40];
+            snprintf(field,sizeof(field),"%-28s", m);
+            printBG(row(25),col(base_y+11),field,COLORS.Highlight,COLORS.Background,S);
         }
         // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
         print(row(59),col(11),"Order List",COLORS.Text,S);
