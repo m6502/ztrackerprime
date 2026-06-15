@@ -155,7 +155,10 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/CUI_SysExLibrarian.cpp` | SysEx Librarian (**Shift+F5**) — `.syx` file send + auto-capture of incoming SysEx |
 | `src/CUI_LuaConsole.cpp` | Lua Console (**Ctrl+Alt+L**) — Renoise-style interactive console over the embedded Lua engine. Tab cycling, `rprint`/`oprint`/`help`, scrollback wrapping. |
 | `src/lua_engine.{cpp,h}` | Embedded Lua API: object model (`zt`, `song`, `transport`, `pattern`, `track`, cells, order list) + notifiers (`zt.on/off/fire` for play/stop/row/idle). `lua/selftest.lua` exercises the surface via `--lua-test` (a ctest target). |
-| `src/ableton_link.{cpp,h}` | Ableton Link tempo + transport sync (PR #159). C API: `zt_ableton_link_startup/teardown/pump/defer_play/available/get_tempo`. Driven from `playback.cpp`; configured from F11 Song Config; conf keys in `conf.cpp`. |
+| `src/ableton_link.{cpp,h}` | Ableton Link tempo + transport sync (PR #159). C API: `zt_ableton_link_startup/teardown/pump/defer_play/available/get_tempo`. Driven from `playback.cpp`; configured from F11 Song Config; conf keys in `conf.cpp`. Rebuilt on the shared `phase_chase.h` controller. |
+| `src/phase_chase.h` | Shared closed-loop position controller (pure logic, SDL-free, unit-tested), used by **both** Ableton Link and MIDI clock sync. `phase_chase_step()` returns a bounded skew that cancels rate error (int-BPM rounding, crystal drift); deadband-tiered feedback. |
+| `src/midi_clock_sync.{cpp,h}` | MIDI clock slave (`midi_in_sync` / `midi_in_sync_chase_tempo`). MIDI-in thread only records into atomic `g_mclk_*` counters; `zt_midi_clock_pump()` (main thread, once/frame) consumes transport, estimates tempo, phase-locks via `phase_chase.h`. Six-state `zt_sync_state`; `zt_midi_clock_get_status()`. Honors `sync_offset_ms`. |
+| `src/midi_timestamp.h` | Pure helpers (SDL-free, unit-tested) to use a MIDI hardware timestamp as clock-arrival time. macOS `mach_absolute_time` → `SDL_GetTicks()` ms via `zt_mach_stamp_to_sdl_ms`, sanity-gated (garbage stamp falls back to software clock). |
 | `src/CUI_*.cpp` | Other pages (Sysconfig, Songconfig, Help, InstEditor, MainMenu, Playsong, etc.) |
 | `src/CUI_Page.{h,cpp}` | Base class for pages |
 | `src/UserInterface.{h,cpp}` | Widget classes — `CheckBox`, `ValueSlider`, `TextInput`, `Frame`, `Button`, `TextBox`, `ListBox`, `MidiOutDeviceOpener`, `SkinSelector`, `VUPlay`. Fix rendering bugs HERE, not in callers. |
@@ -176,7 +179,7 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 |
 | `assets/ccizer/` | Bundled CCizer banks (sc88st, microfreak, minilogue, monologue, Prophet6, deepmind6, waldorf_blofeld, tb03, se02, pro800, polyend_*, midi_control_example) — copied from Paketti. README.md documents the format. |
 | `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` = `F0 7E 7F 06 01 F7` for first-test handshakes. README.md documents the librarian workflow. |
-| `tests/` | CTest unit-test executables — 14 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`, `lua_api`. The `lua_api` suite drives the real `zt` binary headless (`--headless --lua-test`) against a scratch song and runs on macOS CI (PRs #154, #156); the rest are SDL-free and run on Linux CI. (Count drifts as suites are added — `ctest -N` is the source of truth.) |
+| `tests/` | CTest unit-test executables — 14 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`, `lua_api`. The `lua_api` suite drives the real `zt` binary headless (`--headless --lua-test`) against a scratch song and runs on macOS CI (PRs #154, #156); the rest are SDL-free and run on Linux CI. The MIDI clock phase-lock feature adds 3 more (`phase_chase`, `midi_timestamp`, `midi_clock_sync` → 17). (Count drifts as suites are added — `ctest -N` is the source of truth.) |
 | `doc/help.txt` | In-app F1 help — update when adding keybinds or CLI flags |
 | `doc/CHANGELOG.txt` | Release notes, chronological |
 | `.github/workflows/build.yml` | 5-platform CI matrix; Linux job runs `ctest` |
@@ -263,6 +266,17 @@ Tempo + transport sync with Ableton Live and other Link-aware apps over the loca
 - **Config** (`conf.cpp`, keys persisted in `zt.conf`): `ableton_link_enable` (**OFF by default** — no surprise LAN traffic), `ableton_link_start_stop_sync` (ON by default; only effective once Link is enabled), `ableton_link_quantum` (default 4 = one bar of 4/4), `ableton_link_offset_ms` (fire quantized starts early by this much).
 - **UI** — F11 Song Configuration (`CUI_Songconfig.cpp`) hosts the enable + start/stop-sync checkboxes and the offset slider.
 - **Precedence:** if both Ableton Link and MIDI Sync are enabled, **Link wins** (`conf.cpp`).
+
+## MIDI clock sync & phase-lock (`esa/midi-clock-phase-lock`, documented ahead of merge)
+
+External MIDI-clock slave sync built on the **same** `phase_chase.h` controller as Ableton Link, so a fractional-tempo master cannot drift the engine. `midi_in_sync` follows start/stop; `midi_in_sync_chase_tempo` derives tempo and phase-locks; the `--midi-clock` CLI flag turns both on.
+
+- **Observer architecture** (`midi_clock_sync.{cpp,h}`) — the MIDI-in callback thread only records into `std::atomic` counters (`g_mclk_*`, same advisory contract as `player::stop_count`); all decisions run in `zt_midi_clock_pump()` on the main thread once/frame, next to `zt_ableton_link_pump()`. ThreadSanitizer-clean (TSan CI job). Relies only on per-counter atomicity, tolerating a bump seen a frame late.
+- **Position, not just rate** — 24 clocks/beat = 4 subticks/clock; clocks-since-START is the exact expected position (MIDI-clock analogue of Link's `beatAtTime`), fed through `phase_chase_step()` into `player::chase_skew_us`.
+- **Hardware timestamps** (`midi_timestamp.h`, macOS) — CoreMIDI packet stamp → `SDL_GetTicks()` epoch removes callback scheduling jitter; sanity-gated so a bad stamp falls back to the software clock.
+- **Hardening** — warm re-lock + snap-on-discontinuity recover cleanly from a dropout or transport jump.
+- **Observability** — six-state lock model (`zt_sync_state`: off/waiting/dropout/transport/chasing/locked) via `zt_midi_clock_get_status()` → F11 lock meter + Lua `zt.transport.sync_state`/`sync_bpm`/`sync_offset_ms` + the `sync` notifier. `sync_offset_ms` conf key (legacy alias `ableton_link_offset_ms`).
+- **Tests** — `phase_chase`, `midi_timestamp`, `midi_clock_sync` (the 3 suites that take the harness from 14 → 17 when this lands).
 
 ## INVARIANTS for any new or modified page
 
