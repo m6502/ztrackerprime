@@ -163,7 +163,7 @@ static void test_offset_shifts_setpoint() {
     CHECK(ztPlayer->chase_skew_us < -16);
 }
 
-static void test_dropout_pauses_chase() {
+static void test_dropout_pauses_chase_then_warm_relocks() {
     reset_env();
     g_mclk_start_req++;
     zt_midi_clock_pump();
@@ -172,10 +172,34 @@ static void test_dropout_pauses_chase() {
     ztPlayer->chase_skew_us = 77;
     g_test_now_ms += 1500;                // no clocks for 1.5 s
     zt_midi_clock_pump();
-    CHECK(s_tempo_est == 0.0);            // estimate forgotten
-    CHECK(ztPlayer->chase_skew_us == 0);  // engine runs free at nominal
+    CHECK(ztPlayer->chase_skew_us == 0);  // chase paused: engine runs free at nominal
+    // Warm re-lock (Tier 2): the sample window is dropped but the last tempo is
+    // PRESERVED, so a brief dropout re-locks instantly instead of cold-starting.
+    CHECK(s_tempo_est > 119.0 && s_tempo_est < 121.0);   // tempo kept warm
     run_master(2000, 120.0);              // clocks resume
-    CHECK(s_tempo_est > 119.0 && s_tempo_est < 121.0);   // re-locks
+    CHECK(s_tempo_est > 119.0 && s_tempo_est < 121.0);   // still locked
+}
+
+static void test_snap_on_large_jump() {
+    reset_env();
+    g_mclk_start_req++;
+    zt_midi_clock_pump();
+    run_master(2000, 120.0);
+    ztPlayer->played_subticks = (g_mclk_clocks - s_anchor_clocks) * 4;
+    g_mclk_last_clock_ms = g_test_now_ms;
+    zt_midi_clock_pump();                       // locked
+    CHECK(ztPlayer->chase_skew_us >= -17 && ztPlayer->chase_skew_us <= 17);
+    // Simulate a main-loop stall: the engine fell ~1.5 s (3 beats) behind the
+    // master grid -- far past any deliberate move. Tier 2 should SNAP the
+    // anchor (skew 0, error collapses) rather than slew for many seconds.
+    ztPlayer->played_subticks -= 96 * 3;
+    ztPlayer->chase_skew_us = 1234;             // sentinel that must be cleared
+    zt_midi_clock_pump();
+    CHECK(ztPlayer->chase_skew_us == 0);        // snapped, not a huge slew
+    // Next frame after the snap the engine is re-anchored: tiny residual error.
+    g_mclk_last_clock_ms = g_test_now_ms;
+    zt_midi_clock_pump();
+    CHECK(s_offset_ms > -30.0 && s_offset_ms < 30.0);
 }
 
 static void test_transport_only_mode_never_touches_rate() {
@@ -200,7 +224,8 @@ int main(void) {
     test_tempo_estimate_fractional_no_song_bpm_write();
     test_position_chase_locks_and_lags();
     test_offset_shifts_setpoint();
-    test_dropout_pauses_chase();
+    test_dropout_pauses_chase_then_warm_relocks();
+    test_snap_on_large_jump();
     test_transport_only_mode_never_touches_rate();
     printf("midi_clock_sync: %d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

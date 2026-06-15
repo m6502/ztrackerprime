@@ -4,6 +4,29 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_15 (MIDI clock sync robustness: warm re-lock + snap + TSan)
+----------------------------------------------------------------------------
+
+        * Warm re-lock. A brief clock dropout now drops only the sample
+          window and KEEPS the last tempo estimate, so sync re-locks instantly
+          when clocks resume instead of cold-starting (~1 s of wander). The
+          chase still pauses during the dropout (engine free-runs at nominal).
+
+        * Snap on discontinuity. If the engine falls more than ~1 s off the
+          master grid (a main-loop stall that skipped frames, not a deliberate
+          move), the chase snaps its anchor to the current position instead of
+          slewing for seconds and audibly rushing. The half-beat catch-up and
+          the 0-500 ms Sync Offset stay deliberate moves the controller slews.
+
+        + ThreadSanitizer CI step on the Linux job: builds the test suite with
+          -fsanitize=thread and runs the threaded suites (test_sysex_stress's
+          4 producers + consumer against the SysEx queue mutex, plus the SysEx
+          queue and MIDI-clock tests). Locks in the project's thread-safety
+          posture, including the std::atomic MIDI-clock observer counters.
+
+        ! New regression tests: warm-re-lock (tempo survives a dropout) and
+          snap-on-large-jump (a ~3-beat stall snaps rather than slews).
+
 zt 2026_06_15 (Sync observability: F11 lock meter + Lua sync state)
 ----------------------------------------------------------------------------
 
