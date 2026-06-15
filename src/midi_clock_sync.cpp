@@ -26,13 +26,13 @@ static unsigned mclk_now_ms(void) { return (unsigned)SDL_GetTicks(); }
 // ---------------------------------------------------------------------------
 // Observer counters (MIDI-in thread writes, pump reads).
 
-int      g_mclk_clocks        = 0;
-unsigned g_mclk_last_clock_ms = 0;
-int      g_mclk_start_req     = 0;
-int      g_mclk_continue_req  = 0;
-int      g_mclk_stop_req      = 0;
-int      g_mclk_spp_raw       = 0;
-int      g_mclk_spp_seq       = 0;
+std::atomic<int>      g_mclk_clocks        {0};
+std::atomic<unsigned> g_mclk_last_clock_ms {0};
+std::atomic<int>      g_mclk_start_req     {0};
+std::atomic<int>      g_mclk_continue_req  {0};
+std::atomic<int>      g_mclk_stop_req      {0};
+std::atomic<int>      g_mclk_spp_raw       {0};
+std::atomic<int>      g_mclk_spp_seq       {0};
 
 // ---------------------------------------------------------------------------
 // Pump state (main thread only).
@@ -68,10 +68,9 @@ static void mclk_reset_estimate(void) {
     s_last_nominal_bpm = 0;
 }
 
-static void mclk_update_estimate(unsigned now) {
+static void mclk_update_estimate(unsigned now, int clocks, unsigned last_clock) {
     // Dropout: master stopped sending clocks -> forget everything and stop
     // chasing until clocks resume (rebuild a clean window like the old ring).
-    unsigned last_clock = g_mclk_last_clock_ms;
     if (last_clock == 0 || (now - last_clock) > MCLK_DROPOUT_MS) {
         mclk_reset_estimate();
         return;
@@ -79,7 +78,7 @@ static void mclk_update_estimate(unsigned now) {
     int tail = (s_sample_head + MCLK_SAMPLES - s_sample_count) % MCLK_SAMPLES;
     if (s_sample_count == 0 ||
         now - s_sample_ms[(s_sample_head + MCLK_SAMPLES - 1) % MCLK_SAMPLES] >= MCLK_SAMPLE_MS) {
-        s_sample_clocks[s_sample_head] = g_mclk_clocks;
+        s_sample_clocks[s_sample_head] = clocks;
         s_sample_ms[s_sample_head]     = now;
         s_sample_head = (s_sample_head + 1) % MCLK_SAMPLES;
         if (s_sample_count < MCLK_SAMPLES) s_sample_count++;
@@ -96,7 +95,7 @@ static void mclk_update_estimate(unsigned now) {
         s_tempo_est = est;
 }
 
-static void mclk_consume_transport(void) {
+static void mclk_consume_transport(int clocks_now) {
     int s  = g_mclk_start_req;
     int c  = g_mclk_continue_req;
     int st = g_mclk_stop_req;
@@ -135,12 +134,12 @@ static void mclk_consume_transport(void) {
         } else {
             ztPlayer->play(0, cur_edit_pattern, 0);
         }
-        s_anchor_clocks = g_mclk_clocks;     // expected position 0 is NOW
+        s_anchor_clocks = clocks_now;        // expected position 0 is NOW
         s_chase_valid   = true;
     }
 }
 
-static void mclk_chase(unsigned now) {
+static void mclk_chase(unsigned now, int clocks, unsigned last_clock) {
     if (!zt_config_globals.midi_in_sync_chase_tempo) {
         // Transport-only mode: never touch the engine rate (matches the old
         // behavior where the tempo ring was gated on this flag).
@@ -163,7 +162,7 @@ static void mclk_chase(unsigned now) {
     if (!s_chase_valid) {
         // Started outside a consumed START (e.g. local F6 while slaved):
         // anchor at the current position so the lock is drift-only.
-        s_anchor_clocks = g_mclk_clocks - ztPlayer->played_subticks / 4;
+        s_anchor_clocks = clocks - ztPlayer->played_subticks / 4;
         s_chase_valid   = true;
         return;
     }
@@ -172,14 +171,14 @@ static void mclk_chase(unsigned now) {
     // 4-subtick stairs (~20 ms at 120 BPM) that would kick the controller
     // out of its steady-state deadband.
     double clock_period_ms = 60000.0 / (24.0 * s_tempo_est);
-    double frac = (double)(now - g_mclk_last_clock_ms) / clock_period_ms * 4.0;
+    double frac = (double)(now - last_clock) / clock_period_ms * 4.0;
     if (frac < 0.0) frac = 0.0;
     if (frac > 3.99) frac = 3.99;
     // sync_offset_ms: play early so notes monitored through the master
     // DAW's audio chain sound on the grid -- live-dialable, same as Link.
     double off_subticks = (double)zt_config_globals.sync_offset_ms
                           * s_tempo_est / 60000.0 * 96.0;
-    double expected = (double)(g_mclk_clocks - s_anchor_clocks) * 4.0
+    double expected = (double)(clocks - s_anchor_clocks) * 4.0
                       + frac + off_subticks;
     double exact_us   = 60000000.0 / (96.0 * s_tempo_est);
     double nominal_us = (double)(ztPlayer->subtick_len_ms + ztPlayer->subtick_len_mms);
@@ -202,7 +201,17 @@ void zt_midi_clock_pump(void) {
         return;
     }
     unsigned now = mclk_now_ms();
-    mclk_consume_transport();
-    mclk_update_estimate(now);
-    mclk_chase(now);
+    // One consistent snapshot of the clock counters for this whole frame, so
+    // the anchor (consume), the tempo sample (estimate) and the position
+    // reference (chase) can't disagree by a clock that lands mid-pump. Read
+    // the COUNT before the TIMESTAMP: if a 0xF8 arrives between the two loads
+    // we then see (old count, fresh timestamp) -> the interpolation fraction
+    // collapses toward 0, which is consistent. The opposite order would briefly
+    // add a whole clock (new count) on top of a near-full fraction (~20 ms at
+    // 120 BPM) and kick the controller out of its deadband.
+    int      clocks     = g_mclk_clocks;
+    unsigned last_clock = g_mclk_last_clock_ms;
+    mclk_consume_transport(clocks);
+    mclk_update_estimate(now, clocks, last_clock);
+    mclk_chase(now, clocks, last_clock);
 }
