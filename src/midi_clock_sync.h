@@ -18,15 +18,23 @@
 #ifndef ZT_MIDI_CLOCK_SYNC_H
 #define ZT_MIDI_CLOCK_SYNC_H
 
+#include <atomic>
+
 /* Observer counters, bumped ONLY by the MIDI-in callback thread
- * (midi-io.cpp), read by the pump. Plain ints on purpose. */
-extern int      g_mclk_clocks;          /* 0xF8 count, monotonic            */
-extern unsigned g_mclk_last_clock_ms;   /* SDL_GetTicks() at the last 0xF8  */
-extern int      g_mclk_start_req;       /* 0xFA count                       */
-extern int      g_mclk_continue_req;    /* 0xFB count                       */
-extern int      g_mclk_stop_req;        /* 0xFC count                       */
-extern int      g_mclk_spp_raw;         /* last 0xF2 value (14-bit)         */
-extern int      g_mclk_spp_seq;         /* bumped per 0xF2                  */
+ * (midi-io.cpp), read by the pump on the main thread. std::atomic, not plain
+ * int: a value written on one thread and read on another is a data race in
+ * the C++ memory model -- atomic makes it well-defined (ThreadSanitizer-clean).
+ * We rely only on per-counter atomicity, not on any ordering BETWEEN counters:
+ * each is an independent monotonic tally and the pump re-reads every frame,
+ * tolerating a bump seen a frame late. Cost is nil on the targets we ship --
+ * an aligned-word load/store, same as the plain int it replaces. */
+extern std::atomic<int>      g_mclk_clocks;        /* 0xF8 count, monotonic           */
+extern std::atomic<unsigned> g_mclk_last_clock_ms; /* SDL_GetTicks() at the last 0xF8 */
+extern std::atomic<int>      g_mclk_start_req;     /* 0xFA count                      */
+extern std::atomic<int>      g_mclk_continue_req;  /* 0xFB count                      */
+extern std::atomic<int>      g_mclk_stop_req;      /* 0xFC count                      */
+extern std::atomic<int>      g_mclk_spp_raw;       /* last 0xF2 value (14-bit)        */
+extern std::atomic<int>      g_mclk_spp_seq;       /* bumped per 0xF2                 */
 
 /* Per-frame pump: consume transport requests (start/continue/stop on the
  * main thread), estimate the master tempo as a double from clock arrival
