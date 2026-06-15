@@ -43,6 +43,12 @@ std::atomic<int>      g_mclk_spp_seq       {0};
 #define MCLK_SAMPLES        5
 #define MCLK_SAMPLE_MS      250
 #define MCLK_DROPOUT_MS     1000
+// Position error past this is a discontinuity (a multi-frame stall, not a
+// deliberate move) -> snap instead of slew. Set well above the controller's
+// normal operating range: a half-beat catch-up and the 0-500 ms Sync Offset
+// are deliberate moves the move-tier is meant to slew, so the snap floor sits
+// at ~1 s to catch only genuine discontinuities.
+#define MCLK_SNAP_MS        1000.0
 static int      s_sample_clocks[MCLK_SAMPLES];
 static unsigned s_sample_ms[MCLK_SAMPLES];
 static int      s_sample_count = 0;     // 0..MCLK_SAMPLES, ring fill
@@ -65,18 +71,23 @@ static int s_last_start = -1, s_last_cont = -1, s_last_stop = -1;
 static int s_last_spp_seq = -1;
 static int s_queued_row = 0, s_queued_order = 0;
 
-static void mclk_reset_estimate(void) {
+// keep_tempo: drop the sample window but PRESERVE s_tempo_est, so a brief
+// dropout warm-re-locks from the last known tempo instead of cold-starting
+// (~1 s of wander). Cold reset (keep_tempo=false) only when sync is disabled.
+static void mclk_reset_estimate(bool keep_tempo) {
     s_sample_count = 0;
     s_sample_head  = 0;
-    s_tempo_est    = 0.0;
-    s_last_nominal_bpm = 0;
+    if (!keep_tempo) {
+        s_tempo_est        = 0.0;
+        s_last_nominal_bpm = 0;
+    }
 }
 
-static void mclk_update_estimate(unsigned now, int clocks, unsigned last_clock) {
-    // Dropout: master stopped sending clocks -> forget everything and stop
-    // chasing until clocks resume (rebuild a clean window like the old ring).
-    if (last_clock == 0 || (now - last_clock) > MCLK_DROPOUT_MS) {
-        mclk_reset_estimate();
+static void mclk_update_estimate(unsigned now, int clocks, bool clocks_recent) {
+    // Dropout: master stopped sending clocks. Drop the stale window but keep
+    // the last tempo (warm re-lock); the chase stops separately.
+    if (!clocks_recent) {
+        mclk_reset_estimate(/*keep_tempo=*/true);
         return;
     }
     int tail = (s_sample_head + MCLK_SAMPLES - s_sample_count) % MCLK_SAMPLES;
@@ -143,10 +154,20 @@ static void mclk_consume_transport(int clocks_now) {
     }
 }
 
-static void mclk_chase(unsigned now, int clocks, unsigned last_clock) {
+static void mclk_chase(unsigned now, int clocks, unsigned last_clock,
+                       bool clocks_recent) {
     if (!zt_config_globals.midi_in_sync_chase_tempo) {
         // Transport-only mode: never touch the engine rate (matches the old
         // behavior where the tempo ring was gated on this flag).
+        ztPlayer->chase_skew_us = 0;
+        s_chase_valid = false;
+        s_offset_ms   = 0.0;
+        return;
+    }
+    if (!clocks_recent) {
+        // Dropout: the position reference is stale. Stop steering and free-run
+        // the engine at the last nominal tempo; invalidate the anchor so the
+        // first chase after clocks resume re-anchors (warm re-lock).
         ztPlayer->chase_skew_us = 0;
         s_chase_valid = false;
         s_offset_ms   = 0.0;
@@ -189,11 +210,23 @@ static void mclk_chase(unsigned now, int clocks, unsigned last_clock) {
                       + frac + off_subticks;
     double exact_us   = 60000000.0 / (96.0 * s_tempo_est);
     double nominal_us = (double)(ztPlayer->subtick_len_ms + ztPlayer->subtick_len_mms);
+    // Position error (the quantity phase_chase_step feeds back on): engine
+    // behind the master grid = positive.
+    double err_ms = (expected - (double)ztPlayer->played_subticks) * exact_us / 1000.0;
+    if (err_ms > MCLK_SNAP_MS || err_ms < -MCLK_SNAP_MS) {
+        // A jump this large isn't drift -- it's a discontinuity (a main-loop
+        // stall that skipped frames, or the engine resuming behind). Slewing it
+        // back at the controller's bounded authority would take ~1.4 s and
+        // audibly rush; instead snap the anchor to the engine's current
+        // position and let the fine lock re-establish over the next frames.
+        s_anchor_clocks = clocks - ztPlayer->played_subticks / 4;
+        ztPlayer->chase_skew_us = 0;
+        s_offset_ms = 0.0;
+        return;
+    }
     ztPlayer->chase_skew_us = phase_chase_step(expected, ztPlayer->played_subticks,
                                                exact_us, nominal_us);
-    // Position error for the status readout (same quantity phase_chase_step
-    // feeds back on): engine behind the master grid = positive.
-    s_offset_ms = (expected - (double)ztPlayer->played_subticks) * exact_us / 1000.0;
+    s_offset_ms = err_ms;
 }
 
 void zt_midi_clock_pump(void) {
@@ -207,7 +240,7 @@ void zt_midi_clock_pump(void) {
         s_last_stop    = g_mclk_stop_req;
         s_last_spp_seq = g_mclk_spp_seq;
         s_chase_valid  = false;
-        mclk_reset_estimate();
+        mclk_reset_estimate(/*keep_tempo=*/false);
         s_state     = ZT_SYNC_OFF;
         s_offset_ms = 0.0;
         return;
@@ -221,14 +254,14 @@ void zt_midi_clock_pump(void) {
     // collapses toward 0, which is consistent. The opposite order would briefly
     // add a whole clock (new count) on top of a near-full fraction (~20 ms at
     // 120 BPM) and kick the controller out of its deadband.
-    int      clocks     = g_mclk_clocks;
-    unsigned last_clock = g_mclk_last_clock_ms;
+    int      clocks      = g_mclk_clocks;
+    unsigned last_clock  = g_mclk_last_clock_ms;
+    bool clocks_recent   = (last_clock != 0) && ((now - last_clock) <= MCLK_DROPOUT_MS);
     mclk_consume_transport(clocks);
-    mclk_update_estimate(now, clocks, last_clock);
-    mclk_chase(now, clocks, last_clock);
+    mclk_update_estimate(now, clocks, clocks_recent);
+    mclk_chase(now, clocks, last_clock, clocks_recent);
 
     // Derive the user-facing lock state (F11 meter + Lua) from the snapshot.
-    bool clocks_recent = (last_clock != 0) && ((now - last_clock) <= MCLK_DROPOUT_MS);
     if (!clocks_recent) {
         s_state = (last_clock == 0) ? ZT_SYNC_WAITING : ZT_SYNC_DROPOUT;
     } else if (!zt_config_globals.midi_in_sync_chase_tempo) {

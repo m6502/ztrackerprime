@@ -143,6 +143,22 @@ jobs:
       - name: Run unit tests
         run: ctest --test-dir build --output-on-failure
 
+      - name: ThreadSanitizer unit tests
+        run: |
+          cmake -S . -B build-tsan -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=thread -g -O1" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -g -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread" \
+            -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" \
+            -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
+          # Only the test targets need TSan (SDL-free). The point is the
+          # threaded suite: test_sysex_stress drives 4 producer threads + a
+          # consumer against the SysEx queue mutex. Locks in the project's
+          # thread-safety posture (incl. the std::atomic MIDI-clock counters).
+          cmake --build build-tsan -j --target test_sysex_stress test_sysex_inq test_midi_clock_sync
+          ctest --test-dir build-tsan --output-on-failure -R "sysex_stress|sysex_inq|midi_clock_sync"
+
       - name: Stage release
         run: |
           mkdir -p dist/ztrackerprime-linux-x86_64
