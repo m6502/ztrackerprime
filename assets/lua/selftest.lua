@@ -125,6 +125,13 @@ check("transport playing after play", zt.transport.playing == true)
 zt.transport:stop()
 check("transport stopped", zt.transport.playing == false)
 
+-- MIDI-clock sync status (read-only). No external clock under test, so the
+-- state is "off"; just assert the fields exist with the right types/contract.
+check("sync_state is string", type(zt.transport.sync_state) == "string")
+check("sync_state off when not slaved", zt.transport.sync_state == "off")
+check("sync_bpm is number", type(zt.transport.sync_bpm) == "number")
+check("sync_offset_ms is number", type(zt.transport.sync_offset_ms) == "number")
+
 -- ── zt.midimacro(i) ──────────────────────────────────────────────────
 local m = zt.midimacro(0)
 m.name = "Bank" ;                  eq("midimacro.name", m.name, "Bank")
@@ -174,6 +181,13 @@ eq("notifier multiple callbacks", fired, 106)   -- +1 (first) +100 (second)
 zt.off("selftest_evt")
 zt.fire("selftest_evt", 5)
 eq("notifier off stops firing", fired, 106)     -- unchanged
+
+-- the built-in "sync" event registers and dispatches like any other
+local sync_seen = -1
+zt.on("sync", function(state) sync_seen = state end)
+zt.fire("sync", 4)
+eq("sync notifier dispatches state", sync_seen, 4)
+zt.off("sync")
 
 -- ── file save / load roundtrip ───────────────────────────────────────
 local tmp = (os.getenv("TMPDIR") or os.getenv("TEMP") or "/tmp") .. "/zt_selftest.zt"

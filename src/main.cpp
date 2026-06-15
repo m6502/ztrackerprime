@@ -4304,6 +4304,18 @@ int main(int argc, char *argv[])
             g_lua.fire("row", s_prev_row, true);
           }
         }
+        {
+          // "sync" on MIDI-clock lock-state transitions (off/waiting/dropout/
+          // transport/chasing/locked). arg = numeric state; the readable name
+          // and the live BPM/offset are on zt.transport.sync_*.
+          static int s_prev_sync = -1;
+          zt_sync_status ss;
+          zt_midi_clock_get_status(&ss);
+          if (ss.state != s_prev_sync) {
+            s_prev_sync = ss.state;
+            g_lua.fire("sync", ss.state, true);
+          }
+        }
         g_lua.fire("idle");
       }
 
