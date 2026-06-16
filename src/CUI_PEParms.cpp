@@ -16,15 +16,15 @@ CUI_PEParms::CUI_PEParms(void) {
         ;
     
     /* Initialize BPM Slider */
-        vs_step = new ValueSlider;
-        UI->add_element(vs_step,0);
-        vs_step->frame = 1;
-        vs_step->x = (start_x / 8) + 17;
-        vs_step->y = (start_y / 8) + 6; 
-        vs_step->xsize=window_width/8 - 23;
-        vs_step->min = 0;
-        vs_step->max = 32;
-        vs_step->value = cur_step;   
+    vs_step = new ValueSlider;
+    UI->add_element(vs_step,0);
+    vs_step->frame = 1;
+    vs_step->x = (start_x / 8) + 17;
+    vs_step->y = (start_y / 8) + 6;
+    vs_step->xsize=window_width/8 - 23;
+    vs_step->min = 0;
+    vs_step->max = 32;
+    vs_step->value = cur_step;
 
         vs_pat_length = new ValueSlider;
         UI->add_element(vs_pat_length,1);

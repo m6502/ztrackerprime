@@ -13,15 +13,15 @@ CUI_PEVol::CUI_PEVol(void) {
         ;
     
     /* Initialize Volume percent Slider */
-        vs = new ValueSlider;
-        UI->add_element(vs,0);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 12; 
-        vs->y = (start_y + (window_height / 2) ) / 8; 
-        vs->xsize=(window_width / 8) - 19;
-        vs->min = 0;
-        vs->max = 200;
-        vs->value = cur_volume_percent; 
+    vs = new ValueSlider;
+    UI->add_element(vs,0);
+    vs->frame = 1;
+    vs->x = (start_x / 8) + 12;
+    vs->y = (start_y + (window_height / 2) ) / 8;
+    vs->xsize=(window_width / 8) - 19;
+    vs->min = 0;
+    vs->max = 200;
+    vs->value = cur_volume_percent;
 
 }
 

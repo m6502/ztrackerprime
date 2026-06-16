@@ -16,15 +16,15 @@ CUI_PENature::CUI_PENature(void) {
         ;
     
     /* Initialize Naturalization percent Slider */
-        vs = new ValueSlider;
-        UI->add_element(vs,0);
-        vs->frame = 1;
-        vs->x = (start_x / 8) + 12; 
-        vs->y = (start_y + (window_height / 2) ) / 8; 
-        vs->xsize=(window_width / 8) - 19;
-        vs->min = 0;
-        vs->max = 100;
-        vs->value = cur_naturalization_percent;
+    vs = new ValueSlider;
+    UI->add_element(vs,0);
+    vs->frame = 1;
+    vs->x = (start_x / 8) + 12;
+    vs->y = (start_y + (window_height / 2) ) / 8;
+    vs->xsize=(window_width / 8) - 19;
+    vs->min = 0;
+    vs->max = 100;
+    vs->value = cur_naturalization_percent;
 }
 
 void CUI_PENature::enter(void) {
@@ -65,7 +65,7 @@ void CUI_PENature::update() {
                                     float temp;
                                     float nat;
                                     temp = rand();
-                                    temp /= RAND_MAX;
+                                    temp /= (float)RAND_MAX;
                                     temp *= iadd;
                                     nat = cur_naturalization_percent;
                                     nat /=100;
