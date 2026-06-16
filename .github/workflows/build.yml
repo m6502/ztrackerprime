@@ -84,11 +84,11 @@ jobs:
             libdecor-0-dev libdbus-1-dev libibus-1.0-dev \
             libudev-dev libsndio-dev
 
-      - name: Fetch Ableton Link
+      - name: Fetch External Dependencies
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/fetch-ableton-link.sh
+          bash fetch-ext-deps.sh
 
       - name: Cache SDL3 source tarball
         id: cache-sdl3-src
@@ -215,7 +215,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/fetch-ableton-link.sh
+          bash fetch-ext-deps.sh
 
       - name: Configure
         run: |
@@ -298,11 +298,11 @@ jobs:
           brew update
           brew install cmake ninja pkg-config sdl3
 
-      - name: Fetch Ableton Link
+      - name: Fetch External Dependencies
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/fetch-ableton-link.sh
+          bash fetch-ext-deps.sh
 
       - name: Configure
         run: |
