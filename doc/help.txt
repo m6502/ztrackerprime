@@ -246,6 +246,14 @@
  Zxxyy : Send midimacro xx with parameter yy.  00 repeats the last used
          value
 
+|L|%==|H|Easter Eggs|L|==%|U|
+
+ CTRL-ALT-F : Fun sounds. Wakes zTracker's normally-dormant SDL3 audio
+              path on first press and toggles the "TestTone" generator --
+              a deliberately warbly square-ish tone (8-bit aliased into the
+              16-bit output). Press again to stop. A normal MIDI-only
+              session never opens an audio device unless you press this.
+
 |L|%==|H|Command-Line Arguments|L|==%|U|
 
  zt [options] [song.zt]

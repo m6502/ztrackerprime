@@ -119,7 +119,7 @@ static inline void zt_text_input_stop(void) {
 #endif
 #define ZTRACKER_VERSION                "zTracker' v" ZT_BUILD_DATE
 
-//#define _ENABLE_AUDIO                 1  // this enables audio init and audio plugins
+#define _ENABLE_AUDIO                 1  // audio path: dormant by default (no device opened at boot); woken lazily by the Ctrl+Alt+F fun-sounds easter egg
 
 #define ZOOM                            (zt_config_globals.zoom)
 

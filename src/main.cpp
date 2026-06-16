@@ -363,6 +363,9 @@ CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
+#ifdef _ENABLE_AUDIO
+static void zt_fun_sounds_toggle(void);   // fun-sounds easter egg; defined with the audio backend
+#endif
 CUI_KeyBindings *UIP_KeyBindings = NULL;
 CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
@@ -1736,6 +1739,16 @@ void global_keys(Drawable *S)
                     command = CMD_SWITCH_KEYBINDINGS;
                     key = Keys.getkey();
                 }
+                break;
+
+            case SDLK_F: // Fun sounds easter egg (Ctrl+Alt+F)
+#ifdef _ENABLE_AUDIO
+                if ((kstate & KS_CTRL) && (kstate & KS_ALT)) {
+                    zt_fun_sounds_toggle();
+                    key = Keys.getkey();
+                    need_refresh++;
+                }
+#endif
                 break;
 
 #ifndef DISABLE_UNFINISHED_F10_SONG_MESSAGE_EDITOR
@@ -3858,6 +3871,37 @@ static void zt_backend_audio_stop(void)
     g_audio_stream = NULL;
   }
 }
+
+// --- Fun sounds easter egg (Ctrl+Alt+F) ------------------------------------
+// Wakes the dormant SDL3 audio path on first use and toggles the TestTone
+// generator -- the deliberately aliased 8-bit-into-S16 "warble" the
+// enable-audio spike turned up. Lazy + non-fatal: a normal MIDI-only session
+// never opens an output device unless you ask for fun.
+static bool g_fun_audio_up = false;
+static bool g_fun_playing  = false;
+static int  g_fun_dev      = -1;
+
+static void zt_fun_sounds_toggle(void)
+{
+  if (!g_fun_audio_up) {
+    if (!zt_backend_audio_start())
+      return;                         // no output device -> stay silent, never crash
+    g_fun_audio_up = true;
+    for (unsigned int d = 0; d < MidiOut->numOuputDevices; d++) {
+      if (MidiOut->outputDevices[d]->type == OUTPUTDEVICE_TYPE_AUDIO &&
+          strstr(MidiOut->outputDevices[d]->szName, "TestTone")) {
+        g_fun_dev = (int)d;
+        break;
+      }
+    }
+    if (g_fun_dev >= 0)
+      MidiOut->AddDevice(g_fun_dev);  // open() + enlist into the live mix
+  }
+  if (g_fun_dev < 0) return;
+  g_fun_playing = !g_fun_playing;
+  if (g_fun_playing) MidiOut->outputDevices[g_fun_dev]->noteOn(60, 0, 127);
+  else               MidiOut->outputDevices[g_fun_dev]->noteOff(60, 0, 0);
+}
 #endif
 
 static void zt_backend_release_frame_resources(void)
@@ -4279,9 +4323,9 @@ int main(int argc, char *argv[])
     }
 
 #ifdef _ENABLE_AUDIO
-    if (!zt_backend_audio_start()) {
-      return(-1);
-    }
+    // Audio stays dormant at boot: the fun-sounds easter egg (Ctrl+Alt+F)
+    // calls zt_backend_audio_start() lazily on first press, so a normal
+    // MIDI-only session never opens an output device.
 #endif
 
     while (1) {
