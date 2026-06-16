@@ -4,6 +4,32 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_16 (MIDI clock sync: merge of the two independent phase-chase rewrites)
+----------------------------------------------------------------------------
+
+        ! Chris Micali and the hardening branch independently rebuilt MIDI
+          clock sync on a phase-chase controller and arrived at a byte-
+          identical phase_chase.h. This merges the two: Chris's tempo
+          estimator is adopted as the base, the hardening branch's
+          observability and robustness layer on top.
+
+        + From Chris's branch (cmicali/midi-sync-improvements): least-squares
+          tempo regression over the sliding window (down-weights any single
+          jitter-delayed edge instead of swinging the estimate), clock-arrival
+          (edge) sampling rather than pump-time sampling, retune anti-flap
+          hysteresis (>0.6 BPM held for 500 ms, >3.0 BPM immediate; a master
+          on a rounding boundary like 124.5 no longer flaps the nominal), and
+          transport-gap window-drop so a stop/restart can't dip the estimate.
+
+        + From the hardening branch: atomic observer counters (ThreadSanitizer
+          clean), a consistent per-frame counter snapshot, warm re-lock, snap
+          on discontinuity, hardware timestamps feeding the arrival edge, and
+          the six-state lock meter (F11) + Lua zt.transport.sync_* surface.
+
+        + test_midi_clock_estimator: Chris's estimator/hysteresis/dropout unit
+          suite, kept alongside the closed-loop lock-quality sim. Both pass
+          against the merged engine.
+
 zt 2026_06_15 (MIDI clock sync: hardware timestamps on macOS + lock sim test)
 ----------------------------------------------------------------------------
 

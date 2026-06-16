@@ -12,7 +12,7 @@
 #include "midi_clock_sync.h"
 #include "phase_chase.h"
 
-#include <cmath>   // lround
+#include <cmath>   // lround, fabs
 
 #ifdef ZT_TEST_NO_SDL
 #include "zt_link_stub.h"     // tests/: fake player, song, conf, globals
@@ -43,6 +43,7 @@ std::atomic<int>      g_mclk_spp_seq       {0};
 #define MCLK_SAMPLES        5
 #define MCLK_SAMPLE_MS      250
 #define MCLK_DROPOUT_MS     1000
+#define MCLK_RETUNE_MS      500   /* estimate must hold out-of-band this long before the nominal moves */
 // Position error past this is a discontinuity (a multi-frame stall, not a
 // deliberate move) -> snap instead of slew. Set well above the controller's
 // normal operating range: a half-beat catch-up and the 0-500 ms Sync Offset
@@ -55,6 +56,7 @@ static int      s_sample_count = 0;     // 0..MCLK_SAMPLES, ring fill
 static int      s_sample_head  = 0;
 static double   s_tempo_est    = 0.0;   // 0 = no estimate yet
 static int      s_last_nominal_bpm = 0;
+static unsigned s_retune_since = 0;     // when the estimate left the band; 0 = in band
 
 // Position chase: clock count at the consumed START/CONTINUE.
 static int      s_anchor_clocks = 0;
@@ -77,35 +79,54 @@ static int s_queued_row = 0, s_queued_order = 0;
 static void mclk_reset_estimate(bool keep_tempo) {
     s_sample_count = 0;
     s_sample_head  = 0;
+    s_retune_since = 0;
     if (!keep_tempo) {
         s_tempo_est        = 0.0;
         s_last_nominal_bpm = 0;
     }
 }
 
-static void mclk_update_estimate(unsigned now, int clocks, bool clocks_recent) {
+static void mclk_update_estimate(unsigned now, int clocks, unsigned edge,
+                                 bool clocks_recent) {
     // Dropout: master stopped sending clocks. Drop the stale window but keep
     // the last tempo (warm re-lock); the chase stops separately.
     if (!clocks_recent) {
         mclk_reset_estimate(/*keep_tempo=*/true);
         return;
     }
-    int tail = (s_sample_head + MCLK_SAMPLES - s_sample_count) % MCLK_SAMPLES;
-    if (s_sample_count == 0 ||
-        now - s_sample_ms[(s_sample_head + MCLK_SAMPLES - 1) % MCLK_SAMPLES] >= MCLK_SAMPLE_MS) {
+    // Samples pair the clock count with the clock's ARRIVAL time (edge), not
+    // pump time: the pump observes up to one clock period (~20 ms at 120 BPM)
+    // after the edge, and that jitter on the window endpoints is worth several
+    // BPM of hunting over a 1 s window. On macOS the edge is a hardware
+    // timestamp (midi_timestamp.h), so it is jitter-free at the source.
+    int head_i = (s_sample_head + MCLK_SAMPLES - 1) % MCLK_SAMPLES;
+    if ((s_sample_count == 0 && now - edge <= MCLK_SAMPLE_MS) ||
+        (s_sample_count > 0 && clocks != s_sample_clocks[head_i] &&
+         edge - s_sample_ms[head_i] >= MCLK_SAMPLE_MS)) {
         s_sample_clocks[s_sample_head] = clocks;
-        s_sample_ms[s_sample_head]     = now;
+        s_sample_ms[s_sample_head]     = edge;
         s_sample_head = (s_sample_head + 1) % MCLK_SAMPLES;
         if (s_sample_count < MCLK_SAMPLES) s_sample_count++;
-        tail = (s_sample_head + MCLK_SAMPLES - s_sample_count) % MCLK_SAMPLES;
     }
     if (s_sample_count < 2) return;
-    int      head_i  = (s_sample_head + MCLK_SAMPLES - 1) % MCLK_SAMPLES;
-    int      dclocks = s_sample_clocks[head_i] - s_sample_clocks[tail];
-    unsigned dms     = s_sample_ms[head_i] - s_sample_ms[tail];
-    if (dclocks <= 0 || dms == 0) return;
+    // Least-squares slope (clocks per ms) over the whole window: a single
+    // jitter-delayed edge timestamp only carries 1/n of the weight instead of
+    // swinging the estimate as a raw endpoint would.
+    int    n      = s_sample_count;
+    int    base_i = (s_sample_head + MCLK_SAMPLES - n) % MCLK_SAMPLES;
+    int    c0     = s_sample_clocks[base_i];
+    unsigned t0   = s_sample_ms[base_i];
+    double sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+    for (int k = 0; k < n; k++) {
+        int i = (base_i + k) % MCLK_SAMPLES;
+        double x = (double)(s_sample_ms[i] - t0);
+        double y = (double)(s_sample_clocks[i] - c0);
+        sx += x; sy += y; sxx += x * x; sxy += x * y;
+    }
+    double den = (double)n * sxx - sx * sx;
+    if (den <= 0.0) return;
     // 24 clocks per beat: BPM = clocks/24 per minute.
-    double est = ((double)dclocks / 24.0) * 60000.0 / (double)dms;
+    double est = ((double)n * sxy - sx * sy) / den / 24.0 * 60000.0;
     if (est >= 20.0 && est <= 500.0)
         s_tempo_est = est;
 }
@@ -129,6 +150,11 @@ static void mclk_consume_transport(int clocks_now) {
     }
     if (stop_intent) {
         ztPlayer->stop();
+        // The transport gap freezes the clock count while wall time runs: a
+        // sample window spanning it would read "fewer clocks over more time"
+        // and dip the estimate on restart. Drop the window now (the tempo
+        // estimate itself survives for the restart retune).
+        mclk_reset_estimate(/*keep_tempo=*/true);
         s_chase_valid = false;
     }
     if (start_intent || cont_intent) {
@@ -149,8 +175,14 @@ static void mclk_consume_transport(int clocks_now) {
         } else {
             ztPlayer->play(0, cur_edit_pattern, 0);
         }
+        // Same gap hazard as the stop path (a master can restart without ever
+        // sending STOP): start the window fresh.
+        mclk_reset_estimate(/*keep_tempo=*/true);
         s_anchor_clocks = clocks_now;        // expected position 0 is NOW
         s_chase_valid   = true;
+        // play() adopted song->bpm, wiping any chased tempo. Force the next
+        // chase pass to re-tune from the retained estimate (nominal == 0).
+        s_last_nominal_bpm = 0;
     }
 }
 
@@ -164,27 +196,47 @@ static void mclk_chase(unsigned now, int clocks, unsigned last_clock,
         s_offset_ms   = 0.0;
         return;
     }
-    if (!clocks_recent) {
-        // Dropout: the position reference is stale. Stop steering and free-run
-        // the engine at the last nominal tempo; invalidate the anchor so the
-        // first chase after clocks resume re-anchors (warm re-lock).
-        ztPlayer->chase_skew_us = 0;
-        s_chase_valid = false;
-        s_offset_ms   = 0.0;
-        return;
-    }
     if (!ztPlayer->playing || s_tempo_est <= 0.0) {
         ztPlayer->chase_skew_us = 0;
         s_offset_ms = 0.0;
         return;
     }
-    // Keep the engine nominal on the rounded master tempo (the old
-    // chase_external_tempo contract: never writes song->bpm). The fractional
-    // remainder is the chase's rate term.
-    int bpm_int = (int)lround(s_tempo_est);
-    if (bpm_int != s_last_nominal_bpm) {
-        ztPlayer->chase_external_tempo(bpm_int);
-        s_last_nominal_bpm = bpm_int;
+    // Keep the engine nominal on the rounded master tempo (chase_external_tempo
+    // never writes song->bpm); the fractional remainder is the chase's rate
+    // term, so the nominal only needs to be CLOSE. Require >0.6 BPM of
+    // disagreement (a master sitting on a rounding boundary like 124.5 would
+    // flap it forever) held for MCLK_RETUNE_MS before moving it; a >3.0 BPM
+    // jump is an unmistakable deliberate move and retunes now, dropping the
+    // window so the next estimates measure only the new tempo. Runs before the
+    // dropout check so a consumed START re-tunes from the retained estimate
+    // even before the master's clock stream resumes.
+    if (s_last_nominal_bpm == 0) {
+        s_last_nominal_bpm = (int)lround(s_tempo_est);
+        ztPlayer->chase_external_tempo(s_last_nominal_bpm);
+    } else if (fabs(s_tempo_est - (double)s_last_nominal_bpm) > 3.0) {
+        s_last_nominal_bpm = (int)lround(s_tempo_est);
+        ztPlayer->chase_external_tempo(s_last_nominal_bpm);
+        mclk_reset_estimate(/*keep_tempo=*/true);
+    } else if (fabs(s_tempo_est - (double)s_last_nominal_bpm) > 0.6) {
+        if (s_retune_since == 0) {
+            s_retune_since = now;
+        } else if (now - s_retune_since >= MCLK_RETUNE_MS) {
+            s_last_nominal_bpm = (int)lround(s_tempo_est);
+            ztPlayer->chase_external_tempo(s_last_nominal_bpm);
+            s_retune_since = 0;
+        }
+    } else {
+        s_retune_since = 0;
+    }
+    if (!clocks_recent) {
+        // Dropout: the position reference is stale. Stop steering and invalidate
+        // the anchor so the first chase after clocks resume re-anchors (warm
+        // re-lock); the nominal set above keeps the engine free-running at the
+        // master's last tempo.
+        ztPlayer->chase_skew_us = 0;
+        s_chase_valid = false;
+        s_offset_ms   = 0.0;
+        return;
     }
     if (!s_chase_valid) {
         // Started outside a consumed START (e.g. local F6 while slaved):
@@ -258,7 +310,7 @@ void zt_midi_clock_pump(void) {
     unsigned last_clock  = g_mclk_last_clock_ms;
     bool clocks_recent   = (last_clock != 0) && ((now - last_clock) <= MCLK_DROPOUT_MS);
     mclk_consume_transport(clocks);
-    mclk_update_estimate(now, clocks, clocks_recent);
+    mclk_update_estimate(now, clocks, last_clock, clocks_recent);
     mclk_chase(now, clocks, last_clock, clocks_recent);
 
     // Derive the user-facing lock state (F11 meter + Lua) from the snapshot.

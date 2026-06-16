@@ -182,6 +182,21 @@ target_compile_definitions(test_midi_clock_sync PRIVATE ZT_TEST_NO_SDL)
 target_compile_features(test_midi_clock_sync PRIVATE cxx_std_17)
 add_test(NAME midi_clock_sync COMMAND test_midi_clock_sync)
 
+# Chris Micali's estimator/hysteresis unit suite (transport consume, sliding-
+# window tempo estimate, rounding-boundary anti-flap, dropout warm re-lock),
+# kept alongside the closed-loop sim above for full coverage of the merged
+# engine.
+add_executable(test_midi_clock_estimator
+    test_midi_clock_estimator.cpp
+)
+target_include_directories(test_midi_clock_estimator PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/tests"
+)
+target_compile_definitions(test_midi_clock_estimator PRIVATE ZT_TEST_NO_SDL)
+target_compile_features(test_midi_clock_estimator PRIVATE cxx_std_17)
+add_test(NAME midi_clock_estimator COMMAND test_midi_clock_estimator)
+
 add_executable(test_ableton_link
     test_ableton_link.cpp
 )
