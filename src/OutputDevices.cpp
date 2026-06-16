@@ -14,12 +14,11 @@ void AddPlugin(midiOut *mout, OutputDevice *o)
 
 void InitializePlugins(midiOut *mout)
 {
-    
-#ifdef _ENABLE_AUDIO    
-    AddPlugin(mout, new NoiseOutputDevice());
-    AddPlugin(mout, new TestToneOutputDevice());
-#endif
-    
+    // MIDI devices first, so their indices match midiOutGetNumDevs() order --
+    // the device picker and saved selections index by position. Audio plugins
+    // are appended AFTER, so enabling _ENABLE_AUDIO never shifts a MIDI device
+    // index (the selection-breaking bug the enable-audio spike found when the
+    // audio plugins sat at indices 0,1 ahead of MIDI).
     unsigned int i = mout->numOuputDevices;
     unsigned int devs = midiOutGetNumDevs();
     unsigned int total = i+devs;
@@ -27,6 +26,11 @@ void InitializePlugins(midiOut *mout)
     for (;i<total;i++) {
         mout->outputDevices[i] = new MidiOutputDevice(i);
     }
+
+#ifdef _ENABLE_AUDIO
+    AddPlugin(mout, new NoiseOutputDevice());
+    AddPlugin(mout, new TestToneOutputDevice());
+#endif
 }
 
 

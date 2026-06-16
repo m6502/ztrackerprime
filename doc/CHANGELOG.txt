@@ -4,6 +4,22 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_16 (Fun sounds easter egg: Ctrl+Alt+F)
+----------------------------------------------------------------------------
+
+        + Ctrl+Alt+F wakes zTracker's normally-dormant SDL3 audio path and
+          toggles the bundled TestTone generator -- a deliberately warbly
+          square-ish tone (the 8-bit-into-S16 aliasing the enable-audio spike
+          turned up). Press again to stop. Lazy + non-fatal: a normal
+          MIDI-only session never opens an output device unless you press it,
+          and a machine with no audio device just stays silent (no crash).
+
+        * Audio plugins are now registered AFTER the MIDI devices in
+          InitializePlugins (they used to sit at indices 0,1 ahead of MIDI).
+          With _ENABLE_AUDIO on, that previously shifted every MIDI device
+          index and broke device selection; appending audio keeps MIDI indices
+          stable. (Fixes the gotcha the spike documented.)
+
 zt 2026_06_16 (MIDI clock sync: merge of the two independent phase-chase rewrites)
 ----------------------------------------------------------------------------
 
