@@ -41,13 +41,8 @@
 #include "ccenv_advance.h"
 #include "sysex_macro.h"
 #include "ableton_link.h"
-#include "pattern_guard.h"
 #include <algorithm>
 #include <stdint.h>
-
-// Keep the dependency-free guard constant locked to the real patterns[] size.
-static_assert(ZT_PATTERN_GUARD_COUNT == ZTM_MAX_PATTERNS,
-              "pattern_guard count must match patterns[] size (ZTM_MAX_PATTERNS)");
 
 int mctr = 0;
 
@@ -633,15 +628,7 @@ void player::play_immediately(int row, int pattern,int pm, int loopmode)
   }
 
   prepare_play(row,pattern,pm,loopmode);
-
-  // prepare_play() bails on a sentinel order entry (its `if (cur_pattern > 0xFF)
-  // return;`) but leaves cur_pattern holding the 0x100 empty / 0x101 skip marker
-  // and signals nothing. Without this guard we fall through to playback() below,
-  // which indexes song->patterns[cur_pattern] past the 256-entry array -> wild
-  // pointer -> bus error (crash report 2026-06-03: F6 on an empty order slot;
-  // also reachable via the Ableton-Link transport-follow auto-play). There's
-  // nothing to play, so don't start.
-  if (!zt_pattern_index_playable(cur_pattern)) return;
+  if (cur_pattern > 0xFF) return;
 
   //  play_buffer[cur_buf]->reset();
   //  play_buffer[cur_buf]->insert(0,ET_MSTART,0); // First event is MIDI Start
