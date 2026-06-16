@@ -220,7 +220,7 @@ static void test_offset_fires_early() {
     // not at the phase wrap.
     ztPlayer->playing = 0;
     zt_config_globals.ableton_link_quantum   = 4;     // earlier test set 8
-    zt_config_globals.ableton_link_offset_ms = 171;
+    zt_config_globals.sync_offset_ms = 171;
     link_pump_body();                       // absorb stop edge, apply quantum
     g_cached_bpm = 120.0;                   // known tempo for the ms math
     g_stub_phase = 1.0;
@@ -234,7 +234,7 @@ static void test_offset_fires_early() {
     link_pump_body();
     CHECK(g_play_armed == false);
     CHECK(ztPlayer->play_immediately_calls == plays + 1);
-    zt_config_globals.ableton_link_offset_ms = 0;
+    zt_config_globals.sync_offset_ms = 0;
     link_pump_body();                       // absorb the start edge
 }
 
@@ -339,7 +339,7 @@ static void test_peer_transport_follow() {
 static void chase_reset_engine(double session_bpm) {
     be_enable(true);
     g_cached_bpm = session_bpm;
-    zt_config_globals.ableton_link_offset_ms = 0;
+    zt_config_globals.sync_offset_ms = 0;
     ztPlayer->playing         = 1;
     ztPlayer->bpm             = 120;
     ztPlayer->subtick_len_ms  = 5000;
@@ -391,7 +391,7 @@ static void test_chase_live_offset_shifts_setpoint() {
     // User drags the F11 slider to 100 ms while playing: the setpoint moves
     // 100 ms earlier, the engine is suddenly "behind" and must speed up at
     // the deliberate-move tier.
-    zt_config_globals.ableton_link_offset_ms = 100;
+    zt_config_globals.sync_offset_ms = 100;
     link_chase_phase();
     CHECK(ztPlayer->chase_skew_us < -16);
     CHECK(ztPlayer->chase_skew_us >= -626);
@@ -400,7 +400,7 @@ static void test_chase_live_offset_shifts_setpoint() {
     ztPlayer->played_subticks = 96 + 19;
     link_chase_phase();
     CHECK(ztPlayer->chase_skew_us >= -16);    // back inside steady-state
-    zt_config_globals.ableton_link_offset_ms = 0;
+    zt_config_globals.sync_offset_ms = 0;
 }
 
 static void test_chase_fractional_tempo_rate_term() {
