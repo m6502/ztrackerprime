@@ -197,6 +197,44 @@ zt 2026_05_31 (Pattern Editor keymap: Ctrl-D select, Ctrl-Shift-P duration)
           global "Load Song" rather than the documented "select whole
           track / pattern" block function -- the global handler shadows
           the page binding. Left as-is for now.
+zt 2026_05_29 (Sample playback engine: SampleOutputDevice voice mixer)
+----------------------------------------------------------------------------
+
+        ! PR B (engine) of the optional sample-playback work, stacked on the
+          PR A foundation. This is where samples actually make sound. Audio
+          is OFF by default -- pure-MIDI users are unaffected unless they
+          opt in via the new zt.conf audio_enabled key or --load-sample.
+
+        + SampleOutputDevice (src/OutputDevices.{h,cpp}): a polyphonic
+          software sampler (32 voices). Plays PCM from the song's sample
+          pool, pitched from the played note relative to each sample's root
+          note, with linear interpolation, forward loops, velocity scaling
+          and 14-bit pitch-bend. Writes interleaved S16 stereo. The audio
+          callback thread and the UI/playback threads are guarded by a
+          mutex (same lesson as the midiInQueue work). Pure DSP lives in
+          src/sample_voice.h and is unit-tested.
+
+        + The dormant SDL3 audio backend is now compiled in (_ENABLE_AUDIO)
+          and runtime-gated. Audio output devices are registered AFTER MIDI
+          devices, so enabling audio never shifts the MIDI device indices
+          that instruments persist in their .zt files. The old TestTone /
+          Noise demo plugins (and their 8-bit-into-S16 format bug) are gone,
+          replaced by the real sampler.
+
+        + Routing: an instrument with a sample_index whose MIDI Out device
+          is the Sample Player plays its pooled sample instead of sending
+          MIDI. Playback sends the sample selection (as a program change)
+          before each note-on; MIDI instruments are unaffected.
+
+        + New CLI flag --load-sample <file.wav>: load a WAV into sample
+          slot 0 and route instrument 1 to it (forcing audio on for the
+          session). A way to hear the engine before the sample-editor page
+          (the follow-up PR) exists.
+
+        + New zt.conf key audio_enabled (default no). New unit suite
+          test_sample_voice (pitch/advance/loop/interpolation). ctest is
+          now 15 suites.
+
 zt 2026_05_29 (Sample playback foundation: pool + .zt persistence + WAV loader)
 ----------------------------------------------------------------------------
 

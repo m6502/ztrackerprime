@@ -81,6 +81,7 @@
 #include "ccizer.h"
 #include "ableton_link.h"
 #include "midi_clock_sync.h"
+#include "sample_load.h"
 
 #ifdef __APPLE__
 extern "C" void zt_macos_disable_cmd_q(void);
@@ -330,6 +331,12 @@ WStack window_stack;
 bool bDontKeyRepeat=false;
 
 midiOut *MidiOut = NULL;
+
+// Set from the --load-sample CLI flag: a WAV to load into sample-pool slot 0
+// and auto-route to instrument 0 at startup. NULL = flag not given. Forces
+// audio_enabled on for the session. Primarily a way to hear the sample
+// engine before the sample-editor page lands.
+const char *g_cli_load_sample = NULL;
 midiIn *MidiIn = NULL;
 
 CUI_Page *ActivePage = NULL, *LastPage = NULL, *PopupWindow = NULL;
@@ -3683,6 +3690,11 @@ int initSDL(void)
     }
     ZT_DEBUG_LOG("[conf] zt.conf not found, created default configuration\n");
   }
+
+  // --load-sample forces the audio backend on for this session, regardless
+  // of the zt.conf audio_enabled key, so the sample plays. Must happen
+  // after config load and before the midiOut ctor registers devices.
+  if (g_cli_load_sample) zt_config_globals.audio_enabled = 1;
   /*
   if (zcmp(Config.get("fullscreen"),"yes")) {
   //FULLSCREEN=1;
@@ -3844,6 +3856,7 @@ static void audio_mixer(void *udata, SDL_AudioStream *stream, int additional_amo
 
 static int zt_backend_audio_start(void)
 {
+  if (g_audio_stream) return 1;   // idempotent: sampler boot + fun-button lazy start share one stream
   SDL_AudioSpec wanted;
   SDL_zero(wanted);
   wanted.freq = 44100;
@@ -3960,6 +3973,9 @@ struct ZtCliArgs {
     // and exits 0 (all checks passed) / 1 (failures). Pairs with --headless
     // for CI. Output (PASS/FAIL per check) goes to stdout.
     bool        lua_test        = false;
+    // --load-sample <file.wav>: load into sample-pool slot 0 + route to
+    // instrument 0, forcing audio on for the session.
+    const char *load_sample_path = NULL;
 };
 
 static void zt_print_cli_help(const char *progname) {
@@ -3999,6 +4015,10 @@ static void zt_print_cli_help(const char *progname) {
         "                              (lua/selftest.lua) against a scratch\n"
         "                              song and exit 0 (all checks passed) /\n"
         "                              1 (failures). Pair with --headless.\n"
+        "      --load-sample <file>    Load a WAV into sample slot 0 and\n"
+        "                              route instrument 1 to it, forcing\n"
+        "                              audio on for this session. Play notes\n"
+        "                              on instrument 1 to hear the sampler.\n"
         "\n"
         "Examples:\n"
         "  %s mysong.zt\n"
@@ -4091,6 +4111,10 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         if (r < 0) return -1;
         if (r > 0) { out->script_path = value; continue; }
 
+        r = zt_cli_match_flag_with_value(argc, argv, &i, "load-sample", &value);
+        if (r < 0) return -1;
+        if (r > 0) { out->load_sample_path = value; continue; }
+
         if (a[0] == '-') {
             fprintf(stderr, "zt: unknown flag '%s' (try --help)\n", a);
             return -1;
@@ -4162,6 +4186,8 @@ int main(int argc, char *argv[])
   if (zt_parse_cli(argc, argv, &cli_args) != 0) {
       return 2;
   }
+  // Publish to the global initSDL reads before it builds the device list.
+  g_cli_load_sample = cli_args.load_sample_path;
   if (cli_args.show_help) {
       const char *prog = (argc > 0 && argv[0]) ? argv[0] : "zt";
       // Strip path so "Usage: /path/to/zt" doesn't dominate the line.
@@ -4323,9 +4349,37 @@ int main(int argc, char *argv[])
     }
 
 #ifdef _ENABLE_AUDIO
-    // Audio stays dormant at boot: the fun-sounds easter egg (Ctrl+Alt+F)
-    // calls zt_backend_audio_start() lazily on first press, so a normal
-    // MIDI-only session never opens an output device.
+    // A plain MIDI-only session opens no audio device at boot -- the
+    // fun-sounds easter egg (Ctrl+Alt+F) wakes it lazily on first press.
+    // The sampler, when audio_enabled (or --load-sample), opens it now so
+    // loaded samples can play. Failure is non-fatal: warn and keep running
+    // MIDI-only rather than refusing to launch.
+    if (zt_config_globals.audio_enabled) {
+      if (!zt_backend_audio_start())
+        fprintf(stderr, "Audio disabled: could not open the audio device.\n");
+    }
+
+    // --load-sample: load the WAV into pool slot 0 and route instrument 0
+    // to the sample device, so notes on instrument 0 play the sample. A
+    // stop-gap for hearing the engine before the sample-editor page lands.
+    if (g_cli_load_sample && song && song->samples[0] == NULL) {
+      zt_sample *s = new zt_sample();
+      if (zt_sample_load_wav(g_cli_load_sample, s)) {
+        song->samples[0] = s;
+        int dev = -1;
+        for (unsigned int d = 0; d < MidiOut->numOuputDevices; d++)
+          if (MidiOut->get_type(d) == OUTPUTDEVICE_TYPE_AUDIO) { dev = (int)d; break; }
+        if (dev >= 0 && song->instruments[0]) {
+          song->instruments[0]->sample_index = 0;
+          song->instruments[0]->midi_device  = (unsigned char)dev;
+        }
+        fprintf(stderr, "Loaded sample '%s' (%u frames, %uch) -> instrument 1, device %d\n",
+                g_cli_load_sample, s->frames, s->channels, dev);
+      } else {
+        delete s;
+        fprintf(stderr, "Could not load sample WAV: %s\n", g_cli_load_sample);
+      }
+    }
 #endif
 
     while (1) {

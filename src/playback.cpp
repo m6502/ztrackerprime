@@ -689,7 +689,14 @@ void player::play_current_row()
 
         if (song->instruments[pEvent->inst]->midi_device!=0xff && song->instruments[pEvent->inst]->midi_device<=MAX_MIDI_DEVS) {
 
-          MidiOut->noteOn(song->instruments[pEvent->inst]->midi_device,set_note,song->instruments[pEvent->inst]->channel,p1,MAX_TRACKS,0);            
+          // Sample instrument routed to the audio device: tell the voice
+          // mixer which pool slot this channel plays before the note-on.
+          if (song->instruments[pEvent->inst]->sample_index >= 0 &&
+              MidiOut->get_type(song->instruments[pEvent->inst]->midi_device) == OUTPUTDEVICE_TYPE_AUDIO)
+            MidiOut->progChange(song->instruments[pEvent->inst]->midi_device,
+                                song->instruments[pEvent->inst]->sample_index, -1,
+                                song->instruments[pEvent->inst]->channel);
+          MidiOut->noteOn(song->instruments[pEvent->inst]->midi_device,set_note,song->instruments[pEvent->inst]->channel,p1,MAX_TRACKS,0);
           jazz_set_state(SDLK_8, set_note, song->instruments[pEvent->inst]->channel);
         }
       }
@@ -738,6 +745,12 @@ void player::play_current_note()
 
     if (song->instruments[e->inst]->midi_device!=0xff && song->instruments[e->inst]->midi_device<=MAX_MIDI_DEVS) {
 
+      // Sample instrument routed to the audio device: select the pool slot.
+      if (song->instruments[e->inst]->sample_index >= 0 &&
+          MidiOut->get_type(song->instruments[e->inst]->midi_device) == OUTPUTDEVICE_TYPE_AUDIO)
+        MidiOut->progChange(song->instruments[e->inst]->midi_device,
+                            song->instruments[e->inst]->sample_index, -1,
+                            song->instruments[e->inst]->channel);
       MidiOut->noteOn(song->instruments[e->inst]->midi_device,set_note,song->instruments[e->inst]->channel,p1,MAX_TRACKS /*cur_edit_track*/,0);
 
       jazz_set_state(SDLK_4, set_note, song->instruments[e->inst]->channel);
