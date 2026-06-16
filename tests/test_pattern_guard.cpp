@@ -3,12 +3,12 @@
 // Locks in the fix for the 2026-06-03 bus error: clicking an empty order slot
 // on F11 set cur_edit_pattern to the 0x100 "empty" order sentinel, and F6 then
 // drove player::play(0x100) -> playback() -> patterns[256] out of bounds ->
-// SIGBUS. Both the OrderEditor click handler and player::play() now route the
-// pattern index through these helpers; this test pins their contract so a
-// future edit can't quietly let a sentinel back through.
+// SIGBUS. player::play_immediately() now routes the pattern index through
+// zt_pattern_index_playable() before the patterns[] deref; this test pins the
+// helpers' contract so a future edit can't quietly let a sentinel back through.
 //
 // Pure header, no SDL / no module.h -- ZT_PATTERN_GUARD_COUNT defaults to 256
-// here, matching the static_assert against ZTM_MAX_PATTERNS in OrderEditor.cpp.
+// here, matching the static_assert against ZTM_MAX_PATTERNS in playback.cpp.
 
 #include "pattern_guard.h"
 

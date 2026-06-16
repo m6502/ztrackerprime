@@ -13,12 +13,16 @@
 // in the F11 Order editor ran `cur_edit_pattern = orderlist[slot]` (= 0x100)
 // with no guard; pressing F6 then called player::play(cur_edit_pattern) ->
 // playback() -> patterns[256]->tracks[t]->get_event() -> SIGBUS
-// (KERN_PROTECTION_FAILURE). Both the editor assignment and the player play
-// path now funnel through the helpers below.
+// (KERN_PROTECTION_FAILURE). The player play path now funnels through
+// zt_pattern_index_playable() (see play_immediately() in playback.cpp); the
+// F11 editor paths already guard cur_edit_pattern inline with `< 0x100`.
+// zt_orderlist_select_pattern() is the canonical order-entry resolver,
+// exercised by the unit test and available should those inline guards ever be
+// unified onto it.
 //
 // Header-only and dependency-free on purpose: the unit test includes it
 // directly without SDL or module.h. ZT_PATTERN_GUARD_COUNT mirrors
-// ZTM_MAX_PATTERNS; a static_assert in OrderEditor.cpp keeps them in lock-step
+// ZTM_MAX_PATTERNS; a static_assert in playback.cpp keeps them in lock-step
 // so this constant can't silently drift from the real patterns[] size.
 
 #ifndef ZT_PATTERN_GUARD_COUNT
