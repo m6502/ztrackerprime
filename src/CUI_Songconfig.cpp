@@ -488,13 +488,8 @@ void CUI_Songconfig::draw(Drawable *S) {
                 snprintf(linkstat, sizeof(linkstat), "%d peer%s \xb3 %.1f BPM",
                          (int)peers, peers == 1 ? "" : "s", zt_ableton_link_get_tempo());
             } else {
-                snprintf(linkstat, sizeof(linkstat), "off");
+                linkstat[0] = '\0';
             }
-            // Pad to a fixed width and draw with a background fill so a shorter
-            // status (e.g. "off") fully erases the previous longer one
-            // ("N peers ... BPM"). print() only paints glyph pixels — without
-            // this the old text shows through the new, garbled. 28 cols span
-            // col 24..51, clear of the Order List at col 59.
             char linkstat_field[40];
             snprintf(linkstat_field, sizeof(linkstat_field), "%-28s", linkstat);
             printBG(row(24),col(base_y+16),linkstat_field,COLORS.Highlight,COLORS.Background,S);
