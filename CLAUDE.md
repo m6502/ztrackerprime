@@ -203,11 +203,12 @@ External MIDI-clock slave sync, rebuilt on the shared `phase_chase.h` controller
 
 - **Observer architecture** (`src/midi_clock_sync.{cpp,h}`). The MIDI-in callback thread only **records** what arrived into `std::atomic` counters (`g_mclk_clocks`, `g_mclk_last_clock_ms`, `g_mclk_start_req` / `_continue_req` / `_stop_req`, `g_mclk_spp_raw` / `_seq`) — same advisory contract as `player::stop_count`. Every decision (consume transport requests, estimate master tempo, phase-lock) happens in `zt_midi_clock_pump()` on the **main thread**, once per frame, next to `zt_ableton_link_pump()`. Atomics make the cross-thread reads ThreadSanitizer-clean (a TSan CI job guards this); the pump relies only on per-counter atomicity, tolerating a bump seen a frame late.
 - **Position, not just rate.** 24 clocks/beat = 4 subticks/clock, so counting clocks since the consumed START gives an exact "expected position" (the MIDI-clock analogue of Link's `beatAtTime`). `phase_chase_step()` returns a bounded skew applied to `player::chase_skew_us`: inaudible inside `PHASE_CHASE_DEADBAND_US`, slewing hard on a deliberate move (offset slider / tempo step).
+- **Tempo estimate.** A least-squares regression over a ~1 s sliding window of clock-*arrival* samples (Chris Micali's estimator, merged in #169) — a single jitter-delayed edge carries only 1/n of the weight rather than swinging the estimate. Retune anti-flap hysteresis (>0.6 BPM held, >3.0 BPM immediate) keeps the engine nominal steady when the master sits on a rounding boundary like 124.5.
 - **Hardware timestamps** (`src/midi_timestamp.h`, macOS). The clock-arrival time comes from the CoreMIDI packet stamp (`mach_absolute_time`) converted into the `SDL_GetTicks()` ms epoch, not from sampling a software clock inside the callback — removing OS-scheduling jitter from the lock. **Sanity-gated**: a wild/garbage stamp falls back to the software clock instead of poisoning the phase lock.
 - **Hardening.** Warm re-lock + snap-on-discontinuity so a brief clock dropout or a transport jump recovers cleanly rather than chasing forever.
 - **Observability.** Six-state lock model (`zt_sync_state`: off / waiting / dropout / transport / chasing / locked) surfaced by `zt_midi_clock_get_status()` → the **F11 lock meter** (state + master BPM + signed offset) and the Lua `zt.transport.sync_state` / `sync_bpm` / `sync_offset_ms` read-only fields + the `sync` notifier event. Plays early by `sync_offset_ms`, identically to Link.
 
-> **Status:** this subsystem ships with the `esa/midi-clock-phase-lock` branch (commits `4199985`, `436e479`, `e549eb3`, `01e54ff`, `d18ef2a`, `9e9847a`); it is documented here ahead of that merge. The three test suites below land with it.
+> **Status:** this subsystem ships via the integration PR **#169**, which merges this hardening/observability work with Chris Micali's independent phase-chase rewrite (`cmicali/midi-sync-improvements`) — both converged on a byte-identical `phase_chase.h`. #169 adopts Chris's least-squares tempo estimator + retune hysteresis as the base and keeps the atomics / warm re-lock / snap / hardware timestamps / lock observability above. Documented here ahead of that merge; the four test suites below land with it.
 
 ---
 
@@ -230,11 +231,12 @@ External MIDI-clock slave sync, rebuilt on the shared `phase_chase.h` controller
 - `ableton_link` — Ableton Link config + precedence (`ZT_TEST_NO_SDL`).
 - `lua_api` — full Lua API self-test: drives the real `zt` binary headless (`--headless --lua-test`) against a scratch song, runs `lua/selftest.lua`, asserts exit 0.
 
-Three more land with the **MIDI clock sync & phase-lock** feature (`esa/midi-clock-phase-lock`), bringing the total to 17:
+Four more land with the **MIDI clock sync & phase-lock** feature (integration PR #169), bringing the total to 18:
 
 - `phase_chase` — the shared closed-loop controller: deadband tiers, feedback clamps, rate-error cancellation, skew ceiling.
 - `midi_timestamp` — `mach_absolute_time` → `SDL_GetTicks()` ms conversion + the sanity gate (future-dated packet, missing timebase, garbage stamp all fall back safely).
 - `midi_clock_sync` — closed-loop lock-quality simulation: feeds synthetic clock streams and asserts the engine locks within the deadband.
+- `midi_clock_estimator` — Chris Micali's estimator/hysteresis/dropout unit suite (least-squares convergence, rounding-boundary anti-flap, warm re-lock).
 
 Run all: `ctest --test-dir build --output-on-failure`. Linux CI runs the SDL-free suites after every push; the `lua_api` self-test runs on macOS CI.
 

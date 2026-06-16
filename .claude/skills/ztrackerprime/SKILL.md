@@ -179,7 +179,7 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 |
 | `assets/ccizer/` | Bundled CCizer banks (sc88st, microfreak, minilogue, monologue, Prophet6, deepmind6, waldorf_blofeld, tb03, se02, pro800, polyend_*, midi_control_example) — copied from Paketti. README.md documents the format. |
 | `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` = `F0 7E 7F 06 01 F7` for first-test handshakes. README.md documents the librarian workflow. |
-| `tests/` | CTest unit-test executables — 14 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`, `lua_api`. The `lua_api` suite drives the real `zt` binary headless (`--headless --lua-test`) against a scratch song and runs on macOS CI (PRs #154, #156); the rest are SDL-free and run on Linux CI. The MIDI clock phase-lock feature adds 3 more (`phase_chase`, `midi_timestamp`, `midi_clock_sync` → 17). (Count drifts as suites are added — `ctest -N` is the source of truth.) |
+| `tests/` | CTest unit-test executables — 14 suites: `presets`, `selector`, `page_sync`, `save_key`, `keybuffer`, `ccizer`, `sysex_inq`, `sysex_stress`, `sysex_macro`, `ccbn_roundtrip`, `ccenv`, `keyjazz_map`, `ableton_link`, `lua_api`. The `lua_api` suite drives the real `zt` binary headless (`--headless --lua-test`) against a scratch song and runs on macOS CI (PRs #154, #156); the rest are SDL-free and run on Linux CI. The MIDI clock phase-lock feature (integration PR #169) adds 4 more (`phase_chase`, `midi_timestamp`, `midi_clock_sync`, `midi_clock_estimator` → 18). (Count drifts as suites are added — `ctest -N` is the source of truth.) |
 | `doc/help.txt` | In-app F1 help — update when adding keybinds or CLI flags |
 | `doc/CHANGELOG.txt` | Release notes, chronological |
 | `.github/workflows/build.yml` | 5-platform CI matrix; Linux job runs `ctest` |
@@ -267,16 +267,17 @@ Tempo + transport sync with Ableton Live and other Link-aware apps over the loca
 - **UI** — F11 Song Configuration (`CUI_Songconfig.cpp`) hosts the enable + start/stop-sync checkboxes and the offset slider.
 - **Precedence:** if both Ableton Link and MIDI Sync are enabled, **Link wins** (`conf.cpp`).
 
-## MIDI clock sync & phase-lock (`esa/midi-clock-phase-lock`, documented ahead of merge)
+## MIDI clock sync & phase-lock (integration PR #169, documented ahead of merge)
 
-External MIDI-clock slave sync built on the **same** `phase_chase.h` controller as Ableton Link, so a fractional-tempo master cannot drift the engine. `midi_in_sync` follows start/stop; `midi_in_sync_chase_tempo` derives tempo and phase-locks; the `--midi-clock` CLI flag turns both on.
+External MIDI-clock slave sync built on the **same** `phase_chase.h` controller as Ableton Link, so a fractional-tempo master cannot drift the engine. `midi_in_sync` follows start/stop; `midi_in_sync_chase_tempo` derives tempo and phase-locks; the `--midi-clock` CLI flag turns both on. The engine is the merge of two independent rewrites that converged on an identical `phase_chase.h`: Chris Micali's tempo estimator (`cmicali/midi-sync-improvements`) under the hardening branch's observability + robustness.
 
 - **Observer architecture** (`midi_clock_sync.{cpp,h}`) — the MIDI-in callback thread only records into `std::atomic` counters (`g_mclk_*`, same advisory contract as `player::stop_count`); all decisions run in `zt_midi_clock_pump()` on the main thread once/frame, next to `zt_ableton_link_pump()`. ThreadSanitizer-clean (TSan CI job). Relies only on per-counter atomicity, tolerating a bump seen a frame late.
+- **Tempo estimate** (Chris's) — least-squares regression over a ~1 s sliding window of clock-*arrival* samples (a jitter-delayed edge carries only 1/n weight), plus retune anti-flap hysteresis (>0.6 BPM held, >3.0 BPM immediate) so a master on a rounding boundary like 124.5 doesn't flap the nominal.
 - **Position, not just rate** — 24 clocks/beat = 4 subticks/clock; clocks-since-START is the exact expected position (MIDI-clock analogue of Link's `beatAtTime`), fed through `phase_chase_step()` into `player::chase_skew_us`.
-- **Hardware timestamps** (`midi_timestamp.h`, macOS) — CoreMIDI packet stamp → `SDL_GetTicks()` epoch removes callback scheduling jitter; sanity-gated so a bad stamp falls back to the software clock.
+- **Hardware timestamps** (`midi_timestamp.h`, macOS) — CoreMIDI packet stamp → `SDL_GetTicks()` epoch removes callback scheduling jitter and feeds the estimator's arrival edge; sanity-gated so a bad stamp falls back to the software clock.
 - **Hardening** — warm re-lock + snap-on-discontinuity recover cleanly from a dropout or transport jump.
 - **Observability** — six-state lock model (`zt_sync_state`: off/waiting/dropout/transport/chasing/locked) via `zt_midi_clock_get_status()` → F11 lock meter + Lua `zt.transport.sync_state`/`sync_bpm`/`sync_offset_ms` + the `sync` notifier. `sync_offset_ms` conf key (legacy alias `ableton_link_offset_ms`).
-- **Tests** — `phase_chase`, `midi_timestamp`, `midi_clock_sync` (the 3 suites that take the harness from 14 → 17 when this lands).
+- **Tests** — `phase_chase`, `midi_timestamp`, `midi_clock_sync`, and Chris's `midi_clock_estimator` (the 4 suites that take the harness from 14 → 18 when this lands).
 
 ## INVARIANTS for any new or modified page
 
