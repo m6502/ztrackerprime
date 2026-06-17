@@ -267,6 +267,7 @@ endif()
 # when the binary was actually built, instead of a stale hardcoded value.
 string(TIMESTAMP ZT_BUILD_DATE "%Y_%m_%d" UTC)
 target_compile_definitions(zt PRIVATE ZT_BUILD_DATE="${ZT_BUILD_DATE}")
+
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
   pkg_check_modules(SDL3PC QUIET IMPORTED_TARGET sdl3)
@@ -384,18 +385,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if(APPLE)
+  string(TIMESTAMP ZT_BUILD_VERSION "%Y.%m.%d" UTC)
   target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation" "-framework Cocoa")
   # Turn the macOS build into a proper .app bundle with icon + Info.plist.
   set_target_properties(zt PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "zTracker"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.github.m6502.ztrackerprime"
-    MACOSX_BUNDLE_BUNDLE_VERSION "2026.02.23"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "2026.02.23"
-    MACOSX_BUNDLE_LONG_VERSION_STRING "zTracker 2026.02.23"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${ZT_BUILD_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${ZT_BUILD_VERSION}"
+    MACOSX_BUNDLE_LONG_VERSION_STRING "zTracker ${ZT_BUILD_VERSION}"
     MACOSX_BUNDLE_COPYRIGHT "(c) 2000-2026 zTracker contributors"
     MACOSX_BUNDLE_ICON_FILE "zt.icns"
     MACOSX_BUNDLE_INFO_STRING "zTracker - tracker-style music composition"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/cmake/Info.plist.in"
   )
 endif()
 

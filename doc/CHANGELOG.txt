@@ -4,6 +4,12 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_16 (macOS: real thread priorities for the timing threads)
+----------------------------------------------------------------------------
+
+        * macOS: Implement thread priroities for the timing threads and
+          add a Info.plist that disables App Nap
+
 zt 2026_06_16 (Fun sounds easter egg: Ctrl+Alt+F)
 ----------------------------------------------------------------------------
 

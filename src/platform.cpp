@@ -155,6 +155,9 @@ void zt_show_error(const char *title, const char *message)
 #include <atomic>
 #include <unordered_map>
 #include <mutex>
+#if defined(__APPLE__)
+#include <pthread/qos.h>
+#endif
 
 struct zt_posix_thread {
     pthread_t thread;
@@ -205,6 +208,8 @@ static void zt_timespec_add_ns(struct timespec *ts, long ns)
 
 static void *zt_posix_timer_main(void *arg)
 {
+    zt_thread_set_current_priority(ZT_THREAD_PRIORITY_TIME_CRITICAL);
+
     zt_posix_timer *timer = (zt_posix_timer *)arg;
     const long interval_ns = (long)timer->interval_ms * 1000000L;
     struct timespec next_deadline;
@@ -392,9 +397,52 @@ void zt_thread_close(zt_thread_handle thread)
     free(t);
 }
 
+#if defined(__APPLE__)
+
+static qos_class_t zt_qos_for_tier(int tier)
+{
+    if (tier >= ZT_THREAD_PRIORITY_TIME_CRITICAL) return QOS_CLASS_USER_INTERACTIVE;
+    if (tier >= ZT_THREAD_PRIORITY_ABOVE_NORMAL)  return QOS_CLASS_USER_INITIATED;
+    if (tier <= ZT_THREAD_PRIORITY_BELOW_NORMAL)  return QOS_CLASS_UTILITY;
+    return QOS_CLASS_DEFAULT;
+}
+
+static int zt_tier_for_qos(qos_class_t q)
+{
+    switch (q) {
+        case QOS_CLASS_USER_INTERACTIVE: return ZT_THREAD_PRIORITY_TIME_CRITICAL;
+        case QOS_CLASS_USER_INITIATED:   return ZT_THREAD_PRIORITY_ABOVE_NORMAL;
+        case QOS_CLASS_UTILITY:
+        case QOS_CLASS_BACKGROUND:       return ZT_THREAD_PRIORITY_BELOW_NORMAL;
+        default:                         return 0;
+    }
+}
+
+// QoS on macOS is self-only -- there is no supported way to set another
+// pthread's QoS class. The sole cross-thread caller is the save/load helper
+// elevation (CUI_SaveMsg/LoadMsg), which only affects save responsiveness,
+// not playback timing, so a best-effort no-op here is acceptable.
+void zt_thread_set_priority(zt_thread_handle, int) {}
+
+int zt_thread_get_current_priority(void)
+{
+    return zt_tier_for_qos(qos_class_self());
+}
+
+void zt_thread_set_current_priority(int priority)
+{
+    pthread_set_qos_class_self_np(zt_qos_for_tier(priority), 0);
+}
+
+#else
+
+// Non-Apple POSIX (Linux): elevating to SCHED_FIFO/RR needs privileges we
+// can't assume, so priority requests stay advisory no-ops as before.
 void zt_thread_set_priority(zt_thread_handle, int) {}
 int zt_thread_get_current_priority(void) { return 0; }
 void zt_thread_set_current_priority(int) {}
+
+#endif
 
 zt_timer_handle zt_timer_start(zt_timer_handle timer_id, unsigned int interval_ms, zt_timer_callback callback)
 {
