@@ -452,6 +452,7 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
               unsigned char mm_status = (unsigned char)(dwParam1 & 0xFF);
               unsigned char mm_data1  = (unsigned char)((dwParam1 >> 8) & 0xFF);
               unsigned char mm_data2  = (unsigned char)((dwParam1 >> 16) & 0xFF);
+              bool wake_main_loop = true;
               if (mm_status >= 0x80 && mm_status < 0xF0 &&
                   zt_mm_dispatch(mm_status, mm_data1, mm_data2)) {
                   // Consumed by mapping/learn -- do not enqueue.
@@ -470,9 +471,12 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
               default:
                   if (msg < 0xF0) {
                       midiInQueue.insert(dwParam1);
+                  } else {
+                      wake_main_loop = false; // realtime/system byte: serviced by the sync block below, not here
                   }
                   break;
               }
+              if (wake_main_loop) zt_wake_main_loop();
           }
 
           // External-sync messages: this callback runs on the platform MIDI

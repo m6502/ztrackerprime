@@ -74,6 +74,9 @@ void zt_audition_env_release(int sdlk_key);
 void zt_audition_env_pump(void);
 void zt_audition_env_clear_all(void);
 
+// Returns 1 if any audition voice is active
+int zt_audition_env_active(void);
+
 // Test-fire one envelope from the editor without going through
 // jazz_set_state. `sentinel_key` is a tag the editor can pass to
 // later release this voice via zt_audition_env_release.

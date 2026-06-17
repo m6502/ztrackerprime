@@ -3652,6 +3652,17 @@ int set_video_mode(int w, int h, char *errstr)
   return 1;
 }
 
+static Uint32 g_wake_sdl_event_type = 0;
+
+void zt_wake_main_loop(void)
+{
+    if (!g_wake_sdl_event_type) return;
+    SDL_Event e;
+    SDL_zero(e);
+    e.type = g_wake_sdl_event_type;
+    SDL_PushEvent(&e);
+}
+
 static int zt_backend_init_runtime(char *errstr)
 {
   if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO)) {
@@ -3659,6 +3670,7 @@ static int zt_backend_init_runtime(char *errstr)
     zt_show_error("Error", errstr);
     return 0;
   }
+  g_wake_sdl_event_type = SDL_RegisterEvents(1);
   return 1;
 }
 
@@ -4167,6 +4179,21 @@ static int zt_resolve_midi_in_port(const char *spec) {
     return -1;
 }
 
+static const int ZT_IDLE_TARGET_FPS = 60;
+static const int ZT_IDLE_TARGET_FRAME_MS = 1000 / ZT_IDLE_TARGET_FPS;
+
+static bool zt_main_loop_can_idle_wait(void)
+{
+    if (ztPlayer && ztPlayer->playing) return false;
+    if (zt_config_globals.ableton_link_enable) return false;
+    if (zt_config_globals.midi_in_sync) return false;
+    if (zt_audition_env_active()) return false;
+    if (zt_headless_active()) return false;
+    if (need_refresh || need_update || need_popup_refresh) return false;
+    if (!window_stack.isempty()) return false;
+    return true;
+}
+
 int main(int argc, char *argv[])
 {
   // Install fatal-signal handlers as the very first thing so any
@@ -4347,6 +4374,7 @@ int main(int argc, char *argv[])
 #endif
 
     while (1) {
+      const uint64_t frame_start_ms = SDL_GetTicks();
       // Lua notifiers: fire play/stop on transport transitions, row on the
       // playhead advancing, and idle every iteration. Cheap when nothing is
       // registered (fire() bails immediately). A heavy/looping callback will
@@ -4491,8 +4519,13 @@ int main(int argc, char *argv[])
 
 	      zt_autosave_tick();
 
-	      if(screenmanager.Refresh(screen_buffer)) {
+      if(screenmanager.Refresh(screen_buffer)) {
         zt_backend_present_frame();
+      }
+      else if (zt_main_loop_can_idle_wait()) {
+        int wait_ms = ZT_IDLE_TARGET_FRAME_MS - (int)(SDL_GetTicks() - frame_start_ms);
+        if (wait_ms < 1) wait_ms = 1;
+        SDL_WaitEventTimeout(NULL, wait_ms);
       }
       else {
         SDL_Delay(1);

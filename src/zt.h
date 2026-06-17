@@ -694,6 +694,10 @@ void set_error_status(const char *msg);
 void zt_fun_sounds_toggle(void);
 #endif
 
+// Wake the main loop's idle wait from another thread (the MIDI-in callback).
+// Defined in main.cpp.
+void zt_wake_main_loop(void);
+
 #define COLORS CurrentSkin->Colors
 
 void status(const char *msg,Drawable *S);

@@ -1071,6 +1071,13 @@ void zt_audition_env_clear_all(void) {
     for (int k = 0; k < AUD_MAX; k++) g_aud[k].env_inst = -1;
 }
 
+int zt_audition_env_active(void) {
+    aud_ensure();
+    for (int k = 0; k < AUD_MAX; k++)
+        if (g_aud[k].env_inst >= 0) return 1;
+    return 0;
+}
+
 void zt_audition_env_pump(void) {
     aud_ensure();
     if (!ztPlayer || !ztPlayer->song) return;
