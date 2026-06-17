@@ -308,45 +308,33 @@ void fillline(int y, char c, TColor col, TColor bg, Drawable *S) {
 //
 void printBG(int x, int y, const char *str,TColor col, TColor bg, Drawable *S)
 {
-  TColor *buf,*start;
-  unsigned char byte;
-  int c,i,j,fontptr;
+  const int pitch = Screen_Pitch;
+  const int sw = S->surface->w;
+  const int sh = S->surface->h;
+  TColor *const base = S->getLine(y) + x + 7;
 
-  c = 0 ;
+  for (int c = 0; str[c]; c++) {
 
-  //adjust = S->getLine(y) + x;
+    const int cx = x + (c<<3);
+    if (cx + 7 >= sw) continue;            // char past the right edge: skip it
 
-  start = S->getLine(y) + x + 7;
+    const unsigned char *glyph = &font[((int)(unsigned char)str[c])<<3];
+    TColor *buf = base + (c<<3);           // rightmost pixel of the top row
 
-  while(str[c]) {
-
-    fontptr = ((int)(unsigned char)str[c])<<3;
-    buf = start + (c<<3);
-
-    for(i=0; i<8; i++) {
-
-
-      if((y + i) >= S->surface->h) continue ;
-      if((x + (c<<3) + 7) >= S->surface->w) continue ;
-
-
-      byte = font[fontptr++];
-
-      for(j=0;j<8;j++) {
-
-        if (byte & 1) *buf = col;              // <Manu> Este if se puede sacar del for(;;) y hacer dos bucles en su lugar [EN: this if could be hoisted out of the for(;;) and replaced with two loops]
-        else *buf = bg;
-        
-        buf--;
-        byte >>= 1;
-      }
-
-      buf += Screen_Pitch + 8 ; // - 8;
+    for (int i = 0; i < 8; i++) {
+      if (y + i >= sh) break;              // bottom-clipped; lower rows too
+      const unsigned char byte = glyph[i];
+      buf[ 0] = (byte & 0x01) ? col : bg;
+      buf[-1] = (byte & 0x02) ? col : bg;
+      buf[-2] = (byte & 0x04) ? col : bg;
+      buf[-3] = (byte & 0x08) ? col : bg;
+      buf[-4] = (byte & 0x10) ? col : bg;
+      buf[-5] = (byte & 0x20) ? col : bg;
+      buf[-6] = (byte & 0x40) ? col : bg;
+      buf[-7] = (byte & 0x80) ? col : bg;
+      buf += pitch;
     }
-
-    c++ ;
   }
-
 }
 
 
@@ -370,7 +358,7 @@ int hex2dec(char c) {
 void printBGCC(int x, int y, const char *str, TColor col, TColor bg, Drawable *S) {
     TColor *buf,use;
     unsigned char byte;
-    int c=0,i,j,pos=0;
+    int c=0,i,pos=0;
     use = col;
     while(str[c]) {
         if (str[c] == '|' && str[c+1] != '|') {
@@ -389,21 +377,26 @@ void printBGCC(int x, int y, const char *str, TColor col, TColor bg, Drawable *S
             c+=2;
         } else if (str[c] == '|' && str[c+1] == '|') c++;
         
-        for(i=0;i<8;i++) {
-
-          if((y + i) >= S->surface->h) continue ;
-          if((x + (pos<<3) + 7) >= S->surface->w) continue ;
-
-
-            byte = font[(((int)(unsigned char)str[c])<<3)+i];
-            buf = S->getLine(y+i) + x + (pos<<3) + 7;
-            for(j=0;j<8;j++) {
-                if (byte & 1)
-                    *buf = use;
-                else
-                    *buf = bg;
-                buf--;
-                byte >>= 1;
+        // Same branchless-store + hoisted-bounds treatment as printBG; also
+        // caches the row base instead of re-calling getLine() every row.
+        const int cx = x + (pos<<3);
+        if (cx + 7 < S->surface->w) {
+            const unsigned char *glyph = &font[((int)(unsigned char)str[c])<<3];
+            const int pitch = Screen_Pitch;
+            const int sh = S->surface->h;
+            buf = S->getLine(y) + cx + 7;
+            for(i=0;i<8;i++) {
+                if (y + i >= sh) break;
+                byte = glyph[i];
+                buf[ 0] = (byte & 0x01) ? use : bg;
+                buf[-1] = (byte & 0x02) ? use : bg;
+                buf[-2] = (byte & 0x04) ? use : bg;
+                buf[-3] = (byte & 0x08) ? use : bg;
+                buf[-4] = (byte & 0x10) ? use : bg;
+                buf[-5] = (byte & 0x20) ? use : bg;
+                buf[-6] = (byte & 0x40) ? use : bg;
+                buf[-7] = (byte & 0x80) ? use : bg;
+                buf += pitch;
             }
         }
         c++;
