@@ -176,6 +176,13 @@ static void mm_toggle_cc_drawmode(void) {
     zt_advance_cc_drawmode();
 }
 
+#ifdef _ENABLE_AUDIO
+static void mm_fun_sounds(void) {
+    // Toggles the TestTone warble; writes its own ON/OFF status message.
+    zt_fun_sounds_toggle();
+}
+#endif
+
 // Build a CLI invocation string that re-launches zt with the same
 // state the user has now (open MIDI in ports, MIDI clock chase target,
 // loaded song file) and copy it to the system clipboard. Pairs with
@@ -271,6 +278,9 @@ static const mm_entry MM_ENTRIES[] = {
     {MM_CMD,        "Paketti CCizer",           "Shift+F3",             CMD_SWITCH_CCCONSOLE,       NULL},
     {MM_CMD,        "SysEx Librarian",          "Shift+F5",             CMD_SWITCH_SYSEX_LIB,       NULL},
     {MM_FUNC,       "Cycle CC Drawmode",        "Ctrl+Shift+\xA7",      0,                          mm_toggle_cc_drawmode},
+#ifdef _ENABLE_AUDIO
+    {MM_FUNC,       "Fun Sounds (warble)",      "Ctrl+Alt+F",           0,                          mm_fun_sounds},
+#endif
     {MM_CMD,        "Lua Console",              "Ctrl+Alt+L",           CMD_SWITCH_LUA_CONSOLE,     NULL},
     {MM_FUNC,       "Toggle Fullscreen",        "Alt+Enter",            0,                          mm_toggle_fullscreen},
 

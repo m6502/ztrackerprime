@@ -119,9 +119,10 @@ static inline void zt_text_input_stop(void) {
 #endif
 #define ZTRACKER_VERSION                "zTracker' v" ZT_BUILD_DATE
 
-// audio path: dormant by default (no device opened at boot); woken lazily by the Ctrl+Alt+F fun-sounds easter egg
-// #define _ENABLE_AUDIO                 1
-#undef _ENABLE_AUDIO
+// Audio path: compiled in, but dormant at boot (no output device opened). The
+// fun-sounds easter egg (Ctrl+Alt+F) wakes it lazily on first use, and the
+// sampler opens it when audio_enabled. Compiles warning-clean.
+#define _ENABLE_AUDIO                 1
 
 #define ZOOM                            (zt_config_globals.zoom)
 
@@ -685,6 +686,13 @@ extern const char *statusmsg;
 extern char szStatmsg[1024];
 extern Uint64 statusmsg_error_until_ms;
 void set_error_status(const char *msg);
+
+#ifdef _ENABLE_AUDIO
+// Fun-sounds easter egg: wakes the dormant audio path and toggles the TestTone
+// warble. Triggered by Ctrl+Alt+F (macOS: Ctrl+Option+F) and the ESC-menu
+// "Fun Sounds" entry. Defined in main.cpp.
+void zt_fun_sounds_toggle(void);
+#endif
 
 #define COLORS CurrentSkin->Colors
 

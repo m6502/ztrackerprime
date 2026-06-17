@@ -204,17 +204,9 @@ int MidiOutputDevice::sendSysEx(const unsigned char *bytes, int len) {
 
 TestToneOutputDevice::TestToneOutputDevice()
 {
-  int i ;
-
     type = OUTPUTDEVICE_TYPE_AUDIO;
     strcpy(szName, "TestTone Audio Plugin");
     reset();
-    wavec = 0;
-    for(i=0;i<128;i++)
-        wave[i]=0;
-    for(i=128;i<256;i++)
-        wave[i]=0x7F;
-    //smp = NULL;
 }
 
 
@@ -238,36 +230,49 @@ int TestToneOutputDevice::close(void) {
 
 void TestToneOutputDevice::reset(void) {
     makenoise = 0;
+    phase = 0.0;
+    lfo   = 0.0;
     OutputDevice::reset(); // dont forget this
 }
 void TestToneOutputDevice::hardpanic(void) {
     panic();
 }
-void TestToneOutputDevice::send(unsigned int msg) {
+void TestToneOutputDevice::send(unsigned int) {
 }
-void TestToneOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+void TestToneOutputDevice::noteOn(unsigned char, unsigned char, unsigned char) {
     makenoise=1;
-    //Mix_PlayChannel(-1,smp,0);
 }
-void TestToneOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
+void TestToneOutputDevice::noteOff(unsigned char, unsigned char, unsigned char) {
     makenoise=0;
 }
-void TestToneOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
+void TestToneOutputDevice::afterTouch(unsigned char, unsigned char, unsigned char) {
 }
-void TestToneOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+void TestToneOutputDevice::pitchWheel(unsigned char, unsigned short int) {
 }
-void TestToneOutputDevice::progChange(int program, int bank, unsigned char chan) {
+void TestToneOutputDevice::progChange(int, int, unsigned char) {
 }
-void TestToneOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
+void TestToneOutputDevice::sendCC(unsigned char, unsigned char, unsigned char) {
 }
 void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
-    //Mix_PlayChannelTimed()
-    
-        if (makenoise) {
-        for(int i=0;i<len;i++) {
-            stream[i] = wave[wavec&0xFF];
-            wavec++; 
-        }
+    (void)udata;
+    if (!makenoise) return;   // leave the (mixer-zeroed) buffer silent
+
+    // A sine carrier whose pitch is swept up and down by a slow LFO -- the
+    // "weee-ooo" warble. Proper S16 stereo samples (the old version wrote
+    // 8-bit bytes into the 16-bit buffer, which just buzzed at a fixed pitch).
+    const double SR  = 44100.0;
+    const double TAU = 6.283185307179586;
+    Sint16 *out = (Sint16 *)stream;
+    int frames = len / (int)(2 * sizeof(Sint16));   // 2 channels, S16
+    for (int f = 0; f < frames; f++) {
+        lfo += TAU * 7.0 / SR;                       // ~7 Hz wobble
+        if (lfo >= TAU) lfo -= TAU;
+        double freq = 440.0 + 260.0 * sin(lfo);      // sweeps ~180..700 Hz
+        phase += TAU * freq / SR;
+        if (phase >= TAU) phase -= TAU;
+        Sint16 s = (Sint16)(7000.0 * sin(phase));    // ~21% full scale
+        *out++ = s;   // left
+        *out++ = s;   // right
     }
 }
 
@@ -302,23 +307,24 @@ void NoiseOutputDevice::reset(void) {
 void NoiseOutputDevice::hardpanic(void) {
     panic();
 }
-void NoiseOutputDevice::send(unsigned int msg) {
+void NoiseOutputDevice::send(unsigned int) {
 }
-void NoiseOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+void NoiseOutputDevice::noteOn(unsigned char, unsigned char, unsigned char) {
     makenoise=1;
 }
-void NoiseOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
+void NoiseOutputDevice::noteOff(unsigned char, unsigned char, unsigned char) {
     makenoise=0;
 }
-void NoiseOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
+void NoiseOutputDevice::afterTouch(unsigned char, unsigned char, unsigned char) {
 }
-void NoiseOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+void NoiseOutputDevice::pitchWheel(unsigned char, unsigned short int) {
 }
-void NoiseOutputDevice::progChange(int program, int bank, unsigned char chan) {
+void NoiseOutputDevice::progChange(int, int, unsigned char) {
 }
-void NoiseOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
+void NoiseOutputDevice::sendCC(unsigned char, unsigned char, unsigned char) {
 }
 void NoiseOutputDevice::work( void *udata, Uint8 *stream, int len) {
+    (void)udata;
     if (makenoise) {
         for(int i=0;i<len;i++) {
             stream[i] = rand()&0x3F;

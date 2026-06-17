@@ -248,11 +248,14 @@
 
 |L|%==|H|Easter Eggs|L|==%|U|
 
- CTRL-ALT-F : Fun sounds. Wakes zTracker's normally-dormant SDL3 audio
-              path on first press and toggles the "TestTone" generator --
-              a deliberately warbly square-ish tone (8-bit aliased into the
-              16-bit output). Press again to stop. A normal MIDI-only
-              session never opens an audio device unless you press this.
+ Fun Sounds : Wakes zTracker's normally-dormant SDL3 audio path on first
+              use and toggles the "TestTone" generator -- a deliberately
+              warbly square-ish tone (8-bit aliased into the 16-bit output).
+              Trigger it two ways: the ESC menu entry "Fun Sounds (warble)",
+              or the shortcut CTRL-ALT-F. On macOS that is CTRL-OPTION-F --
+              NOT Ctrl-Cmd-F, which is macOS's own Enter-Full-Screen. Do it
+              again to stop. A status line confirms ON/OFF. A normal
+              MIDI-only session never opens an audio device unless you ask.
 
 |L|%==|H|Command-Line Arguments|L|==%|U|
 
