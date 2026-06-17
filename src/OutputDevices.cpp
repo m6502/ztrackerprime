@@ -237,22 +237,21 @@ void TestToneOutputDevice::reset(void) {
 void TestToneOutputDevice::hardpanic(void) {
     panic();
 }
-void TestToneOutputDevice::send(unsigned int msg) {
+void TestToneOutputDevice::send(unsigned int) {
 }
-void TestToneOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+void TestToneOutputDevice::noteOn(unsigned char, unsigned char, unsigned char) {
     makenoise=1;
-    //Mix_PlayChannel(-1,smp,0);
 }
-void TestToneOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
+void TestToneOutputDevice::noteOff(unsigned char, unsigned char, unsigned char) {
     makenoise=0;
 }
-void TestToneOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
+void TestToneOutputDevice::afterTouch(unsigned char, unsigned char, unsigned char) {
 }
-void TestToneOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+void TestToneOutputDevice::pitchWheel(unsigned char, unsigned short int) {
 }
-void TestToneOutputDevice::progChange(int program, int bank, unsigned char chan) {
+void TestToneOutputDevice::progChange(int, int, unsigned char) {
 }
-void TestToneOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
+void TestToneOutputDevice::sendCC(unsigned char, unsigned char, unsigned char) {
 }
 void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
     (void)udata;
@@ -308,23 +307,24 @@ void NoiseOutputDevice::reset(void) {
 void NoiseOutputDevice::hardpanic(void) {
     panic();
 }
-void NoiseOutputDevice::send(unsigned int msg) {
+void NoiseOutputDevice::send(unsigned int) {
 }
-void NoiseOutputDevice::noteOn(unsigned char note, unsigned char chan, unsigned char vol) {
+void NoiseOutputDevice::noteOn(unsigned char, unsigned char, unsigned char) {
     makenoise=1;
 }
-void NoiseOutputDevice::noteOff(unsigned char note, unsigned char chan, unsigned char vol) {
+void NoiseOutputDevice::noteOff(unsigned char, unsigned char, unsigned char) {
     makenoise=0;
 }
-void NoiseOutputDevice::afterTouch(unsigned char note, unsigned char chan, unsigned char vol) {
+void NoiseOutputDevice::afterTouch(unsigned char, unsigned char, unsigned char) {
 }
-void NoiseOutputDevice::pitchWheel(unsigned char chan, unsigned short int value) {
+void NoiseOutputDevice::pitchWheel(unsigned char, unsigned short int) {
 }
-void NoiseOutputDevice::progChange(int program, int bank, unsigned char chan) {
+void NoiseOutputDevice::progChange(int, int, unsigned char) {
 }
-void NoiseOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
+void NoiseOutputDevice::sendCC(unsigned char, unsigned char, unsigned char) {
 }
 void NoiseOutputDevice::work( void *udata, Uint8 *stream, int len) {
+    (void)udata;
     if (makenoise) {
         for(int i=0;i<len;i++) {
             stream[i] = rand()&0x3F;

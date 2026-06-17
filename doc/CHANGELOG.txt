@@ -4,6 +4,17 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_17 (Audio: warning-clean, re-enabled so the fun sounds actually run)
+----------------------------------------------------------------------------
+
+        * Re-enable _ENABLE_AUDIO. It had been turned off (#undef) to suppress
+          the compiler warnings that compiling the audio path introduced, which
+          also compiled the fun-sounds easter egg out entirely. Those were all
+          -Wunused-parameter in the TestTone / NoiseMaker stub methods; their
+          unused note/chan/vol/msg/etc. parameter names are now dropped (and
+          NoiseMaker::work marks udata unused), so the audio path builds clean.
+          The fun sounds (Ctrl+Alt+F / ESC menu) work again, warning-free.
+
 zt 2026_06_17 (Fun sounds: ESC-menu entry + macOS fullscreen-collision fix)
 ----------------------------------------------------------------------------
 
