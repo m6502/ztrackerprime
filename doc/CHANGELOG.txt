@@ -4,6 +4,21 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_17 (Fun sounds: ESC-menu entry + macOS fullscreen-collision fix)
+----------------------------------------------------------------------------
+
+        + ESC menu now has a "Fun Sounds (warble)" entry -- a reliable,
+          clickable way to trigger the easter egg (no shortcut to fumble).
+
+        * Fixed the Ctrl+Alt+F shortcut on macOS. Cmd maps to KS_META|KS_ALT,
+          so the old "Ctrl + Alt" test was also satisfied by Ctrl+Cmd+F --
+          which is macOS's own Enter-Full-Screen accelerator, so the key did
+          nothing but toggle fullscreen. The shortcut now requires Alt WITHOUT
+          Meta: Ctrl+Option+F triggers fun sounds, Ctrl+Cmd+F stays fullscreen.
+
+        + Fun sounds now writes an on-screen status line (ON / OFF / no audio
+          device) so there's visible confirmation it fired.
+
 zt 2026_06_16 (Fun sounds easter egg: Ctrl+Alt+F)
 ----------------------------------------------------------------------------
 

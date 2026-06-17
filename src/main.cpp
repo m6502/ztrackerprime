@@ -363,9 +363,6 @@ CUI_SongMessage *UIP_SongMessage = NULL;
 CUI_Arpeggioeditor *UIP_Arpeggioeditor = NULL;
 CUI_Midimacroeditor *UIP_Midimacroeditor = NULL;
 CUI_LuaConsole *UIP_LuaConsole = NULL;
-#ifdef _ENABLE_AUDIO
-static void zt_fun_sounds_toggle(void);   // fun-sounds easter egg; defined with the audio backend
-#endif
 CUI_KeyBindings *UIP_KeyBindings = NULL;
 CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
@@ -1741,9 +1738,13 @@ void global_keys(Drawable *S)
                 }
                 break;
 
-            case SDLK_F: // Fun sounds easter egg (Ctrl+Alt+F)
+            case SDLK_F: // Fun sounds easter egg (Ctrl+Alt+F; macOS: Ctrl+Option+F)
 #ifdef _ENABLE_AUDIO
-                if ((kstate & KS_CTRL) && (kstate & KS_ALT)) {
+                // Require ALT without META: on macOS Cmd = KS_META|KS_ALT, and
+                // Ctrl+Cmd+F is the system "Enter Full Screen" accelerator. So
+                // match Ctrl+Option+F (KS_ALT, no KS_META) and leave Ctrl+Cmd+F
+                // to fullscreen.
+                if ((kstate & KS_CTRL) && (kstate & KS_ALT) && !(kstate & KS_META)) {
                     zt_fun_sounds_toggle();
                     key = Keys.getkey();
                     need_refresh++;
@@ -3881,11 +3882,14 @@ static bool g_fun_audio_up = false;
 static bool g_fun_playing  = false;
 static int  g_fun_dev      = -1;
 
-static void zt_fun_sounds_toggle(void)
+void zt_fun_sounds_toggle(void)
 {
   if (!g_fun_audio_up) {
-    if (!zt_backend_audio_start())
-      return;                         // no output device -> stay silent, never crash
+    if (!zt_backend_audio_start()) {
+      statusmsg = "Fun sounds: no audio output device";   // non-fatal, never crash
+      status_change = 1;
+      return;
+    }
     g_fun_audio_up = true;
     for (unsigned int d = 0; d < MidiOut->numOuputDevices; d++) {
       if (MidiOut->outputDevices[d]->type == OUTPUTDEVICE_TYPE_AUDIO &&
@@ -3897,10 +3901,20 @@ static void zt_fun_sounds_toggle(void)
     if (g_fun_dev >= 0)
       MidiOut->AddDevice(g_fun_dev);  // open() + enlist into the live mix
   }
-  if (g_fun_dev < 0) return;
+  if (g_fun_dev < 0) {
+    statusmsg = "Fun sounds: TestTone device unavailable";
+    status_change = 1;
+    return;
+  }
   g_fun_playing = !g_fun_playing;
-  if (g_fun_playing) MidiOut->outputDevices[g_fun_dev]->noteOn(60, 0, 127);
-  else               MidiOut->outputDevices[g_fun_dev]->noteOff(60, 0, 0);
+  if (g_fun_playing) {
+    MidiOut->outputDevices[g_fun_dev]->noteOn(60, 0, 127);
+    statusmsg = "Fun sounds: ON (warble) -- press again to stop";
+  } else {
+    MidiOut->outputDevices[g_fun_dev]->noteOff(60, 0, 0);
+    statusmsg = "Fun sounds: OFF";
+  }
+  status_change = 1;
 }
 #endif
 
