@@ -119,9 +119,10 @@ static inline void zt_text_input_stop(void) {
 #endif
 #define ZTRACKER_VERSION                "zTracker' v" ZT_BUILD_DATE
 
-// audio path: dormant by default (no device opened at boot); woken lazily by the Ctrl+Alt+F fun-sounds easter egg
-// #define _ENABLE_AUDIO                 1
-#undef _ENABLE_AUDIO
+// Audio path: compiled in, but dormant at boot (no output device opened). The
+// fun-sounds easter egg (Ctrl+Alt+F) wakes it lazily on first use, and the
+// sampler opens it when audio_enabled. Compiles warning-clean.
+#define _ENABLE_AUDIO                 1
 
 #define ZOOM                            (zt_config_globals.zoom)
 
