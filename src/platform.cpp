@@ -152,6 +152,7 @@ void zt_show_error(const char *title, const char *message)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sched.h>
 #include <atomic>
 #include <unordered_map>
 #include <mutex>
@@ -414,7 +415,7 @@ static int zt_tier_for_qos(qos_class_t q)
         case QOS_CLASS_USER_INITIATED:   return ZT_THREAD_PRIORITY_ABOVE_NORMAL;
         case QOS_CLASS_UTILITY:
         case QOS_CLASS_BACKGROUND:       return ZT_THREAD_PRIORITY_BELOW_NORMAL;
-        default:                         return 0;
+        default:                         return ZT_THREAD_PRIORITY_DEFAULT;
     }
 }
 
@@ -436,11 +437,71 @@ void zt_thread_set_current_priority(int priority)
 
 #else
 
-// Non-Apple POSIX (Linux): elevating to SCHED_FIFO/RR needs privileges we
-// can't assume, so priority requests stay advisory no-ops as before.
-void zt_thread_set_priority(zt_thread_handle, int) {}
-int zt_thread_get_current_priority(void) { return 0; }
-void zt_thread_set_current_priority(int) {}
+// There are no POSIX priority constants like on win/macOS, so we
+// use the standard sched_get_priority_min/sched_get_priority_max
+// to get actual values. They are divided by 5 and 10 to be deliberately
+// modest, well under the kernel's IRQ/watchdog band. Only threads that
+// request RT (the 1 ms timer heartbeat and the buffer-fill counter thread)
+// sleep every iteration, so are serviced first and don't peg a CPU.
+static bool zt_posix_rt_prio_for_tier(int tier, int *out_prio)
+{
+    int lo = sched_get_priority_min(SCHED_FIFO);
+    int hi = sched_get_priority_max(SCHED_FIFO);
+    if (lo < 0 || hi < 0) return false;
+    int span = hi - lo;
+    if (tier >= ZT_THREAD_PRIORITY_TIME_CRITICAL) { *out_prio = lo + span / 5;  return true; }
+    if (tier >= ZT_THREAD_PRIORITY_ABOVE_NORMAL) { *out_prio = lo + span / 10;  return true; }
+    return false;
+}
+
+static void zt_posix_apply_priority(pthread_t t, int tier)
+{
+    struct sched_param sp;
+    int prio;
+    if (zt_posix_rt_prio_for_tier(tier, &prio)) {
+        sp.sched_priority = prio;
+        int rc = pthread_setschedparam(t, SCHED_FIFO, &sp);
+        if (rc != 0) {
+            static std::atomic<bool> warned{false};
+            if (!warned.exchange(true)) {
+                fprintf(stderr,
+                    "zt: real-time thread priority denied (%s); using normal scheduling "
+                    "(grant RT via rtprio in limits.conf or CAP_SYS_NICE for tighter timing)\n",
+                    strerror(rc));
+            }
+        }
+    } else {
+        // NORMAL/BELOW_NORMAL, or restoring a saved priority: return to the
+        // default time-sharing scheduler (also clears any earlier RT boost).
+        sp.sched_priority = 0;
+        pthread_setschedparam(t, SCHED_OTHER, &sp);
+    }
+}
+
+void zt_thread_set_priority(zt_thread_handle thread, int priority)
+{
+    zt_posix_thread *t = (zt_posix_thread *)thread;
+    if (t) zt_posix_apply_priority(t->thread, priority);
+}
+
+void zt_thread_set_current_priority(int priority)
+{
+    zt_posix_apply_priority(pthread_self(), priority);
+}
+
+int zt_thread_get_current_priority(void)
+{
+    int policy;
+    struct sched_param sp;
+    if (pthread_getschedparam(pthread_self(), &policy, &sp) != 0) return 0;
+    if (policy == SCHED_FIFO) {
+        int lo = sched_get_priority_min(SCHED_FIFO);
+        int hi = sched_get_priority_max(SCHED_FIFO);
+        if (lo >= 0 && hi >= 0 && sp.sched_priority >= lo + (hi - lo) / 5)
+            return ZT_THREAD_PRIORITY_TIME_CRITICAL;
+    }
+    return ZT_THREAD_PRIORITY_DEFAULT;
+}
 
 #endif
 
