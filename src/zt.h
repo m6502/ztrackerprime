@@ -686,6 +686,13 @@ extern char szStatmsg[1024];
 extern Uint64 statusmsg_error_until_ms;
 void set_error_status(const char *msg);
 
+#ifdef _ENABLE_AUDIO
+// Fun-sounds easter egg: wakes the dormant audio path and toggles the TestTone
+// warble. Triggered by Ctrl+Alt+F (macOS: Ctrl+Option+F) and the ESC-menu
+// "Fun Sounds" entry. Defined in main.cpp.
+void zt_fun_sounds_toggle(void);
+#endif
+
 #define COLORS CurrentSkin->Colors
 
 void status(const char *msg,Drawable *S);
