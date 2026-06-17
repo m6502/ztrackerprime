@@ -19,6 +19,14 @@ zt 2026_06_17 (Fun sounds: ESC-menu entry + macOS fullscreen-collision fix)
         + Fun sounds now writes an on-screen status line (ON / OFF / no audio
           device) so there's visible confirmation it fired.
 
+        * The warble actually warbles now, and actually stops. The mixer
+          callback malloc'd its buffer without zeroing it, so when no generator
+          was writing (i.e. "stopped") SDL played uninitialized garbage -- you
+          could not make it go quiet. It now starts each callback from silence.
+          And TestTone was an 8-bit square written into a 16-bit buffer = a
+          flat ~689 Hz buzz; it is now a proper S16 sine whose pitch is swept
+          180..700 Hz by a ~7 Hz LFO -- an actual "weee-ooo" warble.
+
 zt 2026_06_16 (Fun sounds easter egg: Ctrl+Alt+F)
 ----------------------------------------------------------------------------
 

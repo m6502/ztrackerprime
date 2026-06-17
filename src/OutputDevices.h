@@ -49,8 +49,8 @@ class MidiOutputDevice : public OutputDevice {
 class TestToneOutputDevice : public AudioOutputDevice {
     public:
         int makenoise;
-        int wavec;
-         unsigned char wave[256];
+        double phase;   // carrier phase accumulator (radians)
+        double lfo;     // wobble-LFO phase accumulator (radians)
          TestToneOutputDevice();
         ~TestToneOutputDevice();
         virtual int open(void);

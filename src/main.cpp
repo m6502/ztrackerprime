@@ -3837,6 +3837,10 @@ static void audio_mixer(void *udata, SDL_AudioStream *stream, int additional_amo
   if (!mixbuf) {
     return;
   }
+  // Start from silence (S16 zero). A generator only writes while it's making
+  // sound; without this the buffer is uninitialized garbage, so "stopping"
+  // the fun sounds would play random noise instead of going quiet.
+  memset(mixbuf, 0, (size_t)additional_amount);
 
   MidiOut->MixAudio(udata, mixbuf, additional_amount);
   SDL_PutAudioStreamData(stream, mixbuf, additional_amount);

@@ -204,17 +204,9 @@ int MidiOutputDevice::sendSysEx(const unsigned char *bytes, int len) {
 
 TestToneOutputDevice::TestToneOutputDevice()
 {
-  int i ;
-
     type = OUTPUTDEVICE_TYPE_AUDIO;
     strcpy(szName, "TestTone Audio Plugin");
     reset();
-    wavec = 0;
-    for(i=0;i<128;i++)
-        wave[i]=0;
-    for(i=128;i<256;i++)
-        wave[i]=0x7F;
-    //smp = NULL;
 }
 
 
@@ -238,6 +230,8 @@ int TestToneOutputDevice::close(void) {
 
 void TestToneOutputDevice::reset(void) {
     makenoise = 0;
+    phase = 0.0;
+    lfo   = 0.0;
     OutputDevice::reset(); // dont forget this
 }
 void TestToneOutputDevice::hardpanic(void) {
@@ -261,13 +255,25 @@ void TestToneOutputDevice::progChange(int program, int bank, unsigned char chan)
 void TestToneOutputDevice::sendCC(unsigned char cc, unsigned char value,unsigned char chan) {
 }
 void TestToneOutputDevice::work( void *udata, Uint8 *stream, int len) {
-    //Mix_PlayChannelTimed()
-    
-        if (makenoise) {
-        for(int i=0;i<len;i++) {
-            stream[i] = wave[wavec&0xFF];
-            wavec++; 
-        }
+    (void)udata;
+    if (!makenoise) return;   // leave the (mixer-zeroed) buffer silent
+
+    // A sine carrier whose pitch is swept up and down by a slow LFO -- the
+    // "weee-ooo" warble. Proper S16 stereo samples (the old version wrote
+    // 8-bit bytes into the 16-bit buffer, which just buzzed at a fixed pitch).
+    const double SR  = 44100.0;
+    const double TAU = 6.283185307179586;
+    Sint16 *out = (Sint16 *)stream;
+    int frames = len / (int)(2 * sizeof(Sint16));   // 2 channels, S16
+    for (int f = 0; f < frames; f++) {
+        lfo += TAU * 7.0 / SR;                       // ~7 Hz wobble
+        if (lfo >= TAU) lfo -= TAU;
+        double freq = 440.0 + 260.0 * sin(lfo);      // sweeps ~180..700 Hz
+        phase += TAU * freq / SR;
+        if (phase >= TAU) phase -= TAU;
+        Sint16 s = (Sint16)(7000.0 * sin(phase));    // ~21% full scale
+        *out++ = s;   // left
+        *out++ = s;   // right
     }
 }
 
