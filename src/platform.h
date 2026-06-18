@@ -26,6 +26,7 @@ typedef void (*zt_timer_callback)(void);
 
 enum {
     ZT_THREAD_PRIORITY_BELOW_NORMAL = -1,
+    ZT_THREAD_PRIORITY_DEFAULT = 0,
     ZT_THREAD_PRIORITY_ABOVE_NORMAL = 1,
     ZT_THREAD_PRIORITY_TIME_CRITICAL = 15
 };
