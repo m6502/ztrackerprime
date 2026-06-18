@@ -133,6 +133,44 @@ target_include_directories(test_ccenv PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_ccenv PRIVATE cxx_std_17)
 add_test(NAME ccenv COMMAND test_ccenv)
 
+# SMPL / SMIX .zt chunk round-trip + the zt_sample data model. SDL-free:
+# compiles the real src/sample.cpp (zt_sample has no SDL deps) and mirrors
+# the SMPL/SMIX reader/writer byte-for-byte in a tiny in-test buffer, the
+# same approach test_ccbn_roundtrip uses for the CCBN chunk.
+add_executable(test_sample_chunk
+    test_sample_chunk.cpp
+    "${CMAKE_SOURCE_DIR}/src/sample.cpp"
+)
+target_include_directories(test_sample_chunk PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_sample_chunk PRIVATE cxx_std_17)
+add_test(NAME sample_chunk COMMAND test_sample_chunk)
+
+# WAV loader. Unlike the other suites this DOES link SDL3, because the
+# loader's whole job is SDL_LoadWAV + SDL_ConvertAudioSamples. The test
+# feeds in-memory WAV blobs via SDL_IOFromMem -- no temp file or committed
+# fixture. SDL is wired the same way as the main `zt` target (pkg-config
+# preferred, manual SDL3_INCLUDE_DIR/SDL3_LIBRARY fallback).
+add_executable(test_sample_load
+    test_sample_load.cpp
+    "${CMAKE_SOURCE_DIR}/src/sample.cpp"
+    "${CMAKE_SOURCE_DIR}/src/sample_load.cpp"
+)
+target_include_directories(test_sample_load PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_sample_load PRIVATE cxx_std_17)
+if(TARGET PkgConfig::SDL3PC)
+    target_link_libraries(test_sample_load PRIVATE PkgConfig::SDL3PC)
+    if(SDL3_COMPAT_INCLUDE_DIR)
+        target_include_directories(test_sample_load SYSTEM PRIVATE "${SDL3_COMPAT_INCLUDE_DIR}")
+    endif()
+else()
+    target_include_directories(test_sample_load SYSTEM PRIVATE "${SDL3_INCLUDE_DIR}")
+    if(EXISTS "${SDL3_INCLUDE_DIR}/SDL3/SDL.h")
+        target_include_directories(test_sample_load SYSTEM PRIVATE "${SDL3_INCLUDE_DIR}/SDL3")
+    endif()
+    target_link_libraries(test_sample_load PRIVATE ${SDL3_LIBRARY})
+endif()
+add_test(NAME sample_load COMMAND test_sample_load)
+
 # Shared keyjazz note table (keyjazz_map.h). Regression-guards the tracker
 # layout byte-for-byte after the four-switch -> one-function refactor, and
 # locks in the Ableton/Logic piano layout + the two layouts' mutual exclusivity.

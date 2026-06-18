@@ -237,6 +237,38 @@ zt 2026_05_31 (Pattern Editor keymap: Ctrl-D select, Ctrl-Shift-P duration)
           global "Load Song" rather than the documented "select whole
           track / pattern" block function -- the global handler shadows
           the page binding. Left as-is for now.
+zt 2026_05_29 (Sample playback foundation: pool + .zt persistence + WAV loader)
+----------------------------------------------------------------------------
+
+        ! PR A of the optional sample-playback work. This lays the
+          foundation only -- it adds storage, file persistence and a WAV
+          loader, but NO audio engine yet, so nothing here makes sound.
+          The SampleOutputDevice voice mixer that plays the pool lands in
+          PR B. See doc/sample-playback-design.md for the full plan.
+
+        + New song-level PCM sample pool (zt_sample, src/sample.{h,cpp}):
+          interleaved S16 frames, loop points, root note, finetune, rate.
+          A song carries up to 100 samples; instruments optionally link to
+          one via a new instrument.sample_index field (-1 = MIDI-only, the
+          default).
+
+        + .zt persistence via two new OPTIONAL chunks:
+            - SMPL: one chunk per occupied sample slot (carries the PCM).
+            - SMIX: per-instrument sample-pool links (CCBN-style parallel
+              chunk; the instrument record format is untouched).
+          Both are skipped by older zTracker (and by this build when the
+          pool is empty), so MIDI-only songs save byte-identically and
+          load cleanly in either direction -- fully backward+forward
+          compatible, the same contract as the CCBN chunk.
+
+        + WAV loader (src/sample_load.{h,cpp}): SDL_LoadWAV +
+          SDL_ConvertAudioSamples to interleaved S16 mono/stereo (>2-channel
+          sources are downmixed to stereo).
+
+        + Two new unit-test suites: test_sample_chunk (SDL-free SMPL/SMIX
+          round-trip + the zt_sample data model) and test_sample_load
+          (SDL-linked WAV loader, fed in-memory WAVs -- no fixtures).
+          ctest is now 14 suites.
 
 zt 2026_05_29 (Instrument Editor: Create 16 channels for a MIDI device)
 ----------------------------------------------------------------------------
