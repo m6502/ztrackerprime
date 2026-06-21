@@ -3,6 +3,7 @@
 #include "ccizer.h"
 #include "keybindings.h"
 #include "keyjazz_map.h"
+#include "track_color.h"
 
 // KS_META stub for Cmd key support (SDL3 maps macOS Cmd to SDL_KMOD_GUI).
 // Currently keybuffer does not translate GUI -> KS_META, so KS_META is a
@@ -13,6 +14,10 @@
 #endif
 
 static PatternUndo g_undo;
+
+// Track custom color helpers
+#define shade_color   zt_track_shade
+#define text_for_bg   zt_track_text_for_bg
 
 // Save undo snapshot before destructive pattern operations
 #define UNDO_SAVE() g_undo.save(song, cur_edit_pattern)
@@ -41,6 +46,19 @@ event *upd_e = NULL;
 
 int max_displayable_rows = 0 ;
 int g_posx_tracks = 0 ;
+
+// When the visible track block is narrower than the window (few tracks, or
+// integer-division slack between window width and track width), center it
+// in the horizontal space. Returns the extra left-shift in character cells
+// to add to the grid's base columns; 0 when the grid fills the width.
+// Shared by disp_pattern and disp_gfxeffect_pattern so both agree.
+static int pattern_center_off(int tracks_shown, int field_size)
+{
+  int track_pixels = ((tracks_shown * (field_size + 1)) * FONT_SIZE_X) + LEFT_MARGIN;
+  int extra = INTERNAL_RESOLUTION_X - track_pixels;
+  if (extra < 0) extra = 0;
+  return (extra / 2) / FONT_SIZE_X;
+}
 
 int last_unused_key = 0 ;
 
@@ -421,8 +439,16 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     if (block_width < 1) block_width = 1;
     if (block_width > 255) block_width = 255;
 
-    if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," Track %.2d ",j+1);
-    else sprintf(name," %.2d ",j+1);
+    // A custom track name (set in Track Options) overrides "Track NN".
+    const char *custom = song->track_name[j];
+    if (custom[0]) {
+      if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," %s ",custom);
+      else snprintf(name,sizeof(name)," %.4s ",custom);
+    }
+    else {
+      if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," Track %.2d ",j+1);
+      else sprintf(name," %.2d ",j+1);
+    }
 
     int toggle_start = block_width - 3;
     if (toggle_start < 0) toggle_start = block_width;
@@ -434,17 +460,24 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     }
     str[name_len] = 0;
 
+    // Tint the header background with the track's custom color (if any) so
+    // colored tracks are identifiable at the header too, not just in the grid.
+    TColor hdr_bg = COLORS.Lowlight;
     TColor fg = COLORS.Brighttext;
+    if (song->track_color[j]) {
+      hdr_bg = shade_color(song->track_color[j], -16);
+      fg = text_for_bg(hdr_bg);
+    }
     if (song->track_mute[j]) fg = COLORS.Text;
 
     int start_col = g_posx_tracks + (p * block_width);
-    printBG(col(start_col), row(TRACKS_ROW_Y), str, fg, COLORS.Lowlight, S);
+    printBG(col(start_col), row(TRACKS_ROW_Y), str, fg, hdr_bg, S);
 
     int toggle_col = track_header_toggle_column(p, field_size);
     if (toggle_col >= 0) {
       const char *toggle_text = "[On ]";
       if (song->track_mute[j]) toggle_text = "[Off]";
-      printBG(col(toggle_col), row(TRACKS_ROW_Y), (char *)toggle_text, fg, COLORS.Lowlight, S);
+      printBG(col(toggle_col), row(TRACKS_ROW_Y), (char *)toggle_text, fg, hdr_bg, S);
     }
     
     p++;
@@ -574,12 +607,17 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 
   (void)cols_shown;
 
-  printline(col(5),row(TRACKS_ROW_Y),148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
-  printline(col(5),row(TRACKS_ROW_Y+(PATTERN_EDIT_ROWS+1)),143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
-  
+  // Center the grid the same way disp_pattern does; keep g_posx_tracks in
+  // sync so draw_track_markers lands on the centered columns.
+  int co = pattern_center_off(tracks_shown, field_size);
+  g_posx_tracks = (LEFT_MARGIN / FONT_SIZE_X) + co;
+
+  printline(col(5+co),row(TRACKS_ROW_Y),148,(tracks_shown * (field_size+1))-1,COLORS.Lowlight,S); // 0x89
+  printline(col(5+co),row(TRACKS_ROW_Y+(PATTERN_EDIT_ROWS+1)),143,(tracks_shown * (field_size+1))-1,COLORS.Highlight,S); // 0x89
+
   draw_track_markers(tracks_shown, field_size,S);
-  
-  printchar(col(4),row(TRACKS_ROW_Y),139,COLORS.Lowlight,S);
+
+  printchar(col(4+co),row(TRACKS_ROW_Y),139,COLORS.Lowlight,S);
 
 
   num_displayed_rows = 0 ;
@@ -594,17 +632,17 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       
         if (var_row==ztPlayer->playing_cur_row && ztPlayer->playing_cur_pattern==cur_edit_pattern) {
           
-          printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Highlight,COLORS.Background,S);
+          printBG(col(1+co),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Highlight,COLORS.Background,S);
         }
         else {
           
-          printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
+          printBG(col(1+co),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
         }
       } 
       else printBG(col(1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),str,COLORS.Text,COLORS.Background,S);
       
-      printchar(col(4),row(TRACKS_ROW_Y + 1 + num_displayed_rows),146,COLORS.Lowlight,S);
-      printchar(col(4+(tracks_shown*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),145,COLORS.Highlight,S);
+      printchar(col(4+co),row(TRACKS_ROW_Y + 1 + num_displayed_rows),146,COLORS.Lowlight,S);
+      printchar(col(4+co+(tracks_shown*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),145,COLORS.Highlight,S);
     }
     
     
@@ -696,22 +734,22 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
 
       case MD_FX_SIGNED:
 
-        draw_signed_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        draw_signed_bar(col(5+co+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
 
         break;
 
       case MD_CC_DRAW:
 
         if (cc_draw_ghost) {
-          draw_bar_ghost(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+          draw_bar_ghost(col(5+co+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
         } else {
-          draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+          draw_bar(col(5+co+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
         }
         break;
 
       default:
 
-        draw_bar(col(5+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
+        draw_bar(col(5+co+(num_displayed_tracks*(field_size+1))),row(TRACKS_ROW_Y + 1 + num_displayed_rows),col(field_size)-1,row(1),data,datamax,bg,S);
 
         break;
       } ;
@@ -719,7 +757,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
       
       if (var_track<(cur_edit_track_disp+tracks_shown-1)) {
         
-        printchar(col(5+((num_displayed_tracks+1)*(field_size+1))-1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),168,COLORS.Lowlight,S) ;
+        printchar(col(5+co+((num_displayed_tracks+1)*(field_size+1))-1),row(TRACKS_ROW_Y + 1 + num_displayed_rows),168,COLORS.Lowlight,S) ;
       }
 
 please_skip:
@@ -730,10 +768,10 @@ please_skip:
     num_displayed_rows++;
   }
 
-  printchar(col(4),                               row(TRACKS_ROW_Y),                   153, COLORS.Lowlight,  S) ;
-  printchar(col(4+(tracks_shown*(field_size+1))), row(TRACKS_ROW_Y),                   152, COLORS.Lowlight,  S) ;
-  printchar(col(4),                               row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS), 151, COLORS.Lowlight,  S) ;
-  printchar(col(4+(tracks_shown*(field_size+1))), row(TRACKS_ROW_Y + PATTERN_EDIT_ROWS), 150, COLORS.Highlight, S) ;
+  printchar(col(4+co),                               row(TRACKS_ROW_Y),                   153, COLORS.Lowlight,  S) ;
+  printchar(col(4+co+(tracks_shown*(field_size+1))), row(TRACKS_ROW_Y),                   152, COLORS.Lowlight,  S) ;
+  printchar(col(4+co),                               row(TRACKS_ROW_Y + 1 + PATTERN_EDIT_ROWS), 151, COLORS.Lowlight,  S) ;
+  printchar(col(4+co+(tracks_shown*(field_size+1))), row(TRACKS_ROW_Y + PATTERN_EDIT_ROWS), 150, COLORS.Highlight, S) ;
 }
 
 
@@ -791,13 +829,10 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   //printchar(col(4), row(TRACKS_ROW_Y), 139, COLORS.Lowlight,S);
 
   
-  int total_pixels = INTERNAL_RESOLUTION_X /*- LEFT_MARGIN - RIGHT_MARGIN*/ ;
-  int track_pixels = ((tracks_shown * (field_size+1)) * FONT_SIZE_X) + LEFT_MARGIN  ;
-  int extra_pixels = total_pixels - track_pixels ;
-  
-  // Left-align the track grid: no centering, just LEFT_MARGIN.
-  int poscharx_tracks = LEFT_MARGIN / FONT_SIZE_X ;
-  (void)extra_pixels;
+  // Center the track grid horizontally when it doesn't fill the window
+  // (the whole block -- row-number gutter + tracks -- shifts together,
+  // since the row numbers and frame are drawn relative to poscharx_tracks).
+  int poscharx_tracks = (LEFT_MARGIN / FONT_SIZE_X) + pattern_center_off(tracks_shown, field_size) ;
   g_posx_tracks = poscharx_tracks ;
 
 
@@ -852,22 +887,12 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
     {
-      unsigned long Background, Highlight ;
-
-      if(song->patterns[cur_edit_pattern]->custom_colors) {
-
-          Background = song->patterns[cur_edit_pattern]->Background ;
-          Highlight = song->patterns[cur_edit_pattern]->Highlight ;
-      }
-      else {
-
-          Background = COLORS.Background ;
-          Highlight = COLORS.Highlight ;
-      }
+      unsigned long Background = COLORS.Background ;
+      unsigned long Highlight = COLORS.Highlight ;
 
 
       if(var_row >= 0) {       // <Manu> ¿Necesario?
-    
+
             // Contenido de los tracks
 
             num_displayed_tracks = 0 ;
@@ -876,17 +901,21 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
               unsigned long EditText, EditBG, EditBGlow, EditBGhigh ;
 
-              if(song->patterns[cur_edit_pattern]->tracks[var_track]->custom_colors) {
-
-                Background = song->patterns[cur_edit_pattern]->Background ;
-                Highlight = song->patterns[cur_edit_pattern]->Highlight ;
+              // Per-track custom color (song-wide, "drums = red" model). A
+              // nonzero track_color derives the three background shades from
+              // one base; otherwise fall back to the theme's Edit* colors.
+              TColor tc = song->track_color[var_track] ;
+              if (tc) {
+                EditBG     = tc ;
+                EditBGlow  = shade_color(tc, -16) ;
+                EditBGhigh = shade_color(tc,  24) ;
+                EditText   = text_for_bg(tc) ;
               }
               else {
-
-                EditText = song->patterns[cur_edit_pattern]->tracks[var_track]->EditText ;
-                EditBG = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBG ;
-                EditBGlow = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBGlow ;
-                EditBGhigh = song->patterns[cur_edit_pattern]->tracks[var_track]->EditBGhigh ;
+                EditText   = COLORS.EditText ;
+                EditBG     = COLORS.EditBG ;
+                EditBGlow  = COLORS.EditBGlow ;
+                EditBGhigh = COLORS.EditBGhigh ;
               }
 
               //if(var_track == 3)
@@ -924,29 +953,40 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
               else {
 
                 if(special) {
-                    
-                    bg = COLORS.CursorRowLow ;
-                    if (!(var_row % zt_config_globals.lowlight_increment)) {
-                
-                        bg = COLORS.CursorRowHigh ;
-                    }
 
-                    if (!(var_row % zt_config_globals.highlight_increment)) {
-                    
-                        bg = COLORS.CursorRowHigh ;
+                    if (tc) {
+                        // Colored track: keep the cursor row in the track's
+                        // hue (a clearly separated shade) instead of the flat
+                        // theme cursor color.
+                        int beat = (!(var_row % zt_config_globals.lowlight_increment))
+                                || (!(var_row % zt_config_globals.highlight_increment));
+                        bg = zt_track_cursor_bg(tc, beat);
+                    }
+                    else {
+
+                        bg = COLORS.CursorRowLow ;
+                        if (!(var_row % zt_config_globals.lowlight_increment)) {
+
+                            bg = COLORS.CursorRowHigh ;
+                        }
+
+                        if (!(var_row % zt_config_globals.highlight_increment)) {
+
+                            bg = COLORS.CursorRowHigh ;
+                        }
                     }
                 }
                 else {
-                    
+
                     bg = EditBG ;
 
                     if (!(var_row % zt_config_globals.lowlight_increment)) {
-                
+
                         bg = EditBGlow ;
                     }
 
                     if (!(var_row % zt_config_globals.highlight_increment)) {
-                    
+
                         bg = EditBGhigh ;
                     }
 
@@ -954,7 +994,9 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
 
 
-                fg = EditText;
+                // For colored tracks, pick the text color from the actual row
+                // shade (base/low/high/cursor) so contrast holds on every row.
+                fg = tc ? text_for_bg(bg) : EditText;
 
                 if (selected) {
 
@@ -987,14 +1029,17 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
                 if (var_row == cur_edit_row && var_track == cur_edit_track) {
 
-                  printBG(
-                          col(poscharx_tracks + edit_cols[cur_edit_col].startx + (num_displayed_tracks * (field_size + 1))),
+                  // <Manu> On a track with custom color we can invert the row's fg/bg so the caret stays in the
+                  // track's color/hue instead of displaying the theme Highlight (looks horrible)
+                  TColor caret_fg = tc ? bg : EditBG;
+                  TColor caret_bg = tc ? fg : Highlight;
+
+                  printBG(col(poscharx_tracks + edit_cols[cur_edit_col].startx + (num_displayed_tracks * (field_size + 1))),
                           posy_current_row,
                           &str[ edit_cols[cur_edit_col].startx ],
-                          EditBG,
-                          Highlight,
-                          S
-                         );
+                          caret_fg,
+                          caret_bg,
+                          S);
                 }
 
                 
@@ -1260,7 +1305,8 @@ void CUI_Patterneditor::update()
   //char note[4];
   unsigned char val,pval;
   float istart,iend,istep,iadd;   
-  int amount, con;
+  int amount = 0 ;
+  int con;
   int note_row, prev_note_row, x, prev_row;
   
   
@@ -1391,8 +1437,8 @@ void CUI_Patterneditor::update()
       status_change = 1;
     }
 
-    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 6) ;
     field_size = 6;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN) / (FONT_SIZE_X * (field_size + 1)) ;
     cols_shown = 4 ;
     init_short_cols();
 
@@ -1409,8 +1455,8 @@ void CUI_Patterneditor::update()
       status_change = 1;
     }
 
-    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 14) ;
     field_size = 13;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN) / (FONT_SIZE_X * (field_size + 1)) ;
     cols_shown = 9;
     fix_cols();
 
@@ -1427,8 +1473,8 @@ void CUI_Patterneditor::update()
       status_change = 1;
     }
 
-    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / 160 ;    // 160 es lo que mide cada columna; dejamos 80 pixels extras de margen
     field_size = 19;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN) / (FONT_SIZE_X * (field_size + 1)) ;
     cols_shown = 14;
     fix_cols();
 
@@ -1445,11 +1491,8 @@ void CUI_Patterneditor::update()
       status_change = 1;
     }
 
-    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN - RIGHT_MARGIN) / (FONT_SIZE_X * 13) ;
-
-//    if((((INTERNAL_RESOLUTION_X-640)/8) % 13) > .5) tracks_shown++;
-
     field_size = 12;
+    tracks_shown = (INTERNAL_RESOLUTION_X - LEFT_MARGIN) / (FONT_SIZE_X * (field_size + 1)) ;
     cols_shown = 9;
     init_fx_cols();
 
@@ -4222,11 +4265,11 @@ nevermind:;
 // ------------------------------------------------------------------------------------------------
 //
 //
-void CUI_Patterneditor::draw(Drawable *S) 
+void CUI_Patterneditor::draw(Drawable *S)
 {
   event *e;
   bool m_Fullupd = true;
-  
+
   if (S->lock()==0) {
 
 

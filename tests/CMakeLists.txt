@@ -123,6 +123,14 @@ target_include_directories(test_ccbn_roundtrip PRIVATE "${CMAKE_SOURCE_DIR}/src"
 target_compile_features(test_ccbn_roundtrip PRIVATE cxx_std_17)
 add_test(NAME ccbn_roundtrip COMMAND test_ccbn_roundtrip)
 
+# ZTtp chunk: per-track name + custom color round-trip.
+add_executable(test_track_props_roundtrip
+    test_track_props_roundtrip.cpp
+)
+target_include_directories(test_track_props_roundtrip PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_track_props_roundtrip PRIVATE cxx_std_17)
+add_test(NAME track_props_roundtrip COMMAND test_track_props_roundtrip)
+
 # CC envelope pure-logic core: linear interp + advance state machine
 # (sustain hold / release, regular loop, terminate). SDL-free,
 # module.h-free; both headers operate on raw arrays.

@@ -304,6 +304,46 @@ void zt_module::build_ZT_track_mutes(CDataBuf *buf)
   buf->write((char *)&tm[0],sizeof(unsigned char)*(ZTM_MAX_TRACKS/8));
 }
 
+
+// ------------------------------------------------------------------------------------------------
+// ZTtp - per-track name + color Only tracks with customized values
+// are written, so a song with no custom track values emits an empty
+// chunk. Verified older zTracker versions will skip this.
+//
+// Format:
+//   uint16 count
+//   repeat count times:
+//     uint16 track_idx
+//     uint32 color          (packed TColor; 0 = no custom color)
+//     uint8  name_len       (0..ZTM_TRACKNAME_MAXLEN-1)
+//     bytes  name           (name_len bytes, no null terminator)
+//
+void zt_module::build_ZT_track_props(CDataBuf *buf)
+{
+  unsigned short int count = 0;
+  
+  for (int i = 0; i < ZTM_MAX_TRACKS; i++) {
+      
+    if (this->track_color[i] || this->track_name[i][0]) count++;
+  }
+
+  buf->pushusi(count);
+  
+  for (int i = 0; i < ZTM_MAX_TRACKS; i++) {
+      
+    if (!this->track_color[i] && !this->track_name[i][0]) continue;
+    
+    buf->pushusi((unsigned short int)i);
+    buf->pushui((unsigned int)this->track_color[i]);
+    
+    unsigned char len = (unsigned char)strnlen(this->track_name[i], ZTM_TRACKNAME_MAXLEN - 1);
+    buf->pushuc(len);
+    buf->write(this->track_name[i], len);
+  }
+}
+
+
+
 /*************************************************************************
  *
  * NAME  zt_module::build_song_message()
@@ -694,6 +734,8 @@ int zt_module::save(char *fn, int compressed)
     writeblock("ZTpp",&buffer,compressed,f,lpDS);
     build_ZT_track_mutes(&buffer);
     writeblock("ZTtm",&buffer,compressed,f,lpDS);
+    build_ZT_track_props(&buffer);
+    writeblock("ZTtp",&buffer,compressed,f,lpDS);
 
     for(i=0;i<ZTM_MAX_INSTS;i++) {
         if (!this->instruments[i]->isempty()) {
@@ -1052,6 +1094,43 @@ void zt_module::load_ZT_track_mutes(CDataBuf *buf) {
     }
 }
 
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+void zt_module::load_ZT_track_props(CDataBuf *buf)
+{
+    unsigned short int count = buf->getusi();
+    
+    for (int k = 0; k < (int)count; k++) {
+        
+        unsigned short int idx = buf->getusi();
+        unsigned int       color = buf->getui();
+        unsigned char      len = buf->getuch();
+        
+        char tmp[ZTM_TRACKNAME_MAXLEN];
+        if (len >= ZTM_TRACKNAME_MAXLEN) len = ZTM_TRACKNAME_MAXLEN - 1;
+        
+        for (int b = 0; b < (int)len; b++) { 
+            
+            tmp[b] = buf->getch();
+        }
+        
+        tmp[len] = '\0';
+        
+        if (idx < ZTM_MAX_TRACKS) {
+            
+            this->track_color[idx] = color;
+            strncpy(this->track_name[idx], tmp, ZTM_TRACKNAME_MAXLEN - 1);
+            this->track_name[idx][ZTM_TRACKNAME_MAXLEN - 1] = '\0';
+        }
+    }
+}
+
+
+
+
 // ------------------------------------------------------------------------------------------------
 //
 //
@@ -1295,6 +1374,10 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "ARPG")) { load_arpeggio(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "MMAC")) { load_MIDI_macro(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTtm")) { load_ZT_track_mutes(&buffer); recognized_chunks++; }
+            
+            // <Manu> Nuevo
+            if (cmp_hd(&header[0], "ZTtp")) { load_ZT_track_props(&buffer); recognized_chunks++; }
+            
             if (cmp_hd(&header[0], "ZTol")) { load_ZT_order_list(&buffer); recognized_chunks++; saw_order_list = 1; }
             if (cmp_hd(&header[0], "ZTpl")) { load_ZT_pattern_lengths(&buffer); recognized_chunks++; saw_pattern_lengths = 1; }
             if (cmp_hd(&header[0], "ZTpp")) { load_ZT_pattern_properties(&buffer); recognized_chunks++; }
