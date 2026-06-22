@@ -3586,16 +3586,19 @@ static int zt_backend_set_video_mode(char *errstr)
     }
 
     // Load window icon (configurable via zt.conf 'window_icon'; default 'zt_icon.png').
-    // On macOS this also updates the Dock icon at runtime; a failure is silent.
+    // Ignore on macOS, which uses the built-in zt.icon/zt.icns
     {
+#if !defined(__APPLE__)
       const char *icon_path = zt_config_globals.window_icon[0]
         ? zt_config_globals.window_icon
-        : "zt_icon.png";
-      SDL_Surface *icon = SDL_LoadPNG(icon_path);
+        : NULL;
+      if (!icon_path) icon_path = "zt_icon.png";
+      SDL_Surface *icon = icon_path ? SDL_LoadPNG(icon_path) : NULL;
       if (icon) {
         SDL_SetWindowIcon(zt_main_window, icon);
         SDL_DestroySurface(icon);
       }
+#endif
     }
   } else {
     SDL_SetWindowSize(zt_main_window, RESOLUTION_X, RESOLUTION_Y);

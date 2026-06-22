@@ -176,11 +176,42 @@ if(WIN32)
 endif()
 
 if(APPLE)
-  # Embed the app icon into the bundle's Contents/Resources/.
+  # App icon. zt.icon (Icon Composer) is the source of truth; zt.icns is a
+  # pre-Tahoe fallback rendered from it. zt.icns is always embedded so every
+  # macOS / toolchain shows the icon; on Xcode 26+ actool additionally compiles
+  # zt.icon into an Assets.car (Liquid Glass icon used on macOS 26+) — see the
+  # gated POST_BUILD step below.
   set(ZT_MACOSX_ICON "${CMAKE_SOURCE_DIR}/zt.icns")
   list(APPEND ZT_SOURCES ${ZT_MACOSX_ICON})
   set_source_files_properties(${ZT_MACOSX_ICON} PROPERTIES
     MACOSX_PACKAGE_LOCATION "Resources")
+
+  # Probe whether this toolchain's actool understands the .icon format
+  # (Xcode 26+). Older actool emits no Assets.car without erroring, so we key
+  # off the artifact's existence rather than the exit code.
+  set(ZT_ICON_COMPOSER OFF)
+  execute_process(COMMAND xcrun --find actool
+    OUTPUT_VARIABLE ZT_ACTOOL OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE ZT_ACTOOL_RC ERROR_QUIET)
+  if(ZT_ACTOOL_RC EQUAL 0 AND ZT_ACTOOL)
+    set(ZT_ICON_PROBE "${CMAKE_BINARY_DIR}/icon-probe")
+    file(MAKE_DIRECTORY "${ZT_ICON_PROBE}")
+    execute_process(
+      COMMAND "${ZT_ACTOOL}" "${CMAKE_SOURCE_DIR}/assets/icon/zt.icon"
+        --app-icon zt --compile "${ZT_ICON_PROBE}" --platform macosx
+        --minimum-deployment-target 26.0
+        --output-partial-info-plist "${ZT_ICON_PROBE}/partial.plist"
+      OUTPUT_QUIET ERROR_QUIET)
+    if(EXISTS "${ZT_ICON_PROBE}/Assets.car")
+      set(ZT_ICON_COMPOSER ON)
+    endif()
+  endif()
+  if(ZT_ICON_COMPOSER)
+    message(STATUS "zTracker: Icon Composer (.icon) supported — bundling Assets.car")
+  else()
+    message(STATUS "zTracker: Icon Composer (.icon) unsupported by this toolchain — using zt.icns only")
+  endif()
+
   # Objective-C++ helper that strips Cmd-Q from the auto-created NSApp menu
   # so the Pattern Editor can use Cmd-Q as Transpose-Up.
   list(APPEND ZT_SOURCES src/macos_menu.mm)
@@ -437,6 +468,19 @@ if(APPLE)
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/lua"
     VERBATIM
   )
+  if(ZT_ICON_COMPOSER)
+    # Compile the Icon Composer source into the bundle: Assets.car (used on
+    # macOS 26+) plus a refreshed zt.icns, overwriting the embedded fallback.
+    add_custom_command(TARGET zt POST_BUILD
+      COMMAND "${ZT_ACTOOL}" "${CMAKE_SOURCE_DIR}/assets/icon/zt.icon"
+        --app-icon zt
+        --compile "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources"
+        --platform macosx
+        --minimum-deployment-target 26.0
+        --output-partial-info-plist "${CMAKE_BINARY_DIR}/zt-icon-partial.plist"
+      VERBATIM
+    )
+  endif()
 else()
   # Copy runtime data next to the binary so it works out of the box on Windows/Linux.
   add_custom_command(TARGET zt POST_BUILD
