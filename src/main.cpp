@@ -66,7 +66,7 @@
 #include <cmath>
 #include <ctime>
 #include <algorithm>
-#include <filesystem>
+#include "fs_compat.h"
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -2568,7 +2568,7 @@ int postAction ()
 	static char tt[256];
     conf DeviceConfig((char *)"devices.conf");
 
-    std::filesystem::current_path(cur_dir);
+    ztfs::set_current_path(cur_dir);
     for (i=0;i<MAX_MIDI_OUTS;i++) {
         sprintf(name,"open_out_device_%d",i);
         DeviceConfig.remove(&name[0]);
@@ -3184,12 +3184,9 @@ static int zt_autosave_now(void)
         return 0;
     }
 
-    std::error_code ec;
-    std::filesystem::remove(autosave_file, ec);
-    ec.clear();
-    std::filesystem::rename(autosave_tmp_file, autosave_file, ec);
-    if (ec) {
-        ZT_DEBUG_LOG("[autosave] rename failed: %s\n", ec.message().c_str());
+    ztfs::remove(autosave_file);
+    if (!ztfs::rename(autosave_tmp_file, autosave_file)) {
+        ZT_DEBUG_LOG("[autosave] rename failed\n");
         return 0;
     }
 
@@ -3217,33 +3214,28 @@ static std::string zt_make_autosave_filename(void)
 
 static void zt_prune_autosaves(size_t keep_count)
 {
-    std::vector<std::filesystem::path> autosaves;
-    std::error_code ec;
-    const std::filesystem::path cwd = std::filesystem::current_path(ec);
-    if (ec) {
+    const std::string cwd = ztfs::current_path();
+    if (cwd.empty()) {
         return;
     }
 
-    for (const auto &entry : std::filesystem::directory_iterator(cwd, ec)) {
-        if (ec) {
-            return;
-        }
-        if (!entry.is_regular_file()) {
+    std::vector<ztfs::DirEntry> autosaves;
+    for (auto &entry : ztfs::list_directory(cwd)) {
+        if (!entry.is_regular_file) {
             continue;
         }
-        const std::string fn = entry.path().filename().string();
+        const std::string &fn = entry.name;
         if (fn.rfind("__autosave_", 0) == 0 && fn.size() > 13 && fn.substr(fn.size() - 3) == ".zt") {
-            autosaves.push_back(entry.path());
+            autosaves.push_back(std::move(entry));
         }
     }
 
-    std::sort(autosaves.begin(), autosaves.end(), [](const std::filesystem::path &a, const std::filesystem::path &b) {
-        return a.filename().string() > b.filename().string();
+    std::sort(autosaves.begin(), autosaves.end(), [](const ztfs::DirEntry &a, const ztfs::DirEntry &b) {
+        return a.name > b.name;
     });
 
     for (size_t i = keep_count; i < autosaves.size(); ++i) {
-        std::filesystem::remove(autosaves[i], ec);
-        ec.clear();
+        ztfs::remove(autosaves[i].path);
     }
 }
 

@@ -4,6 +4,33 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_23 (macOS back-compat: universal Intel + Apple Silicon, floor 10.13)
+------------------------------------------------------------------------------
+
+        + macOS builds are now a single UNIVERSAL .app (Intel x86_64 +
+          Apple Silicon arm64) instead of two separate single-arch artifacts.
+          The deployment floor drops from macOS 15.0 to macOS 10.13 (High Sierra)
+          on the Intel slice and 11.0 (Big Sur) on the Apple Silicon slice -- so
+          zTracker now runs on High Sierra, Mojave, Catalina and everything newer.
+
+        + The macOS .app is now self-contained: SDL3 is bundled into
+          Contents/Frameworks (rewritten install names + ad-hoc re-sign), so a
+          double-clicked app no longer needs Homebrew or a system SDL3 installed.
+
+        * The macOS deployment floor was previously pinned at 15.0 only because
+          (a) no deployment target was set, (b) Homebrew's SDL3 is minos-15 and
+          single-arch, and (c) the code used std::filesystem, which libc++ marks
+          unavailable below macOS 10.15. std::filesystem is now routed through a
+          POSIX facade (src/fs_compat.{h,cpp}) on Apple; Linux and Windows keep
+          their std::filesystem path unchanged. New test suite: fs_compat.
+
+        ! CI builds the universal SDL3 from source at the 10.13 target and gates
+          every macOS run on a hard verification: universal, per-slice floor
+          10.13/11.0, self-contained, renders headless. Ableton Link (header-only)
+          is compiled into both slices. El Capitan (10.11) and older remain
+          out of reach -- SDL3's own floor is 10.13.
+
+
 zt 2026_06_21 (Track properties, dynamic positioning fixes and improvements)
 ----------------------------------------------------------------------------
 
