@@ -3,7 +3,7 @@
  Spacebar    : Turns Edit (or "Keyjazz") mode on or off
  Keyjazz keys: Default is the classic tracker layout (Q-row = upper
                octave, Z-row = lower octave). The "PianoKey" checkbox in
-               the F2 F2 Pattern Editor Options switches to the Ableton
+               the F2 Pattern Editor Options switches to the Ableton
                Live / Logic "Musical Typing" layout instead: the home row
                A S D F G H J K (L ;) are the white keys and the row above
                W E T Y U (O P) are the black keys -- one piano octave
@@ -134,7 +134,9 @@
                   to the line that documents it. Tab / Shift-Tab navigate
                   between section headers.
  F2             : Pattern editor - Pressing F2 again while in the pattern
-                  editing screen brings up the pattern settings, including
+                  editing screen opens the current track Options popup where 
+                  some properties like name and a custom color can be set.
+                  Pressing F2 again will show the pattern settings, including
                   the "PianoKey" toggle (tracker vs Ableton/Logic keyjazz
                   layout).
  F3             : Instrument editor. Pressing F3 again (while already on it)

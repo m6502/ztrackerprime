@@ -337,6 +337,7 @@ enum state {
   STATE_CONFIG,
   STATE_ORDER,
   STATE_PEDIT_WIN,
+  STATE_TRACKOPTS_WIN,
   STATE_IEDIT_WIN,
   STATE_HELP,
   STATE_LOAD,
@@ -821,6 +822,7 @@ extern CUI_PaletteEditor *UIP_PaletteEditor;
 extern CUI_Config *UIP_Config;
 extern CUI_Patterneditor *UIP_Patterneditor;
 extern CUI_PEParms *UIP_PEParms;
+extern CUI_TrackOptions *UIP_TrackOptions;
 extern CUI_PEVol   *UIP_PEVol;
 extern CUI_PENature   *UIP_PENature;
 extern CUI_PEFindReplace *UIP_PEFindReplace;

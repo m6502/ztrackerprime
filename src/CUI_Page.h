@@ -412,6 +412,34 @@ class CUI_PEParms : public CUI_Page {
         void draw(Drawable *S);
 };
 
+
+
+// Track Options popup (press F2 while on the Pattern Editor; F2 again to go
+// to the Pattern Editor Options popup). Edits the current track's name and
+// custom color
+
+class CUI_TrackOptions : public CUI_Page {
+        public:
+        TextInput *ti_name ;
+
+        CheckBox  *cb_color ;
+
+        ValueSlider *vs_r ;
+        ValueSlider *vs_g ;
+        ValueSlider *vs_b ;
+
+        int use_color ;     // backing store for cb_color
+
+        CUI_TrackOptions() ;
+
+        void enter(void) ;
+        void leave(void) ;
+        void update(void) ;
+        void draw(Drawable *S) ;
+
+        void apply_color(void) ;
+};
+
 // Instrument Editor options popup (press F3 again while on the Instrument
 // Editor). Pick a MIDI Out device from the in-dialog list, then "Create 16
 // Channels" generates 16 instruments (channels 1..16) for it. Mirrors the

@@ -4,6 +4,29 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_21 (Track properties, dynamic positioning fixes and improvements)
+----------------------------------------------------------------------------
+
+        + It's now possible to customize the name and color of individual song 
+          tracks. Pressing F2 in the Pattern Editor opens an options popup for 
+          the current track where you can set these properties. Pressing F2 again 
+          switches to the usual pattern options.
+          
+        + These settings are saved inside the .zt files by means of a new ZTtp 
+          chunk that older zTracker versions will ignore when loading files saved 
+          with this version and newer.
+        
+        * Pattern view now centers the visible tracks horizontally instead of aligning
+          them to the left.
+          
+        * Pattern Editor had a small bug where when the space to fit some tracks
+          was exact it fit instead one less than possible leaving instead a large 
+          amount of wasted space.
+          
+        * Squish mode fixes, could draw too much.
+        
+        * Fixed a bug that could make the background blank when opening Pattern Options.
+
 zt 2026_06_18 (macOS: real thread priorities for the timing threads)
 ----------------------------------------------------------------------------
 

@@ -348,6 +348,7 @@ CUI_PaletteEditor *UIP_PaletteEditor = NULL;
 CUI_Config *UIP_Config = NULL;
 CUI_Patterneditor *UIP_Patterneditor = NULL;
 CUI_PEParms *UIP_PEParms = NULL;
+CUI_TrackOptions *UIP_TrackOptions = NULL;
 CUI_IEParms *UIP_IEParms = NULL;
 CUI_PEVol *UIP_PEVol = NULL;
 CUI_PENature *UIP_PENature = NULL;
@@ -1280,6 +1281,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_CCEnvelopeEditor = new CUI_CCEnvelopeEditor;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
+    UIP_TrackOptions = new CUI_TrackOptions;
     UIP_IEParms = new CUI_IEParms;
     UIP_PEVol = new CUI_PEVol;
     UIP_SliderInput = new CUI_SliderInput;
@@ -1974,7 +1976,9 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_PEDIT:
             if (cur_state == STATE_PEDIT) {
-                popup_window(UIP_PEParms); clear++;
+                // F2 on the Pattern Editor opens Track Options first; F2
+                // again (handled inside the popup) cycles to PE Options.
+                popup_window(UIP_TrackOptions); clear++;
                 doredraw++;
             } else {
                 switch_page(UIP_Patterneditor);
@@ -2661,6 +2665,7 @@ int postAction ()
     delete UIP_Sysconfig;
     delete UIP_Patterneditor;
     delete UIP_PEParms;
+    delete UIP_TrackOptions;
     delete UIP_IEParms;
     delete UIP_SliderInput;
     delete UIP_NewSong;
@@ -3472,9 +3477,14 @@ int action(Screen *S)
     keybuff_bg->setvalue(Keys.cursize);
 #endif
 
-    if (need_popup_refresh) {
-//      if (PopupWindow)
-//          PopupWindow->draw(S);
+    // Popup-only refresh. Skip it when need_refresh is ALSO set: in that
+    // case the screen was (or is about to be) cleared/redrawn, and the
+    // need_refresh block below repaints ActivePage *then* the popup on top.
+    // Drawing the popup here first would be harmless except that a popup's
+    // draw() zeroes need_refresh, which would skip the ActivePage repaint
+    // and leave the page blank behind the popup (the "open clears the
+    // background" bug).
+    if (need_popup_refresh && !need_refresh) {
         if (!window_stack.isempty())
             window_stack.draw(S);
         else
@@ -3797,6 +3807,7 @@ int initSDL(void)
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
+    UIP_TrackOptions = new CUI_TrackOptions;
     UIP_IEParms = new CUI_IEParms;
     UIP_PEVol = new CUI_PEVol;
     UIP_PENature = new CUI_PENature;

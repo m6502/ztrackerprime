@@ -1,5 +1,6 @@
 #include "zt.h"
 #include "PatternDisplay.h"
+#include "track_color.h"
 
 
 
@@ -275,17 +276,23 @@ void PatternDisplay::disp_playing_row(int x, int y, int pattern, int row, Drawab
   printBG(col(x),row(y),str,COLORS.Text,COLORS.Background,S);
 
   for (ctrack = 0; ctrack<tracks; ctrack++) {
-  
+
     e = song->patterns[pattern]->tracks[ctrack+starttrack]->get_event(row);
-    
+
 ////    if (e) ctrack = ctrack;
 
     this->printNote(str,e);
-////    //      switch(i) {
+
     color = COLORS.EditText;
-////    //              break;
-////    //      }
-    printBG(col(x + 4 + (ctrack*tracksize)),row(y),str,color,bg,S);
+    TColor cellbg = bg;
+    TColor tc = song->track_color[ctrack+starttrack];
+    if (tc) {
+      // <Manu> current row gets an adaptive cursor shade so it reads
+      // clearly while staying in the track's hue; other rows use the base.
+      cellbg = (bg == COLORS.EditBGhigh) ? zt_track_cursor_bg(tc, 1) : tc;
+      color  = zt_track_text_for_bg(cellbg);
+    }
+    printBG(col(x + 4 + (ctrack*tracksize)),row(y),str,color,cellbg,S);
   }
 }
 
@@ -372,17 +379,27 @@ void PatternDisplay::disp_track_headers(Drawable *S)
     
     
     if (song->track_mute[num_track]) {
-      
+
       if (num_track == cur_track) bg = COLORS.EditText;
       else bg = COLORS.Lowlight;
-    } 
+    }
     else {
-      
+
       if (num_track == cur_track) bg = COLORS.Brighttext;
       else bg = COLORS.Black;
     }
+
+
+    TColor hbg = COLORS.Lowlight;
+    TColor tc = song->track_color[num_track];
     
-    printBG(col(4+x+(p*(this->tracksize))),row(y-1),str,bg,COLORS.Lowlight,S);
+    if (tc) {
+        
+      hbg = (num_track == cur_track) ? zt_track_shade(tc, 24) : zt_track_shade(tc, -16);
+      if (!song->track_mute[num_track]) bg = zt_track_text_for_bg(hbg);
+    }
+
+    printBG(col(4+x+(p*(this->tracksize))),row(y-1),str,bg,hbg,S);
     p++;
   }
 }

@@ -76,6 +76,7 @@ class InflateStream ;
 #define ZTM_SONGTITLE_MAXLEN                26
 #define ZTM_INSTTITLE_MAXLEN                26
 #define ZTM_FILENAME_MAXLEN                 256
+#define ZTM_TRACKNAME_MAXLEN                16
 
 #define ZTM_SONGMESSAGE_MAXLEN              2048
 
@@ -211,15 +212,6 @@ class track
 {
 public:
 
-  // ---------------------------------------------------------------------
-  bool custom_colors = false ;
-
-  unsigned long EditText;       // text that is in the pattern editor and all other boxes except top info boxes
-  unsigned long EditBG;         // background of the pattern editor and all other boxes except top info boxes
-  unsigned long EditBGlow;      // background of pattern editor (lowlight)
-  unsigned long EditBGhigh;     // background of pattern editor (highlight)
-  // ---------------------------------------------------------------------
-
   unsigned char default_inst;
   unsigned char last_note,last_inst;
   unsigned char default_controller;
@@ -250,14 +242,6 @@ public:
 class pattern
 {
 public:
-
-  // ---------------------------------------------------------------------
-  bool custom_colors = false ;
-
-  unsigned long Background ;     // Background of "panel"
-  unsigned long Highlight ;      // highlight of "panel"
-  unsigned long Lowlight ;       // lowlight of "panel"
-  // ---------------------------------------------------------------------
 
   track *tracks[ZTM_MAX_TRACKS];
   short int length;
@@ -375,6 +359,14 @@ class zt_module
 
         unsigned char track_mute[ZTM_MAX_TRACKS];
 
+        // Per-track-index, song-wide cosmetic properties (the "drums = red"
+        // model). track_color is a packed TColor; 0 means "no custom color,
+        // use the theme". track_name is an optional label shown in the
+        // pattern-editor track header. Edited from the Track Options popup
+        // (F2 from the Pattern Editor) and persisted in the ZTtp chunk.
+        char          track_name[ZTM_MAX_TRACKS][ZTM_TRACKNAME_MAXLEN];
+        unsigned long track_color[ZTM_MAX_TRACKS];
+
         int flag_SlidePrecision;
         int flag_SlideOnSubtick;
         int flag_SendMidiClock;
@@ -412,6 +404,7 @@ class zt_module
         void build_ZT_header(CDataBuf *buf, int compr); /* ZThd - .zt header */
         void build_ZT_order_list(CDataBuf *buf);  /* ZTol - order list */
         void build_ZT_track_mutes(CDataBuf *buf);  /* ZTtm - track mutes */
+        void build_ZT_track_props(CDataBuf *buf);  /* ZTtp - track name + color */
         void build_ZT_event_list(CDataBuf *buf);  /* ZTev - event list */
         void build_ZT_pattern_lengths(CDataBuf *buf);  /* ZTpl - pattern lengths */
         void build_ZT_pattern_properties(CDataBuf *buf);  /* ZTpl - pattern lengths */
@@ -426,6 +419,7 @@ class zt_module
 
         int read_ZT_header(CDataBuf *buf, std::ifstream &ifs); /* ZThd - .zt header */
         void load_ZT_track_mutes(CDataBuf *buf); /* ZTtm - track mutes */
+        void load_ZT_track_props(CDataBuf *buf); /* ZTtp - track name + color */
         void load_ZT_pattern_lengths(CDataBuf *buf); /* ZTpl - pattern lengths */
         void load_ZT_pattern_properties(CDataBuf *buf); /* ZTpl - pattern lengths */
         void load_ZT_order_list(CDataBuf *buf); /* ZTol - order list */
