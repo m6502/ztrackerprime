@@ -1976,9 +1976,10 @@ void global_keys(Drawable *S)
         // ------------------------------------------------------------------------
         case CMD_SWITCH_PEDIT:
             if (cur_state == STATE_PEDIT) {
-                // F2 on the Pattern Editor opens Track Options first; F2
-                // again (handled inside the popup) cycles to PE Options.
-                popup_window(UIP_TrackOptions); clear++;
+                // F2 on the Pattern Editor opens the combined Pattern & Track
+                // Options dialog (pattern settings + current-track name/colour
+                // in one popup). F2 again closes it.
+                popup_window(UIP_PEParms); clear++;
                 doredraw++;
             } else {
                 switch_page(UIP_Patterneditor);
