@@ -1812,22 +1812,66 @@ void CUI_Patterneditor::update()
           }
           break;
           
-        case SDLK_TAB:
-          md_mode++;
-          if (md_mode>=MD_END)
-            md_mode = 0;
-          // MD_CC_DRAW is only useful when a CCizer slot is armed
-          // (otherwise we have nothing to write into the effect's
-          // high byte). Skip past it on the TAB cycle when drawmode
-          // is off; the dedicated entry path in the Shift+§ handler
-          // above still drops the user into MD_CC_DRAW directly if
-          // they had a slot armed before entering mouse-draw.
-          if (md_mode == MD_CC_DRAW && g_cc_drawmode <= 0) {
+        case SDLK_TAB: {
+          // Tab walks EVERY draw target, including each CCizer slot, so the
+          // user can reach Cutoff/Resonance/etc. by Tab alone (no separate
+          // Ctrl+F2 slot cycle needed):
+          //   Volume -> Effect low-byte -> Effect low-byte signed
+          //          -> CCizer slot 1 -> slot 2 -> ... -> slot N -> (wrap) Volume
+          // The CCizer slots come from the file loaded in the CC Console
+          // (Shift+F3); with no file loaded, MD_CC_DRAW is skipped.
+          ZtCcizerFile *cf = zt_ccizer_current_file();
+          int max_slot = cf ? cf->num_slots : 0;
+          if (md_mode == MD_CC_DRAW && max_slot > 0) {
+            // Already inside the CCizer-slot walk: advance to the next slot,
+            // then drop back out to Volume after the last one.
+            g_cc_drawmode++;
+            g_cc_draw_session_snapped = 0;
+            if (g_cc_drawmode > max_slot) {
+              g_cc_drawmode = 0;
+              md_mode = MD_VOL;
+            }
+          } else {
             md_mode++;
-            if (md_mode>=MD_END) md_mode = 0;
+            if (md_mode >= MD_END) md_mode = 0;
+            if (md_mode == MD_CC_DRAW) {
+              if (max_slot > 0) {
+                g_cc_drawmode = 1;            // enter the CCizer walk at slot 1
+                g_cc_draw_session_snapped = 0;
+              } else {
+                md_mode++;                   // nothing to draw -- skip past it
+                if (md_mode >= MD_END) md_mode = 0;
+              }
+            }
           }
+          // Status feedback so the active target (and CCizer slot name) shows.
+          switch (md_mode) {
+          case MD_VOL:       statusmsg = "Editing: Volume"; break;
+          case MD_FX:        statusmsg = "Editing: Effect low-byte (0-0x7F)"; break;
+          case MD_FX_SIGNED: statusmsg = "Editing: Effect low-byte signed (0-0x7F)"; break;
+          case MD_CC_DRAW: {
+            static char tabmsg[96];
+            int si = g_cc_drawmode - 1;
+            if (g_cc_drawmode > 0 && cf && si < cf->num_slots) {
+              const ZtCcizerSlot *s = &cf->slots[si];
+              if (s->cc == ZT_CCIZER_PB_MARKER)
+                snprintf(tabmsg, sizeof(tabmsg), "Editing: PB drawbar (%s) [%d/%d]",
+                         s->name, g_cc_drawmode, max_slot);
+              else
+                snprintf(tabmsg, sizeof(tabmsg), "Editing: CC%d drawbar (%s) [%d/%d]",
+                         (int)s->cc, s->name, g_cc_drawmode, max_slot);
+              statusmsg = tabmsg;
+            } else {
+              statusmsg = "Editing: CC drawbar (load a CCizer file in Shift+F3)";
+            }
+            break;
+          }
+          default: statusmsg = "Editing: Volume"; break;
+          }
+          status_change = 1;
           need_refresh++;
           break;
+        }
 
         case SDLK_DOWN:
           cur_edit_row_disp++;
