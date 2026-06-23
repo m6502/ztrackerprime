@@ -7,7 +7,7 @@ CUI_PEParms::CUI_PEParms(void) {
     
 
     int window_width = 54 * col(1);
-    int window_height = 32 * row(1);
+    int window_height = 34 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--)
         ;
@@ -130,7 +130,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(ti_name, 11);
         ti_name->frame = 1;
         ti_name->x = (start_x / 8) + 17;
-        ti_name->y = (start_y / 8) + 22;
+        ti_name->y = (start_y / 8) + 23;
         ti_name->xsize = ZTM_TRACKNAME_MAXLEN - 1;
         ti_name->length = ZTM_TRACKNAME_MAXLEN - 1;
         ti_name->str = (unsigned char *)&song->track_name[cur_edit_track][0];
@@ -139,7 +139,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(cb_color, 12);
         cb_color->frame = 1;
         cb_color->x = (start_x / 8) + 17;
-        cb_color->y = (start_y / 8) + 24;
+        cb_color->y = (start_y / 8) + 25;
         cb_color->xsize = 3;
         cb_color->value = &use_color;
 
@@ -147,7 +147,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(vs_r, 13);
         vs_r->frame = 1;
         vs_r->x = (start_x / 8) + 17;
-        vs_r->y = (start_y / 8) + 26;
+        vs_r->y = (start_y / 8) + 27;
         vs_r->xsize = window_width / 8 - 23;
         vs_r->min = 0; vs_r->max = 255; vs_r->value = 208;
 
@@ -155,7 +155,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(vs_g, 14);
         vs_g->frame = 1;
         vs_g->x = (start_x / 8) + 17;
-        vs_g->y = (start_y / 8) + 28;
+        vs_g->y = (start_y / 8) + 29;
         vs_g->xsize = window_width / 8 - 23;
         vs_g->min = 0; vs_g->max = 255; vs_g->value = 48;
 
@@ -163,7 +163,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(vs_b, 15);
         vs_b->frame = 1;
         vs_b->x = (start_x / 8) + 17;
-        vs_b->y = (start_y / 8) + 30;
+        vs_b->y = (start_y / 8) + 31;
         vs_b->xsize = window_width / 8 - 23;
         vs_b->min = 0; vs_b->max = 255; vs_b->value = 48;
 }
@@ -312,7 +312,7 @@ void CUI_PEParms::update() {
     // hijack the popup's own input.
     if (UIP_Patterneditor->mode == PEM_MOUSEDRAW) {
         int win_w = 54 * col(1);
-        int win_h = 32 * row(1);
+        int win_h = 34 * row(1);
         int wx = (INTERNAL_RESOLUTION_X / 2) - (win_w / 2);
         int wy = (INTERNAL_RESOLUTION_Y / 2) - (win_h / 2);
         int outside_popup = (LastX < wx) || (LastX >= wx + win_w) ||
@@ -335,7 +335,7 @@ void CUI_PEParms::update() {
 void CUI_PEParms::draw(Drawable *S) {
 
     int window_width = 54 * col(1);
-    int window_height = 32 * row(1);
+    int window_height = 34 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--)
         ;
@@ -367,15 +367,15 @@ void CUI_PEParms::draw(Drawable *S) {
     cb_keyjazz_piano->y = (start_y / 8) + 18;
 
     ti_name->x = (start_x / 8) + 17;
-    ti_name->y = (start_y / 8) + 22;
+    ti_name->y = (start_y / 8) + 23;
     cb_color->x = (start_x / 8) + 17;
-    cb_color->y = (start_y / 8) + 24;
+    cb_color->y = (start_y / 8) + 25;
     vs_r->x = (start_x / 8) + 17;
-    vs_r->y = (start_y / 8) + 26;
+    vs_r->y = (start_y / 8) + 27;
     vs_g->x = (start_x / 8) + 17;
-    vs_g->y = (start_y / 8) + 28;
+    vs_g->y = (start_y / 8) + 29;
     vs_b->x = (start_x / 8) + 17;
-    vs_b->y = (start_y / 8) + 30;
+    vs_b->y = (start_y / 8) + 31;
 
 
     if (S->lock()==0) {
@@ -407,25 +407,27 @@ void CUI_PEParms::draw(Drawable *S) {
         print(start_x + col(39),start_y + row(18),"PianoKey:",COLORS.Text,S);
 
         // ---- Track Options section -----------------------------------------
+        // Divider on its own row, then the section header centred on the next
+        // row (matches the title's centring; the window is screen-centred so
+        // textcenter() lands it inside the popup).
         printline(start_x, start_y + row(20), 148, window_width / 8, COLORS.Lowlight, S);
-        print(start_x + col(2), start_y + row(20), " Track Options", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(22), "   Track Name:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(24), " Custom Color:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(26), "          Red:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(28), "        Green:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(30), "         Blue:", COLORS.Text, S);
+        print(col(textcenter("Track Options")), start_y + row(21), "Track Options", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(23), "   Track Name:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(25), " Custom Color:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(27), "          Red:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(29), "        Green:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(31), "         Blue:", COLORS.Text, S);
 
-        // Colour preview swatch to the right of the Custom Color checkbox.
-        {
-            unsigned long sw = use_color
-                ? (0xFF000000u | (((unsigned long)vs_r->value) << 16)
-                              | (((unsigned long)vs_g->value) << 8)
-                              |  ((unsigned long)vs_b->value))
-                : COLORS.EditBG;
-            int sx = start_x + col(33);
-            int sy = start_y + row(24);
-            int ex = start_x + col(50);
-            int ey = sy + row(1) - 2;
+        // Colour swatch next to the Custom Color toggle -- only when a custom
+        // colour is enabled, so disabling it doesn't leave a black void.
+        if (use_color) {
+            unsigned long sw = 0xFF000000u | (((unsigned long)vs_r->value) << 16)
+                                           | (((unsigned long)vs_g->value) << 8)
+                                           |  ((unsigned long)vs_b->value);
+            int sx = start_x + col(23);
+            int sy = start_y + row(25) + 1;
+            int ex = start_x + col(33);
+            int ey = sy + row(1) - 3;
             S->fillRect(sx, sy, ex, ey, sw);
         }
 
