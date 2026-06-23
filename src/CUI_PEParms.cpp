@@ -1,4 +1,5 @@
 #include "zt.h"
+#include "ccizer.h"
 
 CUI_PEParms::CUI_PEParms(void) {
 
@@ -7,7 +8,7 @@ CUI_PEParms::CUI_PEParms(void) {
     
 
     int window_width = 54 * col(1);
-    int window_height = 34 * row(1);
+    int window_height = 36 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--)
         ;
@@ -126,11 +127,22 @@ CUI_PEParms::CUI_PEParms(void) {
         // ---- Track Options section (folded in from the old popup) ----------
         use_color = 0;
 
+        // Per-track "Draw CC" picker: which CCizer parameter this track draws
+        // in CC drawmode. 0 = None; 1..N index the loaded CCizer file's slots.
+        // Writes g_cc_drawmode[cur_edit_track] directly -- no Ctrl+F2 cycle.
+        vs_drawcc = new ValueSlider;
+        UI->add_element(vs_drawcc, 16);
+        vs_drawcc->frame = 1;
+        vs_drawcc->x = (start_x / 8) + 17;
+        vs_drawcc->y = (start_y / 8) + 23;
+        vs_drawcc->xsize = 14;
+        vs_drawcc->min = 0; vs_drawcc->max = 0; vs_drawcc->value = 0;
+
         ti_name = new TextInput;
         UI->add_element(ti_name, 11);
         ti_name->frame = 1;
         ti_name->x = (start_x / 8) + 17;
-        ti_name->y = (start_y / 8) + 23;
+        ti_name->y = (start_y / 8) + 25;
         ti_name->xsize = ZTM_TRACKNAME_MAXLEN - 1;
         ti_name->length = ZTM_TRACKNAME_MAXLEN - 1;
         ti_name->str = (unsigned char *)&song->track_name[cur_edit_track][0];
@@ -139,7 +151,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(cb_color, 12);
         cb_color->frame = 1;
         cb_color->x = (start_x / 8) + 17;
-        cb_color->y = (start_y / 8) + 25;
+        cb_color->y = (start_y / 8) + 27;
         cb_color->xsize = 3;
         cb_color->value = &use_color;
 
@@ -147,7 +159,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(vs_r, 13);
         vs_r->frame = 1;
         vs_r->x = (start_x / 8) + 17;
-        vs_r->y = (start_y / 8) + 27;
+        vs_r->y = (start_y / 8) + 29;
         vs_r->xsize = window_width / 8 - 23;
         vs_r->min = 0; vs_r->max = 255; vs_r->value = 208;
 
@@ -155,7 +167,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(vs_g, 14);
         vs_g->frame = 1;
         vs_g->x = (start_x / 8) + 17;
-        vs_g->y = (start_y / 8) + 29;
+        vs_g->y = (start_y / 8) + 31;
         vs_g->xsize = window_width / 8 - 23;
         vs_g->min = 0; vs_g->max = 255; vs_g->value = 48;
 
@@ -163,7 +175,7 @@ CUI_PEParms::CUI_PEParms(void) {
         UI->add_element(vs_b, 15);
         vs_b->frame = 1;
         vs_b->x = (start_x / 8) + 17;
-        vs_b->y = (start_y / 8) + 31;
+        vs_b->y = (start_y / 8) + 33;
         vs_b->xsize = window_width / 8 - 23;
         vs_b->min = 0; vs_b->max = 255; vs_b->value = 48;
 }
@@ -228,6 +240,18 @@ void CUI_PEParms::enter(void) {
     }
     cb_color = (CheckBox *)UI->get_element(12);
     cb_color->value = &use_color;
+
+    // Draw CC: range 0..num_slots of the currently-loaded CCizer file; show
+    // the cursor track's current armed slot.
+    {
+        ZtCcizerFile *cf = zt_ccizer_current_file();
+        vs_drawcc = (ValueSlider *)UI->get_element(16);
+        vs_drawcc->min = 0;
+        vs_drawcc->max = cf ? cf->num_slots : 0;
+        int s = (cur_edit_track >= 0 && cur_edit_track < MAX_TRACKS) ? g_cc_drawmode[cur_edit_track] : 0;
+        if (s > vs_drawcc->max) s = 0;
+        vs_drawcc->value = s;
+    }
 }
 
 void CUI_PEParms::leave(void) {
@@ -304,6 +328,20 @@ void CUI_PEParms::update() {
         }
     }
 
+    // Draw CC: picking a parameter writes the cursor track's per-track slot
+    // directly (no Ctrl+F2 cycle) and primes CC drawmode so the track is ready
+    // to draw the moment mouse-draw is on.
+    {
+        ValueSlider *d = (ValueSlider *)UI->get_element(16);
+        if (d->changed && cur_edit_track >= 0 && cur_edit_track < MAX_TRACKS) {
+            g_cc_drawmode[cur_edit_track] = d->value;
+            g_cc_draw_session_snapped = 0;
+            if (d->value > 0 && UIP_Patterneditor) UIP_Patterneditor->md_mode = MD_CC_DRAW;
+            need_refresh++;
+            need_popup_refresh++;
+        }
+    }
+
     // Live drawing while the popup is open. With DrawMode on, forward
     // mouse activity to the pattern editor when the cursor is outside
     // the popup window. Only forward if the queue is empty (so the PE
@@ -312,7 +350,7 @@ void CUI_PEParms::update() {
     // hijack the popup's own input.
     if (UIP_Patterneditor->mode == PEM_MOUSEDRAW) {
         int win_w = 54 * col(1);
-        int win_h = 34 * row(1);
+        int win_h = 36 * row(1);
         int wx = (INTERNAL_RESOLUTION_X / 2) - (win_w / 2);
         int wy = (INTERNAL_RESOLUTION_Y / 2) - (win_h / 2);
         int outside_popup = (LastX < wx) || (LastX >= wx + win_w) ||
@@ -335,7 +373,7 @@ void CUI_PEParms::update() {
 void CUI_PEParms::draw(Drawable *S) {
 
     int window_width = 54 * col(1);
-    int window_height = 34 * row(1);
+    int window_height = 36 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--)
         ;
@@ -366,16 +404,18 @@ void CUI_PEParms::draw(Drawable *S) {
     cb_keyjazz_piano->x = (start_x / 8) + 17 + 32;
     cb_keyjazz_piano->y = (start_y / 8) + 18;
 
+    vs_drawcc->x = (start_x / 8) + 17;
+    vs_drawcc->y = (start_y / 8) + 23;
     ti_name->x = (start_x / 8) + 17;
-    ti_name->y = (start_y / 8) + 23;
+    ti_name->y = (start_y / 8) + 25;
     cb_color->x = (start_x / 8) + 17;
-    cb_color->y = (start_y / 8) + 25;
+    cb_color->y = (start_y / 8) + 27;
     vs_r->x = (start_x / 8) + 17;
-    vs_r->y = (start_y / 8) + 27;
+    vs_r->y = (start_y / 8) + 29;
     vs_g->x = (start_x / 8) + 17;
-    vs_g->y = (start_y / 8) + 29;
+    vs_g->y = (start_y / 8) + 31;
     vs_b->x = (start_x / 8) + 17;
-    vs_b->y = (start_y / 8) + 31;
+    vs_b->y = (start_y / 8) + 33;
 
 
     if (S->lock()==0) {
@@ -410,11 +450,12 @@ void CUI_PEParms::draw(Drawable *S) {
         // The centred header alone separates the two halves (no divider line;
         // window is screen-centred so textcenter() lands it inside the popup).
         print(col(textcenter("Track Options")), start_y + row(21), "Track Options", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(23), "   Track Name:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(25), " Custom Color:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(27), "          Red:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(29), "        Green:", COLORS.Text, S);
-        print(start_x + col(2), start_y + row(31), "         Blue:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(23), "      Draw CC:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(25), "   Track Name:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(27), " Custom Color:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(29), "          Red:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(31), "        Green:", COLORS.Text, S);
+        print(start_x + col(2), start_y + row(33), "         Blue:", COLORS.Text, S);
 
         // Colour swatch next to the Custom Color toggle -- only when a custom
         // colour is enabled, so disabling it doesn't leave a black void.
@@ -423,7 +464,7 @@ void CUI_PEParms::draw(Drawable *S) {
                                            | (((unsigned long)vs_g->value) << 8)
                                            |  ((unsigned long)vs_b->value);
             int sx = start_x + col(23);
-            int sy = start_y + row(25) + 1;
+            int sy = start_y + row(27) + 1;
             int ex = start_x + col(33);
             int ey = sy + row(1) - 3;
             S->fillRect(sx, sy, ex, ey, sw);
@@ -431,6 +472,20 @@ void CUI_PEParms::draw(Drawable *S) {
 
         UI->full_refresh();
         UI->draw(S);
+
+        // Draw-CC parameter NAME, drawn AFTER the widgets so it covers the
+        // slider's (meaningless) numeric index. You pick by name: "None" /
+        // "Cutoff" / "Resonance" / ...
+        {
+            ZtCcizerFile *cf = zt_ccizer_current_file();
+            const char *pname = "None";
+            int v = vs_drawcc->value;
+            if (v > 0 && cf && (v - 1) < cf->num_slots) pname = cf->slots[v - 1].name;
+            char ccbuf[40];
+            snprintf(ccbuf, sizeof(ccbuf), " %-18.18s", pname);
+            printBG(start_x + col(32), start_y + row(23), ccbuf, COLORS.Text, COLORS.Background, S);
+        }
+
         S->unlock();
         need_refresh = need_popup_refresh = 0;
         updated++;

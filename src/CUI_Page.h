@@ -413,6 +413,8 @@ class CUI_PEParms : public CUI_Page {
         ValueSlider *vs_r ;
         ValueSlider *vs_g ;
         ValueSlider *vs_b ;
+        // Per-track "Draw CC": which CCizer slot this track draws (0 = None).
+        ValueSlider *vs_drawcc ;
 
         CUI_PEParms();
 
