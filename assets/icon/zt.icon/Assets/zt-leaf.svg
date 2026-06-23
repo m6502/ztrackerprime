@@ -1,0 +1,9 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Leaf body: rounded base at lower-left, softened tip at upper-right -->
+  <path d="M24 80
+           C 18 58, 30 38, 56 26
+           C 70 19, 80 17, 85 17
+           C 83 24, 78 32, 70 43
+           C 58 60, 43 73, 24 80 Z"
+        fill="#ffffff"/>
+</svg>

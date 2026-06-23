@@ -21,33 +21,14 @@
           }
         },
         {
-          "fill" : {
-            "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
-          },
-          "image-name" : "Path.png",
-          "name" : "Path",
+          "hidden" : false,
+          "image-name" : "zt-leaf.svg",
+          "name" : "zt-leaf",
           "position" : {
             "scale" : 3,
             "translation-in-points" : [
-              323.00468749999993,
-              -197.96875
-            ]
-          }
-        },
-        {
-          "blend-mode" : "normal",
-          "fill" : {
-            "solid" : "display-p3:1.00000,1.00000,1.00000,1.00000"
-          },
-          "glass" : true,
-          "hidden" : true,
-          "image-name" : "zt-verdana.svg",
-          "name" : "zt-verdana",
-          "position" : {
-            "scale" : 12,
-            "translation-in-points" : [
-              -78.21874786376952,
-              17.9921875
+              311.00468749999993,
+              -193.46875
             ]
           }
         }
