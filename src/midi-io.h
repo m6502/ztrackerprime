@@ -1,9 +1,17 @@
 #ifndef _MIDI_DEVICE_H
 #define _MIDI_DEVICE_H
 
+#include <atomic>
 #include <mutex>
 
 #include "winmm_compat.h"
+
+// Truncate a MIDI device name at the first control character and trim trailing
+// whitespace, in place. Drivers (and stale config) occasionally hand us names
+// with a stray control byte (e.g. 0x01) that renders as a garbage glyph and,
+// worse, makes an otherwise-identical name compare unequal -- spawning a
+// phantom duplicate row in the device list.
+void zt_sanitize_device_name(char *s);
 
 #define NB_OFF    0x000000
 #define NB_ON     0x010000
@@ -458,7 +466,12 @@ class midiInDevice {
         char *szName;
         int devNum;
         MIDIINCAPS caps;                      // The MIDIINCAPS structure describes the capabilities of a MIDI input device.
-        int opened;     
+        int opened;
+        // Set true on the main thread for the duration of close() so the
+        // MIDI-in callback (other thread) stops re-arming the SysEx buffer
+        // while midiInReset()/midiInClose() are draining it -- re-adding a
+        // buffer mid-reset wedges the WinMM driver and hangs the UI.
+        std::atomic<bool> closing{false};
 
         MIDIHDR         midiHdr;              // The MIDIHDR structure defines the header used to identify a MIDI system-exclusive or stream buffer.
         // 8 KB matches ZT_SYSEX_MAX_LEN in sysex_inq.h. The previous

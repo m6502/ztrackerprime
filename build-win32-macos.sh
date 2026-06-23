@@ -143,6 +143,16 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 add_compile_definitions(_WIN32_WINNT=0x0501 WINVER=0x0501)
 # Static-link the MinGW C++/pthread runtime so zt.exe does not depend on
 # libwinpthread-1.dll / libgcc_s_*-1.dll / libstdc++-6.dll sitting next to it.
+#
+# NOTE: this produces an XP-RUNNABLE binary ONLY if the toolchain's C runtime
+# is legacy msvcrt. Homebrew's mingw-w64 is built --with-default-msvcrt=ucrt
+# and its libstdc++ is UCRT-coupled (e.g. <cstdlib> needs at_quick_exit), so it
+# emits a Universal-CRT binary that imports api-ms-win-crt-*.dll -- which DO NOT
+# EXIST on XP (launch dies: "api-ms-win-crt-...-l1-1-0.dll was not found"), and
+# it cannot be forced to msvcrt with -mcrtdll without breaking the libstdc++
+# build. The post-build guard below catches a UCRT binary and refuses to stage
+# it. CI's Ubuntu mingw-w64 defaults to msvcrt, so the guaranteed-good XP build
+# is the CI artifact ztrackerprime-windows-x86-xp (see guard message).
 add_link_options(-static -static-libgcc -static-libstdc++)
 EOF
 echo "[build-win32-macos] wrote $TOOLCHAIN_FILE"
@@ -164,6 +174,26 @@ cmake --build "$BUILD_DIR" --config Release -j
 EXE="$BUILD_DIR/Program/zt.exe"
 if [[ ! -f "$EXE" ]]; then
   echo "ERROR: build completed but $EXE not found." >&2
+  exit 1
+fi
+
+# Guard: a UCRT-linked binary imports api-ms-win-crt-*.dll and will NOT launch
+# on Windows XP. Refuse to stage one so it can never be silently deployed.
+OBJDUMP="${MINGW_PREFIX}-objdump"
+command -v "$OBJDUMP" >/dev/null 2>&1 || OBJDUMP=objdump
+# Capture imports into a variable and match with a pure-shell `case` (no pipe):
+# piping into `grep -q` makes grep close the pipe early, the producer takes
+# SIGPIPE, and `set -o pipefail` reports the pipeline as failed -- which would
+# silently skip this guard. A glob match avoids the pipe entirely.
+EXE_IMPORTS="$("$OBJDUMP" -p "$EXE" 2>/dev/null || true)"
+if [[ "$EXE_IMPORTS" == *api-ms-win-crt* ]]; then
+  echo "ERROR: $EXE imports api-ms-win-crt-*.dll (Universal CRT) and will NOT" >&2
+  echo "       run on Windows XP -- launch fails with" >&2
+  echo "       'api-ms-win-crt-...-l1-1-0.dll was not found'." >&2
+  echo "       This Homebrew mingw-w64 is UCRT-default and cannot target legacy" >&2
+  echo "       msvcrt. For a guaranteed-good XP binary, pull the CI artifact:" >&2
+  echo "         gh run download --repo m6502/ztrackerprime \\" >&2
+  echo "           --name ztrackerprime-windows-x86-xp -D dist/ztrackerprime-windows-x86-xp" >&2
   exit 1
 fi
 

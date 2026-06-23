@@ -404,12 +404,26 @@ class CUI_PEParms : public CUI_Page {
 
         ValueSlider *vs_speedup ;
 
+        // Track Options section (folded in from the old standalone Track
+        // Options popup so F2 opens a single combined dialog). Edits the
+        // current track's name + custom colour.
+        TextInput   *ti_name ;
+        CheckBox    *cb_color ;
+        int          use_color ;   // backing store for cb_color
+        ValueSlider *vs_r ;
+        ValueSlider *vs_g ;
+        ValueSlider *vs_b ;
+        // Per-track "Draw CC": which CCizer slot this track draws (0 = None).
+        ValueSlider *vs_drawcc ;
+
         CUI_PEParms();
 
         void enter(void);
         void leave(void);
         void update(void);
         void draw(Drawable *S);
+
+        void apply_color(void);
 };
 
 

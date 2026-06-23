@@ -30,6 +30,34 @@ zt 2026_06_23 (macOS back-compat: universal Intel + Apple Silicon, floor 10.13)
           is compiled into both slices. El Capitan (10.11) and older remain
           out of reach -- SDL3's own floor is 10.13.
 
+zt 2026_06_23 (F2: combined Pattern & Track Options dialog)
+----------------------------------------------------------
+
+        * F2 in the Pattern Editor now opens a single "Pattern & Track Options"
+          popup that holds BOTH the pattern settings (EditStep, length, row
+          highlight/lowlight, Centered, StepEdit, RecVeloc, Speedup, DrawMode,
+          CCOver, PianoKey) and the current track's Name + custom Color, instead
+          of two separate popups you had to cycle between with F2. The track
+          name/colour controls moved into the lower half of the dialog; F2
+          again closes it. Fixes the surprise where the track-colour popup
+          (added with track colours) appeared to have replaced the pattern
+          settings -- they were only one F2 press away, now they are together.
+
+zt 2026_06_23 (MIDI In device list: duplicate-name fix + disable-hang fix)
+--------------------------------------------------------------------------
+
+        * MIDI In/Out device names are now sanitized: a stray control byte in a
+          driver-reported name (e.g. "Unitor In 01" followed by a 0x01 that
+          rendered as a smiley glyph) is stripped. Such a byte previously made
+          an otherwise-identical name compare unequal, spawning a phantom
+          duplicate row in the MIDI In Device Selection list. Stale device.conf
+          entries carrying the bad byte self-heal on load.
+
+        * Fixed a hard freeze when disabling a MIDI In device. Closing the
+          device calls midiInReset(), which returns the input buffer through
+          the MIDI-in callback; the callback then re-armed that buffer with
+          midiInAddBuffer() mid-reset, wedging the WinMM driver and hanging the
+          UI. The callback now skips re-arming while the device is closing.
 
 zt 2026_06_21 (Track properties, dynamic positioning fixes and improvements)
 ----------------------------------------------------------------------------

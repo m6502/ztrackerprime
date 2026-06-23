@@ -774,6 +774,27 @@ int zt_module::save(char *fn, int compressed)
         }
     }
 
+    // CDRW: optional per-track CC-draw slot (which CCizer slot each track
+    // draws in CC drawmode). Skipped by older zTracker. Format:
+    //   short int count
+    //   repeat: uint8 track_idx, short int slot
+    {
+        short int count = 0;
+        for (i = 0; i < MAX_TRACKS; i++)
+            if (g_cc_drawmode[i] > 0) count++;
+        if (count > 0) {
+            buffer.write((const char *)&count, sizeof(short int));
+            for (i = 0; i < MAX_TRACKS; i++) {
+                if (g_cc_drawmode[i] <= 0) continue;
+                unsigned char tidx = (unsigned char)i;
+                short int slot = (short int)g_cc_drawmode[i];
+                buffer.write((const char *)&tidx, sizeof(unsigned char));
+                buffer.write((const char *)&slot, sizeof(short int));
+            }
+            writeblock("CDRW", &buffer, compressed, f, lpDS);
+        }
+    }
+
 
     for(i=0;i<ZTM_MAX_ARPEGGIOS;i++) {
         if (this->arpeggios[i] && !this->arpeggios[i]->isempty()) {
@@ -1367,6 +1388,9 @@ int zt_module::load(char *fn)
     int saw_order_list = 0;
     int saw_pattern_lengths = 0;
     int saw_event_list = 0;
+    // Reset per-track CC-draw slots so a song without a CDRW chunk doesn't
+    // inherit the previous song's draw selections.
+    for (int i = 0; i < MAX_TRACKS; i++) g_cc_drawmode[i] = 0;
     while(ret!=-1) {
         ret = readblock(&header[0],&buffer,compressed,f,input);
         if (ret!=-1) {
@@ -1494,6 +1518,21 @@ int zt_module::load(char *fn)
                     setstatusstr("Warning: CCBN chunk in %s looks truncated "
                                  "(payload %d B); some per-instrument banks "
                                  "may be missing.", fn, payload_size);
+                }
+                recognized_chunks++;
+            }
+            if (cmp_hd(&header[0], "CDRW")) {
+                // Optional per-track CC-draw slot chunk. Format:
+                //   short int count
+                //   repeat: uint8 track_idx, short int slot
+                short int count = buffer.getsi();
+                if (count >= 0 && count <= MAX_TRACKS) {
+                    for (short int k = 0; k < count; k++) {
+                        unsigned char tidx = buffer.getuch();
+                        short int slot     = buffer.getsi();
+                        if (tidx < MAX_TRACKS && slot >= 0)
+                            g_cc_drawmode[tidx] = slot;
+                    }
                 }
                 recognized_chunks++;
             }
