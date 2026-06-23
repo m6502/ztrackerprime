@@ -468,15 +468,24 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
       }
     }
 
-    int toggle_start = block_width - 3;
-    if (toggle_start < 0) toggle_start = block_width;
+    // In CC drawmode the [On]/[Off] toggle is hidden so the CC name gets the
+    // full header width.
+    bool show_toggle = !cc_label;
 
+    // Build a FULL-WIDTH, space-padded header so stale glyphs from a longer
+    // previous name / a different drawmode are wiped (printBG only paints
+    // behind the characters it draws, so a short name left tail garbage).
+    int bw = block_width;
+    if (bw > 255) bw = 255;
+    int name_avail = show_toggle ? (bw - 3) : bw;   // reserve room for the toggle
+    if (name_avail < 0) name_avail = 0;
+    for (int c = 0; c < bw; c++) str[c] = ' ';
+    str[bw] = 0;
     int name_len = (int)strlen(name);
-    if (name_len > toggle_start) name_len = toggle_start;
+    if (name_len > name_avail) name_len = name_avail;
     for (int c = 0; c < name_len; c++) {
       str[c] = name[c];
     }
-    str[name_len] = 0;
 
     // Tint the header background with the track's custom color (if any) so
     // colored tracks are identifiable at the header too, not just in the grid.
@@ -491,11 +500,13 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     int start_col = g_posx_tracks + (p * block_width);
     printBG(col(start_col), row(TRACKS_ROW_Y), str, fg, hdr_bg, S);
 
-    int toggle_col = track_header_toggle_column(p, field_size);
-    if (toggle_col >= 0) {
-      const char *toggle_text = "[On ]";
-      if (song->track_mute[j]) toggle_text = "[Off]";
-      printBG(col(toggle_col), row(TRACKS_ROW_Y), (char *)toggle_text, fg, hdr_bg, S);
+    if (show_toggle) {
+      int toggle_col = track_header_toggle_column(p, field_size);
+      if (toggle_col >= 0) {
+        const char *toggle_text = "[On ]";
+        if (song->track_mute[j]) toggle_text = "[Off]";
+        printBG(col(toggle_col), row(TRACKS_ROW_Y), (char *)toggle_text, fg, hdr_bg, S);
+      }
     }
     
     p++;
