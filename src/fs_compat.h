@@ -3,10 +3,12 @@
 // Minimal filesystem facade so the codebase does not call std::filesystem
 // directly. On Apple, std::filesystem is annotated _unavailable_ below macOS
 // 10.15 (libc++ ships the symbols only from Catalina on), which would pin the
-// deployment floor at 10.15 and block High Sierra / Mojave. This facade is
-// implemented with POSIX (opendir/stat/getcwd/...) on Apple so the floor drops
-// to SDL3's own 10.13, and with std::filesystem everywhere else so Linux and
-// Windows behaviour is unchanged. See fs_compat.cpp.
+// deployment floor at 10.15 and block High Sierra / Mojave. So this facade has
+// a POSIX backend (opendir/stat/getcwd/...) selected ONLY when std::filesystem
+// is unavailable -- i.e. an Apple build whose deployment target is below 10.15
+// (the 10.13 universal build) -- which drops the floor to SDL3's own 10.13.
+// Every other build (Linux, Windows, and Apple targeting >= 10.15) uses
+// std::filesystem unchanged. See the gate at the top of fs_compat.cpp.
 //
 // SDL-free and exception-free: every call reports failure by return value, so
 // it is safe in the unit-test harness (ZT_TEST_NO_SDL) and in the headless

@@ -1,6 +1,21 @@
 #include "fs_compat.h"
 
-#if defined(__APPLE__) || defined(ZTFS_FORCE_POSIX)
+#if defined(__APPLE__)
+#include <Availability.h>   // __MAC_OS_X_VERSION_MIN_REQUIRED (the deployment target)
+#endif
+
+// Use the POSIX backend only when std::filesystem is genuinely unavailable, so
+// modern builds get the standard library and ztfs is purely the old-floor
+// fallback (addresses cmicali's review note):
+//   * Apple with a deployment target below macOS 10.15 -- libc++ marks
+//     std::filesystem _unavailable_ before Catalina, so an older floor (e.g.
+//     the 10.13 universal build) cannot link it. A target >= 10.15 falls
+//     through to std::filesystem, exactly like Linux and Windows.
+//   * Or when forced for the test build (ZTFS_FORCE_POSIX, run on Linux CI),
+//     so the POSIX path never rots untested.
+#if defined(ZTFS_FORCE_POSIX) || \
+    (defined(__APPLE__) && (!defined(__MAC_OS_X_VERSION_MIN_REQUIRED) || \
+                            __MAC_OS_X_VERSION_MIN_REQUIRED < 101500))
 #define ZTFS_POSIX 1
 #endif
 
