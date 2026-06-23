@@ -469,8 +469,12 @@ if(APPLE)
     VERBATIM
   )
   if(ZT_ICON_COMPOSER)
-    # Compile the Icon Composer source into the bundle: Assets.car (used on
-    # macOS 26+) plus a refreshed zt.icns, overwriting the embedded fallback.
+    # Compile the Icon Composer source into the bundle: Assets.car is the
+    # Liquid Glass icon used on macOS 26+. actool ALSO drops a zt.icns, but its
+    # version is sparse (only ic04/ic07/ic11/ic13), so afterwards we restore the
+    # committed full-size zt.icns (adds ic05/ic08/ic09/ic10/ic12/ic14) for the
+    # pre-macOS-26 fallback path -- otherwise older systems render only a few
+    # sizes and fall back to a generic icon at the rest.
     add_custom_command(TARGET zt POST_BUILD
       COMMAND "${ZT_ACTOOL}" "${CMAKE_SOURCE_DIR}/assets/icon/zt.icon"
         --app-icon zt
@@ -478,6 +482,9 @@ if(APPLE)
         --platform macosx
         --minimum-deployment-target 26.0
         --output-partial-info-plist "${CMAKE_BINARY_DIR}/zt-icon-partial.plist"
+      COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_SOURCE_DIR}/zt.icns"
+        "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt.icns"
       VERBATIM
     )
   endif()
