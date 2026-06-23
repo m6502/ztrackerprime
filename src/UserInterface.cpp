@@ -67,6 +67,14 @@ static void zt_collect_known_device_names(const char *prefix, std::set<std::stri
         while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) value.erase(value.begin());
         while (!value.empty() && (value.back() == '\r' || value.back() == '\n' || value.back() == ' ' || value.back() == '\t')) value.pop_back();
 
+        // Truncate at the first control byte so a stale config carrying a
+        // stray 0x01 (e.g. "Unitor In 01\x01") self-heals to a clean name
+        // and collapses into its non-corrupt twin instead of spawning a
+        // phantom duplicate row.
+        std::string::size_type ctrl = 0;
+        while (ctrl < value.size() && (unsigned char)value[ctrl] >= 0x20) ctrl++;
+        value.erase(ctrl);
+
         if (key.rfind(key_prefix, 0) == 0 && !value.empty()) {
             out_names.insert(value);
         }
