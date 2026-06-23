@@ -82,16 +82,15 @@
 #include "ableton_link.h"
 #include "midi_clock_sync.h"
 
-#ifdef __APPLE__
-extern "C" void zt_macos_disable_cmd_q(void);
-extern "C" void zt_macos_disable_cmd_w(void);
-#endif
-
 #if defined(__APPLE__)
+
 #include <mach-o/dyld.h>
 #include <unistd.h>
 #include <limits.h>
 #include <cstring>
+
+extern "C" void zt_macos_menu_init(void);
+
 #endif
 
 
@@ -3156,9 +3155,22 @@ static void zt_queue_full_redraw(void)
     screenmanager.UpdateAll();
 }
 
+// Set while servicing an OS-driven resize (a drag, or the green-button native
+// fullscreen transition). Tells zt_backend_set_video_mode NOT to push window
+// size/fullscreen back to SDL, which can cause problem swith full-screen on macOS
+static bool g_zt_os_driven_resize = false;
+
 static void zt_handle_resize_event(int w, int h)
 {
-    if (!set_video_mode(w, h, errstr)) {
+    // Always drive off the window's POINT size, not the event payload: a
+    // PIXEL_SIZE_CHANGED event reports pixels (2x points on HiDPI)
+    if (zt_main_window) {
+        SDL_GetWindowSize(zt_main_window, &w, &h);
+    }
+    g_zt_os_driven_resize = true;
+    const int ok = set_video_mode(w, h, errstr);
+    g_zt_os_driven_resize = false;
+    if (!ok) {
         return;
     }
     zt_request_ui_full_refresh();
@@ -3296,17 +3308,27 @@ static bool zt_zoom_is_integer(float zoom_value)
     return std::fabs(zoom_value - nearest_integer) < 0.001f;
 }
 
+// True when the on-screen pixel scale (display density * zoom) is an integer,
+// i.e. the bitmap font pixel-doubles cleanly. On a 2x Retina panel this holds
+// for zoom 1.0/1.5/2.0/3.0..., so those stay crisp under nearest filtering.
+static bool zt_effective_scale_is_integer(void)
+{
+    float density = zt_main_window ? SDL_GetWindowPixelDensity(zt_main_window) : 1.0f;
+    if (density <= 0.0f) density = 1.0f;
+    return zt_zoom_is_integer(density * (float)ZOOM);
+}
+
 static SDL_ScaleMode zt_get_configured_scale_mode(void)
 {
     const char *scale_filter = zt_config_globals.scale_filter;
     if (!scale_filter || !scale_filter[0]) {
-        return zt_zoom_is_integer(ZOOM) ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR;
+        return zt_effective_scale_is_integer() ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR;
     }
     if (SDL_strcasecmp(scale_filter, "nearest") == 0) {
         return SDL_SCALEMODE_NEAREST;
     }
     if (SDL_strcasecmp(scale_filter, "linear") == 0) {
-        return zt_zoom_is_integer(ZOOM) ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR;
+        return zt_effective_scale_is_integer() ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR;
     }
 #ifdef SDL_SCALEMODE_PIXELART
     if (SDL_strcasecmp(scale_filter, "pixelart") == 0) {
@@ -3394,6 +3416,20 @@ static int zt_handle_platform_window_event(const SDL_Event *e)
     case SDL_EVENT_WINDOW_RESIZED:
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         zt_handle_resize_event((int)e->window.data1, (int)e->window.data2);
+        return 1;
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+        // Fullscreen entered by the OS or Alt+Enter -- mirror it
+        // into zt's own state so config persistence and the next Alt+Enter
+        // toggle stay consistent. Do NOT grab the mouse: confining the cursor
+        // blocks the macOS menu bar (and Dock) from revealing on mouse-to-top.
+        bIsFullscreen = true;
+        zt_config_globals.full_screen = 1;
+        zt_request_ui_full_refresh();
+        return 1;
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+        bIsFullscreen = false;
+        zt_config_globals.full_screen = 0;
+        zt_request_ui_full_refresh();
         return 1;
     default:
         return 0;
@@ -3552,7 +3588,11 @@ int action(Screen *S)
 //
 static int zt_backend_set_video_mode(char *errstr)
 {
-  Uint32 window_flags = SDL_WINDOW_RESIZABLE;
+  // HIGH_PIXEL_DENSITY: render at the display's native pixel resolution instead
+  // of letting the OS up-scale a 1x backing (which softens the bitmap font on
+  // Retina). zt then drives the up-scale itself via the frame-texture scale
+  // mode -- nearest at integer pixel scales for crisp pixel-doubling.
+  Uint32 window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
   if (zt_config_globals.full_screen) {
     window_flags |= SDL_WINDOW_FULLSCREEN;
     bIsFullscreen = true;
@@ -3560,27 +3600,23 @@ static int zt_backend_set_video_mode(char *errstr)
     bIsFullscreen = false;
   }
 
+  const bool had_window = (zt_main_window != NULL);
+
   if (!zt_main_window) {
+    SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, "1");
     zt_main_window = SDL_CreateWindow("zt", RESOLUTION_X, RESOLUTION_Y, window_flags);
     if (!zt_main_window) {
       sprintf(errstr, "Couldn't create SDL window: %s\n", SDL_GetError());
       zt_show_error("Error", errstr);
       return 0;
     }
+
 #ifdef __APPLE__
-    // Free Cmd-Q from the auto-created NSApp menu so the Pattern Editor can
-    // use it as Transpose-Up (KS_HAS_ALT treats Cmd as Alt). Quit reachable
-    // via Ctrl-Q / Ctrl-Alt-Q. Skipped under --headless because the dummy
-    // video driver doesn't create an NSApp menu in the first place; the
-    // disable call would touch a NULL menu and crash.
     if (!zt_headless_active()) {
-        zt_macos_disable_cmd_q();
-        // Free Cmd-W from the Window menu's Close item so it reaches our
-        // keyhandler instead of dismissing the SDL window. Pattern Editor
-        // treats Cmd-W as Ctrl-W (clear unused volumes in selection).
-        zt_macos_disable_cmd_w();
+        zt_macos_menu_init();
     }
 #endif
+
     zt_renderer = SDL_CreateRenderer(zt_main_window, NULL);
     if (!zt_renderer) {
       snprintf(errstr, 2048, "Couldn't create SDL renderer: %s\n", SDL_GetError());
@@ -3606,7 +3642,20 @@ static int zt_backend_set_video_mode(char *errstr)
       }
 #endif
     }
-  } else {
+  }
+
+  if (!g_zt_os_driven_resize) {
+    SDL_SetWindowMinimumSize(zt_main_window,
+                             (int)(MINIMUM_SCREEN_WIDTH  * (float)ZOOM),
+                             (int)(MINIMUM_SCREEN_HEIGHT * (float)ZOOM));
+  }
+
+  // Apply an explicit windowed mode change. Not on first creation (the window
+  // already has the right size) and not while fullscreen (SDL_SetWindowSize
+  // would change the size the window restores to on exit, and the flag is
+  // already asserted).
+  if (had_window && !g_zt_os_driven_resize &&
+      !(SDL_GetWindowFlags(zt_main_window) & SDL_WINDOW_FULLSCREEN)) {
     SDL_SetWindowSize(zt_main_window, RESOLUTION_X, RESOLUTION_Y);
     SDL_SetWindowFullscreen(zt_main_window, zt_config_globals.full_screen ? SDL_WINDOW_FULLSCREEN : 0);
   }
@@ -3615,6 +3664,16 @@ static int zt_backend_set_video_mode(char *errstr)
 
 int set_video_mode(int w, int h, char *errstr)
 {
+  // While the window is fullscreen it is the screen size, not the requested w/h
+  // (e.g. a Size preset's 1280). Drive the internal canvas off the ACTUAL size
+  // so the requested ZOOM is applied exactly -- otherwise the requested-sized
+  // canvas gets stretched to fill the screen, scaling the picture even at 1x.
+  if (zt_main_window && (SDL_GetWindowFlags(zt_main_window) & SDL_WINDOW_FULLSCREEN)) {
+    int fw = 0, fh = 0;
+    SDL_GetWindowSize(zt_main_window, &fw, &fh);
+    if (fw > 0 && fh > 0) { w = fw; h = fh; }
+  }
+
   RESOLUTION_X = w ;
   RESOLUTION_Y = h ;
 
@@ -4562,7 +4621,12 @@ static int zt_backend_toggle_fullscreen(void)
     if (window_h > 0) {
         RESOLUTION_Y = window_h;
     }
-    SDL_SetWindowMouseGrab(zt_main_window, enable_fullscreen);
+
+    // TODO: Ensure this is the right behavior on non-macOS targets
+    // No mouse grab in fullscreen: confining the cursor blocks the macOS menu
+    // bar / Dock from revealing when the mouse moves to the screen edge.
+    // SDL_SetWindowMouseGrab(zt_main_window, enable_fullscreen);
+
     return 1;
 }
 
