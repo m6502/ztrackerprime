@@ -431,7 +431,11 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
                     }
                 }
             }
-            midiInAddBuffer(handle, lpMIDIHeader, sizeof(MIDIHDR));
+            // Don't re-arm while the device is closing: midiInReset() returns
+            // this buffer to us via this very callback, and re-adding it mid-
+            // reset wedges the driver and hangs the UI on device disable.
+            if (dev && !dev->closing.load())
+                midiInAddBuffer(handle, lpMIDIHeader, sizeof(MIDIHDR));
             break;
         }
 
@@ -513,7 +517,7 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
               dev->SysXFlag = 0;
               dev->SysXAccumLen = 0;
           }
-          if (lpHdr) {
+          if (lpHdr && dev && !dev->closing.load()) {
               midiInAddBuffer(handle, lpHdr, sizeof(MIDIHDR));
           }
           break;
@@ -533,6 +537,15 @@ intlist::intlist(int k, intlist *n) {
 intlist::~intlist() {
 }
 
+void zt_sanitize_device_name(char *s) {
+    if (!s) return;
+    for (char *p = s; *p; ++p) {
+        if ((unsigned char)*p < 0x20) { *p = '\0'; break; }
+    }
+    size_t n = strlen(s);
+    while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t')) s[--n] = '\0';
+}
+
 midiInDevice::midiInDevice(int i) {
     devNum = i;
     szName = NULL;
@@ -540,8 +553,10 @@ midiInDevice::midiInDevice(int i) {
     opened = 0;
     SysXFlag = 0;
     SysXAccumLen = 0;
-    if (!midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS)))
+    if (!midiInGetDevCaps(i, &caps, sizeof(MIDIINCAPS))) {
+        zt_sanitize_device_name(caps.szPname);
         szName = caps.szPname;
+    }
 }
 
 midiInDevice::~midiInDevice(void) {
@@ -569,16 +584,20 @@ int midiInDevice::close(void) {
 //    char buffer[30000];
     unsigned long err;
     if (opened) {
+        // Tell the callback thread to stop re-arming the SysEx buffer while
+        // we drain it; re-adding a buffer mid-reset wedges the WinMM driver.
+        closing = true;
         //midiInStop(handle);
         midiInReset(handle);
         midiInUnprepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
         err = midiInClose(handle);
         (void)err;
         //err = midiInGetErrorText(err, &buffer[0], 30000);
-        handle = NULL; 
+        handle = NULL;
         opened = 0;
+        closing = false;
         return 0;
-         
+
     }
 /*  if (!(err = midiInGetErrorText(err, &buffer[0], 30000)))
     {

@@ -47,8 +47,10 @@ MidiOutputDevice::MidiOutputDevice(int deviceIndex) {
     m_runningStatus = reverse_bank_select = 0;
     handle = NULL;
     type = OUTPUTDEVICE_TYPE_MIDI;
-    if (!midiOutGetDevCaps(deviceIndex, &caps, sizeof(MIDIOUTCAPS)))
+    if (!midiOutGetDevCaps(deviceIndex, &caps, sizeof(MIDIOUTCAPS))) {
+        zt_sanitize_device_name(caps.szPname);
         strcpy(szName, caps.szPname);
+    }
 }
 MidiOutputDevice::~MidiOutputDevice() {
     close();

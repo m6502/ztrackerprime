@@ -4,6 +4,22 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_23 (MIDI In device list: duplicate-name fix + disable-hang fix)
+--------------------------------------------------------------------------
+
+        * MIDI In/Out device names are now sanitized: a stray control byte in a
+          driver-reported name (e.g. "Unitor In 01" followed by a 0x01 that
+          rendered as a smiley glyph) is stripped. Such a byte previously made
+          an otherwise-identical name compare unequal, spawning a phantom
+          duplicate row in the MIDI In Device Selection list. Stale device.conf
+          entries carrying the bad byte self-heal on load.
+
+        * Fixed a hard freeze when disabling a MIDI In device. Closing the
+          device calls midiInReset(), which returns the input buffer through
+          the MIDI-in callback; the callback then re-armed that buffer with
+          midiInAddBuffer() mid-reset, wedging the WinMM driver and hanging the
+          UI. The callback now skips re-arming while the device is closing.
+
 zt 2026_06_21 (Track properties, dynamic positioning fixes and improvements)
 ----------------------------------------------------------------------------
 
