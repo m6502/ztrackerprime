@@ -368,7 +368,7 @@ CUI_KeyBindings *UIP_KeyBindings = NULL;
 CUI_CcConsole *UIP_CcConsole = NULL;
 CUI_SysExLibrarian *UIP_SysExLibrarian = NULL;
 CUI_CCEnvelopeEditor *UIP_CCEnvelopeEditor = NULL;
-int g_cc_drawmode = 0;
+int g_cc_drawmode[MAX_TRACKS] = {0};
 int g_cc_draw_session_snapped = 0;
 
 // Cycle CC drawmode: 0 -> 1 -> 2 -> ... -> N -> 0, where N is the
@@ -386,6 +386,11 @@ int g_cc_draw_session_snapped = 0;
 // see" workflow Esa described.
 int zt_advance_cc_drawmode(void)
 {
+    // Cycling acts on the cursor track, so each track carries its own slot.
+    int trk = cur_edit_track;
+    if (trk < 0 || trk >= MAX_TRACKS) trk = 0;
+    int *slot = &g_cc_drawmode[trk];
+
     g_cc_draw_session_snapped = 0;
     ZtCcizerFile *cf = zt_ccizer_current_file();
     int max_slot = (cf != NULL) ? cf->num_slots : 0;
@@ -393,7 +398,7 @@ int zt_advance_cc_drawmode(void)
     if (max_slot <= 0) {
         // No CCizer file loaded. Cycle stays at 0 and we tell the
         // user where to load one.
-        g_cc_drawmode = 0;
+        *slot = 0;
         snprintf(szStatmsg, sizeof(szStatmsg),
                  "CC drawmode: load a CCizer file first (Shift+F3)");
         statusmsg = szStatmsg;
@@ -401,15 +406,15 @@ int zt_advance_cc_drawmode(void)
         return 0;
     }
 
-    g_cc_drawmode++;
-    if (g_cc_drawmode > max_slot) g_cc_drawmode = 0;
+    (*slot)++;
+    if (*slot > max_slot) *slot = 0;
 
     // Auto-enter / auto-exit Pattern Editor mouse-draw mode so the
     // user can just hit Ctrl+Shift+§ and immediately draw -- no
     // separate Shift+§ press required to flip into mouse-draw. The
     // cycle going OFF returns to regular keys mode.
     if (UIP_Patterneditor) {
-        if (g_cc_drawmode > 0) {
+        if (*slot > 0) {
             UIP_Patterneditor->mode    = PEM_MOUSEDRAW;
             UIP_Patterneditor->md_mode = MD_CC_DRAW;
         } else {
@@ -422,23 +427,23 @@ int zt_advance_cc_drawmode(void)
         }
     }
 
-    if (g_cc_drawmode == 0) {
-        snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: OFF");
+    if (*slot == 0) {
+        snprintf(szStatmsg, sizeof(szStatmsg), "CC drawmode: track %d OFF", trk + 1);
     } else {
-        const ZtCcizerSlot *s = &cf->slots[g_cc_drawmode - 1];
+        const ZtCcizerSlot *s = &cf->slots[*slot - 1];
         if (s->cc == ZT_CCIZER_PB_MARKER) {
             snprintf(szStatmsg, sizeof(szStatmsg),
-                     "CC drawmode: slot %d/%d -- PB (%s)",
-                     g_cc_drawmode, max_slot, s->name);
+                     "CC drawmode: track %d slot %d/%d -- PB (%s)",
+                     trk + 1, *slot, max_slot, s->name);
         } else {
             snprintf(szStatmsg, sizeof(szStatmsg),
-                     "CC drawmode: slot %d/%d -- CC %d (%s)",
-                     g_cc_drawmode, max_slot, (int)s->cc, s->name);
+                     "CC drawmode: track %d slot %d/%d -- CC %d (%s)",
+                     trk + 1, *slot, max_slot, (int)s->cc, s->name);
         }
     }
     statusmsg = szStatmsg;
     status_change = 1;
-    return g_cc_drawmode;
+    return *slot;
 }
 
 

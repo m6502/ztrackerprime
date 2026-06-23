@@ -439,15 +439,33 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     if (block_width < 1) block_width = 1;
     if (block_width > 255) block_width = 255;
 
-    // A custom track name (set in Track Options) overrides "Track NN".
-    const char *custom = song->track_name[j];
-    if (custom[0]) {
-      if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," %s ",custom);
-      else snprintf(name,sizeof(name)," %.4s ",custom);
+    // While CC drawmode is active, the header shows THIS track's armed
+    // CCizer parameter ("Cutoff", "Resonance", ...) so you can see at a
+    // glance what each track draws. Otherwise: custom name, else "Track NN".
+    bool cc_label = false;
+    if (UIP_Patterneditor &&
+        UIP_Patterneditor->mode == PEM_MOUSEDRAW &&
+        UIP_Patterneditor->md_mode == MD_CC_DRAW &&
+        j >= 0 && j < MAX_TRACKS && g_cc_drawmode[j] > 0) {
+      ZtCcizerFile *cf_hdr = zt_ccizer_current_file();
+      int sidx = g_cc_drawmode[j] - 1;
+      if (cf_hdr && sidx < cf_hdr->num_slots) {
+        const char *sn = cf_hdr->slots[sidx].name;
+        if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) snprintf(name,sizeof(name)," %s ",sn);
+        else snprintf(name,sizeof(name)," %.4s ",sn);
+        cc_label = true;
+      }
     }
-    else {
-      if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," Track %.2d ",j+1);
-      else sprintf(name," %.2d ",j+1);
+    const char *custom = song->track_name[j];
+    if (!cc_label) {
+      if (custom[0]) {
+        if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," %s ",custom);
+        else snprintf(name,sizeof(name)," %.4s ",custom);
+      }
+      else {
+        if (zt_config_globals.cur_edit_mode != VIEW_SQUISH) sprintf(name," Track %.2d ",j+1);
+        else sprintf(name," %.2d ",j+1);
+      }
     }
 
     int toggle_start = block_width - 3;
@@ -701,7 +719,7 @@ void disp_gfxeffect_pattern(int tracks_shown, int field_size, int cols_shown, Dr
         {
           ZtCcizerFile *cf_disp = zt_ccizer_current_file();
           int si = UIP_Patterneditor && UIP_Patterneditor->md_mode == MD_CC_DRAW
-                       ? (g_cc_drawmode - 1) : -1;
+                       ? (g_cc_drawmode[var_track] - 1) : -1;
           const ZtCcizerSlot *as = (si >= 0 && cf_disp && si < cf_disp->num_slots)
                                        ? &cf_disp->slots[si] : NULL;
           bool armed_match = false;
@@ -1658,7 +1676,7 @@ void CUI_Patterneditor::update()
           // ("cycle to slot K, draw the drawbar") doesn't require a
           // separate TAB press. The user can still TAB back to MD_VOL
           // etc. for non-CC drawing.
-          if (g_cc_drawmode > 0 && md_mode != MD_CC_DRAW) {
+          if (g_cc_drawmode[cur_edit_track] > 0 && md_mode != MD_CC_DRAW) {
             md_mode = MD_CC_DRAW;
           }
           switch(md_mode) {
@@ -1668,8 +1686,8 @@ void CUI_Patterneditor::update()
           case MD_CC_DRAW: {
             static char ccdraw_msg[96];
             ZtCcizerFile *cf = zt_ccizer_current_file();
-            int si = g_cc_drawmode - 1;
-            if (g_cc_drawmode > 0 && cf && si < cf->num_slots) {
+            int si = g_cc_drawmode[cur_edit_track] - 1;
+            if (g_cc_drawmode[cur_edit_track] > 0 && cf && si < cf->num_slots) {
               const ZtCcizerSlot *s = &cf->slots[si];
               if (s->cc == ZT_CCIZER_PB_MARKER) {
                 snprintf(ccdraw_msg, sizeof(ccdraw_msg),
@@ -1793,6 +1811,12 @@ void CUI_Patterneditor::update()
             mousedrawing=1;
             LastX = MousePressX;
             LastY = MousePressY;
+            // Focus the track being drawn so Tab/Ctrl+F2 arm THIS track's
+            // per-track CCizer slot (and the badge follows it).
+            {
+              int dt = ((MousePressX - col(5)) / 8) / (field_size + 1) + cur_edit_track_disp;
+              if (dt >= 0 && dt < MAX_TRACKS) cur_edit_track = dt;
+            }
           }
           break;
         case ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT)):
@@ -1820,15 +1844,18 @@ void CUI_Patterneditor::update()
           //          -> CCizer slot 1 -> slot 2 -> ... -> slot N -> (wrap) Volume
           // The CCizer slots come from the file loaded in the CC Console
           // (Shift+F3); with no file loaded, MD_CC_DRAW is skipped.
+          // Tab arms the CURSOR track's slot (each track keeps its own).
           ZtCcizerFile *cf = zt_ccizer_current_file();
           int max_slot = cf ? cf->num_slots : 0;
+          int trk = (cur_edit_track >= 0 && cur_edit_track < MAX_TRACKS) ? cur_edit_track : 0;
+          int *slot = &g_cc_drawmode[trk];
           if (md_mode == MD_CC_DRAW && max_slot > 0) {
             // Already inside the CCizer-slot walk: advance to the next slot,
             // then drop back out to Volume after the last one.
-            g_cc_drawmode++;
+            (*slot)++;
             g_cc_draw_session_snapped = 0;
-            if (g_cc_drawmode > max_slot) {
-              g_cc_drawmode = 0;
+            if (*slot > max_slot) {
+              *slot = 0;
               md_mode = MD_VOL;
             }
           } else {
@@ -1836,7 +1863,7 @@ void CUI_Patterneditor::update()
             if (md_mode >= MD_END) md_mode = 0;
             if (md_mode == MD_CC_DRAW) {
               if (max_slot > 0) {
-                g_cc_drawmode = 1;            // enter the CCizer walk at slot 1
+                *slot = 1;                   // enter the CCizer walk at slot 1
                 g_cc_draw_session_snapped = 0;
               } else {
                 md_mode++;                   // nothing to draw -- skip past it
@@ -1851,15 +1878,15 @@ void CUI_Patterneditor::update()
           case MD_FX_SIGNED: statusmsg = "Editing: Effect low-byte signed (0-0x7F)"; break;
           case MD_CC_DRAW: {
             static char tabmsg[96];
-            int si = g_cc_drawmode - 1;
-            if (g_cc_drawmode > 0 && cf && si < cf->num_slots) {
+            int si = *slot - 1;
+            if (*slot > 0 && cf && si < cf->num_slots) {
               const ZtCcizerSlot *s = &cf->slots[si];
               if (s->cc == ZT_CCIZER_PB_MARKER)
-                snprintf(tabmsg, sizeof(tabmsg), "Editing: PB drawbar (%s) [%d/%d]",
-                         s->name, g_cc_drawmode, max_slot);
+                snprintf(tabmsg, sizeof(tabmsg), "Editing track %d: PB drawbar (%s) [%d/%d]",
+                         trk + 1, s->name, *slot, max_slot);
               else
-                snprintf(tabmsg, sizeof(tabmsg), "Editing: CC%d drawbar (%s) [%d/%d]",
-                         (int)s->cc, s->name, g_cc_drawmode, max_slot);
+                snprintf(tabmsg, sizeof(tabmsg), "Editing track %d: CC%d drawbar (%s) [%d/%d]",
+                         trk + 1, (int)s->cc, s->name, *slot, max_slot);
               statusmsg = tabmsg;
             } else {
               statusmsg = "Editing: CC drawbar (load a CCizer file in Shift+F3)";
@@ -1979,8 +2006,8 @@ void CUI_Patterneditor::update()
         case MD_CC_DRAW: {
           static char ccdraw_msg2[96];
           ZtCcizerFile *cf2 = zt_ccizer_current_file();
-          int si2 = g_cc_drawmode - 1;
-          if (g_cc_drawmode > 0 && cf2 && si2 < cf2->num_slots) {
+          int si2 = g_cc_drawmode[cur_edit_track] - 1;
+          if (g_cc_drawmode[cur_edit_track] > 0 && cf2 && si2 < cf2->num_slots) {
             const ZtCcizerSlot *s2 = &cf2->slots[si2];
             if (s2->cc == ZT_CCIZER_PB_MARKER) {
               snprintf(ccdraw_msg2, sizeof(ccdraw_msg2),
@@ -3690,9 +3717,9 @@ case SDLK_DELETE:
               // which the surrounding scope is not a loop.)
               bool drawmode_armed_match = false;
               bool drawmode_drop = false;
-              if (g_cc_drawmode > 0 && (hi == 0xB0 || hi == 0xE0)) {
+              if (g_cc_drawmode[cur_edit_track] > 0 && (hi == 0xB0 || hi == 0xE0)) {
                 ZtCcizerFile *cf_filter = zt_ccizer_current_file();
-                int slot_idx = g_cc_drawmode - 1;
+                int slot_idx = g_cc_drawmode[cur_edit_track] - 1;
                 if (cf_filter && slot_idx < cf_filter->num_slots) {
                   const ZtCcizerSlot *active = &cf_filter->slots[slot_idx];
                   int d1 = (dw >> 8) & 0x7F;
@@ -3716,7 +3743,7 @@ case SDLK_DELETE:
                 int data1 = (dw >> 8)  & 0x7F;
                 int data2 = (dw >> 16) & 0x7F;
                 ZtCcizerFile *cf = zt_ccizer_current_file();
-                const ZtCcizerSlot *active = &cf->slots[g_cc_drawmode - 1];
+                const ZtCcizerSlot *active = &cf->slots[g_cc_drawmode[cur_edit_track] - 1];
                 // Snapshot the pattern before the first write of this
                 // drawmode session so the user can undo a knob run with
                 // a single Ctrl+Z. The session marker is reset by
@@ -4224,11 +4251,15 @@ wrap:;
             // using the armed CCizer slot's CC# (or PB marker).
             // X-position in the row drives the value (0..0x7F for CC,
             // scaled to 14-bit 0..0x3FFF for PB).
+            // Per-track: draw with the slot armed for the track under the
+            // mouse, so track 1 = Cutoff and track 2 = Resonance stay
+            // independent.
             ZtCcizerFile *cf = zt_ccizer_current_file();
-            int si = g_cc_drawmode - 1;
-            if (g_cc_drawmode <= 0 || !cf || si >= cf->num_slots) {
-              // Slot evaporated mid-drag. Skip this row -- no write,
-              // no advance. The next ON-cycle will re-arm.
+            int draw_slot = (track >= 0 && track < MAX_TRACKS) ? g_cc_drawmode[track] : 0;
+            int si = draw_slot - 1;
+            if (draw_slot <= 0 || !cf || si >= cf->num_slots) {
+              // This track has no slot armed (or it evaporated mid-drag).
+              // Skip the row -- no write, no advance.
               goto nevermind;
             }
             const ZtCcizerSlot *s = &cf->slots[si];
@@ -4342,22 +4373,23 @@ void CUI_Patterneditor::draw(Drawable *S)
       char badge[BADGE_W + 1];
       memset(badge, ' ', BADGE_W);
       badge[BADGE_W] = '\0';
-      if (g_cc_drawmode > 0) {
+      int badge_slot = g_cc_drawmode[cur_edit_track];
+      if (badge_slot > 0) {
         char tmp[BADGE_W + 1];
         ZtCcizerFile *cf = zt_ccizer_current_file();
-        int slot_idx = g_cc_drawmode - 1;
+        int slot_idx = badge_slot - 1;
         if (cf && slot_idx < cf->num_slots) {
           const ZtCcizerSlot *s = &cf->slots[slot_idx];
           if (s->cc == ZT_CCIZER_PB_MARKER) {
-            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: PB %s]",
-                     g_cc_drawmode, cf->num_slots, s->name);
+            snprintf(tmp, sizeof(tmp), "[CC DRAW T%d slot %d/%d: PB %s]",
+                     cur_edit_track + 1, badge_slot, cf->num_slots, s->name);
           } else {
-            snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d/%d: CC%d %s]",
-                     g_cc_drawmode, cf->num_slots, (int)s->cc, s->name);
+            snprintf(tmp, sizeof(tmp), "[CC DRAW T%d slot %d/%d: CC%d %s]",
+                     cur_edit_track + 1, badge_slot, cf->num_slots, (int)s->cc, s->name);
           }
         } else {
           snprintf(tmp, sizeof(tmp), "[CC DRAW slot %d -- stale]",
-                   g_cc_drawmode);
+                   badge_slot);
         }
         // Right-justify into the padded BADGE_W field so it always
         // ends at the same column.
