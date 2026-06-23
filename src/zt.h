@@ -753,7 +753,13 @@ extern int cur_step;
 // Cycle via the Shortcuts action ZT_ACTION_TOGGLE_CC_DRAWMODE
 // (default Ctrl+Shift+§) or the ESC main menu. Each press advances
 // 0 -> 1 -> ... -> N -> 0.
-extern int g_cc_drawmode;
+//
+// PER-TRACK: indexed by track, so each track remembers its own armed
+// CCizer slot (track 1 = Cutoff, track 2 = Resonance, ...). Cycling acts
+// on the cursor track (cur_edit_track); a mouse-draw on track N uses
+// g_cc_drawmode[N]. 0 = no slot armed for that track. Session-only (the
+// drawn CC values themselves persist in the pattern's effect column).
+extern int g_cc_drawmode[MAX_TRACKS];
 
 // Reset to 0 every time CC drawmode advances, then set to 1 by the
 // first drawmode write so each session-while-non-zero generates exactly
