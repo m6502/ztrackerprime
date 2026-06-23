@@ -4,6 +4,19 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_06_23 (F2: combined Pattern & Track Options dialog)
+----------------------------------------------------------
+
+        * F2 in the Pattern Editor now opens a single "Pattern & Track Options"
+          popup that holds BOTH the pattern settings (EditStep, length, row
+          highlight/lowlight, Centered, StepEdit, RecVeloc, Speedup, DrawMode,
+          CCOver, PianoKey) and the current track's Name + custom Color, instead
+          of two separate popups you had to cycle between with F2. The track
+          name/colour controls moved into the lower half of the dialog; F2
+          again closes it. Fixes the surprise where the track-colour popup
+          (added with track colours) appeared to have replaced the pattern
+          settings -- they were only one F2 press away, now they are together.
+
 zt 2026_06_23 (MIDI In device list: duplicate-name fix + disable-hang fix)
 --------------------------------------------------------------------------
 

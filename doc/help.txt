@@ -134,11 +134,13 @@
                   to the line that documents it. Tab / Shift-Tab navigate
                   between section headers.
  F2             : Pattern editor - Pressing F2 again while in the pattern
-                  editing screen opens the current track Options popup where 
-                  some properties like name and a custom color can be set.
-                  Pressing F2 again will show the pattern settings, including
-                  the "PianoKey" toggle (tracker vs Ableton/Logic keyjazz
-                  layout).
+                  editing screen opens the combined "Pattern & Track Options"
+                  popup. The top half holds the pattern settings (EditStep,
+                  pattern length, row highlight/lowlight, Centered, StepEdit,
+                  RecVeloc, Speedup, DrawMode, CCOver and the "PianoKey"
+                  tracker-vs-Ableton/Logic keyjazz toggle); the bottom half
+                  holds the current track's Name and a custom Color (R/G/B).
+                  Pressing F2 again closes the popup.
  F3             : Instrument editor. Pressing F3 again (while already on it)
                   opens a popup where you PICK a MIDI Out device from a list
                   and hit "Create 16 Channels": it fills the next 16 empty
