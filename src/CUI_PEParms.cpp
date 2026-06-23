@@ -407,10 +407,8 @@ void CUI_PEParms::draw(Drawable *S) {
         print(start_x + col(39),start_y + row(18),"PianoKey:",COLORS.Text,S);
 
         // ---- Track Options section -----------------------------------------
-        // Divider on its own row, then the section header centred on the next
-        // row (matches the title's centring; the window is screen-centred so
-        // textcenter() lands it inside the popup).
-        printline(start_x, start_y + row(20), 148, window_width / 8, COLORS.Lowlight, S);
+        // The centred header alone separates the two halves (no divider line;
+        // window is screen-centred so textcenter() lands it inside the popup).
         print(col(textcenter("Track Options")), start_y + row(21), "Track Options", COLORS.Text, S);
         print(start_x + col(2), start_y + row(23), "   Track Name:", COLORS.Text, S);
         print(start_x + col(2), start_y + row(25), " Custom Color:", COLORS.Text, S);
