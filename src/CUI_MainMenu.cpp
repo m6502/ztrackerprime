@@ -62,6 +62,7 @@ struct ResPreset {
 };
 static const ResPreset MM_RES_PRESETS[] = {
     // label                              W     H    zoom    internal    chars cell on-screen
+    { "Small      840x480  1.0x",       840,  480, 1.0f }, //  840x480     8 px
     { "Compact    1024x640  1.0x",     1024,  640, 1.0f }, //  1024x640    8 px
     { "Default    1280x800  1.0x",     1280,  800, 1.0f }, //  1280x800    8 px
     { "Medium     1440x900  1.5x",     1440,  900, 1.5f }, //   960x600   12 px
@@ -133,6 +134,37 @@ static void mm_res_2(void) { mm_apply_resolution(2); }
 static void mm_res_3(void) { mm_apply_resolution(3); }
 static void mm_res_4(void) { mm_apply_resolution(4); }
 static void mm_res_5(void) { mm_apply_resolution(5); }
+static void mm_res_6(void) { mm_apply_resolution(6); }
+
+// Hooks for the macOS menu bar (src/macos_menu.mm). They arm the SAME
+// deferred change the in-app Window Size menu uses, so a menu click applies
+// safely at the next frame (set_video_mode mid-frame would crash, see above).
+extern "C" void zt_view_apply_size_preset(int idx) {
+    mm_apply_resolution(idx);
+}
+
+// Let the macOS Size menu build itself from MM_RES_PRESETS so the two never
+// drift (e.g. when a preset is added).
+extern "C" int zt_view_size_preset_count(void) {
+    return MM_RES_PRESET_COUNT;
+}
+
+extern "C" const char *zt_view_size_preset_label(int idx) {
+    if (idx < 0 || idx >= MM_RES_PRESET_COUNT) return "";
+    return MM_RES_PRESETS[idx].label;
+}
+
+// Change only the zoom factor, keeping the current window dimensions.
+extern "C" void zt_view_apply_zoom(float zoom) {
+    g_pending_res.armed = true;
+    g_pending_res.w     = zt_config_globals.screen_width;
+    g_pending_res.h     = zt_config_globals.screen_height;
+    g_pending_res.zoom  = zoom;
+    snprintf(szStatmsg, sizeof(szStatmsg), "Setting zoom to %.2fx...", zoom);
+    statusmsg = szStatmsg;
+    status_change = 1;
+    need_refresh++;
+}
 
 // ----------------------------------------------------------------------
 // Functions that don't have a dedicated CMD_* enum. Implemented inline
@@ -286,12 +318,13 @@ static const mm_entry MM_ENTRIES[] = {
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_SUBHEADING, "Window Size & Zoom",       NULL,                   0,                          NULL},
-    {MM_FUNC,       MM_RES_PRESETS[0].label,    NULL,                   0,                          mm_res_0},
-    {MM_FUNC,       MM_RES_PRESETS[1].label,    NULL,                   0,                          mm_res_1},
-    {MM_FUNC,       MM_RES_PRESETS[2].label,    NULL,                   0,                          mm_res_2},
-    {MM_FUNC,       MM_RES_PRESETS[3].label,    NULL,                   0,                          mm_res_3},
-    {MM_FUNC,       MM_RES_PRESETS[4].label,    NULL,                   0,                          mm_res_4},
-    {MM_FUNC,       MM_RES_PRESETS[5].label,    NULL,                   0,                          mm_res_5},
+    {MM_FUNC,       MM_RES_PRESETS[0].label,         NULL,                   0,                          mm_res_0},
+    {MM_FUNC,       MM_RES_PRESETS[1].label,         NULL,                   0,                          mm_res_1},
+    {MM_FUNC,       MM_RES_PRESETS[2].label,         NULL,                   0,                          mm_res_2},
+    {MM_FUNC,       MM_RES_PRESETS[3].label,         NULL,                   0,                          mm_res_3},
+    {MM_FUNC,       MM_RES_PRESETS[4].label,         NULL,                   0,                          mm_res_4},
+    {MM_FUNC,       MM_RES_PRESETS[5].label,         NULL,                   0,                          mm_res_5},
+    {MM_FUNC,       MM_RES_PRESETS[6].label,         NULL,                   0,                          mm_res_6},
 
     {MM_SEPARATOR,  NULL,                       NULL,                   0,                          NULL},
     {MM_FUNC,       "Quit",                     "Ctrl+Q",               0,                          mm_quit},
