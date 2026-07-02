@@ -67,6 +67,22 @@ target_compile_definitions(test_keybuffer PRIVATE ZT_TEST_NO_SDL)
 target_compile_features(test_keybuffer PRIVATE cxx_std_17)
 add_test(NAME keybuffer COMMAND test_keybuffer)
 
+# Filesystem facade (src/fs_compat.cpp). Built with -DZTFS_FORCE_POSIX so the
+# POSIX backend Apple ships (to keep the deployment floor at 10.13 rather than
+# std::filesystem's 10.15) is exercised on Linux/macOS CI, not only on a Mac.
+# Not built on Windows -- the POSIX backend needs <dirent.h>/<unistd.h>; Windows
+# keeps the std::filesystem backend it has always used.
+if(NOT WIN32)
+    add_executable(test_fs_compat
+        test_fs_compat.cpp
+        "${CMAKE_SOURCE_DIR}/src/fs_compat.cpp"
+    )
+    target_include_directories(test_fs_compat PRIVATE "${CMAKE_SOURCE_DIR}/src")
+    target_compile_definitions(test_fs_compat PRIVATE ZTFS_FORCE_POSIX)
+    target_compile_features(test_fs_compat PRIVATE cxx_std_17)
+    add_test(NAME fs_compat COMMAND test_fs_compat)
+endif()
+
 # CCizer parser, sidecar, MIDI byte builder, folder resolution. Pure C/C++
 # (no SDL). The test pulls ccizer.cpp in via #include so the same translation
 # unit lands in the test binary; no need to add it to the source list.

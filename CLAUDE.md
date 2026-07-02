@@ -4,7 +4,7 @@ This file is loaded automatically by Claude Code (and other AI agents that suppo
 
 **This file is self-contained** — you do not need the skill to contribute. For *deeper* material — headless-screenshot recipes, the full list-pane construction idiom (with code), effect reference, glossary — see [`.claude/skills/ztrackerprime/SKILL.md`](.claude/skills/ztrackerprime/SKILL.md) and the `references/` + `recipes/` directories alongside it. The skill is the continuously-maintained companion; CLAUDE.md is the standalone briefing that mirrors its essentials for agents and humans who don't load skills.
 
-> **Last synced with the codebase: 2026-06-15.** If that date is more than ~2 weeks old when you read this, your first move is to check what merged since — `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt` — and reconcile the key-files table, shortcut map, feature sections, and test list below against current `master` before relying on them. Bump this date in the same commit that fixes any drift. (This guard exists because CLAUDE.md silently fell ~7 weeks out of date once: it duplicated the skill's content but, unlike the skill, had no reconcile step.)
+> **Last synced with the codebase: 2026-06-23.** If that date is more than ~2 weeks old when you read this, your first move is to check what merged since — `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt` — and reconcile the key-files table, shortcut map, feature sections, and test list below against current `master` before relying on them. Bump this date in the same commit that fixes any drift. (This guard exists because CLAUDE.md silently fell ~7 weeks out of date once: it duplicated the skill's content but, unlike the skill, had no reconcile step.)
 
 ---
 
@@ -57,6 +57,8 @@ CMake option `ZT_BUILD_TESTS` (default ON) controls whether the `tests/` subdire
 | `src/CUI_Page.{h,cpp}` | Base class for all `CUI_*` pages. |
 | `src/CUI_*.cpp` | Other pages: Sysconfig, Songconfig, Help, About, InstEditor, MainMenu, etc. |
 | `src/UserInterface.{h,cpp}` | Widget classes — `CheckBox`, `ValueSlider`, `TextInput`, `Frame`, `Button`, `TextBox`, `ListBox`, `MidiOutDeviceOpener`, `SkinSelector`, `VUPlay`. **Fix rendering bugs in the widget class, not at every caller.** |
+| `src/fs_compat.{h,cpp}` | Filesystem facade (`ztfs::`) replacing direct `std::filesystem` calls. POSIX backend on Apple (libc++ marks `std::filesystem` unavailable below macOS 10.15, which would pin the deploy floor there); `std::filesystem` backend on Linux/Windows (unchanged). Built with `-DZTFS_FORCE_POSIX` in the `fs_compat` test so the POSIX path is CI-covered on Linux. |
+| `cmake/bundle_sdl3_macos.cmake` | POST_BUILD step (`-P`) that bundles SDL3 into the macOS `.app` (copy → rewrite install names → add rpath → ad-hoc re-sign), making the app self-contained. Robust to Homebrew-absolute and from-source-`@rpath` SDL3 references. Gated by `ZT_MACOS_BUNDLE_SDL3` (default ON). |
 | `src/keybuffer.{h,cpp}` | Key buffer + KS_ALT/KS_CTRL/KS_META/KS_SHIFT state. `KS_HAS_ALT(s)` macro accepts ALT or macOS Cmd. Header has a `ZT_TEST_NO_SDL` guard so it can be compiled into SDL-free unit tests via `tests/sdl_stub.h`. |
 | `src/font.cpp` | `print()` / `printtitle()` / `printBG()` drawing primitives. |
 | `src/zt.h` | Kitchen-sink: `STATE_*` enum (incl. `STATE_CCCONSOLE`, `STATE_SYSEX_LIB`), `CMD_*` enum, page globals (`UIP_CcConsole`, `UIP_SysExLibrarian`), `g_cc_drawmode`, layout macros. |
@@ -80,12 +82,22 @@ CMake option `ZT_BUILD_TESTS` (default ON) controls whether the `tests/` subdire
 | `src/editor_layout.h` | Shared character-grid constants for F4/Shift+F4 editors. |
 | `assets/ccizer/` | Bundled CCizer banks (Paketti subset) + README. CMake POST_BUILD copies into `.app Resources/ccizer` and `<exe-dir>/ccizer`. |
 | `assets/syx/` | Bundled SysEx files. `request_universal_inquiry.syx` for first-test handshakes. |
-| `tests/` | CTest unit-test executables. **8 suites**: presets / selector / page_sync / save_key / keybuffer / ccizer / sysex_inq / sysex_macro. Linux CI runs them. |
+| `tests/` | CTest unit-test executables (run `ctest -N` for the live list). Includes `fs_compat` (the `ztfs::` POSIX backend, forced on via `-DZTFS_FORCE_POSIX` so Linux CI exercises Apple's path). Linux CI runs the SDL-free suites. |
 | `doc/help.txt` | In-app F1 help. **Update this when adding keybinds or CLI flags.** |
 | `doc/CHANGELOG.txt` | Release notes, chronological. |
 | `.github/workflows/build.yml` | CI: 5-platform build matrix + Linux ctest run. |
 
 ---
+
+## macOS deployment floor & universal build
+
+The macOS `.app` is a **universal binary** (Intel x86_64 + Apple Silicon arm64) with a deployment floor of **10.13 (High Sierra)** on the x86_64 slice and **11.0 (Big Sur)** on the arm64 slice (the linker auto-clamps arm64 — no arm64 exists below Big Sur). Three things conspired to keep the old floor at 15.0, all now fixed:
+
+1. **No deployment target** was set → `CMakeLists.txt` now pins `CMAKE_OSX_DEPLOYMENT_TARGET=10.13` (before `project()`, so the flag is baked into every object; setting it after is too late). Override with `-DCMAKE_OSX_DEPLOYMENT_TARGET=`.
+2. **Homebrew SDL3** is minos-15 and single-arch. CI builds a **universal SDL3 from source at 10.13** and passes `-DSDL3_LIBRARY`. An explicit `SDL3_LIBRARY` now overrides pkg-config (otherwise a Homebrew `sdl3.pc` silently wins and pulls in its single-arch dylib, which fails to link universal).
+3. **`std::filesystem`** is marked unavailable below 10.15 by libc++ → routed through `src/fs_compat.{h,cpp}` (`ztfs::`) on Apple. **Never reintroduce a direct `std::filesystem` call** in code compiled on Apple; add to `ztfs::` instead.
+
+SDL3 is bundled into `Contents/Frameworks` (see `cmake/bundle_sdl3_macos.cmake`) so the app is self-contained. The CI macOS job hard-gates every run on: universal, per-slice floor 10.13/11.0, no Homebrew dep leak, renders headless. **El Capitan (10.11) and older are out of reach — SDL3's own floor is 10.13.**
 
 ## Coordinate system (read this; it has tripped us up multiple times)
 
