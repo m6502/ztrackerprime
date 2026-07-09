@@ -1800,6 +1800,8 @@ void global_keys(Drawable *S)
                         (void)Keys.getkey();
                         return;
                     case SAVE_KEY_OPEN_SAVE_POPUP:
+                        // <Manu> Save As modifies UIP_SaveMsg->filetype so control+s would get confused when used after exporting a MIDI file!
+                        UIP_SaveMsg->filetype = 1;
                         popup_window(UIP_SaveMsg);
                         (void)Keys.getkey();
                         clear++;
