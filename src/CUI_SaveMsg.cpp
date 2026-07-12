@@ -61,14 +61,14 @@ unsigned long ZT_THREAD_CALL save_thread(void *) {
             break;
         case 2: {
             ZTImportExport zie;
-            zie.ExportMID((char *)song->filename,0);
+            zie.ExportMID(export_filename,0);
             break;
         }
         case 3: {
             ZTImportExport zie;
-            if (zie.ExportMultichannelMID((char *)song->filename)) {
+            if (zie.ExportMultichannelMID(export_filename)) {
                 sprintf(szStatmsg, "Exported multichannel MIDI to %s",
-                        (char *)song->filename);
+                        export_filename);
             } else {
                 sprintf(szStatmsg,
                         "Multichannel MIDI export failed (no tracks with events)");
@@ -79,7 +79,7 @@ unsigned long ZT_THREAD_CALL save_thread(void *) {
         }
         case 4: {
             ZTImportExport zie;
-            int n = zie.ExportPerTrackMID((char *)song->filename);
+            int n = zie.ExportPerTrackMID(export_filename);
             if (n > 0) {
                 sprintf(szStatmsg,
                         "Exported %d per-track .MID files (e.g. *_track01.mid)",

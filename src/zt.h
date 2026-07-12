@@ -806,6 +806,7 @@ void draw_status(Drawable *S); /* S MUST BE LOCKED! */
 extern Bitmap *load_cached_bitmap(char *name);
 
 extern char ls_filename[MAX_PATH + 1],load_filename[MAX_PATH + 1], save_filename[MAX_PATH + 1];
+extern char export_filename[MAX_PATH + 1];
 
 extern int faded, doredraw;
 

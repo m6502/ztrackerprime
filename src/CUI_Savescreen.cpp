@@ -46,6 +46,7 @@
 
 
 char save_filename[MAX_PATH + 1];
+char export_filename[MAX_PATH + 1];
 // Must match the definition in CUI_SaveMsg.cpp -- declaring this as
 // `extern volatile int` produced an LNK2019 on MSVC because C++ name
 // mangling differs between `volatile int` and `std::atomic<int>`.
@@ -78,7 +79,12 @@ int scmpi(char *s1, char *s2)
 //
 void do_save(void)
 {
-  strcpy((char *)song->filename,save_filename);
+  // <Manu> Don't change the song file name if exporting!!!!
+  if (UIP_SaveMsg->filetype == 1) {
+    strcpy((char *)song->filename, save_filename);
+  } else {
+    strcpy(export_filename, save_filename);
+  }
   popup_window(UIP_SaveMsg);
 }
 
