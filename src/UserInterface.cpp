@@ -37,7 +37,7 @@
  *
  ******/
 
-#include <filesystem>
+#include "fs_compat.h"
 #include <fstream>
 #include <set>
 #include <string>
@@ -2802,16 +2802,16 @@ void SkinSelector::OnChange() {
     std::string skins_dir = std::string(cur_dir) + "/skins";
 
     // Iterate through the directory entries
-    for (const auto& entry : std::filesystem::directory_iterator(skins_dir)) {
-        
-        const std::string dir_name = entry.path().filename().string();
+    for (const auto& entry : ztfs::list_directory(skins_dir)) {
+
+        const std::string &dir_name = entry.name;
 
         // Ignore "." and ".." directories
         if (dir_name[0] != '.') {
-            std::string config_file = entry.path().string() + "/colors.conf";
+            std::string config_file = ztfs::join(entry.path, "colors.conf");
 
             // Check if the "colors.conf" file exists in the subdirectory
-            if (std::filesystem::exists(config_file)) {
+            if (ztfs::exists(config_file)) {
                 LBNode *p = insertItem((char *)dir_name.c_str());
                 if (zcmp(p->caption,zt_config_globals.skin))
                     p->checked = true;

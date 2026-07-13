@@ -3,7 +3,7 @@
 #include "Skins.h"
 #include <stdio.h>
 #include <string.h>
-#include <filesystem>
+#include "fs_compat.h"
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -265,26 +265,23 @@ void CUI_PaletteEditor::rebuild_preset_list(void) {
 #else
     snprintf(skinroot, sizeof(skinroot), "%s/skins", cur_dir ? cur_dir : ".");
 #endif
-    std::error_code ec;
-    if (std::filesystem::is_directory(skinroot, ec)) {
-        std::vector<std::filesystem::path> skin_dirs;
-        for (auto &entry : std::filesystem::directory_iterator(skinroot, ec)) {
-            if (ec) break;
-            if (!entry.is_directory()) continue;
-            auto colors = entry.path() / "colors.conf";
-            if (std::filesystem::exists(colors, ec)) {
-                skin_dirs.push_back(entry.path());
+    if (ztfs::is_directory(skinroot)) {
+        std::vector<std::string> skin_dirs;
+        for (auto &entry : ztfs::list_directory(skinroot)) {
+            if (!entry.is_directory) continue;
+            if (ztfs::exists(ztfs::join(entry.path, "colors.conf"))) {
+                skin_dirs.push_back(entry.path);
             }
         }
         std::sort(skin_dirs.begin(), skin_dirs.end());
         for (auto &p : skin_dirs) {
             if (num_presets >= 64) break;
-            std::string name = p.filename().string();
+            std::string name = ztfs::filename(p);
             snprintf(preset_label[num_presets], sizeof(preset_label[0]),
                      "[skin] %s", name.c_str());
-            auto colors = p / "colors.conf";
+            std::string colors = ztfs::join(p, "colors.conf");
             snprintf(preset_path[num_presets], sizeof(preset_path[0]),
-                     "%s", colors.string().c_str());
+                     "%s", colors.c_str());
             preset_is_skin[num_presets] = 1;
             num_presets++;
         }

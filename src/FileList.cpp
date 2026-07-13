@@ -2,7 +2,7 @@
 #include "FileList.h"
 #include <assert.h>
 
-#include <filesystem>
+#include "fs_compat.h"
 #include <algorithm>
 
 
@@ -100,9 +100,9 @@ void DriveList::OnChange()
 //
 void DriveList::OnSelect(LBNode *selected) {
 #ifdef _WIN32
-    std::filesystem::current_path(&selected->caption[2]);
+    ztfs::set_current_path(&selected->caption[2]);
 #else
-    std::filesystem::current_path(selected->caption);
+    ztfs::set_current_path(selected->caption);
 #endif
     OnChange();
     updated++;
@@ -168,15 +168,9 @@ void DirList::draw(Drawable *S, int active) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-bool is_root_directory(const std::filesystem::path &dir_path)
+bool is_root_directory(const std::string &dir_path)
 {
-    if (std::filesystem::exists(dir_path) && std::filesystem::is_directory(dir_path)) {
-
-        bool result = (dir_path == dir_path.root_path()) ;
-        return result ;
-    }
-
-    return false;
+    return ztfs::is_root_directory(dir_path);
 }
 
 
@@ -189,19 +183,16 @@ void DirList::OnChange()
 {
     clear();
 
-    std::filesystem::path current_dir = std::filesystem::current_path();
+    std::string current_dir = ztfs::current_path();
 
     if(!is_root_directory(current_dir))
     {
         insertItem((char *)"..");
     }
 
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-
-        if (entry.is_directory()) {
-
-            const std::string dirName = entry.path().filename().string();
-            insertItem((char *)dirName.c_str());
+    for (const auto& entry : ztfs::list_directory(".")) {
+        if (entry.is_directory) {
+            insertItem((char *)entry.name.c_str());
         }
     }
 
@@ -227,7 +218,7 @@ void DirList::OnChange()
 //
 //
 void DirList::OnSelect(LBNode *selected) {
-    std::filesystem::current_path(selected->caption);
+    ztfs::set_current_path(selected->caption);
     OnChange();
     updated++;
     char d[1024];
@@ -372,12 +363,12 @@ void FileList::AddFiles(const char *pattern, TColor c)
     std::string wanted_ext = pattern ? pattern : "";
     std::transform(wanted_ext.begin(), wanted_ext.end(), wanted_ext.begin(), ::tolower);
 
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-        std::string ext = entry.path().extension().string();
+    for (const auto& entry : ztfs::list_directory(".")) {
+        std::string ext = ztfs::extension(entry.name);
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
-        if (entry.is_regular_file() && ext == wanted_ext) {
-            LBNode* p = insertItem((char *)entry.path().filename().string().c_str());
+        if (entry.is_regular_file && ext == wanted_ext) {
+            LBNode* p = insertItem((char *)entry.name.c_str());
             p->int_data = c; // Set the integer data
         }
     }
