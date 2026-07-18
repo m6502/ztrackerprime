@@ -142,6 +142,7 @@ set(ZT_SOURCES
   src/CUI_PaletteEditor.cpp
   src/CUI_Sysconfig.cpp
   src/import_export.cpp
+  src/pattern_display_layout.cpp
   src/it.cpp
   src/Button.cpp
   src/FileList.cpp
