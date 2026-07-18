@@ -27,7 +27,6 @@ class PatternDisplay : public UserInterfaceElement
         int update();
         void draw(Drawable *S, int active);
 
-        int next_order(void);
         void disp_playing_row(int x,int y, int pattern, int row, Drawable *S, TColor bg);
         void update_frame(void);
         void disp_playing_pattern(Drawable *S);

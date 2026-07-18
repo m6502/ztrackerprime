@@ -1,5 +1,6 @@
 #include "zt.h"
 #include "PatternDisplay.h"
+#include "pattern_display_layout.h"
 #include "track_color.h"
 
 
@@ -229,41 +230,6 @@ void PatternDisplay::draw(Drawable *S, int)
 // ------------------------------------------------------------------------------------------------
 //
 //
-int PatternDisplay::next_order(void) 
-{
-  int pass=0,cur_order;
-
-  cur_order = ztPlayer->playing_cur_order+1;
-  if (cur_order < 0 || cur_order >= ZTM_ORDERLIST_LEN) {
-    cur_order = 0;
-  }
-
-  while(cur_order < ZTM_ORDERLIST_LEN && song->orderlist[cur_order] > 0xFF && pass<3) {
-
-    if (song->orderlist[cur_order] == 0x100) cur_order = 0;
-
-    while(cur_order < ZTM_ORDERLIST_LEN && song->orderlist[cur_order] == 0x101) cur_order++;
-    if (cur_order >= ZTM_ORDERLIST_LEN) {
-      cur_order = 0;
-    }
-
-    pass++;
-  }
-
-  if (cur_order < 0 || cur_order >= ZTM_ORDERLIST_LEN) {
-    return 0x100;
-  }
-  return song->orderlist[cur_order];
-}
-
-
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 void PatternDisplay::disp_playing_row(int x, int y, int pattern, int row, Drawable *S, TColor bg) 
 {
   char str[40];
@@ -413,60 +379,39 @@ void PatternDisplay::disp_track_headers(Drawable *S)
 //
 void PatternDisplay::disp_playing_pattern(Drawable *S) 
 {
-  int cy, rows, cur_row, pat, last ;
-  int next ;
+  int cy, rows;
+  int playing_row, playing_pattern, playing_order;
+  int lengths[ZTM_MAX_PATTERNS];
   TColor bg;
 
   //int dontchangeitasshole = 0
-  
-  last = 0;
-  next = next_order();
 
-  this->disp_row = cur_row = ztPlayer->playing_cur_row;
+  // Playback runs on another thread.  Copy its display state once so a
+  // pattern boundary cannot leave the top and bottom halves of this frame
+  // using different orders/patterns.
+  playing_row = ztPlayer->playing_cur_row;
+  playing_pattern = ztPlayer->playing_cur_pattern;
+  playing_order = ztPlayer->playing_cur_order;
+
+  for (int i = 0; i < ZTM_MAX_PATTERNS; ++i)
+    lengths[i] = song->patterns[i] ? song->patterns[i]->length : 0;
+
+  this->disp_row = playing_row;
 
   rows = ysize / 2 ;
-  cur_row -= rows;
-  pat = ztPlayer->playing_cur_pattern;
   
   for (cy = y; cy<y+ysize; cy++) {
-    
-    if (cur_row < 0) {
-      
-      pat = ztPlayer->last_pattern;
-      last = 1;
-      
-      if (pat<0) pat = ztPlayer->playing_cur_pattern;
-      cur_row = song->patterns[pat]->length + cur_row ;
-      }
-     /* else
-       if (!dontchangeitasshole)
-       pat = ztPlayer->playing_cur_pattern;
-    */
+    PatternDisplayPosition pos = pattern_display_position_at_offset(
+        song->orderlist, lengths, ztPlayer->playmode,
+        playing_order, playing_pattern, playing_row, cy - (y + rows));
 
-    if (cur_row >= song->patterns[pat]->length) {
-
-      if (ztPlayer->playmode) {
-
-        //dontchangeitasshole = 1;
-
-        if (last) {
-
-          pat = ztPlayer->playing_cur_pattern;
-          last = 0;
-        } 
-        else {
-
-          pat = next;
-        }
-      }
-      
-      cur_row = 0;
-    }
-
-    if (cur_row == this->disp_row) bg = COLORS.EditBGhigh;
+    // The playhead is the fixed centre screen row.  Comparing only the row
+    // number also highlighted the same numbered row in the previous/next
+    // patterns (especially visible when each pattern reached row 00).
+    if (cy == y + rows) bg = COLORS.EditBGhigh;
     else bg = COLORS.EditBG;
 
-    this->disp_playing_row(x,cy,pat,cur_row++,S,bg);
+    this->disp_playing_row(x,cy,pos.pattern,pos.row,S,bg);
   }
   
   this->disp_track_headers(S);    
