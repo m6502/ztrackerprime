@@ -3,8 +3,8 @@
 # Builds `zt` on every push and every PR against master, across:
 #   - Windows x86 (32-bit, XP-compatible) -- MinGW-w64 cross from Ubuntu
 #   - Windows x64 (modern)                -- MSVC on windows-latest
-#   - macOS arm64                          -- Apple Silicon (macos-14)
-#   - macOS x86_64                         -- Intel (macos-26-intel)
+#   - macOS universal (Intel x86_64 + Apple Silicon arm64) -- one self-contained
+#       .app, floor 10.13 (x86_64) / 11.0 (arm64); built on macos-14
 #   - Linux x86_64                         -- ubuntu-24.04
 #
 # Each job uploads an artifact containing:
@@ -19,9 +19,11 @@
 #     binaries that work on XP per upstream docs.
 #   * Windows x64 uses MSVC + the SDL3-devel-VC release zip (the standard
 #     modern Windows path).
-#   * macOS: ship two separate single-arch artifacts instead of a universal
-#     binary, because Homebrew's SDL3 is single-arch -- combining would
-#     require building SDL3 from source twice, which is overkill.
+#   * macOS: ONE universal artifact. Homebrew's SDL3 is single-arch and minos-15,
+#     so we build a universal SDL3 from source at the 10.13 target and bundle it
+#     into the .app (self-contained). A hard-gate verify step asserts the binary
+#     is universal, the per-slice floors are 10.13/11.0, and no Homebrew dep
+#     leaks. Ableton Link is header-only, compiled into both slices.
 #   * Linux: Ubuntu 24.04's apt does not yet ship libsdl3-dev, so we build
 #     SDL3 from source (same tarball as Windows) into a local prefix and
 #     pass -DSDL3_INCLUDE_DIR / -DSDL3_LIBRARY like Windows does.
@@ -197,10 +199,17 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # macOS arm64 (Apple Silicon)
+  # macOS universal (Intel x86_64 + Apple Silicon arm64), one self-contained app
   # ---------------------------------------------------------------------------
-  macos-arm64:
-    name: macOS arm64
+  # Floor: macOS 10.13 on the x86_64 slice, 11.0 on the arm64 slice (the linker
+  # auto-clamps arm64 -- no arm64 exists below Big Sur). Built against a
+  # universal SDL3 compiled from source at the same 10.13 target (Homebrew's
+  # SDL3 is single-arch and minos-15, so it cannot be used here). SDL3 is bundled
+  # into the .app, so the artifact runs with no Homebrew / system SDL3 present.
+  # The verify step is a HARD GATE: the job fails if the binary is not universal,
+  # the per-slice floors are wrong, or the app is not self-contained.
+  macos-universal:
+    name: macOS universal (Intel + Apple Silicon)
     runs-on: macos-14
     steps:
       - name: Checkout
@@ -209,7 +218,7 @@ jobs:
       - name: Install build deps
         run: |
           brew update
-          brew install cmake ninja pkg-config sdl3
+          brew install cmake ninja
 
       - name: Fetch Ableton Link
         shell: bash
@@ -217,11 +226,51 @@ jobs:
           set -euo pipefail
           bash fetch-ext-deps.sh
 
-      - name: Configure
+      - name: Cache SDL3 source tarball
+        id: cache-sdl3-src
+        uses: actions/cache@v4
+        with:
+          path: sdl3-src-cache
+          key: sdl3-src-${{ env.SDL3_VERSION }}
+
+      - name: Download + build universal SDL3 from source (10.13)
+        id: sdl3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sdl3-src-cache
+          TARBALL="sdl3-src-cache/SDL3-${SDL3_VERSION}.tar.gz"
+          if [ ! -f "$TARBALL" ]; then
+            curl -fL -o "$TARBALL" \
+              "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/SDL3-${SDL3_VERSION}.tar.gz"
+          fi
+          rm -rf sdl3-src
+          mkdir -p sdl3-src
+          tar xf "$TARBALL" -C sdl3-src --strip-components=1
+          cmake -S sdl3-src -B sdl3-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$(pwd)/sdl3-prefix" \
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF \
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+          cmake --build sdl3-build -j
+          cmake --install sdl3-build
+          PREFIX="$(pwd)/sdl3-prefix"
+          {
+            echo "include=$PREFIX/include"
+            echo "lib=$PREFIX/lib/libSDL3.0.dylib"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure (universal, 10.13, Ableton Link ON)
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES=arm64
+            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 \
+            -DZT_ENABLE_ABLETON_LINK=ON \
+            -DSDL3_INCLUDE_DIR="${{ steps.sdl3.outputs.include }}" \
+            -DSDL3_LIBRARY="${{ steps.sdl3.outputs.lib }}"
 
       - name: Build
         run: cmake --build build --config Release -j
@@ -229,22 +278,67 @@ jobs:
       - name: Run unit tests (incl. Lua API self-test, headless)
         run: ctest --test-dir build --output-on-failure
 
+      - name: Verify universal + low floor + self-contained (HARD GATE)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN=build/Program/zt.app/Contents/MacOS/zt
+          APP=build/Program/zt.app
+          fail=0
+
+          echo "== architectures =="
+          archs="$(lipo -archs "$BIN")"; echo "  $archs"
+          echo "$archs" | grep -q x86_64 && echo "$archs" | grep -q arm64 \
+            || { echo "  FAIL: not universal"; fail=1; }
+
+          echo "== per-slice deployment floor =="
+          slice_min () { vtool -arch "$1" -show-build "$BIN" 2>/dev/null | awk '/(minos|version) /{print $2; exit}'; }
+          X="$(slice_min x86_64)"; A="$(slice_min arm64)"
+          echo "  x86_64=$X (want 10.13)   arm64=$A (want 11.0)"
+          [ "$X" = "10.13" ] || { echo "  FAIL: x86_64 floor"; fail=1; }
+          [ "$A" = "11.0" ]  || { echo "  FAIL: arm64 floor"; fail=1; }
+
+          echo "== self-contained (no Homebrew / /usr/local deps) =="
+          if otool -L "$BIN" | grep -E "/opt/|/usr/local/"; then
+            echo "  FAIL: non-system absolute dependency remains"; fail=1
+          else
+            echo "  OK"
+          fi
+
+          echo "== bundled SDL3 is universal =="
+          sdlarchs="$(lipo -archs "$APP/Contents/Frameworks/libSDL3.0.dylib" 2>/dev/null || true)"
+          echo "  SDL3: $sdlarchs"
+          echo "$sdlarchs" | grep -q x86_64 && echo "$sdlarchs" | grep -q arm64 \
+            || { echo "  FAIL: bundled SDL3 not universal"; fail=1; }
+
+          echo "== ad-hoc signature valid =="
+          codesign --verify --deep "$APP" && echo "  OK" || { echo "  FAIL: signature"; fail=1; }
+
+          echo "== arm64 renders headless =="
+          printf 'wait 400\nkey F11\nwait 200\nshot %s\nquit\n' "$PWD/zt-ci-smoke.png" > zt-ci.script
+          arch -arm64 "$BIN" --headless --script zt-ci.script >/dev/null 2>&1 || true
+          [ -s zt-ci-smoke.png ] && echo "  OK ($(stat -f%z zt-ci-smoke.png) bytes)" \
+            || { echo "  FAIL: no framebuffer rendered"; fail=1; }
+
+          [ "$fail" -eq 0 ] || { echo "VERIFY FAILED"; exit 1; }
+          echo "VERIFY PASSED: universal, 10.13/11.0, self-contained, Link ON, renders"
+
       - name: Stage release
         run: |
-          mkdir -p dist/ztrackerprime-macos-arm64
-          cp -R build/Program/zt.app dist/ztrackerprime-macos-arm64/
-          cp zt.conf                 dist/ztrackerprime-macos-arm64/
-          cp -R skins                dist/ztrackerprime-macos-arm64/
-          cp -R doc                  dist/ztrackerprime-macos-arm64/
+          mkdir -p dist/ztrackerprime-macos-universal
+          cp -R build/Program/zt.app dist/ztrackerprime-macos-universal/
+          cp zt.conf                 dist/ztrackerprime-macos-universal/
+          cp -R skins                dist/ztrackerprime-macos-universal/
+          cp -R doc                  dist/ztrackerprime-macos-universal/
           # macOS users hit "zt.app is damaged" because the build is unsigned
           # (no Apple Developer Program). README explains the xattr fix.
-          cp .github/release-notes/README-MAC.txt dist/ztrackerprime-macos-arm64/
+          cp .github/release-notes/README-MAC.txt dist/ztrackerprime-macos-universal/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ztrackerprime-macos-arm64
-          path: dist/ztrackerprime-macos-arm64
+          name: ztrackerprime-macos-universal
+          path: dist/ztrackerprime-macos-universal
           if-no-files-found: error
 
       - name: Package release (zip + unsigned DMG)
@@ -254,92 +348,7 @@ jobs:
           set -euo pipefail
           cd dist
           TAG="${RELEASE_TAG}"
-          ARCH="arm64"
-          # Zip of the full staged dir (zt.app + zt.conf + skins + doc + README-MAC.txt).
-          # ditto preserves .app bundle structure and resource forks.
-          ditto -c -k --sequesterRsrc --keepParent \
-            "ztrackerprime-macos-${ARCH}" \
-            "ztrackerprime-${TAG}-macos-${ARCH}.zip"
-          # Unsigned DMG: zt.app + README-MAC.txt side by side, so the user sees
-          # the quarantine-fix instructions immediately on mounting the DMG.
-          mkdir -p "dmg-staging-${ARCH}"
-          cp -R "ztrackerprime-macos-${ARCH}/zt.app"         "dmg-staging-${ARCH}/"
-          cp    "ztrackerprime-macos-${ARCH}/README-MAC.txt" "dmg-staging-${ARCH}/"
-          hdiutil create \
-            -volname "zTracker ${TAG} (${ARCH})" \
-            -srcfolder "dmg-staging-${ARCH}" \
-            -fs HFS+ -format UDZO -ov \
-            "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
-
-      - name: Upload release asset (macos-arm64)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-macos-arm64
-          path: |
-            dist/ztrackerprime-*-macos-arm64.zip
-            dist/ztrackerprime-*-macos-arm64.dmg
-          if-no-files-found: error
-
-  # ---------------------------------------------------------------------------
-  # macOS x86_64 (Intel)
-  # ---------------------------------------------------------------------------
-  macos-x86_64:
-    name: macOS x86_64
-    # macos-13 / macos-12 Intel runners have been retired; macos-26-intel is
-    # the supported Intel image. (macos-14+ are Apple Silicon.)
-    runs-on: macos-26-intel
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install build deps
-        run: |
-          brew update
-          brew install cmake ninja pkg-config sdl3
-
-      - name: Fetch External Dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash fetch-ext-deps.sh
-
-      - name: Configure
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES=x86_64
-
-      - name: Build
-        run: cmake --build build --config Release -j
-
-      - name: Run unit tests (incl. Lua API self-test, headless)
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Stage release
-        run: |
-          mkdir -p dist/ztrackerprime-macos-x86_64
-          cp -R build/Program/zt.app dist/ztrackerprime-macos-x86_64/
-          cp zt.conf                 dist/ztrackerprime-macos-x86_64/
-          cp -R skins                dist/ztrackerprime-macos-x86_64/
-          cp -R doc                  dist/ztrackerprime-macos-x86_64/
-          cp .github/release-notes/README-MAC.txt dist/ztrackerprime-macos-x86_64/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ztrackerprime-macos-x86_64
-          path: dist/ztrackerprime-macos-x86_64
-          if-no-files-found: error
-
-      - name: Package release (zip + unsigned DMG)
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd dist
-          TAG="${RELEASE_TAG}"
-          ARCH="x86_64"
+          ARCH="universal"
           ditto -c -k --sequesterRsrc --keepParent \
             "ztrackerprime-macos-${ARCH}" \
             "ztrackerprime-${TAG}-macos-${ARCH}.zip"
@@ -352,14 +361,14 @@ jobs:
             -fs HFS+ -format UDZO -ov \
             "ztrackerprime-${TAG}-macos-${ARCH}.dmg"
 
-      - name: Upload release asset (macos-x86_64)
+      - name: Upload release asset (macos-universal)
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/pr-release-packaging'
         uses: actions/upload-artifact@v4
         with:
-          name: release-macos-x86_64
+          name: release-macos-universal
           path: |
-            dist/ztrackerprime-*-macos-x86_64.zip
-            dist/ztrackerprime-*-macos-x86_64.dmg
+            dist/ztrackerprime-*-macos-universal.zip
+            dist/ztrackerprime-*-macos-universal.dmg
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
@@ -606,8 +615,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
       - linux-x86_64
-      - macos-arm64
-      - macos-x86_64
+      - macos-universal
       - windows-x86-xp
       - windows-x64
     runs-on: ubuntu-latest

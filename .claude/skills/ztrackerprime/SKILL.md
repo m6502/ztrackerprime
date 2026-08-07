@@ -13,7 +13,7 @@ triggers:
 
 # zTracker Prime Development Skill
 
-> **Last verified: 2026-06-15.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
+> **Last verified: 2026-06-23.** If this date is more than ~7 days old when you load this skill, your first move is to check what merged since: `gh pr list --repo m6502/ztrackerprime --state merged --json number,title,mergedAt --jq '[.[] | select(.mergedAt > "<this date>")]'`. Reconcile any architecture / shortcut / invariant claims below against current `master` before acting on them. Then bump this date in the same PR that fixes the drift.
 >
 > **What lives elsewhere on purpose:** the open-PR list and merged landmarks are NOT in this skill — they go stale fast. For current state run `gh pr list --repo m6502/ztrackerprime` (open) or `gh pr list --repo m6502/ztrackerprime --state merged --limit 30` (recent landings). The skill stays timeless: architecture, invariants, foot-guns, conventions.
 
@@ -41,6 +41,8 @@ ctest --output-on-failure      # unit-test harness (Linux CI runs this)
 `open <path>/zt.app` (or `open <path>/zt`) — gives the app its own session. Avoid `./zt &` from a non-interactive shell; it can exit silently when stdin is detached.
 
 `scripts/zt-screenshot.sh` (macOS) launches zt.app and captures F1/F2/F3/F11/F12/Ctrl+F12 via `screencapture -R` + AppleScript. Output at `/tmp/zt-shots/`. Use it to self-verify layout changes.
+
+**Deployment floor (PR #176):** the macOS `.app` is a **universal** binary (Intel x86_64 + Apple Silicon arm64), floor **10.13** on x86_64 / **11.0** on arm64. Pinned via `CMAKE_OSX_DEPLOYMENT_TARGET=10.13` set *before* `project()`. SDL3 is built universal from source in CI and **bundled** into `Contents/Frameworks` (the app is self-contained — `otool -L` shows only `@rpath` + system frameworks). An explicit `-DSDL3_LIBRARY` overrides pkg-config. El Capitan (10.11) is out of reach (SDL3's floor is 10.13). To build universal locally: `-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"` + a universal `-DSDL3_LIBRARY` (a Homebrew single-arch SDL3 will fail the universal link).
 
 ### Headless framebuffer screenshots
 
@@ -162,6 +164,8 @@ palettes against an actual screenshot; don't trust the 16→18 slot mapping.
 | `src/CUI_*.cpp` | Other pages (Sysconfig, Songconfig, Help, InstEditor, MainMenu, Playsong, etc.) |
 | `src/CUI_Page.{h,cpp}` | Base class for pages |
 | `src/UserInterface.{h,cpp}` | Widget classes — `CheckBox`, `ValueSlider`, `TextInput`, `Frame`, `Button`, `TextBox`, `ListBox`, `MidiOutDeviceOpener`, `SkinSelector`, `VUPlay`. Fix rendering bugs HERE, not in callers. |
+| `src/fs_compat.{h,cpp}` | Filesystem facade (`ztfs::`). POSIX backend on Apple (libc++ marks `std::filesystem` unavailable below macOS 10.15 — using it would pin the deploy floor there); `std::filesystem` backend on Linux/Windows (unchanged). **Never reintroduce a direct `std::filesystem` call in Apple-compiled code** — add to `ztfs::`. Tested via `fs_compat` (forced POSIX on Linux CI with `-DZTFS_FORCE_POSIX`). PR #176. |
+| `cmake/bundle_sdl3_macos.cmake` | POST_BUILD `-P` step bundling SDL3 into the `.app` (copy → rewrite install names → rpath → ad-hoc re-sign); robust to Homebrew-absolute and from-source-`@rpath`. Gated by `ZT_MACOS_BUNDLE_SDL3` (default ON). PR #176. |
 | `src/keybuffer.{h,cpp}` | Key state (KS_ALT/KS_CTRL/KS_META/KS_SHIFT) + `KS_HAS_ALT` macro. `ZT_TEST_NO_SDL` guard for SDL-free unit tests. |
 | `src/font.cpp` | `print()` / `printtitle()` / `printBG()` drawing primitives |
 | `src/zt.h` | STATE_/CMD_ enums, page globals (`UIP_CcConsole`, `UIP_SysExLibrarian`, ...), layout macros, `g_cc_drawmode` |
