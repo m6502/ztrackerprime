@@ -1462,7 +1462,7 @@ void quit() {
   // (file-overwrite, discard-changes) keep the default No-focused
   // behaviour so an accidental Enter doesn't destroy work.
   UIP_RUSure->default_button = 0;
-  UIP_RUSure->yes_caption    = "  OK";
+  UIP_RUSure->yes_caption    = "   OK";
   UIP_RUSure->no_caption     = " Cancel";
   popup_window(UIP_RUSure);
 }

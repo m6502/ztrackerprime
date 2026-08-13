@@ -7,8 +7,56 @@ MidiOutDeviceOpener *midioutdevlist;
 MidiInDeviceOpener *midiindevlist;
 Button *midiout_action_button;
 Button *midiin_action_button;
+static Button *midiout_refresh_button;
+static Button *midiin_refresh_button;
+static ValueSlider *midiout_latency_slider;
+static CheckBox *midiout_bank_select;
+static TextInput *midiout_alias_input;
+static SkinSelector *skin_selector;
 void midi_out_sel(int dev);
 void midi_in_sel(int dev);
+
+// Keep the MIDI controls on the same 80-column grid they historically used,
+// but distribute any additional horizontal space between the two lists.  The
+// midpoint itself remains a one-character gutter.
+static void layout_midi_device_columns()
+{
+    const int left_x = 4;
+    const int midpoint = CHARS_X / 2;
+    const int right_x = midpoint + 1;
+    const int right_edge = CHARS_X - 4;
+    const int left_width = midpoint - left_x - 1;
+    const int right_width = right_edge - right_x;
+
+    if (!midiindevlist || !midioutdevlist ||
+        !midiin_refresh_button || !midiout_refresh_button ||
+        !midiin_action_button || !midiout_action_button ||
+        !midiout_latency_slider || !midiout_bank_select ||
+        !midiout_alias_input || !skin_selector) {
+        return;
+    }
+
+    skin_selector->x = right_x;
+    skin_selector->xsize = right_edge - right_x;
+
+    midiindevlist->x = left_x;
+    midiindevlist->xsize = left_width;
+    midiin_refresh_button->x = left_x + left_width - midiin_refresh_button->xsize;
+    midiin_action_button->x = left_x + left_width - midiin_action_button->xsize;
+
+    midioutdevlist->x = right_x;
+    midioutdevlist->xsize = right_width;
+    midiout_refresh_button->x = right_x + right_width - midiout_refresh_button->xsize;
+    midiout_action_button->x = right_x + right_width - midiout_action_button->xsize;
+
+    midiout_latency_slider->x = right_x + 8;
+    // ValueSlider renders its four-character value immediately after the
+    // track, so reserve that space inside the MIDI Out column.
+    midiout_latency_slider->xsize = right_edge - midiout_latency_slider->x - 4;
+    midiout_bank_select->x = right_x + 20;
+    midiout_alias_input->x = right_x + 13;
+    midiout_alias_input->xsize = right_edge - midiout_alias_input->x;
+}
 
 void BTNCLK_GotoGlobalConfig(UserInterfaceElement*) {
     switch_page(UIP_Config);
@@ -413,14 +461,15 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         sk = new SkinSelector;
         UI->add_element(sk,tabindex++);
-        sk->x = 4+35 +10;
-        sk->y = base_y + 1;   // "Skin Selection" label sits on the same row as "Prebuffer"; list top border one row below
-        sk->xsize = 19+8;     // ends at col 76, matches MIDI In Device list end
+        sk->x = CHARS_X / 2 + 1;
+        sk->y = base_y + 1;   // label is two rows above; the list border occupies the intervening row
+        sk->xsize = CHARS_X - 4 - sk->x;
         sk->ysize = 7;   // tight-fit around installed skin count, avoids empty black space
+        skin_selector = sk;
 
-        // MIDI In column lives on the LEFT, MIDI Out on the RIGHT (+37
-        // offset). Layout: Refresh (y=28), list (y=30-42), Open device
-        // (y=45). MIDI Out also has Latency (y=47), Bank (y=49), Alias
+        // MIDI In lives on the left; MIDI Out begins just right of the
+        // window midpoint. Layout: Refresh (y=28), list (y=30-42), Open device
+        // (y=45). MIDI Out also has Alias (y=47), Latency (y=49), Bank
         // (y=51). tabindex order: MIDI In group first, then MIDI Out.
         b = new Button;
         UI->add_element(b,tabindex++);
@@ -430,6 +479,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->xsize = 9;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_RefreshMidiInDeviceList;
+        midiin_refresh_button = b;
 
         mi = new MidiInDeviceOpener;
         midiindevlist = mi;
@@ -449,7 +499,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiInDevice;
         midiin_action_button = b;
 
-        // MIDI Out column (right side, +37 offset).
+        // MIDI Out column (right side; final x positions are assigned below).
         b = new Button;
         UI->add_element(b,tabindex++);
         b->caption = " Refresh";
@@ -458,6 +508,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->xsize = 9;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_RefreshMidiOutDeviceList;
+        midiout_refresh_button = b;
 
         ml = new MidiOutDeviceOpener;
         UI->add_element(ml,tabindex++);
@@ -477,33 +528,34 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
         midiout_action_button = b;
 
-        // Latency / Bank / Alias share the right half (col 41..76, matching
-        // the MIDI Out list / Open device button width). Labels start at
-        // col 41 (left-aligned with list); values follow each label and
-        // extend to col 76.
+        // Latency / Bank / Alias share the right half and track the MIDI Out
+        // list's left and right edges.
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
         vs->x = 49;        // after "Latency " label (cols 41..48)
-        vs->y = 47;
+        vs->y = 49;
         vs->xsize = 27;    // ends col 76 — matches list right edge
         vs->ysize = 1;
         vs->min = 0;
         vs->max = 255;
+        midiout_latency_slider = vs;
 
         cb = new BankSelectCheckBox(ml);
         UI->add_element(cb,tabindex++);
         cb->x = 61;        // after "Reverse Bank Select " label (cols 41..60)
-        cb->y = 49;
+        cb->y = 51;
         cb->xsize = 3;
         cb->frame = 0;
+        midiout_bank_select = cb;
 
         ti = new AliasTextInput(ml);
         UI->add_element(ti,tabindex++);
         ti->frame = 1;
         ti->x = 54;        // after "Device Alias " label (cols 41..53)
-        ti->y = 51;
+        ti->y = 47;
         ti->xsize = 22;    // ends col 76 — matches list right edge
         ti->length = 41;   // buffer still fits a long alias; field scrolls horizontally
+        midiout_alias_input = ti;
 
         ml->lvs = vs;  // link midi out list to latency value slider
         ml->bscb = cb; // link midi out list to bank select checkbox
@@ -537,6 +589,8 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti->xsize  = 27;                              // matches CCizer field width
         ti->length = MAX_PATH;
         ti->str    = (unsigned char*)zt_config_globals.syx_folder;
+
+        layout_midi_device_columns();
 }
 
 void CUI_Sysconfig::enter(void) {
@@ -557,6 +611,9 @@ void CUI_Sysconfig::update() {
     CheckBox *cb;
     char val[8];
 
+    // Resolution/zoom can change without reconstructing this page, so update
+    // hit boxes before processing mouse input.
+    layout_midi_device_columns();
     UI->update();
     sync_midi_action_buttons();
     // Indices match the tabindex order set in the constructor: 0=button,
@@ -582,6 +639,7 @@ void CUI_Sysconfig::update() {
 
 void CUI_Sysconfig::draw(Drawable *S) {
     if (S->lock()==0) {
+        layout_midi_device_columns();
         UI->draw(S);
         draw_status(S);
         status(S);
@@ -603,16 +661,18 @@ void CUI_Sysconfig::draw(Drawable *S) {
         print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
         print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);
 #endif
-        print(row(4+37+8),col(TRACKS_ROW_Y+3),"Skin Selection",COLORS.Text,S);
+        const int midi_out_x = CHARS_X / 2 + 1;
+        print(row(midi_out_x),col(TRACKS_ROW_Y+2),"Skin Selection",COLORS.Text,S);
 
-        // MIDI In on the LEFT (col 4), MIDI Out on the RIGHT (col 4+37).
+        // MIDI In remains at col 4; MIDI Out begins one column right of
+        // centre.  Both lists extend to four columns from their outer edge.
         print(row(4),col(28),"MIDI In Device Selection",COLORS.Text,S);
-        print(row(4+37),col(28),"MIDI Out Device Selection",COLORS.Text,S);
+        print(row(midi_out_x),col(28),"MIDI Out Device Selection",COLORS.Text,S);
 
-        // Labels left-aligned to col 41 (= MIDI Out list left edge).
-        print(row(4+37),col(47),"Latency",COLORS.Text,S);
-        print(row(4+37),col(49),"Reverse Bank Select",COLORS.Text,S);
-        print(row(4+37),col(51),"Device Alias",COLORS.Text,S);
+        // Labels stay aligned with the MIDI Out list's left edge.
+        print(row(midi_out_x),col(47),"Device Alias",COLORS.Text,S);
+        print(row(midi_out_x),col(49),"Latency",COLORS.Text,S);
+        print(row(midi_out_x),col(51),"Reverse Bank Select",COLORS.Text,S);
         
         need_refresh = 0;
         updated=2;

@@ -475,7 +475,9 @@ void draw_track_markers(int tracks_shown, int field_size, Drawable *S)
     // Build a FULL-WIDTH, space-padded header so stale glyphs from a longer
     // previous name / a different drawmode are wiped (printBG only paints
     // behind the characters it draws, so a short name left tail garbage).
-    int bw = block_width;
+    // Paint only the track's content cells. The final cell in block_width is
+    // the separator between adjacent tracks and must remain visible.
+    int bw = field_size;
     if (bw > 255) bw = 255;
     int name_avail = show_toggle ? (bw - 3) : bw;   // reserve room for the toggle
     if (name_avail < 0) name_avail = 0;

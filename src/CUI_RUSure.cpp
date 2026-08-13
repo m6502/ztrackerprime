@@ -125,20 +125,19 @@ void CUI_RUSure::update() {
 void CUI_RUSure::draw(Drawable *S) {
     int i;
     int window_width = 20 * col(1);
-    int window_height = 6 * row(1);
+    int window_height = 5 * row(1);
     int start_x = (INTERNAL_RESOLUTION_X / 2) - (window_width / 2);
     for(;start_x % 8;start_x--);
     int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--);
 
-    // Auto-size each button to fit its current caption with one cell of
-    // padding inside the frame. This lets a caller swap "Yes" for "OK"
-    // or "No" for "Cancel" without doing arithmetic in their setup
-    // code -- the captions just work.
+    // Give both buttons the same width, with one cell beyond the longer
+    // caption. For OK/Cancel this produces two balanced 8-cell buttons.
     int yes_len = button_yes->caption ? (int)strlen(button_yes->caption) : 0;
     int no_len  = button_no->caption  ? (int)strlen(button_no->caption)  : 0;
-    button_yes->xsize = yes_len + 2;
-    button_no->xsize  = no_len  + 2;
+    int button_width = ((yes_len > no_len) ? yes_len : no_len) + 1;
+    button_yes->xsize = button_width;
+    button_no->xsize  = button_width;
 
     // Centre the (yes_btn + 2-cell gap + no_btn) cluster horizontally
     // inside the popup window so OK/Cancel and Yes/No both look balanced.
@@ -147,7 +146,7 @@ void CUI_RUSure::draw(Drawable *S) {
     int left_pad_cols = (popup_cols - total_cols) / 2;
     if (left_pad_cols < 1) left_pad_cols = 1;
     button_yes->x = (start_x / 8) + left_pad_cols;
-    button_yes->y = (start_y + (window_height / 2)) / 8 + 1;
+    button_yes->y = (start_y / 8) + 3;
     button_no->x  = button_yes->x + button_yes->xsize + 2;
     button_no->y  = button_yes->y;
 
@@ -159,7 +158,12 @@ void CUI_RUSure::draw(Drawable *S) {
             printchar(start_x + window_width - row(1) + 1,row(i),146,COLORS.Lowlight,S);
         } 
         printline(start_x,start_y,143,window_width / 8,COLORS.Highlight,S);
-        print(col(textcenter(this->str)),start_y + 2 * row(1),this->str,COLORS.Text,S);
+        // Ignore legacy leading padding and centre the visible prompt within
+        // the popup rather than relying on whole-screen text centring.
+        const char *prompt = this->str ? this->str : "";
+        while (*prompt == ' ') ++prompt;
+        int prompt_x = (start_x / 8) + (popup_cols - (int)strlen(prompt)) / 2;
+        print(col(prompt_x),start_y + row(1),prompt,COLORS.Text,S);
 		    UI->full_refresh();
         UI->draw(S);
         S->unlock();
