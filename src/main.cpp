@@ -68,6 +68,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -4021,6 +4022,20 @@ static void zt_backend_shutdown_runtime(void)
   SDL_Quit();
 }
 
+// Finish a one-shot CLI operation through the same cleanup path as the UI.
+// In particular this stops MIDI/Link resources before SDL is shut down.
+static int zt_finish_one_shot(int exit_code)
+{
+  if (screen_buffer_surface != NULL) {
+    zt_destroy_surface(screen_buffer_surface);
+    screen_buffer_surface = NULL;
+  }
+  zt_backend_release_frame_resources();
+  postAction();
+  zt_backend_shutdown_runtime();
+  return exit_code;
+}
+
 
 // ------------------------------------------------------------------------------------------------
 //
@@ -4034,6 +4049,8 @@ static void zt_backend_shutdown_runtime(void)
 //       --midi-clock <name|index>  open + enable midi_in_sync +
 //                                  midi_in_sync_chase_tempo so the song's
 //                                  BPM follows incoming MIDI clock.
+//       --export-multitrack-midi <file.mid>
+//                                  export the loaded song and exit.
 // First positional arg (if any) is treated as a .zt song to load on boot.
 
 struct ZtCliArgs {
@@ -4059,6 +4076,11 @@ struct ZtCliArgs {
     // and exits 0 (all checks passed) / 1 (failures). Pairs with --headless
     // for CI. Output (PASS/FAIL per check) goes to stdout.
     bool        lua_test        = false;
+    // One-shot Type 1 MIDI export. This implicitly enables headless mode.
+    const char *multitrack_midi_filename = NULL;
+    // --export-muted: put muted tracks BACK into a MIDI export (they are left
+    // out by default).
+    bool        export_muted = false;
 };
 
 static void zt_print_cli_help(const char *progname) {
@@ -4082,6 +4104,14 @@ static void zt_print_cli_help(const char *progname) {
         "                              chase: turns on midi_in_sync +\n"
         "                              midi_in_sync_chase_tempo so the song\n"
         "                              tempo follows incoming F8 clock.\n"
+        "      --export-multitrack-midi <file.mid>\n"
+        "                              Load the positional .zt song, export\n"
+        "                              one MIDI track per used zTracker\n"
+        "                              track, and exit. Runs headlessly.\n"
+        "      --export-muted          Include MUTED tracks in a MIDI export.\n"
+        "                              They are left out by default. Use this\n"
+        "                              if you mute a track only to keep it off\n"
+        "                              your synth while composing.\n"
         "      --headless              Run without opening a window (SDL's\n"
         "                              dummy video driver). The renderer\n"
         "                              still produces frames into an\n"
@@ -4103,9 +4133,10 @@ static void zt_print_cli_help(const char *progname) {
         "  %s mysong.zt\n"
         "  %s --midi-in \"IAC Driver Bus 1\"\n"
         "  %s --midi-clock 0 mysong.zt\n"
+        "  %s mysong.zt --export-multitrack-midi mysong.mid\n"
         "  %s --headless --script tests/scripts/smoke.txt\n"
         "  %s --headless --lua-test\n",
-        progname, progname, progname, progname, progname, progname);
+        progname, progname, progname, progname, progname, progname, progname);
 }
 
 // Strip leading '-' or '--' so we accept "-midi-in" or "--midi-in" --
@@ -4140,7 +4171,7 @@ static int zt_cli_match_flag_with_value(int argc, char *argv[], int *i,
         return 1;
     }
     if (*i + 1 >= argc) {
-        fprintf(stderr, "zt: --%s requires a port name or index\n", flag_name);
+        fprintf(stderr, "zt: --%s requires a value\n", flag_name);
         return -1;
     }
     *value_out = argv[++(*i)];
@@ -4185,10 +4216,22 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         if (r > 0) { out->midi_clock_port = value; continue; }
 
         if (zt_cli_match_flag(a, "headless")) { out->headless = true; continue; }
+        if (zt_cli_match_flag(a, "export-muted")) { out->export_muted = true; continue; }
         if (zt_cli_match_flag(a, "lua-test")) { out->lua_test = true; continue; }
         r = zt_cli_match_flag_with_value(argc, argv, &i, "script", &value);
         if (r < 0) return -1;
         if (r > 0) { out->script_path = value; continue; }
+        r = zt_cli_match_flag_with_value(argc, argv, &i,
+                                         "export-multitrack-midi", &value);
+        if (r < 0) return -1;
+        if (r > 0) {
+            if (!value || !value[0]) {
+                fprintf(stderr, "zt: --export-multitrack-midi requires a non-empty filename\n");
+                return -1;
+            }
+            out->multitrack_midi_filename = value;
+            continue;
+        }
 
         if (a[0] == '-') {
             fprintf(stderr, "zt: unknown flag '%s' (try --help)\n", a);
@@ -4197,7 +4240,25 @@ static int zt_parse_cli(int argc, char *argv[], ZtCliArgs *out) {
         // First positional = song filename. Subsequent positionals ignored.
         if (!out->song_filename) out->song_filename = a;
     }
+    if (out->multitrack_midi_filename && !out->song_filename) {
+        fprintf(stderr,
+                "zt: --export-multitrack-midi requires a positional .zt song\n");
+        return -1;
+    }
     return 0;
+}
+
+// Resolve CLI paths while the process is still in the caller's working
+// directory. Startup later changes cwd to the executable/config directory.
+static bool zt_cli_make_absolute(const char *path, std::string *result)
+{
+    if (!path || !path[0] || !result) return false;
+    std::error_code ec;
+    std::filesystem::path absolute =
+        std::filesystem::absolute(std::filesystem::u8path(path), ec);
+    if (ec) return false;
+    *result = absolute.lexically_normal().string();
+    return true;
 }
 
 // Run the bundled Lua self-test against the (scratch) song and return a
@@ -4270,6 +4331,26 @@ int main(int argc, char *argv[])
       return 0;
   }
 
+  std::string cli_song_path;
+  std::string cli_multitrack_midi_path;
+  if (cli_args.song_filename &&
+      !zt_cli_make_absolute(cli_args.song_filename, &cli_song_path)) {
+      fprintf(stderr, "zt: could not resolve song path '%s'\n",
+              cli_args.song_filename);
+      return 2;
+  }
+  if (cli_args.multitrack_midi_filename &&
+      !zt_cli_make_absolute(cli_args.multitrack_midi_filename,
+                            &cli_multitrack_midi_path)) {
+      fprintf(stderr, "zt: could not resolve MIDI output path '%s'\n",
+              cli_args.multitrack_midi_filename);
+      return 2;
+  }
+
+  if (cli_args.multitrack_midi_filename) {
+      cli_args.headless = true;
+  }
+
   // Headless mode: tell SDL to use the dummy video driver BEFORE SDL_Init
   // so no window opens. The renderer + texture pipeline still works
   // against an in-memory surface; the script driver dumps PNGs from it.
@@ -4291,13 +4372,10 @@ int main(int argc, char *argv[])
     '/';
 #endif
 
-  // Build zt_filename from cwd + the positional song arg (if any).
-  // Kept for parity with the historical argv[1] handling; the actual
-  // song load below uses cli_args.song_filename directly.
-  if (cli_args.song_filename && cli_args.song_filename[0] != '\0') {
-      zt_get_current_directory(1024, zt_filename);
-      strcat(zt_filename, (path_sep == '\\') ? "\\" : "/");
-      strcat(zt_filename, cli_args.song_filename);
+  // Keep the legacy global in sync, but use the already-resolved path so a
+  // later cwd change cannot redirect positional loading.
+  if (!cli_song_path.empty()) {
+      snprintf(zt_filename, sizeof(zt_filename), "%s", cli_song_path.c_str());
   }
 
   bool launched_from_bundle = false;
@@ -4352,7 +4430,7 @@ int main(int argc, char *argv[])
   doredraw++;
 
   if (!initSDL()) {
-    return -1;
+    return cli_args.multitrack_midi_filename ? 1 : -1;
   }
 
   // --lua-test: initSDL() has created the song + Lua engine, which is all
@@ -4407,12 +4485,37 @@ int main(int argc, char *argv[])
       }
   }
 
+  if (cli_args.multitrack_midi_filename) {
+      if (song->load((char *)cli_song_path.c_str()) != 0) {
+          const char *detail = song->getstatusstr();
+          fprintf(stderr, "zt: failed to load '%s'%s%s\n",
+                  cli_song_path.c_str(), detail ? ": " : "", detail ? detail : "");
+          return zt_finish_one_shot(1);
+      }
+
+      extern int zt_export_muted_tracks;
+      zt_export_muted_tracks = cli_args.export_muted ? 1 : 0;
+
+      ZTImportExport exporter;
+      if (!exporter.ExportMultitrackMID(cli_multitrack_midi_path.c_str())) {
+          fprintf(stderr,
+                  "zt: failed to export multitrack MIDI to '%s' "
+                  "(output could not be written or the song has no used tracks)\n",
+                  cli_multitrack_midi_path.c_str());
+          return zt_finish_one_shot(1);
+      }
+
+      fprintf(stdout, "Exported multitrack MIDI: %s\n",
+              cli_multitrack_midi_path.c_str());
+      return zt_finish_one_shot(0);
+  }
+
   if (screen_buffer_surface != NULL) {
 
     initGFX();
 
-    if (cli_args.song_filename && cli_args.song_filename[0] != '\0') {
-      song->load((char *)cli_args.song_filename);
+    if (!cli_song_path.empty()) {
+      song->load((char *)cli_song_path.c_str());
     } else {
       if (zt_config_globals.autoload_ztfile) {
         if (strlen(zt_config_globals.autoload_ztfile_filename)) {

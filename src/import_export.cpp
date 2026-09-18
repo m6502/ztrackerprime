@@ -464,7 +464,11 @@ int ZTImportExport::ExportMID(const char *fn, int format)
   // END MTrk         
   for (i=0;i<total_mtrks;i++) {
     
-    push_varlen(&mtrk[i], 0) ;
+    // Delta dtime[], NOT 0: dtime is the ticks since this track's last event, so a
+    // 0 here ends the MIDI track on its final note and throws away every tick of
+    // trailing silence -- the rest of the last pattern, and any silent pattern
+    // after it. A reader that sizes the song from its events then loops early.
+    push_varlen(&mtrk[i], dtime[i]) ;
     mtrk[i].pushc(0xFF); 
     mtrk[i].pushc(0x2f); 
     mtrk[i].pushc(0x00);  // End of track
@@ -490,6 +494,20 @@ int ZTImportExport::ExportMID(const char *fn, int format)
 // event with an instrument assigned. Needed so empty tracks don't create
 // stub MTrks.
 //
+// A MUTED track is not exported. Cleared by --export-muted, which puts back the
+// behaviour every MIDI export had until 2026-09-08: these exports drive the
+// player and drain its event buffer, and that buffer is filled BEFORE
+// playback.cpp consults song->track_mute (the mute is applied further down, at
+// the MIDI-out consumer), so a muted track came out of the file anyway.
+//
+// Muted means muted, hence the default. It is worth knowing what it costs
+// downstream, though: two tracks sharing a MIDI channel produce overlapping
+// notes, and a monophonic target (the NES 2A03, via nesmusicpack) has to drop
+// one of each pair -- so exporting muted tracks can silently wreck a conversion.
+// The other direction has a price too: if a track is muted only so it does not
+// reach your synth while you compose, it disappears from the export.
+int zt_export_muted_tracks = 0;
+
 static void find_used_tracks(unsigned char tflag[MAX_TRACKS], zt_module *song)
 {
   for (int i = 0; i < MAX_TRACKS; i++) tflag[i] = 0;
@@ -497,6 +515,8 @@ static void find_used_tracks(unsigned char tflag[MAX_TRACKS], zt_module *song)
   for (int p = 0; p < 256; p++) {
 
     for (int t = 0; t < MAX_TRACKS; t++) {
+
+      if (!zt_export_muted_tracks && song->track_mute[t]) continue;
 
       event *e = song->patterns[p]->tracks[t]->event_list;
 
@@ -590,13 +610,13 @@ static void push_midi_event(CDataBuf *mp, midi_event *e, int &dtime_ref)
 
 
 // ------------------------------------------------------------------------------------------------
-// ExportMultichannelMID: writes a MIDI Type 1 file where each zTracker
+// ExportMultitrackMID: writes a MIDI Type 1 file where each zTracker
 // track that contains events becomes its own MIDI track. The MIDI channel
 // encoded in each status byte is preserved from the source event's
 // data1 low nybble (which playback populates from the instrument's
 // channel assignment).
 //
-int ZTImportExport::ExportMultichannelMID(const char *fn)
+int ZTImportExport::ExportMultitrackMID(const char *fn)
 {
   CDataBuf buffer;
   CDataBuf mtrk[MAX_TRACKS + 1]; // track 0 = conductor, 1..N = per-track
@@ -674,10 +694,18 @@ int ZTImportExport::ExportMultichannelMID(const char *fn)
 
   delete buf;
 
-  // End-of-track + assemble chunks
+  // End-of-track + assemble chunks.
+  //
+  // The delta here is dtime[i], NOT 0, and that is the whole length of the song
+  // as far as any reader is concerned. dtime[i] is the ticks elapsed on this
+  // track since its last event, so with a 0 delta every MIDI track ends on its
+  // final note and ALL TRAILING SILENCE IS LOST -- the rest of the last pattern,
+  // and any whole pattern after the last note. A reader that derives the song
+  // length from the events (nesmusicpack does, to size a looping NES stream)
+  // then loops early: kumo's boss01 lost 62 of its 2048 rows, a full pattern.
   for (int i = 0; i < total_mtrks; i++) {
 
-    push_varlen(&mtrk[i], 0);
+    push_varlen(&mtrk[i], dtime[i]);
     mtrk[i].pushc(0xFF);
     mtrk[i].pushc(0x2f);
     mtrk[i].pushc(0x00);
@@ -786,7 +814,11 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
     if (!tflag[t]) continue;
 
     // End-of-track
-    push_varlen(&mtrk[t], 0);
+    // Delta dtime[], NOT 0: dtime is the ticks since this track's last event, so a
+    // 0 here ends the MIDI track on its final note and throws away every tick of
+    // trailing silence -- the rest of the last pattern, and any silent pattern
+    // after it. A reader that sizes the song from its events then loops early.
+    push_varlen(&mtrk[t], dtime[t]);
     mtrk[t].pushc(0xFF);
     mtrk[t].pushc(0x2f);
     mtrk[t].pushc(0x00);
@@ -1037,7 +1069,11 @@ int ZTImportExport::ExportMID(char *fn, int format) {
 
 // END MTrk         
     for (i=0;i<total_mtrks;i++) {
-        push_varlen(&mtrk[i], 0);
+    // Delta dtime[], NOT 0: dtime is the ticks since this track's last event, so a
+    // 0 here ends the MIDI track on its final note and throws away every tick of
+    // trailing silence -- the rest of the last pattern, and any silent pattern
+    // after it. A reader that sizes the song from its events then loops early.
+        push_varlen(&mtrk[i], dtime[i]);
         mtrk[i].pushc(0xFF); mtrk[i].pushc(0x2f); mtrk[i].pushc(0x00);  // End of track
         buffer.write("MTrk",4);
         push_le_int(&buffer, mtrk[i].getsize());

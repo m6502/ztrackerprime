@@ -112,7 +112,7 @@ int file_exists(const char *fn)
 // ------------------------------------------------------------------------------------------------
 //
 //
-// Save-format buttons live at element IDs 4..7 (ZT, MID, MID-Multichannel,
+// Save-format buttons live at element IDs 4..7 (ZT, MID, MID-Multitrack,
 // MID-PerTrack). Radio-style: clicking any one toggles it on and clears the
 // others.
 #define SAVEBTN_ID_FIRST 4
@@ -232,15 +232,15 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
   b_mid->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
-  b_mid_mc = new Button;
-  UI->add_element(b_mid_mc, 6);
-  b_mid_mc->x = SAVE_MID_MC_BUTTON_POS_X;
-  b_mid_mc->y = SAVE_MID_MC_BUTTON_POS_Y;
-  b_mid_mc->caption = " Save as Multichannel .MID";
-  b_mid_mc->ysize = 1;
-  b_mid_mc->xsize = strlen(b_mid_mc->caption) + 1;
-  b_mid_mc->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
-  b_mid_mc->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
+  b_mid_mt = new Button;
+  UI->add_element(b_mid_mt, 6);
+  b_mid_mt->x = SAVE_MID_MT_BUTTON_POS_X;
+  b_mid_mt->y = SAVE_MID_MT_BUTTON_POS_Y;
+  b_mid_mt->caption = " Save as Multitrack .MID";
+  b_mid_mt->ysize = 1;
+  b_mid_mt->xsize = strlen(b_mid_mt->caption) + 1;
+  b_mid_mt->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
+  b_mid_mt->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   b_mid_pertrack = new Button;
   UI->add_element(b_mid_pertrack, 7);
@@ -339,7 +339,7 @@ void begin_save(void)
     }
   }
 
-  // MIDI exports: .MID (2), Multichannel .MID (3), per-track .MID (4).
+  // MIDI exports: .MID (2), Multitrack .MID (3), per-track .MID (4).
   // All three ensure a .mid extension; the per-track exporter appends its
   // own _trackNN suffix per file.
   int mid_filetype = 0;

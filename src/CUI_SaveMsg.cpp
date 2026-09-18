@@ -66,12 +66,12 @@ unsigned long ZT_THREAD_CALL save_thread(void *) {
         }
         case 3: {
             ZTImportExport zie;
-            if (zie.ExportMultichannelMID(export_filename)) {
-                sprintf(szStatmsg, "Exported multichannel MIDI to %s",
+            if (zie.ExportMultitrackMID(export_filename)) {
+                sprintf(szStatmsg, "Exported multitrack MIDI to %s",
                         export_filename);
             } else {
                 sprintf(szStatmsg,
-                        "Multichannel MIDI export failed (no tracks with events)");
+                        "Multitrack MIDI export failed (no tracks with events)");
             }
             statusmsg = szStatmsg;
             status_change = 1;

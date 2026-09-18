@@ -294,7 +294,7 @@ Pattern editing additions:
 
 - **Interpolate (Ctrl+I)** — interpolate values across a selection (note, vol, or fx param), with a sensible fallback when no selection column applies.
 
-- **Multichannel MIDI export** — exporting `.mid` writes one track per channel instead of flattening everything onto one track.
+- **Multitrack MIDI export** — exporting MIDI files writes one MIDI track for each zTracker track and preserves each event's MIDI channel.
 
 - **PianoKey keyjazz layout** — a toggle in the Pattern Editor Options (F2 again) switches note entry from the classic tracker layout to the Ableton Live / Logic "Musical Typing" piano layout: home row `A S D F G H J K (L ; ')` = white keys, row above `W E T Y U (O P)` = black keys. In piano mode `Z`/`X` shift the octave and `C`/`V` decrease/increase the keyjazz velocity (shown in the status bar and written into the volume column). Default off; persists in `zt.conf` as `keyjazz_piano`.
 

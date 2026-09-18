@@ -299,7 +299,7 @@ class CUI_Savescreen : public CUI_Page {
         TextInput *ti;
         Button *b_zt;
         Button *b_mid;
-        Button *b_mid_mc;
+        Button *b_mid_mt;
         Button *b_mid_pertrack;
         //Button *b_gba;
 

@@ -10,6 +10,7 @@ zt accepts named CLI flags parsed by `zt_parse_cli` in `main.cpp`.
 | `--list-midi-in` | List MIDI input ports + exit. |
 | `--midi-in <name\|index>` | Open the named port at startup. Repeatable. |
 | `--midi-clock <name\|index>` | Open + enable `midi_in_sync` + `midi_in_sync_chase_tempo`. |
+| `--export-multitrack-midi <file.mid>` | Load the positional song, export a Type 1 file with one MIDI track per used zTracker track, and exit headlessly. |
 
 First positional arg = .zt song to load.
 
