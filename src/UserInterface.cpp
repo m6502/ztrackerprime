@@ -1380,7 +1380,7 @@ int VUPlay::update() {
     // Decay once per observed playback row, independent of UI polling rate.
     if (row_changed) {
         for (int i = 0; i < 64; i++)
-            latency[i].longevity = std::max(0, latency[i].longevity - SPEED);
+            latency[i].longevity = (std::max)(0, latency[i].longevity - SPEED);
         cur_row = ztPlayer->playing_cur_row;
         cur_pattern = ztPlayer->playing_cur_pattern;
         cur_order = ztPlayer->playing_cur_order;

@@ -18,6 +18,8 @@ fixture = r'''
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+// Windows headers expose a function-like max macro unless NOMINMAX is set.
+#define max(a, b) windows_max_macro_must_not_expand(a, b)
 using KBKey = int;
 constexpr int SDLK_DOWN = 1, SDLK_UP = 2, MAX_TRACKS = 64;
 int need_refresh = 0;
