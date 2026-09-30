@@ -3062,10 +3062,12 @@ void CUI_Patterneditor::update()
           }
           break;
 
-          case SDLK_Q: /* Transpose selection up by 1 semitone */
-            if (selected) {
-              for(i=select_track_start;i<=select_track_end;i++) {
-                for(j=select_row_start;j<=select_row_end;j++) {
+          case SDLK_Q: /* Transpose selection or cursor note up by 1 semitone */
+            {
+              for(i=selected ? select_track_start : cur_edit_track;
+                  i<=(selected ? select_track_end : cur_edit_track);i++) {
+                for(j=selected ? select_row_start : cur_edit_row;
+                    j<=(selected ? select_row_end : cur_edit_row);j++) {
                   if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                     if (e->note < 0x7F)
                       e->note++;
@@ -3075,10 +3077,12 @@ void CUI_Patterneditor::update()
               need_refresh++;
             }
             break;
-          case SDLK_A: /* Transpose selection down by 1 semitone */
-            if (selected) {
-              for(i=select_track_start;i<=select_track_end;i++) {
-                for(j=select_row_start;j<=select_row_end;j++) {
+          case SDLK_A: /* Transpose selection or cursor note down by 1 semitone */
+            {
+              for(i=selected ? select_track_start : cur_edit_track;
+                  i<=(selected ? select_track_end : cur_edit_track);i++) {
+                for(j=selected ? select_row_start : cur_edit_row;
+                    j<=(selected ? select_row_end : cur_edit_row);j++) {
                   if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                     if (e->note > 0 && e->note < 0x80)
                       e->note--;
@@ -3217,14 +3221,16 @@ case SDLK_DELETE:
           break;
         }
 
-        // Alt+Shift+Q / Alt+Shift+A : Transpose selection by an OCTAVE.
+        // Alt+Shift+Q / Alt+Shift+A : Transpose selection or cursor note by an OCTAVE.
         // KS_HAS_ALT excludes Shift, so the +1/-1 semitone block above
         // never sees Shift+Alt; this is a sibling gate. Cmd+Shift+Q/A
         // also lands here on macOS via the KS_META→KS_ALT mapping.
         if ((kstate & (KS_ALT | KS_META)) && (kstate & KS_SHIFT) && !(kstate & KS_CTRL)) {
-          if (key == SDLK_Q && selected) {
-            for (i = select_track_start; i <= select_track_end; i++) {
-              for (j = select_row_start; j <= select_row_end; j++) {
+          if (key == SDLK_Q) {
+            for (i = selected ? select_track_start : cur_edit_track;
+                 i <= (selected ? select_track_end : cur_edit_track); i++) {
+              for (j = selected ? select_row_start : cur_edit_row;
+                   j <= (selected ? select_row_end : cur_edit_row); j++) {
                 if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                   if (e->note < 0x80) {
                     int nn = (int)e->note + 12;
@@ -3237,9 +3243,11 @@ case SDLK_DELETE:
             need_refresh++;
             break;
           }
-          if (key == SDLK_A && selected) {
-            for (i = select_track_start; i <= select_track_end; i++) {
-              for (j = select_row_start; j <= select_row_end; j++) {
+          if (key == SDLK_A) {
+            for (i = selected ? select_track_start : cur_edit_track;
+                 i <= (selected ? select_track_end : cur_edit_track); i++) {
+              for (j = selected ? select_row_start : cur_edit_row;
+                   j <= (selected ? select_row_end : cur_edit_row); j++) {
                 if ((e = song->patterns[cur_edit_pattern]->tracks[i]->get_event(j))) {
                   if (e->note > 0 && e->note < 0x80) {
                     int nn = (int)e->note - 12;
