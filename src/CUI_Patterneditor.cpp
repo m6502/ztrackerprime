@@ -1,4 +1,6 @@
 #include "zt.h"
+#include "pattern_note_format.h"
+#include "pattern_draw_cache.h"
 #include "platform/undo.h"
 #include "ccizer.h"
 #include "keybindings.h"
@@ -46,6 +48,8 @@ event *upd_e = NULL;
 
 int max_displayable_rows = 0 ;
 int g_posx_tracks = 0 ;
+
+static PatternDrawCache g_pattern_draw_cache;
 
 // When the visible track block is narrower than the window (few tracks, or
 // integer-division slack between window width and track width), center it
@@ -300,81 +304,15 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
 // ------------------------------------------------------------------------------------------------
 //
 //
-char *printNote(char *str, event *r, int cur_edit_mode) 
+char *printNote(char *str, event *r, int cur_edit_mode)
 {
-  char note[4],ins[3],vol[3],len[4],fx[3],fxd[5];
-
-  hex2note(note,r->note);
-  
-  if (r->vol < 0x80) {
-
-    sprintf(vol,"%.2x",r->vol);
-    vol[0] = toupper(vol[0]);
-    vol[1] = toupper(vol[1]);
-  } 
-  else strcpy(vol,"..");
-
-  
-  if (r->inst<MAX_INSTS) {
-
-    sprintf(ins,"%.2d",r->inst);
-    ins[0] = toupper(ins[0]);
-    ins[1] = toupper(ins[1]);
-  } 
-  else strcpy(ins,"..");
-  
-  
-  if (r->length>0x0) {
-
-    if (r->length>999) sprintf(len,"INF");
-    else sprintf(len,"%.3d",r->length);
-  } 
-  else strcpy(len,"...");
-  
-  
-  if (r->effect<0xFF) {
-
-    sprintf(fx,"%c",r->effect);
-    fx[0] = toupper(fx[0]);
-  } 
-  else strcpy(fx,".");
-
-
-  sprintf(fxd,"%.4x",r->effect_data);
-  fxd[0] = toupper(fxd[0]);
-  fxd[1] = toupper(fxd[1]);
-  fxd[2] = toupper(fxd[2]);
-  fxd[3] = toupper(fxd[3]);
-
-  switch(cur_edit_mode)
-  {
-  case VIEW_SQUISH:
-    sprintf(str,"%.3s %.2s",note,vol); // 2 cols
-    break;
-  case VIEW_REGULAR:
-    sprintf(str,"%.3s %.2s %.2s %.3s",note,ins,vol,len); // 4 cols
-    break;
-  case VIEW_BIG:
-    sprintf(str,"%.3s %.2s %.2s %.3s %s%.4s",note,ins,vol,len,fx,fxd); // 7 cols
-    // NOT IN VL CH LEN fx PARM 
-    break;
-  case VIEW_FX:
-    sprintf(str,"%.3s %.2s %s%.4s",note,vol,fx,fxd);
-    break;
-    /*
-    case VIEW_EXTEND:
-    sprintf(str,"%.3s %.2s %.2s %.2s ... .. .... .. .... .. .... .. .... .. ....",note,ins,vol,ch); // 15 cols
-    // NOT IN VL CH LEN fx PARM*5 
-    break;
-    */
+  switch (cur_edit_mode) {
+  case VIEW_SQUISH:  return format_pattern_note(str, *r, PatternNoteView::Volume);
+  case VIEW_REGULAR: return format_pattern_note(str, *r, PatternNoteView::Regular);
+  case VIEW_FX:      return format_pattern_note(str, *r, PatternNoteView::Effect);
+  case VIEW_BIG:     return format_pattern_note(str, *r, PatternNoteView::Full);
   }
-  
   return str;
-  
-  // 4  .!. .. 
-  // 8  .!. .. .. ..
-  // 17 .!. .. .. .. ... .. ....
-  // 40 .!. .. .. .. ... .. .... .. .... .. .... .. .... .. ....
 }
 
 
@@ -866,6 +804,18 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
   int poscharx_tracks = (LEFT_MARGIN / FONT_SIZE_X) + pattern_center_off(tracks_shown, field_size) ;
   g_posx_tracks = poscharx_tracks ;
 
+  const PatternDrawLayout layout{
+      S->surface->pixels, S->surface->w, S->surface->h, S->surface->pitch,
+      cur_edit_pattern, first_row, cur_edit_track_disp, tracks_shown,
+      last_row + blank_rows - first_row, field_size,
+      zt_config_globals.cur_edit_mode, poscharx_tracks, TRACKS_FIRST_NOTE_POS_Y,
+      song->patterns[cur_edit_pattern]->length};
+#if defined(FORCE_FULL_SCREEN_REFRESH) || defined(DEBUG_SCREENMANAGER)
+  g_pattern_draw_cache.invalidate();
+#endif
+  g_pattern_draw_cache.begin(layout, font, false);
+
+
 
   num_displayed_rows = 0 ; // <Manu> Esto va de 0 al número máximo de rows a dibujar - 1 [EN: this goes from 0 to (max rows to draw) - 1]
   
@@ -979,7 +929,10 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
                 int y1 = posy_current_row ;
                 int y2 = y1 + FONT_SIZE_Y ;
 
-                S->fillRect(x1, y1, x2, y2, Background) ;
+                PatternCellPaint paint;
+                paint.background = Background;
+                if (g_pattern_draw_cache.needs_paint(num_displayed_rows, num_displayed_tracks, paint))
+                  S->fillRect(x1, y1, x2, y2, Background);
               }
               else {
 
@@ -1049,6 +1002,26 @@ void disp_pattern(int tracks_shown, int field_size, int cols_shown, Drawable *S)
 
                 event *e = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(var_row) ;
                 if (e == NULL) e = &blank_event;
+
+                // Compare values, never event pointers: an edit can mutate an
+                // existing event and undo/load can replace every allocation.
+                PatternCellPaint paint;
+                paint.contents = uint64_t(e->note) | (uint64_t(e->inst) << 8) |
+                    (uint64_t(e->vol) << 16) | (uint64_t(e->effect) << 24) |
+                    (uint64_t(e->length) << 32) | (uint64_t(e->effect_data) << 48);
+                paint.foreground = fg;
+                paint.background = bg;
+                paint.separator = COLORS.Lowlight;
+                if (var_row == cur_edit_row && var_track == cur_edit_track) {
+                  paint.caret = edit_cols[cur_edit_col].startx;
+                  paint.caret_foreground = tc ? bg : EditBG;
+                  paint.caret_background = tc ? fg : Highlight;
+                }
+                if (!g_pattern_draw_cache.needs_paint(num_displayed_rows, num_displayed_tracks, paint)) {
+                  ++num_displayed_tracks;
+                  continue;
+                }
+
 
                 printNote(str, e, zt_config_globals.cur_edit_mode) ;
                 printBG(col(poscharx_tracks + (num_displayed_tracks*(field_size+1))), posy_current_row, str, fg, bg, S) ;
@@ -1186,6 +1159,7 @@ CUI_Patterneditor::CUI_Patterneditor(void)
 //
 void CUI_Patterneditor::enter(void)
 {
+  g_pattern_draw_cache.invalidate();
   need_refresh = 1;
   clear = 1;
   cur_state = STATE_PEDIT;
@@ -1226,6 +1200,7 @@ void CUI_Patterneditor::enter(void)
 //
 void CUI_Patterneditor::leave(void)
 {
+  g_pattern_draw_cache.invalidate();
   
 }
 
@@ -4359,6 +4334,11 @@ void CUI_Patterneditor::draw(Drawable *S)
   bool m_Fullupd = true;
 
   if (S->lock()==0) {
+    // A full-screen repaint or popup can overwrite pixels without changing
+    // song data. Rebuild the grid after those operations, not just on edits.
+    if (clear || screenmanager.update_all || !window_stack.isempty())
+      g_pattern_draw_cache.invalidate();
+
 
 
     if (clear) {
@@ -4423,7 +4403,8 @@ void CUI_Patterneditor::draw(Drawable *S)
 
     switch(mode) {
       
-    case PEM_MOUSEDRAW: 
+    case PEM_MOUSEDRAW:
+      g_pattern_draw_cache.invalidate();
 
       if (!ztPlayer->playing) status(S);
       
@@ -4469,43 +4450,7 @@ void CUI_Patterneditor::draw(Drawable *S)
         status(S);
 
 
-//      #define __FAST_UPDATE__
-
-#ifdef __FAST_UPDATE__
-      
-      /////////////////////////////////////////////////////////////////////////////////
-      
-      // Hello, this is an attempt at speeding up the pattern editor dramatically
-      // through the use of an off screen buffer that contains the "image" of the
-      // pattern editor (even beyond the current page's scope). When navigating, zt
-      // will determine what "coordinates" of this huge image to plaster up on the
-      // pattern editor, and then will update as usual the current row (for colors).
-      
-      // Update buffer if necessary
-
-      // <Manu> Esto nunca puede funcionar porque pe_buf es NULL [EN: this can never work because pe_buf is NULL]
-
-      
-      if(pe_modification) // pe_modification is a very very global var which is set to
-        // 1 in modifying parts of patterneditor's Update, and it is
-        // set to something > 1 when doing any F key (except F2)
-      {
-        if(pe_modification==1) { // Only a chunk
-          disp_pattern(20,field_size,128,pe_buf); // these numbers are wrong of course
-        }
-        else { // the whole thing (useful at least at the very beginning...)
-          disp_pattern(20,field_size,128,pe_buf);
-        }
-      }
-      
-      // Now that buffer is up to date, determine exactly which portion to display
-      
-      // put that portion in S
-      
-      /////////////////////////////////////////////////////////////////////////////////
-#else
       disp_pattern(tracks_shown,field_size,cols_shown,S);
-#endif
       break;
     }
 

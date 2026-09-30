@@ -112,6 +112,8 @@ int instrument::isempty(void) {
         return 0;
     if (midi_device != ZTM_INST_DEFAULT_MIDI_DEVICE)
         return 0;
+    if (midi_route.named() || midi_legacy_device != 255)
+        return 0;
     if (channel != ZTM_INST_DEFAULT_CHANNEL)
         return 0;
     if (transpose != ZTM_INST_DEFAULT_TRANSPOSE)

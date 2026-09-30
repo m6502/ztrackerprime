@@ -42,6 +42,7 @@
 #define _MODULE_H
 
 #include <fstream>
+#include "midi_route.h"
 
 #include "platform.h"
 
@@ -164,6 +165,14 @@ public:
 
   signed char patch;
   unsigned char midi_device;
+  ZTMidiRoute midi_route;
+  // Unresolved old slot, kept only for file roundtrips; never used to play.
+  unsigned char midi_legacy_device = 255;
+  void set_midi_device(unsigned char device) {
+      midi_device = device;
+      midi_route = ZTMidiRoute{};
+      midi_legacy_device = 255;
+  }
   unsigned char channel;
   unsigned char flags;
   signed char transpose;

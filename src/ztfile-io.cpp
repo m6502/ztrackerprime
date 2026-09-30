@@ -672,7 +672,9 @@ void instrument::save(CDataBuf *buf, unsigned char inum) {
     buf->write((const char *)&inum,sizeof(unsigned char));                     // byte
     buf->write((const char *)&this->bank,sizeof(signed short int));            // word
     buf->write((const char *)&this->patch,sizeof(unsigned char));              // byte
-    buf->write((const char *)&this->midi_device,sizeof(unsigned char));        // byte
+    const unsigned char saved_device = this->midi_device == 255 && !this->midi_route.named() ?
+        this->midi_legacy_device : this->midi_device;
+    buf->write((const char *)&saved_device,sizeof(unsigned char));            // byte
     buf->write((const char *)&c,sizeof(unsigned char));                        // byte
     buf->write((const char *)&this->default_volume,sizeof(unsigned char));     // byte
     buf->write((const char *)&this->global_volume,sizeof(unsigned char));      // byte
@@ -742,6 +744,24 @@ int zt_module::save(char *fn, int compressed)
             this->instruments[i]->save(&buffer,i);
             writeblock("ZTin",&buffer,compressed,f,lpDS);
         }
+    }
+
+    // Keep ZTin's numeric byte for old readers, and add stable identities.
+    // Retain unavailable destinations so saving offline cannot erase them.
+    std::vector<ZTMidiRouteEntry> routes;
+    for (i = 0; i < ZTM_MAX_INSTS; ++i) {
+        instrument *inst = this->instruments[i];
+        ZTMidiRoute route = inst->midi_route;
+        if (MidiOut && inst->midi_device < MidiOut->numOuputDevices) {
+            OutputDevice *dev = MidiOut->outputDevices[inst->midi_device];
+            snprintf(route.name, sizeof(route.name), "%s", dev->szName);
+            snprintf(route.alias, sizeof(route.alias), "%s", dev->alias ? dev->alias : "");
+        }
+        if (route.named()) routes.push_back({static_cast<unsigned char>(i), route});
+    }
+    if (!routes.empty()) {
+        zt_write_midi_routes(buffer, routes);
+        writeblock("MIDR", &buffer, compressed, f, lpDS);
     }
 
     // CCBN: optional chunk listing per-instrument CCizer bank filenames.
@@ -1206,30 +1226,7 @@ void instrument::load(CDataBuf *buf)
     this->bank = buf->getsi();
     this->patch = buf->getuch();
     
-    this->midi_device = buf->getuch();
-
-    // <Manu> Aqui es donde se puede hacer un parche que ponga el primer dispositivo [EN: this is where a patch could pick the first device]
-    //        MIDI que este abierto en los instrumentos que quieran usar uno que
-    //        no este disponible
-    
-/*    
-    if(MidiOut->outputDevices[this->midi_device]->handle==NULL) {
-    
-      int a ;
-
-      a=5 ;
-    }
-    else {
-    
-      int b ;
-
-      b=5 ;
-    }
-
-
-*/
-
-
+    this->set_midi_device(buf->getuch());
     this->channel = buf->getuch();
     this->flags = this->channel;
     this->channel &= 0x0F;
@@ -1388,6 +1385,8 @@ int zt_module::load(char *fn)
     int saw_order_list = 0;
     int saw_pattern_lengths = 0;
     int saw_event_list = 0;
+    std::vector<ZTMidiRouteEntry> routes;
+    bool bad_routes = false;
     // Reset per-track CC-draw slots so a song without a CDRW chunk doesn't
     // inherit the previous song's draw selections.
     for (int i = 0; i < MAX_TRACKS; i++) g_cc_drawmode[i] = 0;
@@ -1406,6 +1405,11 @@ int zt_module::load(char *fn)
             if (cmp_hd(&header[0], "ZTpl")) { load_ZT_pattern_lengths(&buffer); recognized_chunks++; saw_pattern_lengths = 1; }
             if (cmp_hd(&header[0], "ZTpp")) { load_ZT_pattern_properties(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ZTin")) { load_ZT_instrument(&buffer); recognized_chunks++; }
+            if (cmp_hd(&header[0], "MIDR")) {
+                if (!zt_read_midi_routes(buffer.getbuffer(), buffer.getsize(), routes))
+                    bad_routes = true;
+                recognized_chunks++;
+            }
             if (cmp_hd(&header[0], "ZTev")) { load_ZT_event_list(&buffer); recognized_chunks++; saw_event_list = 1; }
             if (cmp_hd(&header[0], "INSE")) {
                 // Per-instrument CC envelopes chunk (see save side for
@@ -1540,11 +1544,12 @@ int zt_module::load(char *fn)
         SDL_Delay(1);
     }
 
-    if (recognized_chunks == 0 || !saw_order_list || !saw_pattern_lengths || !saw_event_list) {
+    if (bad_routes || recognized_chunks == 0 || !saw_order_list || !saw_pattern_lengths || !saw_event_list) {
         if (compressed) {
             delete input;
         }
-        setstatusstr("Error loading %s (invalid/incomplete song data)", fn);
+        setstatusstr(bad_routes ? "Error loading %s (invalid MIDI routing metadata)" :
+                                "Error loading %s (invalid/incomplete song data)", fn);
         unlock_mutex(this->hEditMutex);
         return -1;
     }
@@ -1565,6 +1570,52 @@ int zt_module::load(char *fn)
     } else {
         setstatusstr("Loaded %s (uncompressed)",fn);
     }
+
+    // Resolve after ALL chunks, so MIDR may precede or follow ZTin.
+    for (const auto &entry : routes) {
+        if (entry.instrument < ZTM_MAX_INSTS)
+            this->instruments[entry.instrument]->midi_route = entry.route;
+    }
+    std::vector<ZTMidiDestination> destinations;
+    if (MidiOut) {
+        for (unsigned int d = 0; d < MidiOut->numOuputDevices; ++d) {
+            OutputDevice *dev = MidiOut->outputDevices[d];
+            destinations.push_back({dev->szName, dev->alias, dev->opened != 0,
+                                    dev->type == OUTPUTDEVICE_TYPE_MIDI});
+        }
+    }
+    int unavailable = 0, remapped = 0, opened = 0;
+    std::vector<bool> attempted(destinations.size(), false);
+    for (int i = 0; i < ZTM_MAX_INSTS; ++i) {
+        instrument *inst = this->instruments[i];
+        const unsigned char old_device = inst->midi_device;
+        if (!inst->midi_route.named() && (old_device == 64 || old_device == 255)) {
+            inst->midi_device = 255;
+            continue;
+        }
+        const auto resolved = zt_resolve_midi_route(old_device, inst->midi_route, destinations);
+        if (resolved.device < 0) {
+            // Keep unresolved slots for resaving, separate from the live
+            // routing byte: a stale MIDI slot may now be an audio plugin.
+            if (!inst->midi_route.named()) inst->midi_legacy_device = old_device;
+            inst->midi_device = 255;
+            ++unavailable;
+            fprintf(stderr, "MIDI routing: instrument %02X unavailable: %s (saved slot %u)\n",
+                    i, inst->midi_route.named() ? inst->midi_route.name : "legacy device", old_device);
+            continue;
+        }
+        inst->midi_device = static_cast<unsigned char>(resolved.device);
+        if (resolved.fallback) ++remapped;
+        OutputDevice *dev = MidiOut->outputDevices[resolved.device];
+        if (zt_open_midi_route_once(*MidiOut, resolved.device, attempted) == 1) ++opened;
+        if (!dev->opened) {
+            ++unavailable;
+            fprintf(stderr, "MIDI routing: instrument %02X could not open %s\n", i, dev->szName);
+        }
+    }
+    if (unavailable || remapped || opened)
+        setstatusstr("MIDI: %d output(s) opened, %d legacy instrument(s) remapped, %d unavailable (F3). Loaded %s",
+                     opened, remapped, unavailable, fn);
     if (song->orderlist[0] < 0x100)
         cur_edit_pattern = song->orderlist[0];
 
@@ -1647,7 +1698,7 @@ void zt_module::setstatusstr(const char *fmtstr, ...) {
         return;
     }
     va_start(ap, fmtstr);
-    vsprintf(statusstr_buffer, fmtstr, ap);
+    vsnprintf(statusstr_buffer, sizeof(statusstr_buffer), fmtstr, ap);
     va_end(ap);
     statusstr=statusstr_buffer;
     return;

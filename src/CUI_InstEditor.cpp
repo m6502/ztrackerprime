@@ -47,6 +47,7 @@ static bool inst_slot_available(instrument *in) {
     // local to module.cpp): no device = 0xff, patch = -1, bank = -1.
     if (!in) return false;
     if (in->midi_device != 0xff) return false;
+    if (in->midi_route.named() || in->midi_legacy_device != 255) return false;
     if (in->patch       != -1)   return false;
     if (in->bank        != -1)   return false;
     if (in->ccizer_bank[0] != '\0') return false;
@@ -77,7 +78,7 @@ int inst_create_16_channels_for_device(unsigned int dev) {
         instrument *in = song->instruments[i];
         if (!inst_slot_available(in)) continue;
 
-        in->midi_device = (unsigned char)dev;
+        in->set_midi_device((unsigned char)dev);
         in->channel     = (unsigned char)created;   // 0..15 == MIDI channel 1..16
 
         // "<device> Channel NN". The title field is a fixed, space-padded

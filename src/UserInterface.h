@@ -166,6 +166,7 @@ class VUPlay : public UserInterfaceElement {
         int cur_row;
         int cur_pattern;
         int cur_order;
+        bool was_playing;
         int num_channels;
         int starttrack;
         playedinfo latency[64]; // These are set to some number when a note on track n is played

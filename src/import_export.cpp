@@ -207,7 +207,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
         // song->instruments[i]->midi_device will be set to 255 if it is not set
         // to a valid midi device.
 
-        if(song->instruments[i]->midi_device < MAX_MIDI_OUTS) {
+        if(song->instruments[i]->midi_device < MidiOut->numOuputDevices) {
         
           if((MidiOut->outputDevices[song->instruments[i]->midi_device]->alias != NULL &&
              strlen(MidiOut->outputDevices[song->instruments[i]->midi_device]->alias)>1)) {
@@ -221,7 +221,8 @@ int ZTImportExport::ExportMID(const char *fn, int format)
           
           
         }
-        else midiOutName = NULL;
+        else midiOutName = song->instruments[i]->midi_route.named() ?
+            song->instruments[i]->midi_route.name : (char *)"Unavailable MIDI output";
 
         
         if(midiOutName == NULL) sprintf(str,"%s (%s)",song->instruments[i]->title, "") ;
@@ -888,10 +889,11 @@ int ZTImportExport::ExportMID(char *fn, int format) {
                 mtrk_imap[i+1] = total_mtrks;
 
                 // crash fix - lipid
-                midiOutName = NULL;
+                midiOutName = song->instruments[i]->midi_route.named() ?
+                    song->instruments[i]->midi_route.name : (char *)"Unavailable MIDI output";
                 // song->instruments[i]->midi_device will be set to 255 if it is not set
                 // to a valid midi device.
-                if (song->instruments[i]->midi_device < MAX_MIDI_OUTS) {
+                if (song->instruments[i]->midi_device < MidiOut->numOuputDevices) {
                     midiOutName = (MidiOut->outputDevices[song->instruments[i]->midi_device]->alias != NULL &&
                         strlen(MidiOut->outputDevices[song->instruments[i]->midi_device]->alias)>1) ?
                         MidiOut->outputDevices[song->instruments[i]->midi_device]->alias :

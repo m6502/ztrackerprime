@@ -198,6 +198,11 @@ check("load ok", zt.load(tmp) == true)
 eq("load restores bpm", zt.song.bpm, 171)
 os.remove(tmp)
 
+-- Exercise routing metadata through the real loader and both save formats.
+local routing_ok, routing_err = pcall(dofile, "lua/midi_route_test.lua")
+check("MIDI routing file integration", routing_ok)
+if not routing_ok then print(tostring(routing_err)) end
+
 -- ── summary ──────────────────────────────────────────────────────────
 print(string.format("=== %d/%d checks passed, %d failed ===", total - fails, total, fails))
 SELFTEST_FAILURES = fails

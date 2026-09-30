@@ -91,7 +91,7 @@ void dev_sel(int dev, MidiOutDeviceSelector *mds )
   if (p) {
 
     dev = mds->findItem(p->caption);
-    if (dev < MidiOut->GetNumOpenDevs()) song->instruments[cur_inst]->midi_device = MidiOut->GetDevID(dev);
+    if (dev >= 0 && dev < MidiOut->GetNumOpenDevs()) song->instruments[cur_inst]->set_midi_device(MidiOut->GetDevID(dev));
   }
 }
 
@@ -1340,6 +1340,8 @@ VUPlay::VUPlay() {
     for(int i=0; i < 64; i++)
         latency[i].e.note = latency[i].longevity = latency[i].init_longevity = latency[i].init_vol = 0;
     starttrack = 0;
+    cur_row = cur_pattern = cur_order = -1;
+    was_playing = false;
 }
 
 
@@ -1352,7 +1354,8 @@ int VUPlay::update() {
     KBKey key;
     key = Keys.checkkey();
     Keys.getstate();
-    int SPEED = 2; // speed of fading
+    const int SPEED = 2; // speed of fading
+    const int old_starttrack = starttrack;
 
     switch(key)
     {
@@ -1368,18 +1371,25 @@ int VUPlay::update() {
         break;
     };
 
-    if (ztPlayer->playing)
-    {
-        if (this->cur_row != ztPlayer->playing_cur_row) {
-            for(int i = 0; i < 64; i++)
-                if(latency[i].longevity - SPEED > 0)
-                    latency[i].longevity -=SPEED;
-                else
-                    latency[i].longevity = 0;
-        }
+    const bool playing = ztPlayer && ztPlayer->playing;
+    const bool row_changed = playing &&
+        (cur_row != ztPlayer->playing_cur_row ||
+         cur_pattern != ztPlayer->playing_cur_pattern ||
+         cur_order != ztPlayer->playing_cur_order);
+
+    // Decay once per observed playback row, independent of UI polling rate.
+    if (row_changed) {
+        for (int i = 0; i < 64; i++)
+            latency[i].longevity = std::max(0, latency[i].longevity - SPEED);
+        cur_row = ztPlayer->playing_cur_row;
+        cur_pattern = ztPlayer->playing_cur_pattern;
+        cur_order = ztPlayer->playing_cur_order;
     }
-    need_refresh++;
-    need_redraw++;
+    if (row_changed || playing != was_playing || starttrack != old_starttrack) {
+        need_refresh++;
+        need_redraw = 1;
+    }
+    was_playing = playing;
 
     return(0);
 }
@@ -1412,19 +1422,23 @@ void VUPlay::draw(Drawable *S, int)
   if (starttrack >= MAX_TRACKS)                 starttrack = MAX_TRACKS - 1;
   if (starttrack + track_count > MAX_TRACKS)    track_count = MAX_TRACKS - starttrack;
 
-  if (ztPlayer->playing && (this->cur_row < ztPlayer->cur_row - 2 ||
-                            this->cur_row > ztPlayer->cur_row)) {
+  // Static labels must also survive a stopped-view switch or full refresh.
+  sprintf(str," Tk  Instrument               Note  Vol  FX    Length ................");
+  printBG(col(x),row(y - 1),str,COLORS.Text,COLORS.Background,S);
+
+  // Paint on explicit invalidation too (view switches, resize, track scroll).
+  // cur_row in the player is the prebuffer position, not the audible row.
+  if (ztPlayer->playing) {
 
     pattern = ztPlayer->playing_cur_pattern;
     cur_row = ztPlayer->playing_cur_row;
+    cur_pattern = pattern;
     cur_order = ztPlayer->playing_cur_order;
 
     // Defensive: ensure pattern slot exists before reading it.
     if (pattern < 0 || pattern >= ZTM_MAX_PATTERNS) return;
     if (!song->patterns[pattern]) return;
 
-    sprintf(str," Tk  Instrument               Note  Vol  FX    Length ................");
-    printBG(col(x),row(y - 1),str,COLORS.Text,COLORS.Background,S);
     color = COLORS.EditText;
 
     for (ctrack = starttrack; ctrack < starttrack + track_count; ctrack++) {
@@ -2886,6 +2900,24 @@ void MidiOutDeviceSelector::enter(void) {
 //
 void MidiOutDeviceSelector::OnChange() {
     clear();
+    instrument *inst = song->instruments[cur_inst];
+    // Keep a closed/missing target visible instead of displaying an empty
+    // selection that is indistinguishable from an intentionally disabled one.
+    if (!MidiOut->QueryDevice(inst->midi_device) &&
+        (inst->midi_route.named() || inst->midi_legacy_device != 255 ||
+         (inst->midi_device != 255 && inst->midi_device != 64))) {
+        char label[320];
+        if (inst->midi_device < MidiOut->numOuputDevices)
+            snprintf(label, sizeof(label), "[closed] %s", MidiOut->outputDevices[inst->midi_device]->szName);
+        else if (inst->midi_route.named())
+            snprintf(label, sizeof(label), "[missing] %.255s", inst->midi_route.name[0] ? inst->midi_route.name : inst->midi_route.alias);
+        else
+            snprintf(label, sizeof(label), "[missing] legacy MIDI slot %u",
+                     inst->midi_legacy_device != 255 ? inst->midi_legacy_device : inst->midi_device);
+        LBNode *p = insertItem(label);
+        p->checked = true;
+        p->int_data = inst->midi_device;
+    }
     for (int i=0;i<MidiOut->GetNumOpenDevs();i++) {
         int dev = MidiOut->GetDevID(i);
         if (dev < 0 || dev >= MAX_MIDI_DEVS) {
@@ -2918,10 +2950,17 @@ void MidiOutDeviceSelector::OnChange() {
 //
 void MidiOutDeviceSelector::OnSelect(LBNode *selected) {
     if (selected->checked) {
-        song->instruments[cur_inst]->midi_device =  MAX_MIDI_DEVS;
+        song->instruments[cur_inst]->set_midi_device(255);
         selected->checked = false;
     } else {
-        song->instruments[cur_inst]->midi_device =  selected->int_data;
+        if (selected->int_data < 0 || (unsigned int)selected->int_data >= MidiOut->numOuputDevices)
+            return;
+        if (!MidiOut->QueryDevice(selected->int_data) && MidiOut->AddDevice(selected->int_data) != 0) {
+            statusmsg = (char *)"Could not open MIDI output; check System Configuration";
+            need_refresh++;
+            return;
+        }
+        song->instruments[cur_inst]->set_midi_device(selected->int_data);
         this->selectNone();
         selected->checked = true;
     }

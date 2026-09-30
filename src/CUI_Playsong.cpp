@@ -60,7 +60,6 @@ CUI_Playsong::CUI_Playsong(void)
     delete lcd;
 */
     vu = new VUPlay;
-    vu->cur_order = vu->cur_pattern = vu->cur_row = 0;
     vu->num_channels = 32;
     UI_VUMeters->add_element(vu,0);
 
@@ -88,6 +87,7 @@ void CUI_Playsong::enter(void)
 {
     need_refresh = 1;
     cur_state = STATE_PLAY;
+    UI->full_refresh();
 }
 
 
@@ -181,6 +181,7 @@ void CUI_Playsong::update()
       if (UI == UI_PatternDisplay) UI = UI_VUMeters;
       else UI = UI_PatternDisplay;
       
+      UI->full_refresh();
       clear++;
       act++;
       
@@ -215,9 +216,11 @@ void CUI_Playsong::draw(Drawable *S)
     
     if (clear > 0) {
       
-      // <Manu> cambio res [EN: resolution change]
-      //S->fillRect(0,row(15),INTERNAL_RESOLUTION_X,row(50)/*410*/,COLORS.Background);
-      S->fillRect(0, row(15), INTERNAL_RESOLUTION_X, INTERNAL_RESOLUTION_Y - (640 - row(50))/*410*/,COLORS.Background); // <Manu> Necesario? [EN: needed?]
+      // Clear both views' full content area, including the pattern headers.
+      // The old 640-based height left stale rows/columns behind the VU view.
+      S->fillRect(0, row(pattern_display->y - 1), INTERNAL_RESOLUTION_X - 1,
+                  INTERNAL_RESOLUTION_Y - 56, COLORS.Background);
+      screenmanager.UpdateAll();
 
       clear = 0 ;
     }

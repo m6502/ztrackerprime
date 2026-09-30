@@ -161,6 +161,11 @@ target_include_directories(test_midi_timestamp PRIVATE "${CMAKE_SOURCE_DIR}/src"
 target_compile_features(test_midi_timestamp PRIVATE cxx_std_17)
 add_test(NAME midi_timestamp COMMAND test_midi_timestamp)
 
+add_executable(test_midi_route test_midi_route.cpp)
+target_include_directories(test_midi_route PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_midi_route PRIVATE cxx_std_17)
+add_test(NAME midi_route COMMAND test_midi_route)
+
 add_executable(test_midi_clock_sync
     test_midi_clock_sync.cpp
 )
@@ -207,4 +212,20 @@ if(TARGET zt)
     set_tests_properties(lua_api PROPERTIES
         WORKING_DIRECTORY "$<TARGET_FILE_DIR:zt>"
         LABELS "lua")
+endif()
+
+# VU invalidation uses real constructor/update bodies with deterministic
+# playback/key fixtures; no SDL window or MIDI hardware is needed.
+if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME vu_refresh COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_vu_refresh.py")
+        if(TARGET PkgConfig::SDL3PC)
+            add_test(NAME drawing COMMAND "${CMAKE_COMMAND}" -E env
+                "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_drawing.py")
+        endif()
+    endif()
 endif()

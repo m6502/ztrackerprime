@@ -451,7 +451,7 @@ static int inst_newindex(lua_State *L)
         return 0;
     }
     if (!strcmp(k, "channel"))   { ins->channel        = (unsigned char)luaL_checkinteger(L, 3); return 0; }
-    if (!strcmp(k, "device"))    { ins->midi_device    = (unsigned char)luaL_checkinteger(L, 3); return 0; }
+    if (!strcmp(k, "device"))    { ins->set_midi_device((unsigned char)luaL_checkinteger(L, 3)); return 0; }
     if (!strcmp(k, "transpose")) { ins->transpose      = (signed char)luaL_checkinteger(L, 3); return 0; }
     if (!strcmp(k, "bank"))      { ins->bank           = (short)luaL_checkinteger(L, 3); return 0; }
     if (!strcmp(k, "volume"))        { ins->default_volume = (unsigned char)luaL_checkinteger(L, 3); return 0; }

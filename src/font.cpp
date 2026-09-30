@@ -432,30 +432,33 @@ void printBGu(int x, int y, unsigned char *str, TColor col, TColor bg, Drawable 
     }
 }
 
-void printchar(int x, int y, unsigned char ch, TColor col, Drawable *S) {
-    TColor *buf;
-    unsigned char byte;
-    int i,j;
-    for(i=0;i<8;i++) {
-
-
-        if((y + i) >= S->surface->h) continue ;
-        if((x + 7) >= S->surface->w) continue ;
-
-
-        byte = font[(((int)ch)<<3)+i];
-        buf = S->getLine(y+i) + x + 7;
-
-
-
-
-        for(j=0;j<8;j++) {
-            if (byte & 1) 
-
-                *buf = col;
-            buf--;
-            byte >>= 1;
+void printchar(int x, int y, unsigned char ch, TColor col, Drawable *s) {
+    // Hoist the row address and horizontal clipping out of the glyph loop.
+    if (x + 7 >= s->surface->w || y >= s->surface->h) return;
+    if (x < 0 || y < 0) {
+        for (int i = 0; i < 8; ++i) {
+            if (y + i < 0 || y + i >= s->surface->h) continue;
+            TColor *line = s->getLine(y + i);
+            const unsigned char bits = font[ch * 8 + i];
+            for (int j = 0; j < 8; ++j)
+                if (x + j >= 0 && (bits & (128 >> j))) line[x + j] = col;
         }
+        return;
+    }
+    TColor *top = s->getLine(y) + x;
+    const int pitch = s->surface->pitch / sizeof(TColor);
+    const unsigned char *glyph = &font[ch * 8];
+    for (int i = 0; i < 8 && y + i < s->surface->h; ++i) {
+        TColor *p = top + i * pitch;
+        const unsigned char b = glyph[i];
+        if (b & 128) p[0] = col;
+        if (b & 64) p[1] = col;
+        if (b & 32) p[2] = col;
+        if (b & 16) p[3] = col;
+        if (b & 8) p[4] = col;
+        if (b & 4) p[5] = col;
+        if (b & 2) p[6] = col;
+        if (b & 1) p[7] = col;
     }
 }
 
