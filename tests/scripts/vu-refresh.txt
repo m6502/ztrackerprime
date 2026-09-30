@@ -1,0 +1,24 @@
+# mkdir -p /tmp/zt-vu-shots
+# zt --headless --script /absolute/path/to/tests/scripts/vu-refresh.txt
+# Run against a scratch configuration/song. Creates notes in the scratch song.
+wait 100
+lua zt.orders[0]=0; zt.orders[1]=zt.BREAK; for r=0,63 do zt.pattern(0):set_note(0,r,60,0,100); zt.pattern(0):cell(0,r).length=8 end
+key f5
+wait 100
+key pageup
+wait 200
+shot /tmp/zt-vu-shots/playing.png
+key f8
+wait 100
+shot /tmp/zt-vu-shots/stopped.png
+wait 100
+shot /tmp/zt-vu-shots/idle.png
+key pageup
+wait 100
+key pageup
+wait 100
+shot /tmp/zt-vu-shots/restored.png
+key down
+wait 100
+shot /tmp/zt-vu-shots/scrolled.png
+quit

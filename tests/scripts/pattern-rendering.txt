@@ -1,0 +1,67 @@
+# mkdir -p /tmp/zt-pattern-shots
+# Run with a scratch configuration/song and --headless --script.
+# These screenshots can be compared between a full-render and cached build.
+wait 100
+key f2
+wait 100
+lua zt.pattern(0).length=128; for t=0,7 do for r=0,127,4 do zt.pattern(0):set_note(t,r,36+(r+t)%60,t,100); zt.pattern(0):cell(t,r).length=8 end end
+key right
+wait 100
+shot /tmp/zt-pattern-shots/01-populated.png
+key right
+wait 100
+shot /tmp/zt-pattern-shots/02-caret.png
+key down
+wait 100
+shot /tmp/zt-pattern-shots/03-cursor-row.png
+key tab
+wait 100
+shot /tmp/zt-pattern-shots/04-track.png
+key ctrl+b
+key down
+key down
+key down
+key ctrl+e
+wait 100
+shot /tmp/zt-pattern-shots/05-selection.png
+key ctrl+c
+key down
+key down
+key ctrl+v
+wait 100
+shot /tmp/zt-pattern-shots/06-paste.png
+key alt+z
+wait 100
+shot /tmp/zt-pattern-shots/07-undo.png
+key f2
+wait 100
+shot /tmp/zt-pattern-shots/08-popup.png
+key esc
+wait 100
+shot /tmp/zt-pattern-shots/09-popup-restored.png
+key f1
+wait 100
+key f2
+wait 100
+shot /tmp/zt-pattern-shots/10-page-restored.png
+key shift+grave
+wait 100
+shot /tmp/zt-pattern-shots/11-drawbars.png
+key shift+grave
+wait 100
+shot /tmp/zt-pattern-shots/12-notes-restored.png
+key pagedown
+wait 100
+shot /tmp/zt-pattern-shots/13-scrolled.png
+key pagedown
+wait 100
+shot /tmp/zt-pattern-shots/14-scrolled-again.png
+lua zt.pattern(0).length=32
+key up
+wait 100
+shot /tmp/zt-pattern-shots/15-short-pattern.png
+lua zt.pattern(0).length=128
+key down
+wait 100
+shot /tmp/zt-pattern-shots/16-grown-pattern.png
+quit
