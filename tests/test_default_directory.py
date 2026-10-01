@@ -6,16 +6,14 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from app_fixture import create_test_app
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from drawing_harness import ROOT, function
 
 binary = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='zt-default-directory-') as tmp:
-    app = Path(tmp)
-    (app / 'zt').symlink_to(binary)
-    (app / 'skins').symlink_to(binary.parent / 'skins', target_is_directory=True)
-    (app / 'syx').mkdir()
+    app, executable = create_test_app(binary, Path(tmp))
     songs = app / 'songs with spaces'
     songs.mkdir()
     (app / 'next').mkdir()
@@ -36,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='zt-default-directory-') as tmp:
             "local f=assert(io.open('cwd-marker','w')); f:write('ok'); f:close(); "
             "zt.pattern(0):set_note(0,0,60,0,100); assert(zt.save('autoload.zt'))\n"
             'wait 50\nquit\n')
-        result = subprocess.run([str(app / 'zt'), '--headless', '--script', str(script)],
+        result = subprocess.run([str(executable), '--headless', '--script', str(script)],
                                 cwd=app.parent, capture_output=True, text=True, timeout=20)
         assert result.returncode == 0, result.stderr
         assert marker.read_text() == 'ok', result.stderr
@@ -64,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='zt-default-directory-') as tmp:
                      f'lua local f=assert(io.open("live-{browser}-marker", "w")); f:write("ok"); f:close()',
                      'quit']
         script.write_text('wait 50\n' + '\nwait 50\n'.join(commands) + '\n')
-        result = subprocess.run([str(app / 'zt'), '--headless', '--script', str(script)],
+        result = subprocess.run([str(executable), '--headless', '--script', str(script)],
                                 cwd=app.parent, capture_output=True, text=True, timeout=20)
         assert result.returncode == 0, result.stderr
         assert (app / 'next' / f'live-{browser}-marker').read_text() == 'ok', result.stderr
@@ -82,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='zt-default-directory-') as tmp:
                           'f:write("ok"); f:close()\nquit\n')
         marker = app / 'next' / 'restart-marker'
         marker.unlink(missing_ok=True)
-        result = subprocess.run([str(app / 'zt'), '--headless', '--script', str(script)],
+        result = subprocess.run([str(executable), '--headless', '--script', str(script)],
                                 cwd=app.parent, capture_output=True, text=True, timeout=20)
         assert result.returncode == 0, result.stderr
         assert marker.read_text() == 'ok', result.stderr

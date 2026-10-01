@@ -4,13 +4,11 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from app_fixture import create_test_app
 
 binary = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix='zt-songconfig-focus-') as tmp:
-    app = Path(tmp)
-    (app / 'zt').symlink_to(binary)
-    (app / 'skins').symlink_to(binary.parent / 'skins', target_is_directory=True)
-    (app / 'syx').mkdir()
+    app, executable = create_test_app(binary, Path(tmp))
     (app / 'zt.conf').write_text('skin: default\ndefault_directory: \n')
     commands = ['wait 50', 'key f11', 'wait 50', f'shot {app}/order.png']
     for direction, key in [('forward', 'tab'), ('backward', 'shift+tab')]:
@@ -22,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='zt-songconfig-focus-') as tmp:
                  'quit']
     script = app / 'focus.txt'
     script.write_text('\n'.join(commands) + '\n')
-    result = subprocess.run([str(app / 'zt'), '--headless', '--script', str(script)],
+    result = subprocess.run([str(executable), '--headless', '--script', str(script)],
                             cwd=app.parent, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     order = (app / 'order.png').read_bytes()

@@ -4,14 +4,12 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from app_fixture import create_test_app
 
 binary = Path(sys.argv[1]).resolve()
 for remembered in [False, True]:
     with tempfile.TemporaryDirectory(prefix='zt-sysconfig-focus-') as tmp:
-        app = Path(tmp)
-        (app / 'zt').symlink_to(binary)
-        (app / 'skins').symlink_to(binary.parent / 'skins', target_is_directory=True)
-        (app / 'syx').mkdir()
+        app, executable = create_test_app(binary, Path(tmp))
         (app / 'zt.conf').write_text('skin: default\ndefault_directory: \n')
         if remembered:
             (app / 'devices.conf').write_text(
@@ -24,7 +22,7 @@ for remembered in [False, True]:
         commands += ['quit']
         script = app / 'focus.txt'
         script.write_text('\n'.join(commands) + '\n')
-        result = subprocess.run([str(app / 'zt'), '--headless', '--script', str(script)],
+        result = subprocess.run([str(executable), '--headless', '--script', str(script)],
                                 cwd=app.parent, capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, result.stderr
         top = (app / 'top.png').read_bytes()
