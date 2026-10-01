@@ -86,7 +86,7 @@ int OrderEditor::update() {
 
     if (key) {
         switch(key) {
-            case SDLK_TAB: ret = 1; act++; break;
+            case SDLK_TAB: ret = (kstate & KS_SHIFT) ? -1 : 1; act++; break;
             case SDLK_HOME:
                 if (cursor_y>0)
                     cursor_y=0;

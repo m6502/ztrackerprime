@@ -267,12 +267,14 @@ CUI_Savescreen::CUI_Savescreen(void)
 //
 void CUI_Savescreen::enter(void)
 {
+  zt_config_globals.apply_default_directory(true);
   need_refresh = 1;
   is_saving = 0;
   FileList *fl;
   DirList *dl;
   fl = (FileList *)UI->get_element(0);
   dl = (DirList *)UI->get_element(1);
+  ((DriveList *)UI->get_element(2))->OnChange();
   dl->OnChange();
   fl->OnChange();
   if (song->filename[0] && song->filename[0]!=' ')
@@ -297,6 +299,30 @@ void CUI_Savescreen::leave(void) {
 // ------------------------------------------------------------------------------------------------
 //
 //
+static bool prepare_save_filename(const char *extension)
+{
+  size_t length = 0;
+  while (length < sizeof(save_filename) && save_filename[length]) length++;
+  if (length < sizeof(save_filename)) {
+    while (length > 0 && save_filename[length - 1] == ' ') length--;
+    save_filename[length] = '\0';
+    if (length > 0) {
+      const size_t extension_length = strlen(extension);
+      if (length >= extension_length &&
+          zcmpi(save_filename + length - extension_length, extension)) return true;
+      if (length + extension_length < sizeof(save_filename)) {
+        memcpy(save_filename + length, extension, extension_length + 1);
+        return true;
+      }
+    }
+  }
+  strcpy(szStatmsg, length == 0 ? "Enter a filename before saving." : "Filename is too long.");
+  statusmsg = szStatmsg;
+  status_change = 1;
+  need_refresh++;
+  return false;
+}
+
 void begin_save(void)
 {
   //int i = strlen(ls_filename)-3; if (i<0) i=0;
@@ -304,28 +330,7 @@ void begin_save(void)
 
     UIP_SaveMsg->filetype = 1;
 
-    int i=0;
-
-    while(i<255 && save_filename[i] != 0) {
-
-      i++;
-    }
-
-    while (i>=0 && save_filename[i]==' ') {
-
-      i--;
-    }
-
-    if (save_filename[i] == ' ' || i == 0) save_filename[i] =0;
-
-    if (i>3) {
-
-      if (zcmpi(&save_filename[i-3],".zt")==0) memcpy(&save_filename[i],".zt",3);
-    }
-    else {
-
-      if (i>0) memcpy(&save_filename[i+3],".zt",3);
-    }
+    if (!prepare_save_filename(".zt")) return;
 
     if (file_exists(save_filename)) {
 
@@ -350,28 +355,7 @@ void begin_save(void)
   if (mid_filetype) {
 
     UIP_SaveMsg->filetype = mid_filetype;
-    int i=0;
-
-    while(i<255 && save_filename[i] != 0) {
-
-      i++;
-    }
-
-    while (i>=0 && save_filename[i]==' ') {
-
-      i--;
-    }
-
-    if (save_filename[i] == ' ' || i == 0) save_filename[i] =0;
-
-    if (i>4) {
-      if (zcmpi(&save_filename[i-4],".mid")==0)
-        memcpy(&save_filename[i],".mid",4);
-    }
-    else {
-
-      if (i>0) memcpy(&save_filename[i+4],".mid",4);
-    }
+    if (!prepare_save_filename(".mid")) return;
 
     // Per-track mode writes to <basename>_trackNN.mid, not the raw
     // filename, so the "File exists" check based on save_filename is

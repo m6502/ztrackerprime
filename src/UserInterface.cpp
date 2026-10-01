@@ -48,7 +48,7 @@ int needaclear = 0;
 int g_ui_tab_dir = 0;
 static void zt_collect_known_device_names(const char *prefix, std::set<std::string> &out_names)
 {
-    std::ifstream fp("devices.conf");
+    std::ifstream fp(std::filesystem::path(cur_dir ? cur_dir : ".") / "devices.conf");
     if (!fp.is_open()) {
         return;
     }
@@ -2583,7 +2583,7 @@ int ListBox::update() {
         }
         
         switch(key) {
-            case SDLK_TAB: ret = 1; act++; break;
+            case SDLK_TAB: ret = (Keys.getstate() & KS_SHIFT) ? -1 : 1; act++; break;
             case SDLK_UP:
                 if (cur_sel>0)
                     cur_sel--;

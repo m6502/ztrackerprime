@@ -219,6 +219,24 @@ endif()
 if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME warning_fixes COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_warning_fixes.py")
+        add_test(NAME midi_export_bank COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_midi_export_bank.py")
+        add_test(NAME save_filename COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_save_filename.py")
+        if(TARGET zt)
+            add_test(NAME sysconfig_focus COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_sysconfig_focus.py" "$<TARGET_FILE:zt>")
+            add_test(NAME songconfig_focus COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_songconfig_focus.py" "$<TARGET_FILE:zt>")
+            add_test(NAME default_directory COMMAND "${CMAKE_COMMAND}" -E env
+                "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_default_directory.py" "$<TARGET_FILE:zt>")
+        endif()
         add_test(NAME vu_refresh COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_vu_refresh.py")

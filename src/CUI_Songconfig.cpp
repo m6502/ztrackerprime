@@ -154,7 +154,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         // but still wanted single-row auditioning. Stored as a plain int
         // so zt.conf round-trips it cleanly.
         vs = new ValueSlider;
-        UI->add_element(vs, 10);
+        UI->add_element(vs, 9);
         vs->frame = 0;
         vs->x = 20;
         vs->y = base_y + 13;
@@ -165,7 +165,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
 
         // Ableton Link
         cb = new CheckBox;
-        UI->add_element(cb, 11);
+        UI->add_element(cb, 10);
         cb->frame = 0;
         cb->x = 20;
         cb->y = base_y + 16;
@@ -173,7 +173,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->value = &zt_config_globals.ableton_link_enable;
 
         cb = new CheckBox;
-        UI->add_element(cb, 12);
+        UI->add_element(cb, 11);
         cb->frame = 0;
         cb->x = 20;
         cb->y = base_y + 17;
@@ -181,7 +181,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         cb->value = &zt_config_globals.ableton_link_start_stop_sync;
 
         vs = new ValueSlider;
-        UI->add_element(vs, 13);
+        UI->add_element(vs, 12);
         vs->frame = 0;
         vs->x = 20;
         vs->y = base_y + 18;
@@ -191,7 +191,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
         vs->value = zt_config_globals.sync_offset_ms;
 
         oe = new OrderEditor;
-        UI->add_element(oe,9);
+        UI->add_element(oe,13);
         oe->x = 59;
         oe->y = 13;
         oe->xsize = 9;
@@ -218,13 +218,13 @@ void CUI_Songconfig::enter(void) {
     // Reflect the live config value in the slider whenever this page
     // is entered (config could have been changed elsewhere — e.g. by
     // hand-editing zt.conf and reloading).
-    vs = (ValueSlider *)UI->get_element(10);
+    vs = (ValueSlider *)UI->get_element(9);
     if (vs) vs->value = zt_config_globals.note_audition_step_mode;
-    vs = (ValueSlider *)UI->get_element(13);
+    vs = (ValueSlider *)UI->get_element(12);
     if (vs) vs->value = zt_config_globals.sync_offset_ms;
 
     // F11 toggle: pressing F11 while already on Songconfig flips focus
-    // between OrderEditor (id 9) and Title (id 0) on every press, so the
+    // between OrderEditor (id 13) and Title (id 0) on every press, so the
     // user can keep tapping F11 to alternate. Fresh entry from another
     // page lands on the OrderEditor.
     bool same_page = (LastPage == this);
@@ -240,9 +240,9 @@ void CUI_Songconfig::enter(void) {
     Keys.flush();
     int target;
     if (same_page) {
-        target = (UI->cur_element == 0) ? 9 : 0;
+        target = (UI->cur_element == 0) ? 13 : 0;
     } else {
-        target = 9;   // fresh entry → OrderEditor
+        target = 13;   // fresh entry → OrderEditor
     }
     UI->set_focus(target);
     UI->cur_element = target;
@@ -331,7 +331,7 @@ void CUI_Songconfig::update()
     } else if (vs) {
         vs->value = zt_config_globals.highlight_increment;
     }
-    vs = (ValueSlider *)UI->get_element(13);
+    vs = (ValueSlider *)UI->get_element(12);
     if (vs && vs->from_input) vs->from_input = 0;
     if (vs && vs->value != zt_config_globals.sync_offset_ms) {
         zt_config_globals.sync_offset_ms = vs->value;
@@ -377,7 +377,7 @@ void CUI_Songconfig::update()
             // Mutual exclusion the other way: MIDI-In-Sync on kicks Link off.
             if (zt_config_globals.ableton_link_enable) {
                 zt_config_globals.ableton_link_enable = link_now = 0;
-                UI->get_element(11)->need_redraw++;   // cross-cleared checkbox
+                UI->get_element(10)->need_redraw++;   // cross-cleared checkbox
                 statusmsg = (char*)"Ableton Link disabled (MIDI-In Sync took over)";
                 status_change = 1;
                 need_refresh++;
@@ -423,7 +423,7 @@ void CUI_Songconfig::update()
             }
         }
     }
-    vs = (ValueSlider *)UI->get_element(10);
+    vs = (ValueSlider *)UI->get_element(9);
     if (vs) {
         if (vs->from_input) vs->from_input = 0;
         if (vs->value < ZT_NAS_NONE)     vs->value = ZT_NAS_NONE;

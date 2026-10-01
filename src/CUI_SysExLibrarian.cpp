@@ -257,22 +257,25 @@ void CUI_SysExLibrarian::resolve_folder(void) {
     if (zt_config_globals.syx_folder[0]) {
         snprintf(folder, sizeof(folder), "%s", zt_config_globals.syx_folder);
     } else {
-        // Default: ./syx — next to the binary (or in macOS .app's
-        // Resources/syx after the chdir). Matches where CMake POST_BUILD
+        // Default: syx next to the binary (or in macOS .app's
+        // Resources). Keep it independent of the song browsing directory.
+        // Matches where CMake POST_BUILD
         // copies the bundled `assets/syx` directory so the example
         // request files are visible out of the box.
         struct stat st;
-        if (stat("./syx", &st) == 0 && (st.st_mode & S_IFDIR)) {
-            snprintf(folder, sizeof(folder), "./syx");
+        char bundled_folder[sizeof(folder)];
+        snprintf(bundled_folder, sizeof(bundled_folder), "%s/syx", cur_dir ? cur_dir : ".");
+        if (stat(bundled_folder, &st) == 0 && (st.st_mode & S_IFDIR)) {
+            snprintf(folder, sizeof(folder), "%s", bundled_folder);
         } else {
 #ifndef _WIN32
             const char *home = getenv("HOME");
             if (home && *home)
                 snprintf(folder, sizeof(folder), "%s/.config/zt/syx", home);
             else
-                snprintf(folder, sizeof(folder), "./syx");
+                snprintf(folder, sizeof(folder), "%s", bundled_folder);
 #else
-            snprintf(folder, sizeof(folder), "./syx");
+            snprintf(folder, sizeof(folder), "%s", bundled_folder);
 #endif
         }
     }

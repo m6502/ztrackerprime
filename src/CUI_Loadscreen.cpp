@@ -175,6 +175,7 @@ CUI_Loadscreen::CUI_Loadscreen(void)
 //
 void CUI_Loadscreen::enter(void) 
 {
+  zt_config_globals.apply_default_directory(true);
   need_refresh = 1;
   is_loading = 0;
   cur_state = STATE_LOAD;
@@ -182,6 +183,7 @@ void CUI_Loadscreen::enter(void)
   DirList *dl;
   fl = (FileList *)UI->get_element(0);
   dl = (DirList *)UI->get_element(1);
+  ((DriveList *)UI->get_element(2))->OnChange();
   dl->OnChange();
   fl->OnChange();
   if (song->filename[0] && song->filename[0]!=' ') strcpy(load_filename, (const char *)song->filename);

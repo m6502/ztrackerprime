@@ -175,10 +175,10 @@ extern int PATTERN_EDIT_ROWS;
 
 #define RGB(r,g,b)                      (long)(0xFF000000u | ((r)+((g)<<8)+((b)<<16)))
 
-//// Some hacks
-#define mutetrack(t)                    song->track_mute[t] = 1; MidiOut->mute_track(t)
-#define unmutetrack(t)                  song->track_mute[t] = 0; MidiOut->unmute_track(t)
-#define toggle_track_mute(t)            song->track_mute[t] = !song->track_mute[t];    if (song->track_mute[t]) MidiOut->mute_track(t); else MidiOut->unmute_track(t)
+//// Some hacks                         // <Manu> OK, these hacks were too hacky. I wrapped these in do {} while(0) ; in order to make the places where these were called from a single if() with no braces do what it was intended
+#define mutetrack(t)                    do { song->track_mute[t] = 1; MidiOut->mute_track(t) ; } while(0)
+#define unmutetrack(t)                  do { song->track_mute[t] = 0; MidiOut->unmute_track(t) ; } while(0)
+#define toggle_track_mute(t)            do { song->track_mute[t] = !song->track_mute[t];    if (song->track_mute[t]) { MidiOut->mute_track(t); } else { MidiOut->unmute_track(t) ;} } while(0)
 ////
 
 #define MAX_MIDI_DEVS                   64 // Max midi devices in lists
@@ -872,7 +872,6 @@ extern std::atomic<int> load_lock;
 extern int save_lock;
 
 extern void do_save(void);
-extern int already_changed_default_directory;
 void draw_status_vars(Drawable *S);
 void begin_save(void);
 extern char *cur_dir;

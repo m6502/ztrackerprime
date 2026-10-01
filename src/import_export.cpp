@@ -368,12 +368,12 @@ int ZTImportExport::ExportMID(const char *fn, int format)
           
         case ET_PC: 
           
-          if (e->data2 >= 0) {
+          if (e->data1 <= 0x3FFF) {
             
             unsigned short int bank;
             unsigned char hb,lb;
 
-            bank = e->data2;
+            bank = e->data1;
             bank &= 0x3fff;
             lb = bank&0x007F;
             hb = bank>>7;
@@ -556,10 +556,10 @@ static void push_midi_event(CDataBuf *mp, midi_event *e, int &dtime_ref)
       break;
 
     case ET_PC:
-      if (e->data2 >= 0) {
+      if (e->data1 <= 0x3FFF) {
         unsigned short int bank;
         unsigned char hb, lb;
-        bank = e->data2;
+        bank = e->data1;
         bank &= 0x3fff;
         lb = bank & 0x007F;
         hb = bank >> 7;
@@ -1176,14 +1176,14 @@ int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
 
     for (int i = 0; i < mod.header.numIns; i++) {
       
-      zt->instruments[i]->bank = mod.Instruments(i).midiBank;
-      if (zt->instruments[i]->bank <-1 || zt->instruments[i]->bank >0x3FFF) zt->instruments[i]->bank = -1;
+      const int bank = mod.Instruments(i).midiBank;
+      zt->instruments[i]->bank = static_cast<signed short>((bank <= 0x3FFF) ? bank : -1);
       
-      zt->instruments[i]->channel = mod.Instruments(i).midiChannel-1;
-      if (zt->instruments[i]->channel > 0xF || zt->instruments[i]->channel<0) zt->instruments[i]->channel = 0x0;
+      const int channel = static_cast<int>(mod.Instruments(i).midiChannel) - 1;
+      zt->instruments[i]->channel = static_cast<unsigned char>((channel >= 0 && channel <= 0xF) ? channel : 0);
       
-      zt->instruments[i]->patch = mod.Instruments(i).midiProgram;
-      if (zt->instruments[i]->patch <-1 || zt->instruments[i]->patch >0x7F) zt->instruments[i]->patch = -1;
+      const int patch = mod.Instruments(i).midiProgram;
+      zt->instruments[i]->patch = static_cast<signed char>((patch <= 0x7F) ? patch : -1);
       
       //strcpy((char *)&zt->instruments[i]->title[0], mod.Instruments(i).name);
       memcpy(&zt->instruments[i]->title[0], mod.Instruments(i).name, 24);

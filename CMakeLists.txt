@@ -298,7 +298,7 @@ endif()
 
 # Inject build date as ZT_BUILD_DATE so the version string in the UI reflects
 # when the binary was actually built, instead of a stale hardcoded value.
-string(TIMESTAMP ZT_BUILD_DATE "%Y_%m_%d" UTC)
+string(TIMESTAMP ZT_BUILD_DATE "%Y_%m_%d")
 target_compile_definitions(zt PRIVATE ZT_BUILD_DATE="${ZT_BUILD_DATE}")
 
 find_package(PkgConfig QUIET)
@@ -452,9 +452,10 @@ if(APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${CMAKE_SOURCE_DIR}/doc"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/doc"
-    COMMAND ${CMAKE_COMMAND} -E copy
-      "${CMAKE_SOURCE_DIR}/zt.conf"
-      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt.conf"
+    COMMAND ${CMAKE_COMMAND}
+      "-DSOURCE=${CMAKE_SOURCE_DIR}/zt.conf"
+      "-DDESTINATION=$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt.conf"
+      -P "${CMAKE_SOURCE_DIR}/cmake/CopyDefaultConfig.cmake"
     COMMAND ${CMAKE_COMMAND} -E copy
       "${CMAKE_SOURCE_DIR}/zt_icon.png"
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt_icon.png"
@@ -492,8 +493,10 @@ if(APPLE)
 else()
   # Copy runtime data next to the binary so it works out of the box on Windows/Linux.
   add_custom_command(TARGET zt POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          "${CMAKE_SOURCE_DIR}/zt.conf" "$<TARGET_FILE_DIR:zt>/zt.conf"
+      COMMAND ${CMAKE_COMMAND}
+          "-DSOURCE=${CMAKE_SOURCE_DIR}/zt.conf"
+          "-DDESTINATION=$<TARGET_FILE_DIR:zt>/zt.conf"
+          -P "${CMAKE_SOURCE_DIR}/cmake/CopyDefaultConfig.cmake"
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/skins" "$<TARGET_FILE_DIR:zt>/skins"
       COMMAND ${CMAKE_COMMAND} -E copy_directory

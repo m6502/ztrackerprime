@@ -175,7 +175,6 @@ int select_track_start,select_track_end;
 int selected=0;
 
 int zclear_flag, zclear_presscount;
-int already_changed_default_directory = 0;
 char ls_filename[MAX_PATH + 1];
 
 //int default_midistopstart = 1;
@@ -2405,11 +2404,12 @@ void make_toolbar(void)
 //
 void encode(char *str, char w[256])
 {
-    char *q, *r;
+    char *q;
+    const char *r;
     //*w = (char*)malloc(strlen(str));
     q = w;
-    r = str;
-    for(;*r != '\0'; r++, q++) {
+    r = str ? str : "";
+    for(;*r != '\0' && q < w + 255; r++, q++) {
         if((*r >= 'a' && *r <= 'z') || (*r >= 'A' && *r <= 'Z') || (*r >= '0' && *r <= '9')) {
             *q = *r;
         }
@@ -2574,9 +2574,8 @@ int postAction ()
     static char name[256];
 	static char val[256];
 	static char tt[256];
-    conf DeviceConfig((char *)"devices.conf");
-
     std::filesystem::current_path(cur_dir);
+    conf DeviceConfig((char *)"devices.conf");
     for (i=0;i<MAX_MIDI_OUTS;i++) {
         sprintf(name,"open_out_device_%d",i);
         DeviceConfig.remove(&name[0]);
@@ -3753,10 +3752,9 @@ static int zt_backend_init_runtime(char *errstr)
 //
 int initSDL(void)
 {
-  if(zt_config_globals.default_directory[0] != '\0') zt_set_current_directory(zt_config_globals.default_directory);
-
-  cur_dir = (char *)malloc(256);
-  zt_get_current_directory(256, cur_dir);
+  cur_dir = strdup(std::filesystem::current_path().string().c_str());
+  free(zt_directory);
+  zt_directory = strdup(cur_dir);
 
   if (zt_config_globals.load()) {
     if (zt_config_globals.save()) {
@@ -3861,6 +3859,10 @@ int initSDL(void)
 #endif
     zt_set_window_title("zt");
 
+
+    // Resources and MIDI configuration load from the application directory;
+    // file browsers and relative autoload filenames use the song directory.
+    zt_config_globals.apply_default_directory();
 
     UIP_About = new CUI_About;
     UIP_InstEditor = new CUI_InstEditor;
@@ -4273,7 +4275,12 @@ static int zt_run_lua_selftest(void) {
     lua_State *L = g_lua.L;
     g_lua.line_count = 0;                // drop the startup banner so only
     g_lua.scroll_off = 0;                // the test output is dumped
-    int rc = luaL_dofile(L, "lua/selftest.lua");
+    // The bundled suite loads companion scripts and writes scratch fixtures
+    // relative to the application directory, independent of song browsing.
+    if (cur_dir) std::filesystem::current_path(cur_dir);
+    const std::string selftest_path =
+        (std::filesystem::path(cur_dir ? cur_dir : ".") / "lua/selftest.lua").string();
+    int rc = luaL_dofile(L, selftest_path.c_str());
     int start = g_lua.line_count - LUA_CONSOLE_MAX_LINES;
     if (start < 0) start = 0;
     for (int i = start; i < g_lua.line_count; ++i)

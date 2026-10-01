@@ -54,13 +54,6 @@ void DriveList::OnChange()
     r = GetLogicalDrives();
     LBNode *p;
     save[0] = 0;
-    if(!already_changed_default_directory)
-    {
-        if(zt_config_globals.default_directory[0] != '\0')
-            zt_set_current_directory(zt_config_globals.default_directory);
-        already_changed_default_directory = 1;
-    }
-
     zt_get_current_directory(512,cur);
 
     for(i=0;i<26;i++) {

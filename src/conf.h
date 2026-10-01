@@ -2,6 +2,7 @@
 #define _CONF_H
 
 #include "list.h"
+#include <string>
 
 #define MAX_PATH 260
 
@@ -52,11 +53,14 @@ class conf {
 
 class ZTConf {
 
+    private:
+        std::string applied_default_directory;
     public:
         ZTConf();
         ~ZTConf();
         int load();
         int save();
+        bool apply_default_directory(bool only_if_changed = false);
         int getFlag(const char *key);
         
         // Here are the variables

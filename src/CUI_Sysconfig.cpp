@@ -1,6 +1,7 @@
 #include "zt.h"
 #include "Button.h"
 #include <string>
+#include <filesystem>
 #include <vector>
 
 MidiOutDeviceOpener *midioutdevlist;
@@ -230,7 +231,7 @@ static void encode_dev_key(const char *str, char w[256])
 {
     const char *r = str ? str : "";
     char *q = w;
-    for(; *r != '\0'; r++, q++) {
+    for(; *r != '\0' && q < w + 255; r++, q++) {
         if((*r >= 'a' && *r <= 'z') || (*r >= 'A' && *r <= 'Z') || (*r >= '0' && *r <= '9')) {
             *q = *r;
         } else {
@@ -246,8 +247,10 @@ static void forget_device_entries(const char *name, int is_output)
         return;
     }
 
-    conf device_config((char *)"devices.conf");
-    char key[256];
+    const std::string device_config_path =
+        (std::filesystem::path(cur_dir ? cur_dir : ".") / "devices.conf").string();
+    conf device_config(device_config_path.c_str());
+    char key[512];
     char enc[256];
     encode_dev_key(name, enc);
 
@@ -273,7 +276,7 @@ static void forget_device_entries(const char *name, int is_output)
         }
     }
 
-    device_config.save((char *)"devices.conf");
+    device_config.save(device_config_path.c_str());
 }
 
 void BTNCLK_ForgetMidiOutDevice(UserInterfaceElement *b) {
@@ -437,6 +440,33 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->value = &zt_config_globals.record_velocity;
         cb->frame = 0;
 
+        // Folder settings follow Record Velocity in keyboard navigation.
+        ti = new TextInput;
+        UI->add_element(ti, tabindex++);
+        ti->frame  = 1;
+        ti->x      = 4 + 16;                          // matches left-column controls
+        ti->y      = base_y + 7;                      // gap row 6 between Record Velocity (+5) and this
+        ti->xsize  = 27;                              // ends col 47 -- one col gap before Skin Selection at col 49
+        ti->length = MAX_PATH;
+        ti->str    = (unsigned char*)zt_config_globals.ccizer_folder;
+
+        // SysEx folder picker (audit L13). Two rows below the CCizer
+        // folder, not one -- frame=1 TextInputs draw a top border at
+        // y-1 and a bottom border at y+1, so a 1-row gap makes the
+        // two frames overwrite each other's content rows (the bug
+        // that rendered both fields as solid yellow stripes). With
+        // y = base_y + 9, CCizer's bottom frame at +8 and SysEx's
+        // top frame at +8 share a single row and the content rows
+        // (+7 / +9) stay clean.
+        ti = new TextInput;
+        UI->add_element(ti, tabindex++);
+        ti->frame  = 1;
+        ti->x      = 4 + 16;
+        ti->y      = base_y + 9;
+        ti->xsize  = 27;                              // matches CCizer field width
+        ti->length = MAX_PATH;
+        ti->str    = (unsigned char*)zt_config_globals.syx_folder;
+
 #ifndef DISABLED_CONFIGURATION_VALUES
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
@@ -528,7 +558,16 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         b->OnClick = (ActFunc)BTNCLK_ForgetMidiOutDevice;
         midiout_action_button = b;
 
-        // Latency / Bank / Alias share the right half and track the MIDI Out
+        ti = new AliasTextInput(ml);
+        UI->add_element(ti,tabindex++);
+        ti->frame = 1;
+        ti->x = 54;        // after "Device Alias " label (cols 41..53)
+        ti->y = 47;
+        ti->xsize = 22;    // ends col 76 — matches list right edge
+        ti->length = 41;   // buffer still fits a long alias; field scrolls horizontally
+        midiout_alias_input = ti;
+
+        // Alias / Latency / Bank share the right half and track the MIDI Out
         // list's left and right edges.
         vs = new LatencyValueSlider(ml);
         UI->add_element(vs,tabindex++);
@@ -548,47 +587,10 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         cb->frame = 0;
         midiout_bank_select = cb;
 
-        ti = new AliasTextInput(ml);
-        UI->add_element(ti,tabindex++);
-        ti->frame = 1;
-        ti->x = 54;        // after "Device Alias " label (cols 41..53)
-        ti->y = 47;
-        ti->xsize = 22;    // ends col 76 — matches list right edge
-        ti->length = 41;   // buffer still fits a long alias; field scrolls horizontally
-        midiout_alias_input = ti;
 
         ml->lvs = vs;  // link midi out list to latency value slider
         ml->bscb = cb; // link midi out list to bank select checkbox
         ml->al = ti;
-
-        // CCizer folder picker. Appended at the END of tabindex so the
-        // earlier UI->get_element(N) literal indices in update() (1=Prebuffer,
-        // 5=Full Screen, etc.) keep working. Label drawn in draw() below.
-        ti = new TextInput;
-        UI->add_element(ti, tabindex++);
-        ti->frame  = 1;
-        ti->x      = 4 + 16;                          // matches left-column controls
-        ti->y      = base_y + 7;                      // gap row 6 between Record Velocity (+5) and this
-        ti->xsize  = 27;                              // ends col 47 -- one col gap before Skin Selection at col 49
-        ti->length = MAX_PATH;
-        ti->str    = (unsigned char*)zt_config_globals.ccizer_folder;
-
-        // SysEx folder picker (audit L13). Two rows below the CCizer
-        // folder, not one -- frame=1 TextInputs draw a top border at
-        // y-1 and a bottom border at y+1, so a 1-row gap makes the
-        // two frames overwrite each other's content rows (the bug
-        // that rendered both fields as solid yellow stripes). With
-        // y = base_y + 9, CCizer's bottom frame at +8 and SysEx's
-        // top frame at +8 share a single row and the content rows
-        // (+7 / +9) stay clean.
-        ti = new TextInput;
-        UI->add_element(ti, tabindex++);
-        ti->frame  = 1;
-        ti->x      = 4 + 16;
-        ti->y      = base_y + 9;
-        ti->xsize  = 27;                              // matches CCizer field width
-        ti->length = MAX_PATH;
-        ti->str    = (unsigned char*)zt_config_globals.syx_folder;
 
         layout_midi_device_columns();
 }

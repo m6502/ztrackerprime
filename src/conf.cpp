@@ -51,7 +51,30 @@
 
 #include "zt.h"
 
-const char *conf_filename = "zt.conf";
+#include <filesystem>
+#include <string>
+
+// cur_dir is captured before browsing or applying the default song directory.
+static std::string configuration_path()
+{
+    return (std::filesystem::path(cur_dir ? cur_dir : ".") / "zt.conf").string();
+}
+
+bool ZTConf::apply_default_directory(bool only_if_changed)
+{
+    if (only_if_changed && applied_default_directory == default_directory) return true;
+    const std::filesystem::path directory =
+        std::filesystem::path(cur_dir ? cur_dir : ".") / default_directory;
+    std::error_code error;
+    std::filesystem::current_path(directory, error);
+    if (error) {
+        fprintf(stderr, "zt: cannot use default directory '%s': %s\n",
+                directory.string().c_str(), error.message().c_str());
+        return false;
+    }
+    applied_default_directory = default_directory;
+    return true;
+}
 
 conf::conf() {
     filename = NULL;
@@ -281,7 +304,7 @@ int ZTConf::load()
 {
   char *temp ;
   
-  if (!Config->load(conf_filename)) return -1;
+  if (!Config->load(configuration_path().c_str())) return -1;
 
   
   //    colorfile = Config->get("color_file");
@@ -600,5 +623,5 @@ int ZTConf::save() {
         }
     }
 
-    return Config->save(conf_filename) ? 0 : -1;
+    return Config->save(configuration_path().c_str()) ? 0 : -1;
 }
