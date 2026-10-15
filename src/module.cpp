@@ -454,7 +454,7 @@ void pattern::resize(int newsize) {
     }
 
     for (j=0;j<ZTM_MAX_TRACKS;j++)
-        for (int i=newsize+1; i<this->length; i++)
+        for (int i=newsize; i<this->length; i++)
             this->tracks[j]->del_event(i);
     this->length=newsize;
 }

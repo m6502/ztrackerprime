@@ -2,6 +2,7 @@
 #include "pattern_note_format.h"
 #include "pattern_draw_cache.h"
 #include "platform/undo.h"
+#include "block_transform.h"
 #include "ccizer.h"
 #include "keybindings.h"
 #include "keyjazz_map.h"
@@ -2255,8 +2256,8 @@ void CUI_Patterneditor::update()
 
 
         // ------------------------------------------------------------------
-        // Pattern operations (ported from master: Undo, Double, Halve, Clone,
-        // Interpolate Selection, Reverse Selection, Rotate Up/Down, Track Solo).
+        // Pattern and block operations: Duplicate, Expand, Halve, Clone,
+        // Interpolate Block, Reverse Block, Rotate Up/Down, Track Solo.
         // Keys are hardcoded here; PR-C (#8) makes them remappable once merged.
         // ------------------------------------------------------------------
 
@@ -2280,48 +2281,35 @@ void CUI_Patterneditor::update()
         // (CC drawmode cycle moved to the COMMON KEYS block above so it
         // also fires in PEM_MOUSEDRAW mode.)
 
-        // Double Pattern: Ctrl+Shift+G
-        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
-          int pat_len = song->patterns[cur_edit_pattern]->length;
-          int new_len = pat_len * 2;
-          if (new_len <= 256) {
-            song->patterns[cur_edit_pattern]->resize(new_len);
-            for (int t = 0; t < MAX_TRACKS; t++) {
-              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
-              if (!trk) continue;
-              for (int r = 0; r < pat_len; r++) {
-                event *ev = trk->get_event(r);
-                if (ev) trk->update_event(r + pat_len, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
-              }
-            }
-            sprintf(szStatmsg, "Pattern doubled: %d -> %d rows", pat_len, new_len);
+        // Block transforms require a selection and never resize the pattern.
+        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) &&
+            (key == SDLK_G || key == SDLK_E || key == SDLK_H)) {
+          const BlockTransform operation = key == SDLK_G ? BlockTransform::Duplicate :
+                                           key == SDLK_E ? BlockTransform::Expand : BlockTransform::Halve;
+          if (!selected) {
+            statusmsg = "No block selected";
           } else {
-            sprintf(szStatmsg, "Cannot double: max 256 rows");
-          }
-          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
-        }
-
-        // Halve Pattern: Ctrl+Shift+H
-        if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_H) {
-          int pat_len = song->patterns[cur_edit_pattern]->length;
-          int new_len = pat_len / 2;
-          if (new_len >= 32) {
-            for (int t = 0; t < MAX_TRACKS; t++) {
-              track *trk = song->patterns[cur_edit_pattern]->tracks[t];
-              if (!trk) continue;
-              for (int r = 0; r < new_len; r++) {
-                event *ev = trk->get_event(r * 2);
-                if (ev) trk->update_event(r, ev->note, ev->inst, ev->vol, ev->length, ev->effect, ev->effect_data);
-                else    trk->update_event(r, blank_event.note, blank_event.inst, blank_event.vol, blank_event.length, blank_event.effect, blank_event.effect_data);
+            BlockRange block = {select_track_start, select_track_end, select_row_start, select_row_end};
+            const BlockTransformResult result = transform_block(song, cur_edit_pattern, block, operation);
+            if (result == BlockTransformResult::Changed || result == BlockTransformResult::Unchanged) {
+              select_row_end = block.last_row;
+              cur_edit_row = clamp_int(cur_edit_row, block.first_row, block.last_row);
+              if (cur_edit_row < cur_edit_row_disp) cur_edit_row_disp = cur_edit_row;
+              if (cur_edit_row >= cur_edit_row_disp + PATTERN_EDIT_ROWS)
+                cur_edit_row_disp = cur_edit_row - PATTERN_EDIT_ROWS + 1;
+              statusmsg = operation == BlockTransform::Duplicate ? "Block duplicated" :
+                          operation == BlockTransform::Expand ? "Block expanded" : "Block halved";
+              if (result == BlockTransformResult::Changed) {
+                file_changed++;
+                m_upd = 0;
+                upd_e = NULL;
               }
+            } else {
+              statusmsg = result == BlockTransformResult::LockTimeout ?
+                          "Block edit: mutex lock timeout" : "Invalid block selection";
             }
-            song->patterns[cur_edit_pattern]->resize(new_len);
-            if (cur_edit_row >= new_len) cur_edit_row = new_len - 1;
-            sprintf(szStatmsg, "Pattern halved: %d -> %d rows", pat_len, new_len);
-          } else {
-            sprintf(szStatmsg, "Cannot halve: minimum pattern length is 32 rows");
           }
-          statusmsg = szStatmsg; status_change = 1; need_refresh++; key = 0;
+          status_change = 1; need_refresh++; key = 0;
         }
 
         // Humanize Velocities: Alt+H — randomize volume column within selection
@@ -2489,7 +2477,7 @@ void CUI_Patterneditor::update()
           status_change = 1; need_refresh++; key = 0;
         }
 
-        // Reverse Selection: Ctrl+Shift+R
+        // Reverse Block: Ctrl+Shift+R
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_R) {
           if (selected) {
             for (int t = select_track_start; t <= select_track_end; t++) {
@@ -2507,9 +2495,9 @@ void CUI_Patterneditor::update()
                 lo++; hi--;
               }
             }
-            statusmsg = "Selection reversed";
+            statusmsg = "Block reversed";
           } else {
-            statusmsg = "No selection";
+            statusmsg = "No block selected";
           }
           status_change = 1; need_refresh++; key = 0;
         }

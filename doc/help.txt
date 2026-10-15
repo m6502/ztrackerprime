@@ -52,12 +52,9 @@
  ALT-R           : Replicate at Cursor (rows 0..cursor repeat across rest)
  CTRL-Z          : Undo last pattern edit (up to 128 edits)
  CTRL-Y          : Redo last undone pattern edit
- CTRL-SHIFT-G    : Double Pattern (duplicate rows, max 256)
- CTRL-SHIFT-H    : Halve Pattern (keep every other row, min 32)
  CTRL-SHIFT-D    : Clone Pattern (copy to next empty slot and jump to it)
  CTRL-SHIFT-F    : Fill Selection with Note at Cursor (note + inst + length;
                    leaves volume / effects in each row untouched)
- CTRL-SHIFT-R    : Reverse Selection (reverse row order in selected block)
  CTRL-SHIFT-Down : Rotate Track Down (last row wraps to first)
  CTRL-SHIFT-Up   : Rotate Track Up (first row wraps to last)
  CTRL-F9         : Track Solo (mute all other tracks; repeat to unsolo all)
@@ -66,6 +63,16 @@
                    free here and does nothing, unlike on other pages)
 
 |L|%==|H|Block Functions|L|==%|U|
+
+ CTRL-SHIFT-G : Duplicate Block (append a copy of the selected rows)
+ CTRL-SHIFT-E : Expand Block (space selected rows apart with empty rows)
+ CTRL-SHIFT-H : Halve Block (keep every other row, relative to block start)
+ CTRL-SHIFT-R : Reverse Block (reverse rows within the selected block)
+               These commands require a selection and affect its tracks only.
+               Pattern length stays unchanged. Duplicate/Expand overwrite
+               destination rows, clipped at the pattern end; Halve clears the
+               unused rows of the original block. The selection follows the
+               result. ALT-L twice selects the entire pattern.
 
  CTRL-B / ALT-B : Marks the beginning of a select block.
  CTRL-E / ALT-E : Marks the end of a select block.

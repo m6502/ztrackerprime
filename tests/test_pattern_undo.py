@@ -12,6 +12,7 @@ from drawing_harness import ROOT, function
 
 source = r'''
 #include "platform/undo.h"
+#include "block_transform.h"
 #include <cassert>
 #include <cstdio>
 int file_changed = 0;
@@ -41,7 +42,7 @@ arpeggio::~arpeggio() {}
 midimacro::~midimacro() {}
 '''
 for signature in [
-    'event::event(void)', 'event::~event(void)', 'int event::blank(void)',
+    'event::event(void)', 'event::event(event *e)', 'event::~event(void)', 'int event::blank(void)',
     'track::track(short int len)', 'track::~track(void)', 'void track::reset(void)',
     'void track::del_event(', 'void track::ins_row(', 'void track::del_row(',
     'void track::update_event(unsigned short int row, int note,',
@@ -173,6 +174,85 @@ int main() {
     { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 0, 70); }
     fixture.de_init(); assert(history.undo_count() == 1);
     history.undo(song); assert(!get(0, 0, 0));
+    // Block transforms overwrite only their destination on selected tracks,
+    // keep the shared pattern length, and restore every field through undo.
+    zt_module blocks(8, 120);
+    song = &blocks;
+    blocks.patterns[0] = new pattern(64);
+    for (int t : {4, 5, 6})
+        for (int r : {7, 8, 9, 10, 11, 12, 14, 20, 61, 62, 63})
+            put(0, t, r, 30 + r);
+    history.clear();
+    auto transform = [&](BlockRange &range, BlockTransform operation) {
+        PatternUndo::Edit edit(history, song); edit.watch(0);
+        return transform_block(song, 0, range, operation);
+    };
+    BlockRange range{4, 5, 9, 11};
+    assert(transform(range, BlockTransform::Expand) == BlockTransformResult::Changed);
+    assert(range.first_row == 9 && range.last_row == 14);
+    for (int t : {4, 5}) {
+        check(0, t, 8, 38); check(0, t, 9, 39); check(0, t, 11, 40); check(0, t, 13, 41);
+        for (int r : {10, 12, 14}) assert(!get(0, t, r));
+        check(0, t, 20, 50); check(0, t, 63, 93);
+    }
+    check(0, 6, 10, 40); check(0, 6, 14, 44);
+    assert(transform(range, BlockTransform::Halve) == BlockTransformResult::Changed);
+    assert(range.last_row == 11);
+    check(0, 4, 9, 39); check(0, 4, 10, 40); check(0, 4, 11, 41);
+    assert(!get(0, 4, 12) && !get(0, 4, 14));
+    history.undo(song); assert(!get(0, 4, 10));
+    history.undo(song); check(0, 4, 12, 42); check(0, 4, 14, 44);
+    history.redo(song); check(0, 4, 13, 41);
+    history.undo(song);
+
+    range = {4, 5, 9, 11};
+    assert(transform(range, BlockTransform::Duplicate) == BlockTransformResult::Changed);
+    assert(range.last_row == 14);
+    for (int t : {4, 5}) {
+        check(0, t, 9, 39); check(0, t, 10, 40); check(0, t, 11, 41);
+        check(0, t, 12, 39); check(0, t, 13, 40); check(0, t, 14, 41);
+        check(0, t, 20, 50); check(0, t, 63, 93);
+    }
+    check(0, 6, 12, 42);
+    history.undo(song); check(0, 4, 12, 42);
+    range = {4, 5, 9, 11};
+    assert(transform(range, BlockTransform::Halve) == BlockTransformResult::Changed);
+    assert(range.last_row == 10); // Keep offsets 0 and 2 of an odd-sized block.
+    check(0, 4, 9, 39); check(0, 4, 10, 41);
+    assert(!get(0, 4, 11)); check(0, 4, 12, 42); check(0, 4, 20, 50);
+    history.undo(song); check(0, 4, 10, 40); check(0, 4, 11, 41);
+
+    range = {4, 4, 62, 63};
+    assert(transform(range, BlockTransform::Expand) == BlockTransformResult::Changed);
+    assert(range.last_row == 63);
+    check(0, 4, 61, 91); check(0, 4, 62, 92); assert(!get(0, 4, 63));
+    assert(!get(0, 4, 64) && blocks.patterns[0]->length == 64);
+    check(0, 5, 63, 93);
+    history.undo(song); check(0, 4, 63, 93);
+    auto undo_count = history.undo_count();
+    range = {4, 4, 62, 63};
+    transform(range, BlockTransform::Duplicate); // Copy falls entirely beyond the end.
+    assert(history.undo_count() == undo_count); check(0, 4, 63, 93);
+    range = {4, 4, 61, 62};
+    transform(range, BlockTransform::Duplicate); // Only the first copied row fits.
+    assert(range.last_row == 63 && blocks.patterns[0]->length == 64);
+    check(0, 4, 61, 91); check(0, 4, 62, 92); check(0, 4, 63, 91);
+    assert(!get(0, 4, 64)); check(0, 5, 63, 93);
+    history.undo(song); check(0, 4, 63, 93);
+    range = {4, 4, 9, 9};
+    assert(transform(range, BlockTransform::Halve) == BlockTransformResult::Unchanged);
+    range = {0, MAX_TRACKS - 1, 0, 63};
+    transform(range, BlockTransform::Halve);
+    assert(range.last_row == 31 && blocks.patterns[0]->length == 64);
+    for (track *trk : blocks.patterns[0]->tracks) assert(trk->length == 64);
+    check(0, 4, 31, 92); assert(!get(0, 4, 32));
+    history.undo(song);
+    range = {0, 0, 0, 64};
+    assert(transform(range, BlockTransform::Expand) == BlockTransformResult::InvalidSelection);
+    range = {0, 0, 0, 63};
+    lock_available = false;
+    assert(transform(range, BlockTransform::Expand) == BlockTransformResult::LockTimeout);
+    lock_available = true;
     assert(locks == 0);
     puts("Pattern undo: data restoration, redo branches, gestures, bounds and song teardown passed.");
 }

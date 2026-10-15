@@ -55,7 +55,7 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "midi_export",          // ZT_ACTION_MIDI_EXPORT
     "undo",                 // ZT_ACTION_UNDO
     "replicate_at_cursor",  // ZT_ACTION_REPLICATE_AT_CURSOR
-    "double_pattern",       // ZT_ACTION_DOUBLE_PATTERN
+    "double_pattern",       // ZT_ACTION_DUPLICATE_BLOCK (legacy config key)
     "clone_pattern",        // ZT_ACTION_CLONE_PATTERN
     "octave_down",          // ZT_ACTION_OCTAVE_DOWN
     "octave_up",            // ZT_ACTION_OCTAVE_UP
@@ -70,17 +70,18 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "step_8",               // ZT_ACTION_STEP_8
     "step_9",               // ZT_ACTION_STEP_9
     "switch_lua_console",   // ZT_ACTION_SWITCH_LUA_CONSOLE
-    "halve_pattern",        // ZT_ACTION_HALVE_PATTERN
+    "halve_pattern",        // ZT_ACTION_HALVE_BLOCK (legacy config key)
     "interpolate_selection",// ZT_ACTION_INTERPOLATE_SELECTION
     "follow_playback",      // ZT_ACTION_FOLLOW_PLAYBACK
     "track_solo",           // ZT_ACTION_TRACK_SOLO
-    "reverse_selection",    // ZT_ACTION_REVERSE_SELECTION
+    "reverse_selection",    // ZT_ACTION_REVERSE_BLOCK (legacy config key)
     "rotate_down",          // ZT_ACTION_ROTATE_DOWN
     "rotate_up",            // ZT_ACTION_ROTATE_UP
     "note_audition",        // ZT_ACTION_NOTE_AUDITION
     "row_audition",         // ZT_ACTION_ROW_AUDITION
     "toggle_cc_drawmode",   // ZT_ACTION_TOGGLE_CC_DRAWMODE
     "redo",                 // ZT_ACTION_REDO
+    "expand_pattern",       // ZT_ACTION_EXPAND_BLOCK (legacy config key)
 };
 
 // Same length as s_actionNames; rendered in the Shortcuts & MIDI
@@ -110,7 +111,7 @@ static const char* const s_actionDescriptions[ZT_ACTION_COUNT] = {
     "Export to .mid file",                 // ZT_ACTION_MIDI_EXPORT
     "Undo",                                // ZT_ACTION_UNDO
     "Replicate selection at cursor",       // ZT_ACTION_REPLICATE_AT_CURSOR
-    "Double pattern length",               // ZT_ACTION_DOUBLE_PATTERN
+    "Duplicate Block",                      // ZT_ACTION_DUPLICATE_BLOCK
     "Clone pattern to next slot",          // ZT_ACTION_CLONE_PATTERN
     "Octave down",                         // ZT_ACTION_OCTAVE_DOWN
     "Octave up",                           // ZT_ACTION_OCTAVE_UP
@@ -125,17 +126,18 @@ static const char* const s_actionDescriptions[ZT_ACTION_COUNT] = {
     "Edit step = 8",                       // ZT_ACTION_STEP_8
     "Edit step = 9",                       // ZT_ACTION_STEP_9
     "Switch to Lua Console",               // ZT_ACTION_SWITCH_LUA_CONSOLE
-    "Halve pattern length",                // ZT_ACTION_HALVE_PATTERN
+    "Halve Block",                          // ZT_ACTION_HALVE_BLOCK
     "Interpolate selection",               // ZT_ACTION_INTERPOLATE_SELECTION
     "Follow playback",                     // ZT_ACTION_FOLLOW_PLAYBACK
     "Track solo",                          // ZT_ACTION_TRACK_SOLO
-    "Reverse selection",                   // ZT_ACTION_REVERSE_SELECTION
+    "Reverse Block",                       // ZT_ACTION_REVERSE_BLOCK
     "Rotate selection down",               // ZT_ACTION_ROTATE_DOWN
     "Rotate selection up",                 // ZT_ACTION_ROTATE_UP
     "Audition current note (4)",           // ZT_ACTION_NOTE_AUDITION
     "Audition current row (8)",            // ZT_ACTION_ROW_AUDITION
     "Cycle CC Drawmode (off/slot N)",      // ZT_ACTION_TOGGLE_CC_DRAWMODE
     "Redo",                                // ZT_ACTION_REDO
+    "Expand Block",                         // ZT_ACTION_EXPAND_BLOCK
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -192,7 +194,7 @@ void KeyBindings::setDefaults()
     bindings[ZT_ACTION_UNDO]               = { SDLK_Z,  KS_CTRL };
     bindings[ZT_ACTION_REDO]               = { SDLK_Y,  KS_CTRL };
     bindings[ZT_ACTION_REPLICATE_AT_CURSOR]= { SDLK_R,  KS_ALT };   // ALT+R
-    bindings[ZT_ACTION_DOUBLE_PATTERN]     = { SDLK_G,  KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_DUPLICATE_BLOCK]  = { SDLK_G,  KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_CLONE_PATTERN]      = { SDLK_D,  KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_OCTAVE_DOWN]        = { SDLK_KP_DIVIDE,   0 };
     bindings[ZT_ACTION_OCTAVE_UP]          = { SDLK_KP_MULTIPLY, 0 };
@@ -211,11 +213,12 @@ void KeyBindings::setDefaults()
     bindings[ZT_ACTION_SWITCH_LUA_CONSOLE] = { SDLK_L,  KS_CTRL | KS_ALT };
 
     // New Paketti/IT features
-    bindings[ZT_ACTION_HALVE_PATTERN]        = { SDLK_H,          KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_EXPAND_BLOCK]      = { SDLK_E,          KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_HALVE_BLOCK]        = { SDLK_H,          KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_INTERPOLATE_SELECTION]= { SDLK_I,          KS_CTRL };
     bindings[ZT_ACTION_FOLLOW_PLAYBACK]      = { SDLK_SCROLLLOCK,  0 };
     bindings[ZT_ACTION_TRACK_SOLO]           = { SDLK_F9,          KS_CTRL };
-    bindings[ZT_ACTION_REVERSE_SELECTION]    = { SDLK_R,           KS_CTRL | KS_SHIFT };
+    bindings[ZT_ACTION_REVERSE_BLOCK]    = { SDLK_R,           KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_ROTATE_DOWN]          = { SDLK_DOWN,        KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_ROTATE_UP]            = { SDLK_UP,          KS_CTRL | KS_SHIFT };
     // Note column auditioning. The keyboard scancode path in
