@@ -20,6 +20,10 @@ PatternDisplay::PatternDisplay(void)
     starttrack = 0; 
     cur_track = 0;
     disp_row = 0;
+    disp_pattern = -1;
+    disp_order = 0;
+    disp_playmode = 0;
+    disp_song_generation = -1;
 }
 
 
@@ -215,8 +219,19 @@ int PatternDisplay::update()
 //
 void PatternDisplay::draw(Drawable *S, int)
 {
-  if (ztPlayer->playing) this->disp_playing_pattern(S);
-  else this->disp_track_headers(S);
+  if (disp_song_generation != zt_song_generation) {
+    disp_pattern = -1;
+    disp_song_generation = zt_song_generation;
+    S->fillRect(col(x), row(y), col(frame->x + frame->xsize) - 1,
+                row(y + ysize) - 1, COLORS.Background);
+  }
+
+  // A stopped view still needs to rebuild its notes after focus recovery,
+  // window exposure, a popup, or switching back from the VU meters.
+  if (ztPlayer && (ztPlayer->playing || disp_pattern >= 0))
+    this->disp_playing_pattern(S);
+  else
+    this->disp_track_headers(S);
 
   frame->ysize = ysize ;
   frame->draw(S,0);
@@ -390,20 +405,30 @@ void PatternDisplay::disp_playing_pattern(Drawable *S)
   // Playback runs on another thread.  Copy its display state once so a
   // pattern boundary cannot leave the top and bottom halves of this frame
   // using different orders/patterns.
-  playing_row = ztPlayer->playing_cur_row;
-  playing_pattern = ztPlayer->playing_cur_pattern;
-  playing_order = ztPlayer->playing_cur_order;
+  if (ztPlayer->playing) {
+    disp_row = ztPlayer->playing_cur_row;
+    disp_pattern = ztPlayer->playing_cur_pattern;
+    disp_order = ztPlayer->playing_cur_order;
+    disp_playmode = ztPlayer->playmode;
+  }
+  if (disp_pattern < 0 || disp_pattern >= ZTM_MAX_PATTERNS ||
+      !song->patterns[disp_pattern]) {
+    disp_pattern = -1;
+    this->disp_track_headers(S);
+    return;
+  }
+  playing_row = disp_row;
+  playing_pattern = disp_pattern;
+  playing_order = disp_order;
 
   for (int i = 0; i < ZTM_MAX_PATTERNS; ++i)
     lengths[i] = song->patterns[i] ? song->patterns[i]->length : 0;
-
-  this->disp_row = playing_row;
 
   rows = ysize / 2 ;
   
   for (cy = y; cy<y+ysize; cy++) {
     PatternDisplayPosition pos = pattern_display_position_at_offset(
-        song->orderlist, lengths, ztPlayer->playmode,
+        song->orderlist, lengths, disp_playmode,
         playing_order, playing_pattern, playing_row, cy - (y + rows));
 
     // The playhead is the fixed centre screen row.  Comparing only the row

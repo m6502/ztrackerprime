@@ -232,6 +232,8 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_save_filename.py")
         if(TARGET zt)
+            add_test(NAME playback_focus COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_playback_focus.py" "$<TARGET_FILE:zt>")
             add_test(NAME pattern_undo_ui COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_pattern_undo_ui.py" "$<TARGET_FILE:zt>")
             add_test(NAME sysconfig_focus COMMAND "${Python3_EXECUTABLE}"

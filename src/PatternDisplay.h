@@ -13,6 +13,8 @@ class PatternDisplay : public UserInterfaceElement
 
         Frame *frame;
         int disp_row;
+        // Last position actually painted, retained while playback is stopped.
+        int disp_pattern, disp_order, disp_playmode, disp_song_generation;
         int cur_pat_view;
         int starttrack;
         int tracks,tracksize;

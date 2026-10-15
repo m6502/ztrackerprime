@@ -229,6 +229,24 @@ static void exec_command(SDL_Surface *frame_surface, const char *cmd, char *args
         g_lua.execute(args);
         return;
     }
+    // Exercise the real SDL window-event path, including full repaints.
+    if (!strcmp(cmd, "window_event")) {
+        while (*args && isspace((unsigned char)*args)) args++;
+        char *end = args + strlen(args);
+        while (end > args && isspace((unsigned char)end[-1])) *--end = '\0';
+        SDL_Event event = {};
+        if (!strcmp(args, "focus_lost")) event.type = SDL_EVENT_WINDOW_FOCUS_LOST;
+        else if (!strcmp(args, "focus_gained")) event.type = SDL_EVENT_WINDOW_FOCUS_GAINED;
+        else if (!strcmp(args, "exposed")) event.type = SDL_EVENT_WINDOW_EXPOSED;
+        else if (!strcmp(args, "restored")) event.type = SDL_EVENT_WINDOW_RESTORED;
+        else {
+            fprintf(stderr, "zt: --script: unknown window event '%s' on line %d\n",
+                    args, g_script_lineno);
+            return;
+        }
+        SDL_PushEvent(&event);
+        return;
+    }
     // Mouse commands. All take pixel coordinates in zt's internal resolution
     // (the same space col()/row() produce: col(N)=N*8, row(N)=N*8).
     //   mousemove <x> <y>   move the cursor (hover / drag-path setup)
