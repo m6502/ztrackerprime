@@ -39,8 +39,8 @@ inline BlockTransformResult transform_block(zt_module *song, int pattern_index,
     } lock(song->hEditMutex);
     if (!lock.held) return BlockTransformResult::LockTimeout;
 
-    const int output_end = std::min<int>(pat->length - 1, range.first_row + new_rows - 1);
-    const int overwritten_end = std::max(range.last_row, output_end);
+    const int output_end = (std::min<int>)(pat->length - 1, range.first_row + new_rows - 1);
+    const int overwritten_end = (std::max)(range.last_row, output_end);
 
     std::array<std::unique_ptr<track>, MAX_TRACKS> replacements;
     for (int t = range.first_track; t <= range.last_track; ++t) {

@@ -12,9 +12,14 @@ from drawing_harness import ROOT, function
 
 source = r'''
 #include "platform/undo.h"
-#include "block_transform.h"
 #include <cassert>
 #include <cstdio>
+// Reproduce Windows headers' function-like macros at the include site.
+#define min(a, b) windows_min_macro_must_not_expand(a, b)
+#define max(a, b) windows_max_macro_must_not_expand(a, b)
+#include "block_transform.h"
+#undef min
+#undef max
 int file_changed = 0;
 zt_module *song = nullptr;
 struct { int pattern_length = 64; } zt_config_globals;
