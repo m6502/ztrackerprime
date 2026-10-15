@@ -378,6 +378,22 @@ class CUI_Patterneditor : public CUI_Page {
 };
 
 
+class CUI_PatternTools : public CUI_Page {
+    Button *buttons[10];
+    int whole_song = 0;
+    int context_generation = -1;
+    char message[96] = {};
+    void layout();
+    void refresh_buttons();
+public:
+    CUI_PatternTools();
+    void enter(void);
+    void leave(void);
+    void update(void);
+    void draw(Drawable *S);
+    void activate(int action);
+};
+
 class CUI_PEParms : public CUI_Page {
     public:
 

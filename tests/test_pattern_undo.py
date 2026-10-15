@@ -258,6 +258,108 @@ int main() {
     lock_available = false;
     assert(transform(range, BlockTransform::Expand) == BlockTransformResult::LockTimeout);
     lock_available = true;
+    // Song tools use reversible permutations; repeated orders and references
+    // after blank/skip markers keep their musical meaning.
+    zt_module tools(8, 120);
+    song = &tools;
+    std::array<pattern *, ZTM_MAX_PATTERNS> original_patterns;
+    for (int p = 0; p < ZTM_MAX_PATTERNS; ++p) {
+        tools.patterns[p] = new pattern(32 + (p % 3) * 32);
+        original_patterns[p] = tools.patterns[p];
+        put(p, 0, 0, p % 128);
+        put(p, 63, tools.patterns[p]->length - 1, (p + 1) % 128);
+    }
+    for (int &entry : tools.orderlist) entry = 0x100;
+    int sequence[] = {1, 4, 3, 7, 3, 7, 9};
+    for (int i = 0; i < 7; ++i) tools.orderlist[i] = sequence[i];
+    tools.orderlist[80] = 0x101; tools.orderlist[100] = 42;
+    auto original_orders = std::array<int, ZTM_ORDERLIST_LEN>{};
+    std::copy(std::begin(tools.orderlist), std::end(tools.orderlist), original_orders.begin());
+    for (int t = 0; t < MAX_TRACKS; ++t) {
+        std::snprintf(tools.track_name[t], ZTM_TRACKNAME_MAXLEN, "Track %d", t);
+        tools.track_color[t] = 1000 + t; tools.track_mute[t] = t % 2;
+    }
+    int draw_modes[MAX_TRACKS]; for (int t = 0; t < MAX_TRACKS; ++t) draw_modes[t] = t;
+    history.clear();
+    g_song_tools_selection.sync(song, 1);
+    g_song_tools_selection.source_pattern = tools.patterns[7];
+    auto defrag = song_defrag_order(tools);
+    assert(defrag.valid() && defrag.destination[1] == 0 && defrag.destination[4] == 1 &&
+           defrag.destination[3] == 2 && defrag.destination[7] == 3 && defrag.destination[9] == 4 &&
+           defrag.destination[42] == 5 && defrag.destination[0] == 6 && defrag.destination[2] == 7);
+    assert(history.reorder(song, defrag, 7, 3, 0, 0));
+    assert(history.next_is_reorder(false) && g_song_tools_selection.pattern_index(song) == 3);
+    for (int p = 0; p < ZTM_MAX_PATTERNS; ++p)
+        assert(tools.patterns[defrag.destination[p]] == original_patterns[p]);
+    for (int i = 0; i < ZTM_ORDERLIST_LEN; ++i) {
+        if (original_orders[i] < 256) assert(tools.patterns[tools.orderlist[i]] == original_patterns[original_orders[i]]);
+        else assert(tools.orderlist[i] == original_orders[i]);
+    }
+    assert(song_defrag_order(tools).identity());
+    assert(history.undo(song) == 7 && g_song_tools_selection.pattern_index(song) == 7);
+    for (int p = 0; p < ZTM_MAX_PATTERNS; ++p) assert(tools.patterns[p] == original_patterns[p]);
+    assert(std::equal(original_orders.begin(), original_orders.end(), tools.orderlist));
+    assert(history.redo(song) == 3); history.undo(song);
+    for (bool swap : {false, true}) for (auto direction : {std::pair<int,int>{1,7}, {7,1}}) {
+        auto reorder = make_song_reorder(SongReorderKind::Patterns, direction.first, direction.second, swap);
+        assert(history.reorder(song, reorder, direction.second, direction.second, 0, 0));
+        assert(tools.patterns[direction.second] == original_patterns[direction.first]);
+        for (int i = 0; i < ZTM_ORDERLIST_LEN; ++i)
+            if (original_orders[i] < 256) assert(tools.patterns[tools.orderlist[i]] == original_patterns[original_orders[i]]);
+        history.undo(song);
+        for (int p = 0; p < ZTM_MAX_PATTERNS; ++p) assert(tools.patterns[p] == original_patterns[p]);
+    }
+    history.clear();
+    auto used = song_used_patterns(tools);
+    assert(used[42] && !used[0] && !used[2]);
+    { PatternUndo::Edit edit(history, song); edit.focus(0,0);
+      for (int p = 0; p < ZTM_MAX_PATTERNS; ++p) if (!used[p]) edit.watch(p);
+      assert(edit.ready() && clear_song_unused_patterns(song) == 250); }
+    assert(!song_pattern_has_events(tools.patterns[0]) && song_pattern_has_events(tools.patterns[42]));
+    assert(tools.patterns[0]->length == 32 && std::equal(original_orders.begin(), original_orders.end(), tools.orderlist));
+    history.undo(song); check(0,0,0,0); check(42,0,0,42);
+    history.redo(song); assert(!song_pattern_has_events(tools.patterns[0]));
+    history.undo(song);
+
+    // Track data moves independently per pattern; song-wide metadata follows
+    // only for whole-song operations. Unequal pattern lengths stay intact.
+    std::array<std::array<track *, MAX_TRACKS>, ZTM_MAX_PATTERNS> tracks_before;
+    for (int p = 0; p < ZTM_MAX_PATTERNS; ++p)
+        for (int t = 0; t < MAX_TRACKS; ++t) tracks_before[p][t] = tools.patterns[p]->tracks[t];
+    for (int scope : {0, -1}) for (bool swap : {false,true})
+        for (auto direction : {std::pair<int,int>{0,63}, {63,0}}) {
+            history.clear();
+            auto reorder = make_song_reorder(SongReorderKind::Tracks, direction.first, direction.second, swap, scope);
+            assert(history.reorder(song, reorder, 0,0,direction.first,direction.second,draw_modes));
+            for (int p = 0; p < ZTM_MAX_PATTERNS; ++p) for (int t = 0; t < MAX_TRACKS; ++t) {
+                int destination = scope < 0 || scope == p ? reorder.destination[t] : t;
+                assert(tools.patterns[p]->tracks[destination] == tracks_before[p][t]);
+                assert(tools.patterns[p]->tracks[destination]->length == tools.patterns[p]->length);
+            }
+            for (int t = 0; t < MAX_TRACKS; ++t) {
+                int target = scope < 0 ? reorder.destination[t] : t;
+                assert(tools.track_color[target] == static_cast<unsigned long>(1000+t));
+                assert(tools.track_mute[target] == t%2 && draw_modes[target] == t);
+                char expected[16]; std::snprintf(expected,sizeof(expected),"Track %d",t);
+                assert(std::strcmp(tools.track_name[target],expected)==0);
+            }
+            assert(history.undo(song) == 0 && history.restored_track() == direction.first);
+            for (int p = 0; p < ZTM_MAX_PATTERNS; ++p) for (int t = 0; t < MAX_TRACKS; ++t)
+                assert(tools.patterns[p]->tracks[t] == tracks_before[p][t]);
+            assert(history.redo(song) == 0 && history.restored_track() == direction.second);
+            history.undo(song);
+        }
+    auto invalid = make_song_reorder(SongReorderKind::Tracks, 0,1,true);
+    invalid.destination[1] = invalid.destination[0];
+    assert(!apply_song_reorder(song, invalid));
+    auto unchanged_reorder = make_song_reorder(SongReorderKind::Patterns, 3,3,false);
+    assert(!history.reorder(song, unchanged_reorder,0,0,0,0));
+    lock_available = false;
+    assert(!history.reorder(song, make_song_reorder(SongReorderKind::Patterns,0,255,true),0,0,0,0));
+    lock_available = true;
+    g_song_tools_selection.source_track = 12;
+    g_song_tools_selection.sync(song,2);
+    assert(!g_song_tools_selection.source_pattern && g_song_tools_selection.source_track == -1);
     assert(locks == 0);
     puts("Pattern undo: data restoration, redo branches, gestures, bounds and song teardown passed.");
 }

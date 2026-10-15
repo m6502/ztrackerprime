@@ -347,6 +347,7 @@ CUI_PaletteEditor *UIP_PaletteEditor = NULL;
 CUI_Config *UIP_Config = NULL;
 CUI_Patterneditor *UIP_Patterneditor = NULL;
 CUI_PEParms *UIP_PEParms = NULL;
+CUI_PatternTools *UIP_PatternTools = NULL;
 CUI_TrackOptions *UIP_TrackOptions = NULL;
 CUI_IEParms *UIP_IEParms = NULL;
 CUI_PEVol *UIP_PEVol = NULL;
@@ -1285,6 +1286,7 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
     UIP_CCEnvelopeEditor = new CUI_CCEnvelopeEditor;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
+    UIP_PatternTools = new CUI_PatternTools;
     UIP_TrackOptions = new CUI_TrackOptions;
     UIP_IEParms = new CUI_IEParms;
     UIP_PEVol = new CUI_PEVol;
@@ -1694,7 +1696,11 @@ void global_keys(Drawable *S)
                 // and the MIDI bindings for every action in one
                 // place. (Moved from Shift+F3 to free that slot for
                 // the CC Console page.)
-                if (kstate & KS_SHIFT) {
+                if (kstate == (KS_CTRL | KS_SHIFT)) {
+                    key = Keys.getkey();
+                    popup_window(UIP_PatternTools);
+                    clear++;
+                } else if (kstate & KS_SHIFT) {
                     command = CMD_SWITCH_KEYBINDINGS;
                     key = Keys.getkey();
                 }
@@ -2672,6 +2678,7 @@ int postAction ()
     delete UIP_Sysconfig;
     delete UIP_Patterneditor;
     delete UIP_PEParms;
+    delete UIP_PatternTools;
     delete UIP_TrackOptions;
     delete UIP_IEParms;
     delete UIP_SliderInput;
@@ -3880,6 +3887,7 @@ int initSDL(void)
     UIP_Config = new CUI_Config;
     UIP_Patterneditor = new CUI_Patterneditor;
     UIP_PEParms = new CUI_PEParms;
+    UIP_PatternTools = new CUI_PatternTools;
     UIP_TrackOptions = new CUI_TrackOptions;
     UIP_IEParms = new CUI_IEParms;
     UIP_PEVol = new CUI_PEVol;

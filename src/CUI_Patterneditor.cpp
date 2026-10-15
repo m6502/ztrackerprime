@@ -1610,9 +1610,17 @@ void CUI_Patterneditor::update()
                      (KS_META && (kstate == KS_META || kstate == (KS_META | KS_ALT)))) && key == SDLK_Z;
     bool redo_key = kstate == KS_CTRL && key == SDLK_Y;
     if (undo_key || redo_key) {
+      if (g_pattern_undo.next_is_reorder(redo_key) && ztPlayer->playing) ztPlayer->stop();
       int restored = redo_key ? g_pattern_undo.redo(song) : g_pattern_undo.undo(song);
       if (restored >= 0) {
         cur_edit_pattern = restored;
+        int restored_track = g_pattern_undo.restored_track();
+        if (restored_track >= 0) {
+          cur_edit_track = restored_track;
+          if (cur_edit_track < cur_edit_track_disp) cur_edit_track_disp = cur_edit_track;
+          if (cur_edit_track >= cur_edit_track_disp + tracks_shown)
+            cur_edit_track_disp = cur_edit_track - tracks_shown + 1;
+        }
         selected = 0;
         mousedrawing = 0;
         m_upd = 0;

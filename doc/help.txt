@@ -47,6 +47,35 @@
                note and current cursor position
  ScrollLock  : Follow playback toggle (cursor follows playback position)
 
+|L|%==|H|Pattern Tools|L|==%|U|
+
+ CTRL-SHIFT-F2 : Pattern tools popup. F2 keeps Pattern & Track Options;
+                 SHIFT-F2 keeps Shortcuts & MIDI Mappings.
+
+ Defrag song: puts used patterns first, in the order of their first
+ appearance in the entire Order list, then all remaining patterns in
+ their previous numeric order. Order entries are remapped with them.
+
+ Clear unused patterns: empties patterns with no Order list references.
+ References after blank/end slots also count as used. Pattern lengths,
+ numbering and the Order list stay unchanged.
+
+ Move / Swap Patterns: select a source pattern, close the popup, navigate
+ to a destination pattern and reopen it. Move inserts the source into
+ that position, shifting intervening patterns; Swap exchanges the two.
+ Both remap every Order list reference to preserve the playback sequence.
+
+ Move / Swap Tracks: select a source track number, navigate to a target
+ track, then Move or Swap. Scope chooses the current pattern or every
+ pattern in the song, including unused patterns. Whole-song moves carry
+ track names, colours, mute states and CC draw settings. Current-pattern
+ moves affect track events only. Source markers reset on song load/New.
+
+ Move/Swap buttons are disabled until a different source is selected.
+ Cleanup and reordering stop playback. Close the popup and use CTRL-Z /
+ CTRL-Y to undo/redo each action. TAB/arrows choose buttons; ENTER or
+ SPACE activates; ESC, right-click or CTRL-SHIFT-F2 closes the popup.
+
 |L|%==|H|Pattern Operations|L|==%|U|
 
  ALT-R           : Replicate at Cursor (rows 0..cursor repeat across rest)

@@ -249,6 +249,8 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
     this->playback_start_ms = 0;
 //  this->hr_timer = new hires_timer;
     this->playing_cur_row = 1;
+    this->playing_cur_pattern = 0;
+    this->playing_cur_order = 0;
     init();
 
     //this->noteoff_eventlist = NULL;

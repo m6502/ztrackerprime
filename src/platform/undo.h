@@ -4,6 +4,7 @@
 #define ZT_UNDO_H
 
 #include "module.h"
+#include "song_tools.h"
 #include <algorithm>
 #include <array>
 #include <deque>
@@ -35,9 +36,13 @@ class PatternUndo {
     struct Entry {
         std::vector<Change> changes;
         int before_focus = -1, after_focus = -1, group = 0;
+        int before_track = -1, after_track = -1;
+        std::unique_ptr<SongReorder> reorder;
+        int *draw_modes = nullptr;
     };
     zt_module *owner_ = nullptr;
     unsigned generation_ = 0;
+    int restored_track_ = -1;
     std::deque<Entry> undo_, redo_;
 
     struct Lock {
@@ -74,7 +79,7 @@ class PatternUndo {
         return true;
     }
     static size_t bytes(const Entry &entry) {
-        size_t size = sizeof(Entry);
+        size_t size = sizeof(Entry) + (entry.reorder ? sizeof(SongReorder) : 0);
         for (const auto &change : entry.changes)
             size += sizeof(Change) + sizeof(Note) *
                 (change.before.notes.capacity() + change.after.notes.capacity());
@@ -89,60 +94,67 @@ class PatternUndo {
         }
     }
     int apply(zt_module *song, bool redo) {
+        restored_track_ = -1;
         if (!song) return -1;
         bind(song);
         auto &from = redo ? redo_ : undo_;
         auto &to = redo ? undo_ : redo_;
         if (from.empty()) return -1;
         const Entry &entry = from.back();
-        // Allocate replacements before taking the playback edit mutex. Keep
-        // existing pattern/track objects and their playback defaults intact.
-        std::vector<std::unique_ptr<pattern>> prepared;
-        for (const auto &change : entry.changes) {
-            const Snapshot &state = redo ? change.after : change.before;
-            std::unique_ptr<pattern> pat;
-            if (state.present) {
-                pat.reset(new pattern(state.length));
-                for (int t = 0; t < MAX_TRACKS; ++t)
-                    if (!state.tracks[t]) { delete pat->tracks[t]; pat->tracks[t] = nullptr; }
-                for (const auto &note : state.notes) {
-                    event *e = new event;
-                    e->row = note.row; e->note = note.note; e->inst = note.inst;
-                    e->vol = note.vol; e->length = note.length;
-                    e->effect = note.effect; e->effect_data = note.effect_data;
-                    track *trk = pat->tracks[note.track];
-                    e->next_event = trk->event_list;
-                    trk->event_list = e;
+        if (entry.reorder) {
+            SongReorder reorder = redo ? *entry.reorder : entry.reorder->inverse();
+            if (!apply_song_reorder(song, reorder, entry.draw_modes)) return -1;
+        } else {
+            // Allocate replacements before taking the playback edit mutex. Keep
+            // existing pattern/track objects and their playback defaults intact.
+            std::vector<std::unique_ptr<pattern>> prepared;
+            for (const auto &change : entry.changes) {
+                const Snapshot &state = redo ? change.after : change.before;
+                std::unique_ptr<pattern> pat;
+                if (state.present) {
+                    pat.reset(new pattern(state.length));
+                    for (int t = 0; t < MAX_TRACKS; ++t)
+                        if (!state.tracks[t]) { delete pat->tracks[t]; pat->tracks[t] = nullptr; }
+                    for (const auto &note : state.notes) {
+                        event *e = new event;
+                        e->row = note.row; e->note = note.note; e->inst = note.inst;
+                        e->vol = note.vol; e->length = note.length;
+                        e->effect = note.effect; e->effect_data = note.effect_data;
+                        track *trk = pat->tracks[note.track];
+                        e->next_event = trk->event_list;
+                        trk->event_list = e;
+                    }
                 }
+                prepared.push_back(std::move(pat));
             }
-            prepared.push_back(std::move(pat));
-        }
-        {
-            Lock lock(song);
-            if (!lock.held) return -1;
-            for (size_t i = 0; i < entry.changes.size(); ++i) {
-                const Snapshot &state = redo ? entry.changes[i].after : entry.changes[i].before;
-                pattern *&target = song->patterns[state.index];
-                pattern *replacement = prepared[i].get();
-                if (!target || !replacement) {
-                    std::swap(target, replacement);
-                    prepared[i].release();
-                    prepared[i].reset(replacement);
-                    continue;
-                }
-                target->length = state.length;
-                for (int t = 0; t < MAX_TRACKS; ++t) {
-                    track *old_track = target->tracks[t], *new_track = replacement->tracks[t];
-                    if (!old_track || !new_track) {
-                        std::swap(target->tracks[t], replacement->tracks[t]);
-                    } else {
-                        old_track->length = state.length;
-                        std::swap(old_track->event_list, new_track->event_list);
+            {
+                Lock lock(song);
+                if (!lock.held) return -1;
+                for (size_t i = 0; i < entry.changes.size(); ++i) {
+                    const Snapshot &state = redo ? entry.changes[i].after : entry.changes[i].before;
+                    pattern *&target = song->patterns[state.index];
+                    pattern *replacement = prepared[i].get();
+                    if (!target || !replacement) {
+                        std::swap(target, replacement);
+                        prepared[i].release();
+                        prepared[i].reset(replacement);
+                        continue;
+                    }
+                    target->length = state.length;
+                    for (int t = 0; t < MAX_TRACKS; ++t) {
+                        track *old_track = target->tracks[t], *new_track = replacement->tracks[t];
+                        if (!old_track || !new_track) {
+                            std::swap(target->tracks[t], replacement->tracks[t]);
+                        } else {
+                            old_track->length = state.length;
+                            std::swap(old_track->event_list, new_track->event_list);
+                        }
                     }
                 }
             }
         }
         int focus = redo ? entry.after_focus : entry.before_focus;
+        restored_track_ = redo ? entry.after_track : entry.before_track;
         to.push_back(std::move(from.back()));
         from.pop_back();
         ++generation_; // Invalidates any transaction spanning an undo/redo.
@@ -153,9 +165,32 @@ public:
     static constexpr size_t max_entries = 128;
     static constexpr size_t max_bytes = 32 * 1024 * 1024;
 
+    // Reorder records contain a permutation, not copies of song events.
+    bool reorder(zt_module *song, const SongReorder &reorder, int before_pattern,
+                 int after_pattern, int before_track, int after_track, int *draw_modes = nullptr) {
+        if (!song || !reorder.valid() || reorder.identity()) return false;
+        bind(song);
+        Entry entry;
+        entry.reorder.reset(new SongReorder(reorder));
+        entry.before_focus = before_pattern; entry.after_focus = after_pattern;
+        entry.before_track = before_track; entry.after_track = after_track;
+        entry.draw_modes = draw_modes;
+        undo_.push_back(std::move(entry));
+        if (!apply_song_reorder(song, reorder, draw_modes)) { undo_.pop_back(); return false; }
+        redo_.clear();
+        ++generation_;
+        trim();
+        return true;
+    }
+    int restored_track() const { return restored_track_; }
+    bool next_is_reorder(bool redo) const {
+        const auto &entries = redo ? redo_ : undo_;
+        return !entries.empty() && entries.back().reorder != nullptr;
+    }
+
     void clear(zt_module *song = nullptr) {
         if (song && owner_ != song) return;
-        undo_.clear(); redo_.clear(); owner_ = nullptr; ++generation_;
+        undo_.clear(); redo_.clear(); owner_ = nullptr; restored_track_ = -1; ++generation_;
     }
     int undo(zt_module *song) { return apply(song, false); }
     int redo(zt_module *song) { return apply(song, true); }
@@ -184,6 +219,7 @@ public:
             before_.push_back(std::move(state));
             if (before_focus_ < 0) before_focus_ = after_focus_ = index;
         }
+        bool ready() const { return valid_ && history_.owner_ == song_ && history_.generation_ == generation_; }
         void focus(int before, int after) { before_focus_ = before; after_focus_ = after; }
         void group(int group, bool merge) {
             // A MIDI burst can contain several writes in one frame. Keep

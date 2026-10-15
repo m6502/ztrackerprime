@@ -82,6 +82,7 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "toggle_cc_drawmode",   // ZT_ACTION_TOGGLE_CC_DRAWMODE
     "redo",                 // ZT_ACTION_REDO
     "expand_pattern",       // ZT_ACTION_EXPAND_BLOCK (legacy config key)
+    "pattern_tools",        // ZT_ACTION_PATTERN_TOOLS
 };
 
 // Same length as s_actionNames; rendered in the Shortcuts & MIDI
@@ -138,6 +139,7 @@ static const char* const s_actionDescriptions[ZT_ACTION_COUNT] = {
     "Cycle CC Drawmode (off/slot N)",      // ZT_ACTION_TOGGLE_CC_DRAWMODE
     "Redo",                                // ZT_ACTION_REDO
     "Expand Block",                         // ZT_ACTION_EXPAND_BLOCK
+    "Pattern tools",                        // ZT_ACTION_PATTERN_TOOLS
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -211,6 +213,8 @@ void KeyBindings::setDefaults()
 
     // Lua console — Ctrl+Alt+L (avoids collision with Ctrl+L load shortcut)
     bindings[ZT_ACTION_SWITCH_LUA_CONSOLE] = { SDLK_L,  KS_CTRL | KS_ALT };
+
+    bindings[ZT_ACTION_PATTERN_TOOLS] = { SDLK_F2, KS_CTRL | KS_SHIFT };
 
     // New Paketti/IT features
     bindings[ZT_ACTION_EXPAND_BLOCK]      = { SDLK_E,          KS_CTRL | KS_SHIFT };

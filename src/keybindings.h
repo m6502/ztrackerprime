@@ -75,6 +75,8 @@ enum ZtAction {
     ZT_ACTION_REDO,
     ZT_ACTION_EXPAND_BLOCK,
 
+    ZT_ACTION_PATTERN_TOOLS,
+
     ZT_ACTION_COUNT
 };
 

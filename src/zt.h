@@ -829,6 +829,7 @@ extern CUI_PaletteEditor *UIP_PaletteEditor;
 extern CUI_Config *UIP_Config;
 extern CUI_Patterneditor *UIP_Patterneditor;
 extern CUI_PEParms *UIP_PEParms;
+extern CUI_PatternTools *UIP_PatternTools;
 extern CUI_TrackOptions *UIP_TrackOptions;
 extern CUI_PEVol   *UIP_PEVol;
 extern CUI_PENature   *UIP_PENature;
