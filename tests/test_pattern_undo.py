@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Exercise history against production event/track/pattern and teardown bodies."""
+import os
+from pathlib import Path
+import shlex
+import subprocess
+import sys
+import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+from drawing_harness import ROOT, function
+
+source = r'''
+#include "platform/undo.h"
+#include <cassert>
+#include <cstdio>
+int file_changed = 0;
+zt_module *song = nullptr;
+struct { int pattern_length = 64; } zt_config_globals;
+constexpr int EDIT_LOCK_TIMEOUT = 800;
+bool lock_available = true;
+int locks = 0;
+int zt_mutex_lock(zt_mutex_handle, int) {
+    if (!lock_available) return 0;
+    assert(locks == 0); ++locks; return 1;
+}
+int zt_mutex_unlock(zt_mutex_handle) { assert(locks == 1); --locks; return 1; }
+int lock_mutex(zt_mutex_handle m, int t) { return zt_mutex_lock(m, t); }
+int unlock_mutex(zt_mutex_handle m) { return zt_mutex_unlock(m); }
+// Only patterns are needed in this fixture; use production de_init() below.
+zt_module::zt_module(int, int) : songmessage(nullptr), hEditMutex(nullptr) {
+    for (auto &p : patterns) p = nullptr;
+    for (auto &i : instruments) i = nullptr;
+    for (auto &a : arpeggios) a = nullptr;
+    for (auto &m : midimacros) m = nullptr;
+}
+zt_module::~zt_module() { de_init(); }
+instrument::~instrument() {}
+songmsg::~songmsg() {}
+arpeggio::~arpeggio() {}
+midimacro::~midimacro() {}
+'''
+for signature in [
+    'event::event(void)', 'event::~event(void)', 'int event::blank(void)',
+    'track::track(short int len)', 'track::~track(void)', 'void track::reset(void)',
+    'void track::del_event(', 'void track::ins_row(', 'void track::del_row(',
+    'void track::update_event(unsigned short int row, int note,',
+    'event* track::get_event(', 'event* track::get_next_event(',
+    'pattern::pattern(void)', 'pattern::pattern(int len)', 'pattern::~pattern(void)',
+    'void pattern::resize(', 'int pattern::isempty(', 'void zt_module::de_init(void)',
+]:
+    source += function('src/module.cpp', signature)
+source += r'''
+void put(int pattern, int track, int row, int note) {
+    song->patterns[pattern]->tracks[track]->update_event(row, note, 3, 100, 48, 'S', 0x4aff);
+}
+event *get(int pattern, int track, int row) {
+    return song->patterns[pattern]->tracks[track]->get_event(row);
+}
+void check(int pattern, int track, int row, int note) {
+    event *e = get(pattern, track, row);
+    assert(e && e->note == note && e->inst == 3 && e->vol == 100 &&
+           e->length == 48 && e->effect == 'S' && e->effect_data == 0x4aff);
+}
+int main() {
+    zt_module fixture(8, 120), other(8, 120);
+    song = &fixture;
+    fixture.patterns[0] = new pattern(64);
+    fixture.patterns[1] = new pattern(32);
+    other.patterns[0] = new pattern(64);
+    auto &history = g_pattern_undo;
+    assert(history.undo(song) == -1 && history.redo(song) == -1);
+
+    { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 0, 60); }
+    { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 1, 62); }
+    assert(history.undo_count() == 2);
+    // Removing newly inserted notes must clear their allocations, too.
+    assert(history.undo(song) == 0 && !get(0, 0, 1)); check(0, 0, 0, 60);
+    assert(history.undo(song) == 0 && !get(0, 0, 0));
+    assert(history.undo(song) == -1);
+    assert(history.redo(song) == 0); check(0, 0, 0, 60);
+    assert(history.redo(song) == 0); check(0, 0, 1, 62);
+    assert(history.redo(song) == -1);
+
+    // Multi-track deletion is atomic; every field survives the round trip.
+    put(0, 63, 63, 127);
+    { PatternUndo::Edit edit(history, song); edit.watch(0);
+      for (int t : {0, 63}) for (int r : {0, 1, 63})
+          fixture.patterns[0]->tracks[t]->del_event(r); }
+    assert(!get(0, 0, 0) && !get(0, 63, 63));
+    history.undo(song); check(0, 0, 0, 60); check(0, 0, 1, 62); check(0, 63, 63, 127);
+    // Navigation/copy and rewriting identical data don't consume undo or redo.
+    size_t count = history.undo_count();
+    { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 0, 60); }
+    assert(history.undo_count() == count && history.redo_count() == 1);
+    history.redo(song); assert(!get(0, 0, 0) && !get(0, 63, 63));
+    history.undo(song);
+    { PatternUndo::Edit edit(history, song); edit.watch(0); get(0, 0, 0)->note = 65; }
+    assert(history.redo(song) == -1); // New edits invalidate the old branch.
+    history.undo(song); check(0, 0, 0, 60);
+    history.redo(song); assert(get(0, 0, 0)->note == 65);
+
+    // Shrinking restores notes deleted beyond the new length; growing again
+    // via redo does not leak notes from a previous incarnation of the pattern.
+    { PatternUndo::Edit edit(history, song); edit.watch(0); fixture.patterns[0]->resize(32); }
+    assert(fixture.patterns[0]->length == 32 && !get(0, 63, 63));
+    history.undo(song); assert(fixture.patterns[0]->length == 64); check(0, 63, 63, 127);
+    history.redo(song); assert(fixture.patterns[0]->length == 32 && !get(0, 63, 63));
+    history.undo(song);
+    auto *original_track = fixture.patterns[0]->tracks[0];
+    original_track->default_inst = 17;
+    { PatternUndo::Edit edit(history, song); edit.watch(0); original_track->ins_row(0); }
+    history.undo(song); assert(fixture.patterns[0]->tracks[0] == original_track);
+    assert(original_track->default_inst == 17 && get(0, 0, 0)->note == 65);
+    history.redo(song); assert(!get(0, 0, 0) && get(0, 0, 1)->note == 65);
+    { PatternUndo::Edit edit(history, song); edit.watch(0); original_track->del_row(0); }
+    history.undo(song); assert(!get(0, 0, 0) && get(0, 0, 1)->note == 65);
+
+    // Multiple patterns form one edit, with independent pre/post focus.
+    { PatternUndo::Edit edit(history, song); edit.watch(0); edit.watch(1); edit.focus(0, 1);
+      put(0, 2, 5, 50); fixture.patterns[1]->resize(96); put(1, 4, 90, 70); }
+    assert(history.undo(song) == 0 && fixture.patterns[1]->length == 32);
+    assert(!get(0, 2, 5) && !get(1, 4, 90));
+    assert(history.redo(song) == 1 && fixture.patterns[1]->length == 96);
+    check(0, 2, 5, 50); check(1, 4, 90, 70);
+    // Clone into a previously absent slot can also be undone/redone.
+    { PatternUndo::Edit edit(history, song); edit.watch(2); edit.focus(0, 2);
+      fixture.patterns[2] = new pattern(64); put(2, 0, 0, 42); }
+    assert(history.undo(song) == 0 && !fixture.patterns[2]);
+    assert(history.redo(song) == 2); check(2, 0, 0, 42);
+
+    history.clear();
+    // One gesture, many frames; a second gesture and an intervening edit
+    // are separate history entries even if they use the same drawing mode.
+    for (int r = 0; r < 10; ++r) {
+        PatternUndo::Edit edit(history, song); edit.watch(1); edit.group(1, r != 0); put(1, 0, r, 40);
+    }
+    assert(history.undo_count() == 1);
+    history.undo(song); for (int r = 0; r < 10; ++r) assert(!get(1, 0, r));
+    history.redo(song); for (int r = 0; r < 10; ++r) check(1, 0, r, 40);
+    { PatternUndo::Edit edit(history, song); edit.watch(1); edit.group(1, false); put(1, 0, 0, 40); }
+    { PatternUndo::Edit edit(history, song); edit.watch(1); edit.group(1, true); put(1, 0, 9, 41); }
+    assert(history.undo_count() == 2);
+    history.undo(song); check(1, 0, 9, 40);
+    { PatternUndo::Edit edit(history, song); edit.watch(1); edit.group(1, false);
+      edit.group(1, true); put(1, 0, 10, 41); }
+    { PatternUndo::Edit edit(history, song); edit.watch(1); put(1, 0, 11, 42); }
+    { PatternUndo::Edit edit(history, song); edit.watch(1); edit.group(1, true); put(1, 0, 12, 43); }
+    assert(history.undo_count() == 4);
+
+    // A failed mutex acquisition must neither mutate data nor consume history.
+    lock_available = false;
+    assert(history.undo(song) == -1 && history.undo_count() == 4);
+    lock_available = true; assert(history.undo(song) == 1 && !get(1, 0, 12));
+    history.clear();
+    for (size_t n = 0; n < PatternUndo::max_entries + 10; ++n) {
+        PatternUndo::Edit edit(history, song); edit.watch(1); put(1, 0, 0, n % 128);
+    }
+    assert(history.undo_count() == PatternUndo::max_entries);
+    for (size_t n = 0; n < PatternUndo::max_entries; ++n) assert(history.undo(song) == 1);
+    assert(history.undo(song) == -1 && history.redo_count() == PatternUndo::max_entries);
+
+    // Production teardown clears both histories even when the module address
+    // is reused by a new song. Also invalidate a transaction across teardown.
+    { PatternUndo::Edit edit(history, song); edit.watch(0);
+      fixture.de_init(); fixture.patterns[0] = new pattern(64); }
+    assert(history.undo_count() == 0 && history.redo_count() == 0);
+    assert(history.undo(song) == -1 && history.redo(song) == -1);
+    { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 0, 60); }
+    song = &other;
+    assert(history.undo(song) == -1 && history.redo(song) == -1 && !get(0, 0, 0));
+    // Tearing down an unrelated module must not erase the active song's history.
+    { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 0, 70); }
+    fixture.de_init(); assert(history.undo_count() == 1);
+    history.undo(song); assert(!get(0, 0, 0));
+    assert(locks == 0);
+    puts("Pattern undo: data restoration, redo branches, gestures, bounds and song teardown passed.");
+}
+'''
+with tempfile.TemporaryDirectory(prefix='zt-pattern-undo-') as tmp:
+    cpp = Path(tmp) / 'test.cpp'
+    cpp.write_text(source)
+    exe = Path(tmp) / 'test'
+    flags = ['-std=c++17', '-O2', '-Wall', '-Wextra', '-I' + str(ROOT / 'src')]
+    if '--sanitize' in sys.argv:
+        flags += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer']
+    subprocess.run(shlex.split(os.environ.get('CXX', 'c++')) + flags +
+                   [str(cpp), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
