@@ -1,4 +1,5 @@
 #include "zt.h"
+#include "platform/undo.h"
 #include "ccizer.h"
 
 CUI_PEParms::CUI_PEParms(void) {
@@ -275,6 +276,8 @@ void CUI_PEParms::update() {
         // edited pattern length.
         if (key == SDLK_F2 || key == SDLK_ESCAPE || (key == SDLK_RETURN) || key==((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT))) {
             if (key == SDLK_RETURN) {
+                PatternUndo::Edit pattern_edit(g_pattern_undo, song);
+                pattern_edit.watch(cur_edit_pattern);
                 vs = (ValueSlider *)UI->get_element(1);
                 song->patterns[cur_edit_pattern]->resize(vs->value);
             }

@@ -219,6 +219,9 @@ endif()
 if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME pattern_undo COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_pattern_undo.py")
         add_test(NAME warning_fixes COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_warning_fixes.py")
@@ -229,6 +232,8 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_save_filename.py")
         if(TARGET zt)
+            add_test(NAME pattern_undo_ui COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_pattern_undo_ui.py" "$<TARGET_FILE:zt>")
             add_test(NAME sysconfig_focus COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_sysconfig_focus.py" "$<TARGET_FILE:zt>")
             add_test(NAME songconfig_focus COMMAND "${Python3_EXECUTABLE}"

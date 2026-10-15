@@ -72,6 +72,8 @@ enum ZtAction {
     // awkward.
     ZT_ACTION_TOGGLE_CC_DRAWMODE,
 
+    ZT_ACTION_REDO,
+
     ZT_ACTION_COUNT
 };
 

@@ -50,7 +50,8 @@
 |L|%==|H|Pattern Operations|L|==%|U|
 
  ALT-R           : Replicate at Cursor (rows 0..cursor repeat across rest)
- ALT-Z           : Undo last destructive pattern operation (single level)
+ CTRL-Z          : Undo last pattern edit (up to 128 edits)
+ CTRL-Y          : Redo last undone pattern edit
  CTRL-SHIFT-G    : Double Pattern (duplicate rows, max 256)
  CTRL-SHIFT-H    : Halve Pattern (keep every other row, min 32)
  CTRL-SHIFT-D    : Clone Pattern (copy to next empty slot and jump to it)
@@ -83,7 +84,7 @@
  CTRL-M : Merge paste the contents of the clipboard with the contents
           of the location you're pasting to.
  CTRL-X : Cut the selected block. (remove and copy to clipboard)
- CTRL-Z : Clear block (hold this one)
+ ALT-Z : Clear selected block
 
  CTRL-N : Set length of first row of block to length of block
  CTRL-W : Clear unused volumes

@@ -15,14 +15,9 @@
 #define KS_META 0
 #endif
 
-static PatternUndo g_undo;
-
 // Track custom color helpers
 #define shade_color   zt_track_shade
 #define text_for_bg   zt_track_text_for_bg
-
-// Save undo snapshot before destructive pattern operations
-#define UNDO_SAVE() g_undo.save(song, cur_edit_pattern)
 
 // (g_cc_draw_session_snapped is now a true extern -- defined in
 // main.cpp, declared in zt.h -- so the ESC menu toggle can reset
@@ -1177,7 +1172,7 @@ void CUI_Patterneditor::enter(void)
   // otherwise burst-write every accumulated CC/PB at the current
   // cursor as a single tick of update() drained the backlog -- a
   // surprise pattern stomp the user can't easily undo (drawmode's
-  // session UNDO_SAVE only fires once per ON->OFF span). Clear on
+  // session is grouped into a single undo step). Clear on
   // enter so drawmode only captures messages received after the user
   // is actually back on Pattern Editor. With drawmode OFF the queue's
   // legacy jazz-record path handles 0x80/0x90 directly, but stale
@@ -1559,6 +1554,9 @@ void CUI_Patterneditor::update()
   //need_refresh++ ;
   
   
+  PatternUndo::Edit pattern_edit(g_pattern_undo, song);
+  bool continuing_mouse_draw = mousedrawing != 0;
+
   if (Keys.size() || midiInQueue.size() > 0) {
     
     key=Keys.getkey();
@@ -1605,6 +1603,44 @@ void CUI_Patterneditor::update()
       }
     }
     
+    // Undo/redo work in both keyboard and mouse-draw modes. Consume the
+    // shortcut before the note keyboard or selection commands see it.
+    bool undo_key = (kstate == KS_CTRL ||
+                     (KS_META && (kstate == KS_META || kstate == (KS_META | KS_ALT)))) && key == SDLK_Z;
+    bool redo_key = kstate == KS_CTRL && key == SDLK_Y;
+    if (undo_key || redo_key) {
+      int restored = redo_key ? g_pattern_undo.redo(song) : g_pattern_undo.undo(song);
+      if (restored >= 0) {
+        cur_edit_pattern = restored;
+        selected = 0;
+        mousedrawing = 0;
+        m_upd = 0;
+        upd_e = NULL;
+        g_cc_draw_session_snapped = 0;
+        sanitize_cursor();
+        g_pattern_draw_cache.invalidate();
+        file_changed++;
+        statusmsg = redo_key ? "Redo" : "Undo";
+      } else {
+        statusmsg = redo_key ? "Nothing to redo" : "Nothing to undo";
+      }
+      status_change = 1; need_refresh++; clear++;
+      return;
+    }
+
+    // Alt+Z clears the selected block. Cmd+Z remains undo on macOS.
+    if (kstate == KS_ALT && key == SDLK_Z) {
+      pattern_edit.watch(cur_edit_pattern);
+      if (selected) {
+        for (int t = select_track_start; t <= select_track_end; ++t)
+          for (int r = select_row_start; r <= select_row_end; ++r)
+            song->patterns[cur_edit_pattern]->tracks[t]->update_event(
+                r, 0x80, 0xff, 0x80, 0, 0xff, 0);
+        need_refresh++;
+      }
+      key = 0;
+    }
+
     /* COMMON KEYS */
 
     // CC drawmode cycle. Ctrl+Shift+§ (SDLK_GRAVE — the keyhandler on
@@ -1763,6 +1799,8 @@ void CUI_Patterneditor::update()
     }
     
     
+    pattern_edit.watch(cur_edit_pattern);
+
     /* START KEYS */
     
     switch(mode) {
@@ -2222,18 +2260,6 @@ void CUI_Patterneditor::update()
         // Keys are hardcoded here; PR-C (#8) makes them remappable once merged.
         // ------------------------------------------------------------------
 
-        // Undo: ALT+Z / Cmd+Z (Ctrl+Z is already block-clear)
-        if ((kstate & KS_ALT || kstate & KS_META) && !(kstate & KS_CTRL) && !(kstate & KS_SHIFT) && key == SDLK_Z) {
-          int restored = g_undo.restore(song);
-          if (restored >= 0) {
-            cur_edit_pattern = restored;
-            statusmsg = "Undo";
-          } else {
-            statusmsg = "Nothing to undo";
-          }
-          status_change = 1; need_refresh++; key = 0;
-        }
-
         // Cmd+N (macOS): set length of first note of selection to length of
         // the selection. Mirrors the Ctrl+N binding documented in help.txt;
         // on Mac the global Alt+N → New Song would otherwise win because
@@ -2256,7 +2282,6 @@ void CUI_Patterneditor::update()
 
         // Double Pattern: Ctrl+Shift+G
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_G) {
-          UNDO_SAVE();
           int pat_len = song->patterns[cur_edit_pattern]->length;
           int new_len = pat_len * 2;
           if (new_len <= 256) {
@@ -2278,7 +2303,6 @@ void CUI_Patterneditor::update()
 
         // Halve Pattern: Ctrl+Shift+H
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_H) {
-          UNDO_SAVE();
           int pat_len = song->patterns[cur_edit_pattern]->length;
           int new_len = pat_len / 2;
           if (new_len >= 32) {
@@ -2304,7 +2328,6 @@ void CUI_Patterneditor::update()
         // by +/- HUMANIZE_RANGE on each row that has a note. Paketti-inspired.
         if ((kstate & KS_ALT) && !(kstate & KS_SHIFT) && !(kstate & KS_CTRL) && key == SDLK_H) {
           if (selected) {
-            UNDO_SAVE();
             const int HUMANIZE_RANGE = 15; // +/- steps around current value
             int touched = 0;
             for (int t = select_track_start; t <= select_track_end; t++) {
@@ -2341,12 +2364,14 @@ void CUI_Patterneditor::update()
           if (dest < 0) {
             for (int p = 0; p < 256; p++) {
               if (p != src && !song->patterns[p]) {
-                song->patterns[p] = new pattern(song->patterns[src]->length);
                 dest = p; break;
               }
             }
           }
           if (dest >= 0) {
+            pattern_edit.watch(dest);
+            pattern_edit.focus(src, dest);
+            if (!song->patterns[dest]) song->patterns[dest] = new pattern(song->patterns[src]->length);
             int pat_len = song->patterns[src]->length;
             song->patterns[dest]->resize(pat_len);
             for (int t = 0; t < MAX_TRACKS; t++) {
@@ -2371,7 +2396,6 @@ void CUI_Patterneditor::update()
         // legacy "Interpolate effect" op; this one is richer — it picks the
         // column type from where the cursor is.)
         if (kstate == KS_CTRL && key == SDLK_I && selected) {
-          UNDO_SAVE();
           int rows = select_row_end - select_row_start;
           if (rows >= 1) {
             for (int t = select_track_start; t <= select_track_end; t++) {
@@ -2439,8 +2463,8 @@ void CUI_Patterneditor::update()
         // row in the cursor track, replicate across every cell in the
         // selection. Volume / effect / effect_data are left untouched
         // (per-row creative decisions stay yours). If the cursor row has
-        // no note, error out without modifying anything. Single
-        // UNDO_SAVE makes the whole fill one Ctrl+Z.
+        // no note, error out without modifying anything.
+        // The editor transaction makes the whole fill one Ctrl+Z.
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_F) {
           if (!selected) {
             statusmsg = "Fill: no selection";
@@ -2449,7 +2473,6 @@ void CUI_Patterneditor::update()
             if (!src || src->note >= 0x80 || src->note == 0) {
               statusmsg = "Fill: cursor row has no note";
             } else {
-              UNDO_SAVE();
               int src_note   = src->note;
               int src_inst   = src->inst;
               int src_length = src->length;
@@ -2469,7 +2492,6 @@ void CUI_Patterneditor::update()
         // Reverse Selection: Ctrl+Shift+R
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_R) {
           if (selected) {
-            UNDO_SAVE();
             for (int t = select_track_start; t <= select_track_end; t++) {
               track *trk = song->patterns[cur_edit_pattern]->tracks[t];
               if (!trk) continue;
@@ -2494,7 +2516,6 @@ void CUI_Patterneditor::update()
 
         // Rotate Track Down: Ctrl+Shift+Down
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_DOWN) {
-          UNDO_SAVE();
           int pat_len = song->patterns[cur_edit_pattern]->length;
           track *trk = song->patterns[cur_edit_pattern]->tracks[cur_edit_track];
           if (trk && pat_len > 1) {
@@ -2512,7 +2533,6 @@ void CUI_Patterneditor::update()
 
         // Rotate Track Up: Ctrl+Shift+Up
         if ((kstate & KS_CTRL) && (kstate & KS_SHIFT) && key == SDLK_UP) {
-          UNDO_SAVE();
           int pat_len = song->patterns[cur_edit_pattern]->length;
           track *trk = song->patterns[cur_edit_pattern]->tracks[cur_edit_track];
           if (trk && pat_len > 1) {
@@ -2534,6 +2554,19 @@ void CUI_Patterneditor::update()
 
           switch(key)
           {
+          case SDLK_H:
+            // Find/Replace Note (Ctrl+H). Opens a popup with two
+            // ValueSliders (Find / With) pre-filled with the cursor
+            // row's note. Walks the selection (or current track if no
+            // selection) and replaces every event whose .note matches
+            // Find with With. See src/CUI_PEFindReplace.cpp.
+            popup_window(UIP_PEFindReplace);
+            Keys.flush();
+            key = Keys.checkkey();
+            kstate = Keys.getstate();
+            need_refresh++;
+            break;
+
           case SDLK_A:
             if(selected) {
               popup_window(UIP_PENature);
@@ -2839,19 +2872,6 @@ void CUI_Patterneditor::update()
             break;
             
             
-          case SDLK_H:
-            // Find/Replace Note (Ctrl+H). Opens a popup with two
-            // ValueSliders (Find / With) pre-filled with the cursor
-            // row's note. Walks the selection (or current track if no
-            // selection) and replaces every event whose .note matches
-            // Find with With. See src/CUI_PEFindReplace.cpp.
-            popup_window(UIP_PEFindReplace);
-            Keys.flush();
-            key = Keys.checkkey();
-            kstate = Keys.getstate();
-            need_refresh++;
-            break;
-
           case SDLK_J:
             if(selected) {
               // display the fader menu
@@ -2930,26 +2950,6 @@ void CUI_Patterneditor::update()
               select_track_start = select_track_end = cur_edit_track;
             }
             need_refresh++;
-            break;
-          case SDLK_Z:
-            if (selected) {
-              if (zclear_presscount) {
-
-
-                for(i=select_track_start;i<=select_track_end;i++) {
-                  for(j=select_row_start;j<=select_row_end;j++) {
-                    song->patterns[cur_edit_pattern]->tracks[i]->update_event(j,0x80,MAX_INSTS,0x80,0x0,0xff,0x0);
-                  }
-                }
-
-                zclear_presscount=0;
-                need_refresh++;
-
-              } else {
-                zclear_presscount++;
-                zclear_flag++;
-              }
-            }
             break;
           case SDLK_U: // Unselect block
             selected=0;
@@ -3035,7 +3035,6 @@ void CUI_Patterneditor::update()
             break;
           case SDLK_R: /* Replicate at Cursor (from Paketti, ALT+R / Cmd+R) */
           {
-            UNDO_SAVE();
             // Take rows 0..cur_edit_row-1 (above cursor, not including cursor)
             // as the source chunk on the current track, then repeat that chunk
             // from cur_edit_row to end of pattern.
@@ -3740,16 +3739,11 @@ case SDLK_DELETE:
                 int data2 = (dw >> 16) & 0x7F;
                 ZtCcizerFile *cf = zt_ccizer_current_file();
                 const ZtCcizerSlot *active = &cf->slots[g_cc_drawmode[cur_edit_track] - 1];
-                // Snapshot the pattern before the first write of this
-                // drawmode session so the user can undo a knob run with
-                // a single Ctrl+Z. The session marker is reset by
-                // zt_advance_cc_drawmode() whenever the cycle advances,
-                // so each "armed -> draw -> advance" span generates one
-                // undo step.
-                if (!g_cc_draw_session_snapped) {
-                    UNDO_SAVE();
-                    g_cc_draw_session_snapped = 1;
-                }
+                // One undo step for each armed-slot knob run. A different
+                // edit or pattern automatically breaks the group.
+                pattern_edit.group(2 + cur_edit_track * 256 + g_cc_drawmode[cur_edit_track],
+                                   g_cc_draw_session_snapped != 0);
+                g_cc_draw_session_snapped = 1;
                 // Use the active slot's name directly for the status
                 // line -- we already know which slot is armed, no need
                 // to learn-match against the incoming bytes.
@@ -4180,6 +4174,8 @@ wrap:;
     switch(mode) {
     case PEM_MOUSEDRAW:
       if (mousedrawing) {
+        pattern_edit.watch(cur_edit_pattern);
+        pattern_edit.group(1, continuing_mouse_draw);
         
         if (   LastX >= col(5) 
           && LastX <  col(5+(tracks_shown*(field_size+1)))

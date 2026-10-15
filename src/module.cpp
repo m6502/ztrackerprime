@@ -39,6 +39,7 @@
  ******/
 
 #include "zt.h"
+#include "platform/undo.h"
 
 // NOT IN VL CH LEN fx PARM*5
 
@@ -813,6 +814,7 @@ void zt_module::init(void)
 
 
 void zt_module::de_init(void) {
+    g_pattern_undo.clear(this);
     int i;
 
     // delete patterns

@@ -3,7 +3,8 @@
 // Users can remap any action by adding entries to zt.conf:
 //   key_quit: ctrl+alt+q
 //   key_play_song: f5
-//   key_undo: alt+z
+//   key_undo: ctrl+z
+//   key_redo: ctrl+y
 //
 // Entries that are absent from zt.conf use the built-in defaults,
 // which reproduce the original hard-coded behaviour exactly.
@@ -79,6 +80,7 @@ static const char* const s_actionNames[ZT_ACTION_COUNT] = {
     "note_audition",        // ZT_ACTION_NOTE_AUDITION
     "row_audition",         // ZT_ACTION_ROW_AUDITION
     "toggle_cc_drawmode",   // ZT_ACTION_TOGGLE_CC_DRAWMODE
+    "redo",                 // ZT_ACTION_REDO
 };
 
 // Same length as s_actionNames; rendered in the Shortcuts & MIDI
@@ -133,6 +135,7 @@ static const char* const s_actionDescriptions[ZT_ACTION_COUNT] = {
     "Audition current note (4)",           // ZT_ACTION_NOTE_AUDITION
     "Audition current row (8)",            // ZT_ACTION_ROW_AUDITION
     "Cycle CC Drawmode (off/slot N)",      // ZT_ACTION_TOGGLE_CC_DRAWMODE
+    "Redo",                                // ZT_ACTION_REDO
 };
 
 const char* KeyBindings::actionName(ZtAction action)
@@ -186,7 +189,8 @@ void KeyBindings::setDefaults()
     bindings[ZT_ACTION_MIDI_EXPORT]     = { SDLK_M,   KS_CTRL };
 
     // Pattern editor shortcuts — matches CUI_Patterneditor.cpp
-    bindings[ZT_ACTION_UNDO]               = { SDLK_Z,  KS_ALT };   // also KS_META, handled in match()
+    bindings[ZT_ACTION_UNDO]               = { SDLK_Z,  KS_CTRL };
+    bindings[ZT_ACTION_REDO]               = { SDLK_Y,  KS_CTRL };
     bindings[ZT_ACTION_REPLICATE_AT_CURSOR]= { SDLK_R,  KS_ALT };   // ALT+R
     bindings[ZT_ACTION_DOUBLE_PATTERN]     = { SDLK_G,  KS_CTRL | KS_SHIFT };
     bindings[ZT_ACTION_CLONE_PATTERN]      = { SDLK_D,  KS_CTRL | KS_SHIFT };
@@ -412,8 +416,7 @@ void KeyBindings::save(conf *Config)
 // -----------------------------------------------------------------------
 // match — return the action whose binding exactly matches key+kstate.
 //
-// Special case for undo: accept KS_META in place of (or in addition to)
-// KS_ALT, matching the original "KS_ALT || KS_META" logic.
+// Undo also accepts macOS Cmd+Z with its default binding.
 // -----------------------------------------------------------------------
 ZtAction KeyBindings::match(int key, int kstate) const
 {
@@ -426,6 +429,11 @@ ZtAction KeyBindings::match(int key, int kstate) const
 
         // Exact modifier match
         if (b.modifiers == kstate) return (ZtAction)a;
+
+        if (a == ZT_ACTION_UNDO && b.modifiers == KS_CTRL && KS_META &&
+            (kstate == KS_META || kstate == (KS_META | KS_ALT))) {
+            return ZT_ACTION_UNDO;
+        }
 
         // Special undo: binding uses KS_ALT, but KS_META is also acceptable
         // (KS_META may be 0 in SDL3 builds where the meta path is unused)

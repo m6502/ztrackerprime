@@ -21,7 +21,7 @@
  *   pattern / current track if no selection is active) and replaces
  *   every event whose .note equals `find` with `replace`. Instrument
  *   / vol / length / effect columns are left untouched. A single
- *   UNDO_SAVE() makes the whole replace one Ctrl+Z. Status line
+ *   editor transaction makes the whole replace one Ctrl+Z. Status line
  *   reports the number of substitutions.
  *
  *   The "Find" slider pre-fills with the note at (cur_edit_row,
@@ -31,6 +31,7 @@
  *
  ******/
 #include "zt.h"
+#include "platform/undo.h"
 
 CUI_PEFindReplace::CUI_PEFindReplace(void) {
     UI = new UserInterface;
@@ -110,6 +111,8 @@ void CUI_PEFindReplace::update(void) {
             key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT))) {
 
             if (key == SDLK_RETURN) {
+                PatternUndo::Edit pattern_edit(g_pattern_undo, song);
+                pattern_edit.watch(cur_edit_pattern);
                 int find    = ((ValueSlider *)UI->get_element(0))->value & 0x7F;
                 int replace = ((ValueSlider *)UI->get_element(1))->value & 0x7F;
                 if (find != replace) {
@@ -128,13 +131,6 @@ void CUI_PEFindReplace::update(void) {
                         r_lo = 0;
                         r_hi = song->patterns[cur_edit_pattern]->length - 1;
                     }
-                    // Note: no UNDO_SAVE() — same convention as the
-                    // CUI_PENature / CUI_PEVol popups, where g_undo is
-                    // a file-static instance in CUI_Patterneditor.cpp
-                    // and isn't accessible from popup classes. The
-                    // user's escape hatch is save-before / save-after.
-                    // Promoting g_undo to a global is a separate
-                    // refactor.
                     int replaced = 0;
                     for (int t = t_lo; t <= t_hi; t++) {
                         track *trk = song->patterns[cur_edit_pattern]->tracks[t];

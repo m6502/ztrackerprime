@@ -1,118 +1,232 @@
-// Simple single-level undo for pattern editing.
-// Saves a snapshot of one pattern's event data before destructive operations.
-
+// Bounded, song-local history for pattern data. Editor transactions keep a
+// whole block operation (or a drawing gesture) together and ignore no-op edits.
 #ifndef ZT_UNDO_H
 #define ZT_UNDO_H
 
 #include "module.h"
-
-struct UndoEvent {
-    unsigned short row;
-    unsigned char note, inst, vol, effect;
-    unsigned short length, effect_data;
-};
-
-struct UndoTrack {
-    UndoEvent *events;
-    int count;
-};
+#include <algorithm>
+#include <array>
+#include <deque>
+#include <memory>
+#include <tuple>
+#include <vector>
 
 class PatternUndo {
-public:
-    int saved_pattern;
-    int saved_length;
-    UndoTrack tracks[MAX_TRACKS];
-    bool has_undo;
-
-    PatternUndo() : saved_pattern(-1), saved_length(0), has_undo(false) {
-        for (int i = 0; i < MAX_TRACKS; i++) {
-            tracks[i].events = nullptr;
-            tracks[i].count = 0;
+    struct Note {
+        int track;
+        unsigned short row, length, effect_data;
+        unsigned char note, inst, vol, effect;
+        auto fields() const {
+            return std::tie(track, row, length, effect_data, note, inst, vol, effect);
         }
-    }
-
-    ~PatternUndo() { clear(); }
-
-    void clear() {
-        for (int i = 0; i < MAX_TRACKS; i++) {
-            delete[] tracks[i].events;
-            tracks[i].events = nullptr;
-            tracks[i].count = 0;
+        bool operator==(const Note &other) const { return fields() == other.fields(); }
+    };
+    struct Snapshot {
+        int index, length = 0;
+        bool present = false;
+        std::array<bool, MAX_TRACKS> tracks{};
+        std::vector<Note> notes;
+        bool operator==(const Snapshot &other) const {
+            return index == other.index && length == other.length &&
+                   present == other.present && tracks == other.tracks && notes == other.notes;
         }
-        has_undo = false;
+    };
+    struct Change { Snapshot before, after; };
+    struct Entry {
+        std::vector<Change> changes;
+        int before_focus = -1, after_focus = -1, group = 0;
+    };
+    zt_module *owner_ = nullptr;
+    unsigned generation_ = 0;
+    std::deque<Entry> undo_, redo_;
+
+    struct Lock {
+        zt_mutex_handle mutex;
+        bool held;
+        explicit Lock(zt_module *song) : mutex(song->hEditMutex),
+            held(zt_mutex_lock(mutex, 800) != 0) {}
+        ~Lock() { if (held) zt_mutex_unlock(mutex); }
+    };
+
+    void bind(zt_module *song) {
+        if (owner_ != song) { clear(); owner_ = song; }
     }
-
-    // Save a snapshot of the given pattern
-    void save(zt_module *song, int pat_idx) {
-        clear();
-        if (!song->patterns[pat_idx]) return;
-
-        saved_pattern = pat_idx;
-        saved_length = song->patterns[pat_idx]->length;
-
-        for (int t = 0; t < MAX_TRACKS; t++) {
-            track *trk = song->patterns[pat_idx]->tracks[t];
+    static bool capture(zt_module *song, int index, Snapshot &out) {
+        if (!song || index < 0 || index >= ZTM_MAX_PATTERNS) return false;
+        Lock lock(song);
+        if (!lock.held) return false;
+        out.index = index;
+        pattern *pat = song->patterns[index];
+        if (!pat) return true;
+        out.present = true;
+        out.length = pat->length;
+        for (int t = 0; t < MAX_TRACKS; ++t) {
+            track *trk = pat->tracks[t];
+            out.tracks[t] = trk != nullptr;
             if (!trk) continue;
-
-            // Count events
-            int count = 0;
-            for (int r = 0; r < saved_length; r++) {
-                if (trk->get_event(r)) count++;
+            for (event *e = trk->event_list; e; e = e->next_event)
+                out.notes.push_back({t, e->row, e->length, e->effect_data,
+                                     e->note, e->inst, e->vol, e->effect});
+        }
+        // Linked-list insertion order is immaterial to the pattern contents.
+        std::sort(out.notes.begin(), out.notes.end(),
+                  [](const Note &a, const Note &b) { return a.fields() < b.fields(); });
+        return true;
+    }
+    static size_t bytes(const Entry &entry) {
+        size_t size = sizeof(Entry);
+        for (const auto &change : entry.changes)
+            size += sizeof(Change) + sizeof(Note) *
+                (change.before.notes.capacity() + change.after.notes.capacity());
+        return size;
+    }
+    void trim() {
+        size_t size = 0;
+        for (const auto &entry : undo_) size += bytes(entry);
+        while (undo_.size() > 1 && (undo_.size() > max_entries || size > max_bytes)) {
+            size -= bytes(undo_.front());
+            undo_.pop_front();
+        }
+    }
+    int apply(zt_module *song, bool redo) {
+        if (!song) return -1;
+        bind(song);
+        auto &from = redo ? redo_ : undo_;
+        auto &to = redo ? undo_ : redo_;
+        if (from.empty()) return -1;
+        const Entry &entry = from.back();
+        // Allocate replacements before taking the playback edit mutex. Keep
+        // existing pattern/track objects and their playback defaults intact.
+        std::vector<std::unique_ptr<pattern>> prepared;
+        for (const auto &change : entry.changes) {
+            const Snapshot &state = redo ? change.after : change.before;
+            std::unique_ptr<pattern> pat;
+            if (state.present) {
+                pat.reset(new pattern(state.length));
+                for (int t = 0; t < MAX_TRACKS; ++t)
+                    if (!state.tracks[t]) { delete pat->tracks[t]; pat->tracks[t] = nullptr; }
+                for (const auto &note : state.notes) {
+                    event *e = new event;
+                    e->row = note.row; e->note = note.note; e->inst = note.inst;
+                    e->vol = note.vol; e->length = note.length;
+                    e->effect = note.effect; e->effect_data = note.effect_data;
+                    track *trk = pat->tracks[note.track];
+                    e->next_event = trk->event_list;
+                    trk->event_list = e;
+                }
             }
-
-            if (count == 0) continue;
-
-            tracks[t].events = new UndoEvent[count];
-            tracks[t].count = count;
-            int idx = 0;
-            for (int r = 0; r < saved_length; r++) {
-                event *e = trk->get_event(r);
-                if (e) {
-                    tracks[t].events[idx].row = r;
-                    tracks[t].events[idx].note = e->note;
-                    tracks[t].events[idx].inst = e->inst;
-                    tracks[t].events[idx].vol = e->vol;
-                    tracks[t].events[idx].effect = e->effect;
-                    tracks[t].events[idx].length = e->length;
-                    tracks[t].events[idx].effect_data = e->effect_data;
-                    idx++;
+            prepared.push_back(std::move(pat));
+        }
+        {
+            Lock lock(song);
+            if (!lock.held) return -1;
+            for (size_t i = 0; i < entry.changes.size(); ++i) {
+                const Snapshot &state = redo ? entry.changes[i].after : entry.changes[i].before;
+                pattern *&target = song->patterns[state.index];
+                pattern *replacement = prepared[i].get();
+                if (!target || !replacement) {
+                    std::swap(target, replacement);
+                    prepared[i].release();
+                    prepared[i].reset(replacement);
+                    continue;
+                }
+                target->length = state.length;
+                for (int t = 0; t < MAX_TRACKS; ++t) {
+                    track *old_track = target->tracks[t], *new_track = replacement->tracks[t];
+                    if (!old_track || !new_track) {
+                        std::swap(target->tracks[t], replacement->tracks[t]);
+                    } else {
+                        old_track->length = state.length;
+                        std::swap(old_track->event_list, new_track->event_list);
+                    }
                 }
             }
         }
-        has_undo = true;
+        int focus = redo ? entry.after_focus : entry.before_focus;
+        to.push_back(std::move(from.back()));
+        from.pop_back();
+        ++generation_; // Invalidates any transaction spanning an undo/redo.
+        return focus;
     }
 
-    // Restore the saved snapshot
-    int restore(zt_module *song) {
-        if (!has_undo || saved_pattern < 0) return -1;
-        if (!song->patterns[saved_pattern]) return -1;
+public:
+    static constexpr size_t max_entries = 128;
+    static constexpr size_t max_bytes = 32 * 1024 * 1024;
 
-        // Clear all events in the pattern
-        for (int t = 0; t < MAX_TRACKS; t++) {
-            track *trk = song->patterns[saved_pattern]->tracks[t];
-            if (!trk) continue;
-            trk->reset();
+    void clear(zt_module *song = nullptr) {
+        if (song && owner_ != song) return;
+        undo_.clear(); redo_.clear(); owner_ = nullptr; ++generation_;
+    }
+    int undo(zt_module *song) { return apply(song, false); }
+    int redo(zt_module *song) { return apply(song, true); }
+    size_t undo_count() const { return undo_.size(); }
+    size_t redo_count() const { return redo_.size(); }
+
+    class Edit {
+        PatternUndo &history_;
+        zt_module *song_;
+        unsigned generation_;
+        std::vector<Snapshot> before_;
+        int before_focus_ = -1, after_focus_ = -1, group_ = 0;
+        bool merge_ = false, valid_ = true;
+    public:
+        Edit(PatternUndo &history, zt_module *song) : history_(history), song_(song) {
+            history_.bind(song);
+            generation_ = history_.generation_;
         }
-
-        // Resize if needed
-        if (song->patterns[saved_pattern]->length != saved_length) {
-            song->patterns[saved_pattern]->resize(saved_length);
+        Edit(const Edit &) = delete;
+        Edit &operator=(const Edit &) = delete;
+        void watch(int index) {
+            if (!valid_) return;
+            for (const auto &state : before_) if (state.index == index) return;
+            Snapshot state;
+            if (!capture(song_, index, state)) { valid_ = false; return; }
+            before_.push_back(std::move(state));
+            if (before_focus_ < 0) before_focus_ = after_focus_ = index;
         }
-
-        // Restore events
-        for (int t = 0; t < MAX_TRACKS; t++) {
-            track *trk = song->patterns[saved_pattern]->tracks[t];
-            if (!trk || tracks[t].count == 0) continue;
-
-            for (int i = 0; i < tracks[t].count; i++) {
-                UndoEvent &ue = tracks[t].events[i];
-                trk->update_event(ue.row, ue.note, ue.inst, ue.vol, ue.length, ue.effect, ue.effect_data);
+        void focus(int before, int after) { before_focus_ = before; after_focus_ = after; }
+        void group(int group, bool merge) {
+            // A MIDI burst can contain several writes in one frame. Keep
+            // the first write's decision about whether this starts a run.
+            if (group_ == group) return;
+            group_ = group; merge_ = merge;
+            // A new stroke may start on an unchanged cell. It still needs
+            // a boundary so later frames cannot merge into an older stroke.
+            if (!merge && !history_.undo_.empty()) history_.undo_.back().group = 0;
+        }
+        ~Edit() {
+            if (!valid_ || history_.owner_ != song_ || history_.generation_ != generation_) return;
+            Entry entry;
+            entry.before_focus = before_focus_; entry.after_focus = after_focus_; entry.group = group_;
+            for (auto &before : before_) {
+                Snapshot after;
+                if (!capture(song_, before.index, after)) return;
+                if (!(before == after))
+                    entry.changes.push_back({std::move(before), std::move(after)});
             }
+            if (entry.changes.empty()) return; // Navigation/copy/no-op preserves redo.
+            history_.redo_.clear();
+            bool combine = merge_ && group_ != 0 && !history_.undo_.empty();
+            if (combine) {
+                const Entry &previous = history_.undo_.back();
+                combine = previous.group == group_ && previous.changes.size() == entry.changes.size();
+                for (size_t i = 0; combine && i < entry.changes.size(); ++i)
+                    combine = previous.changes[i].after == entry.changes[i].before;
+            }
+            if (combine) {
+                Entry &previous = history_.undo_.back();
+                for (size_t i = 0; i < entry.changes.size(); ++i)
+                    previous.changes[i].after = std::move(entry.changes[i].after);
+                previous.after_focus = after_focus_;
+            } else {
+                history_.undo_.push_back(std::move(entry));
+            }
+            history_.trim();
         }
-
-        has_undo = false;
-        return saved_pattern;
-    }
+    };
 };
 
+// Shared by the editor, its popups and the song lifecycle. de_init() clears
+// this before freeing the old song, including load, import and New Song.
+inline PatternUndo g_pattern_undo;
 #endif

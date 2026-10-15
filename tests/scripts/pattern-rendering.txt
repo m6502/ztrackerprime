@@ -30,7 +30,7 @@ key down
 key ctrl+v
 wait 100
 shot /tmp/zt-pattern-shots/06-paste.png
-key alt+z
+key ctrl+z
 wait 100
 shot /tmp/zt-pattern-shots/07-undo.png
 key f2

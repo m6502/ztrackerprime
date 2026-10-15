@@ -1,4 +1,5 @@
 #include "zt.h"
+#include "platform/undo.h"
 
 CUI_PEVol::CUI_PEVol(void) {
     ValueSlider *vs;
@@ -47,6 +48,8 @@ void CUI_PEVol::update() {
         key = Keys.getkey();
         if (key == SDLK_ESCAPE || (key == SDLK_RETURN) || key==((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_RIGHT))) {
             if (key == SDLK_RETURN) {
+                PatternUndo::Edit pattern_edit(g_pattern_undo, song);
+                pattern_edit.watch(cur_edit_pattern);
                 vs = (ValueSlider *)UI->get_element(0);
                 cur_volume_percent = vs->value;
                 for(i=select_track_start;i<=select_track_end;i++) {
