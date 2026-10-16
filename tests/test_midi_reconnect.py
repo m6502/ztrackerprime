@@ -13,6 +13,7 @@ from drawing_harness import function
 
 source = r'''
 #include "midi_route.h"
+#include "midi_monitor.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -28,14 +29,30 @@ constexpr int MMSYSERR_BADDEVICEID = 2, MMSYSERR_NOERROR = 0;
 using UINT = unsigned int;
 using HMIDIIN = void *;
 struct UserInterfaceElement {};
-struct List { int need_redraw = 0; void OnChange() {} } outlist, inlist;
+struct LBNode { char *caption = nullptr; };
+struct List {
+    int need_redraw = 0, num_elements = 0, updates = 0;
+    int getCurrentItemIndex() { return 0; }
+    LBNode *getNode(int) { return nullptr; }
+    int findItem(char *) { return -1; }
+    void setCursor(int) {}
+    void OnChange() { ++updates; }
+} outlist, inlist, selector;
+using ListBox = List;
+using MidiOutDeviceOpener = List;
+using MidiInDeviceOpener = List;
+using MidiOutDeviceSelector = List;
+List *mds = &selector;
 List *midioutdevlist = &outlist, *midiindevlist = &inlist;
 struct Editor { int reset = 0; } editor;
 Editor *UIP_InstEditor = &editor;
 const char *cur_dir = "/app", *statusmsg = "";
 char szStatmsg[1024];
+std::uint64_t ticks = 0;
+std::uint64_t SDL_GetTicks() { return ticks; }
 int status_change = 0, need_refresh = 0, lock_depth = 0;
-int lock_mutex(int) { ++lock_depth; return 1; }
+bool allow_lock = true;
+int lock_mutex(int, int = -1) { if (!allow_lock) return 0; ++lock_depth; return 1; }
 void unlock_mutex(int) { --lock_depth; }
 void jazz_clear_all_states() {}
 struct { bool auto_open_midi = true; } zt_config_globals;
@@ -50,7 +67,7 @@ struct Song {
     Song() { for (int i = 0; i < ZTM_MAX_INSTS; ++i) instruments[i] = &data[i]; }
 } storage;
 Song *song = &storage;
-struct Player { int stops = 0, queued = 5; void stop() { ++stops; queued = 0; } } player;
+struct Player { int playing = 0, stops = 0, queued = 5; void stop() { ++stops; queued = 0; } } player;
 Player *ztPlayer = &player;
 struct Queue { int clears = 0; void clear() { ++clears; } } midiInQueue;
 std::map<std::string, std::string> config_data;
@@ -60,6 +77,8 @@ struct conf {
         auto i = config_data.find(key);
         return i == config_data.end() ? nullptr : i->second.data();
     }
+    void set(const char *key, const char *value, int = 0) { config_data[key] = value; }
+    void remove(const char *key) { config_data.erase(key); }
 };
 struct Port { std::string name; bool fail = false; };
 std::vector<Port> host_out, host_in;
@@ -70,15 +89,26 @@ struct intlist {
 struct OutputDevice {
     char szName[256]; char *alias = nullptr;
     int opened = 0, delay_ticks = 0, type = OUTPUTDEVICE_TYPE_MIDI;
-    bool fail;
-    OutputDevice(const Port &p) : fail(p.fail) { std::snprintf(szName, sizeof(szName), "%s", p.name.c_str()); }
+    bool fail = false, available = true;
+    int open_calls = 0, close_calls = 0, clears = 0, devNum = 0;
+    OutputDevice(const Port &p) { std::snprintf(szName, sizeof(szName), "%s", p.name.c_str()); }
     virtual ~OutputDevice() { free(alias); }
-    int open() { if (fail) return 7; opened = 1; return 0; }
-    int close() { opened = 0; return 0; }
+    virtual int open() { ++open_calls; if (fail) return 7; opened = 1; return 0; }
+    int close() { ++close_calls; opened = 0; return 0; }
+    void clear_notestates() { ++clears; }
 };
 struct MidiOutputDevice : OutputDevice {
     int reverse_bank_select = 0;
-    using OutputDevice::OutputDevice;
+    std::string native_id;
+    MidiOutputDevice(const Port &p) : OutputDevice(p) {
+        for (size_t i = 0; i < host_out.size(); ++i) if (host_out[i].name == p.name) { devNum = i; break; }
+    }
+    MidiOutputDevice(int i) : OutputDevice(host_out[i]) { devNum = i; }
+    int open() override {
+        ++open_calls;
+        if (fail || host_out[devNum].fail) return 7;
+        opened = 1; return 0;
+    }
 };
 struct midiOut {
     OutputDevice *outputDevices[MAX_MIDI_OUTS] = {};
@@ -96,9 +126,12 @@ void InitializePlugins(midiOut *out) {
 }
 struct midiInDevice {
     std::string name; const char *szName; HMIDIIN handle = this;
-    int opened = 0; bool fail;
-    midiInDevice(int i) : name(host_in[i].name), szName(name.c_str()), fail(host_in[i].fail) {}
-    int open() { if (fail) return 7; opened = 1; return 0; }
+    struct { char szPname[256]; } caps;
+    std::string native_id;
+    bool available = true;
+    int opened = 0, devNum = 0, open_calls = 0, close_calls = 0; bool fail;
+    midiInDevice(int i) : name(host_in[i].name), szName(name.c_str()), fail(false) { devNum = i; std::snprintf(caps.szPname, sizeof(caps.szPname), "%s", szName); }
+    int open() { ++open_calls; if (fail || host_in[devNum].fail) return 7; opened = 1; return 0; }
     int close();
 };
 unsigned midiInGetNumDevs() { return host_in.size(); }
@@ -115,6 +148,7 @@ int midiInDevice::close() {
     // Simulate a final callback during close; the active linked list must
     // remain valid while every subsequent input is being drained.
     if (opened) assert(MidiIn->GetDevice(handle) == this);
+    ++close_calls;
     opened = 0; return 0;
 }
 '''
@@ -132,6 +166,8 @@ for signature in [
     'midiIn::midiIn(', 'midiIn::~midiIn(', 'UINT midiIn::AddDevice(',
     'int midiIn::RemDevice(', 'int midiIn::QueryDevice(', 'midiInDevice *midiIn::GetDevice(']:
     source += function('src/midi-io.cpp', signature) + '\n'
+fixture = source
+source += 'void zt_midi_hotplug_rescan() {}\n'
 for signature in [
     'static void encode_dev_key(',
     'static ZTMidiConnectionState read_midi_connection_settings(',
@@ -183,6 +219,7 @@ struct midiInDevice {
     const char *szName = "Synth A";
     void *handle = nullptr;
     MIDIHDR midiHdr{}; char SysXBuffer[8192];
+    int SysXFlag = 0, SysXAccumLen = 0;
     int open(); int close() { opened = 0; handle = nullptr; ++closes; return 0; }
 };
 '''
@@ -310,13 +347,14 @@ int main() {
     delete MidiIn; delete MidiOut;
 }
 '''
-with tempfile.TemporaryDirectory(prefix='zt-midi-reconnect-') as tmp:
-    cpp = Path(tmp) / 'test.cpp'
-    cpp.write_text(source)
-    exe = Path(tmp) / 'test'
-    subprocess.run(shlex.split(os.environ.get('CXX', 'c++')) +
-                   ['-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-                    '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
-                    '-I', str(root / 'src'), str(cpp), '-o', str(exe)], check=True, cwd=root)
-    subprocess.run([str(exe)], check=True)
-print('MIDI reconnect: startup absence, reorder, repeated unplug, aliases/settings, failed opens, ambiguity and input lifecycle passed.')
+if __name__ == '__main__':
+    with tempfile.TemporaryDirectory(prefix='zt-midi-reconnect-') as tmp:
+        cpp = Path(tmp) / 'test.cpp'
+        cpp.write_text(source)
+        exe = Path(tmp) / 'test'
+        subprocess.run(shlex.split(os.environ.get('CXX', 'c++')) +
+                       ['-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
+                        '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
+                        '-I', str(root / 'src'), str(cpp), '-o', str(exe)], check=True, cwd=root)
+        subprocess.run([str(exe)], check=True)
+    print('MIDI reconnect: startup absence, reorder, repeated unplug, aliases/settings, failed opens, ambiguity and input lifecycle passed.')

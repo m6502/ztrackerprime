@@ -1580,8 +1580,8 @@ int zt_module::load(char *fn)
     if (MidiOut) {
         for (unsigned int d = 0; d < MidiOut->numOuputDevices; ++d) {
             OutputDevice *dev = MidiOut->outputDevices[d];
-            destinations.push_back({dev->szName, dev->alias, dev->opened != 0,
-                                    dev->type == OUTPUTDEVICE_TYPE_MIDI});
+            destinations.push_back({dev->available ? dev->szName : "", dev->available ? dev->alias : "", dev->opened != 0,
+                                    dev->available && dev->type == OUTPUTDEVICE_TYPE_MIDI});
         }
     }
     int unavailable = 0, remapped = 0, opened = 0;

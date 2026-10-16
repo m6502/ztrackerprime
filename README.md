@@ -93,7 +93,9 @@ Per-song settings: title, BPM, TPB, Send MIDI Clock, Send MIDI Stop/Start, MIDI 
 
 zTracker'-wide settings: Prebuffer, Panic on Stop, Auto-open MIDI, Full Screen, Record Velocity, the CCizer / SysEx folder paths, Skin Selection, MIDI In + MIDI Out Device Selection, per-device Latency / Reverse Bank Select / Device Alias. "Go to page 2" jumps to the second config page.
 
-After connecting or restarting a MIDI device, use **Refresh** in the relevant MIDI In or MIDI Out list. Output refresh restores instrument destinations by saved device name or unique alias, including devices missing when the song loaded. It retains aliases, latency and bank-select settings across repeated refreshes in the current session. Input refresh retries previously requested inputs. The status bar reports opened, failed and missing devices; failed opens keep their error message. Output refresh stops playback and clears queued notes before rebuilding the port list. Missing or ambiguous named destinations stay unavailable until their identity can be resolved.
+MIDI devices are monitored automatically. When playback is stopped, returning devices reconnect to their existing instruments by name or unique alias. Healthy connections stay open, and new devices appear in F12 without being enabled automatically. Closing a device deliberately prevents automatic reopening until you open it again. Assignments, aliases, latency, bank-select settings and requested connections survive disconnections, including quitting while a device is absent.
+
+Linux and macOS use device-change notifications; Windows checks in the background about every three seconds. Connection changes wait until playback stops, including any pending Ableton Link launch. Failed opens retry with increasing delays, up to 30 seconds. **Refresh** remains available in the MIDI In and MIDI Out lists; output refresh stops playback and rebuilds the list. Missing or ambiguous destinations remain unavailable until their identity can be resolved. See [MIDI connection handling](doc/midi-connections.md) for details.
 
 ![System Configuration](docs/screenshots/12-system-configuration.png)
 

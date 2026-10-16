@@ -9,6 +9,7 @@ class MidiOutputDevice : public OutputDevice {
         HMIDIOUT handle;
         MIDIOUTCAPS caps;
         int devNum;
+        std::string native_id;
         int reverse_bank_select;
          MidiOutputDevice(int devIndex);
         ~MidiOutputDevice();

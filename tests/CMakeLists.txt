@@ -225,6 +225,12 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         add_test(NAME warning_fixes COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_warning_fixes.py")
+        add_test(NAME midi_monitor_platforms COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_midi_monitor_platforms.py")
+        add_test(NAME midi_hotplug COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_midi_hotplug.py")
         add_test(NAME midi_reconnect COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_midi_reconnect.py")
@@ -241,6 +247,11 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
                 "${CMAKE_SOURCE_DIR}/tests/test_playback_focus.py" "$<TARGET_FILE:zt>")
             add_test(NAME pattern_undo_ui COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_pattern_undo_ui.py" "$<TARGET_FILE:zt>")
+            if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+                add_test(NAME midi_hotplug_ui COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_SOURCE_DIR}/tests/test_midi_hotplug_ui.py" "$<TARGET_FILE:zt>")
+                set_tests_properties(midi_hotplug_ui PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30)
+            endif()
             add_test(NAME sysconfig_focus COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_sysconfig_focus.py" "$<TARGET_FILE:zt>")
             add_test(NAME songconfig_focus COMMAND "${Python3_EXECUTABLE}"
@@ -258,4 +269,24 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
                 "${CMAKE_SOURCE_DIR}/tests/test_drawing.py")
         endif()
     endif()
+endif()
+
+# Exercise Linux notifications against disposable virtual ports in another
+# process. A machine without /dev/snd/seq skips this hardware-service test.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(test_midi_monitor test_midi_monitor.cpp "${CMAKE_SOURCE_DIR}/src/midi_monitor.cpp")
+    target_include_directories(test_midi_monitor PRIVATE "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(test_midi_monitor PRIVATE asound Threads::Threads)
+    add_test(NAME midi_monitor COMMAND test_midi_monitor)
+    set_tests_properties(midi_monitor PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 25)
+endif()
+
+# Virtual MIDI graph changes must not occur during other app screenshot tests.
+if(TARGET test_midi_monitor)
+    foreach(name midi_monitor midi_hotplug_ui lua_api sysconfig_focus songconfig_focus
+                 song_tools_ui playback_focus pattern_undo_ui default_directory)
+        if(TEST ${name})
+            set_tests_properties(${name} PROPERTIES RESOURCE_LOCK midi_graph)
+        endif()
+    endforeach()
 endif()

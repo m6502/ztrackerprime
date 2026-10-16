@@ -130,14 +130,21 @@ void midi_out_sel(int dev) {
     if ((unsigned int)dev < MidiOut->numOuputDevices) {
         if (MidiOut->QueryDevice(dev)) {
             zt_capture_midi_instruments();
-            zt_midi_connections(true)[MidiOut->outputDevices[dev]->szName].reopen = false;
+            auto &state = zt_midi_connections(true)[MidiOut->outputDevices[dev]->szName];
+            state.reopen = false;
+            state.explicitly_closed = true;
+            state.retry.reset();
             MidiOut->RemDevice(dev);
             sprintf(szStatmsg,"Closed[out]: %s",MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
             statusmsg = szStatmsg;
             status_change = 1;
         } else {
-            zt_midi_connections(true)[MidiOut->outputDevices[dev]->szName].reopen = true;
+            auto &state = zt_midi_connections(true)[MidiOut->outputDevices[dev]->szName];
+            state.reopen = true;
+            state.explicitly_closed = false;
+            state.retry.reset();
             if ((a = MidiOut->AddDevice(dev))) {
+                state.retry.failed(SDL_GetTicks());
                 char buf[1024];
                 snprintf(buf, sizeof(buf), "*** ERROR: Could not open %s (%d: %s)",
                     MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName,
@@ -162,14 +169,21 @@ void midi_in_sel(int dev) {
     int a;
     if ((unsigned int)dev < MidiIn->numMidiDevs) {
         if (MidiIn->QueryDevice(dev)) {
-            zt_midi_connections(false)[MidiIn->midiInDev[dev]->szName].reopen = false;
+            auto &state = zt_midi_connections(false)[MidiIn->midiInDev[dev]->szName];
+            state.reopen = false;
+            state.explicitly_closed = true;
+            state.retry.reset();
             MidiIn->RemDevice(dev);
             sprintf(szStatmsg,"Closed[in]: %s",MidiIn->midiInDev[dev]->szName);
             statusmsg = szStatmsg;
             status_change = 1;
         } else {
-            zt_midi_connections(false)[MidiIn->midiInDev[dev]->szName].reopen = true;
+            auto &state = zt_midi_connections(false)[MidiIn->midiInDev[dev]->szName];
+            state.reopen = true;
+            state.explicitly_closed = false;
+            state.retry.reset();
             if ((a = MidiIn->AddDevice(dev))) {
+                state.retry.failed(SDL_GetTicks());
                 char buf[1024];
                 snprintf(buf, sizeof(buf), "*** ERROR: Could not open %s (%d: %s)",
                     MidiIn->midiInDev[dev]->szName, a, zt_decode_midi_error(a));
@@ -3016,14 +3030,18 @@ void MidiOutDeviceOpener::OnChange() {
         if (!name) {
             continue;
         }
-        known_out_names.insert(name);
+        if (MidiOut->outputDevices[i]->available || !zt_midi_connections(true)[name].forgotten)
+            known_out_names.insert(name);
     }
+
+    for (const auto &entry : zt_midi_connections(true))
+        if (!entry.second.forgotten) known_out_names.insert(entry.first);
 
     for (std::set<std::string>::const_iterator it = known_out_names.begin(); it != known_out_names.end(); ++it) {
         const std::string &name = *it;
         int found_dev = -1;
         for (unsigned int i=0; i<MidiOut->numOuputDevices; i++) {
-            if (MidiOut->outputDevices[i] && zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
+            if (MidiOut->outputDevices[i] && MidiOut->outputDevices[i]->available && zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
                 found_dev = (int)i;
                 break;
             }
@@ -3149,14 +3167,18 @@ void MidiInDeviceOpener::OnChange() {
         if (!name) {
             continue;
         }
-        known_in_names.insert(name);
+        if (MidiIn->midiInDev[i]->available || !zt_midi_connections(false)[name].forgotten)
+            known_in_names.insert(name);
     }
+
+    for (const auto &entry : zt_midi_connections(false))
+        if (!entry.second.forgotten) known_in_names.insert(entry.first);
 
     for (std::set<std::string>::const_iterator it = known_in_names.begin(); it != known_in_names.end(); ++it) {
         const std::string &name = *it;
         int found_dev = -1;
         for (unsigned int i=0; i<MidiIn->numMidiDevs; i++) {
-            if (MidiIn->midiInDev[i] && MidiIn->midiInDev[i]->szName && zcmp((char *)MidiIn->midiInDev[i]->szName, (char *)name.c_str())) {
+            if (MidiIn->midiInDev[i] && MidiIn->midiInDev[i]->available && MidiIn->midiInDev[i]->szName && zcmp((char *)MidiIn->midiInDev[i]->szName, (char *)name.c_str())) {
                 found_dev = (int)i;
                 break;
             }

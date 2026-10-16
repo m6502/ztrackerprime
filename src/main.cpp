@@ -2567,81 +2567,16 @@ int initGFX ()
 int postAction ()
 {  // Deinit functions
 
+    zt_midi_hotplug_stop();
+
     // Guard against cleanup crashes when initialization failed (e.g. zt.conf not found).
     if (!cur_dir || !MidiOut || !MidiIn) {
         return 0;
     }
 
-    intlist *mod;
-    OutputDevice *m;
-    midiInDevice *mi;
-    static char blah[1024];
-    unsigned i;
-    static char name[256];
-	static char val[256];
-	static char tt[256];
     std::filesystem::current_path(cur_dir);
     conf DeviceConfig((char *)"devices.conf");
-    for (i=0;i<MAX_MIDI_OUTS;i++) {
-        sprintf(name,"open_out_device_%d",i);
-        DeviceConfig.remove(&name[0]);
-        sprintf(name,"known_out_device_%d",i);
-        DeviceConfig.remove(&name[0]);
-    }
-    for (i=0;i<MAX_MIDI_INS;i++) {
-        sprintf(name,"open_in_device_%d",i);
-        DeviceConfig.remove(&name[0]);
-        sprintf(name,"known_in_device_%d",i);
-        DeviceConfig.remove(&name[0]);
-    }
-	//tt = NULL;
-
-    for (unsigned j=0;j<MidiOut->numOuputDevices;j++) {
-
-        m = MidiOut->outputDevices[j];
-        sprintf(name,"known_out_device_%d",j);
-        DeviceConfig.set(&name[0], m->szName,0);
-//		if(tt != NULL)
-//			free(tt);
-		encode(m->szName, tt);
-//        zt_config_globals.Config->set(&m->szName[0], (m->alias != NULL)?m->alias:"",0);
-		sprintf(blah,"latency_%s",tt);
-		sprintf(val,"%d",m->delay_ticks);
-		DeviceConfig.set(&blah[0], val);
-		sprintf(blah,"bank_%s",tt);
-		DeviceConfig.set(&blah[0], MidiOut->get_bank_select(j) ? "Yes" : "No");
-        if(m->alias != NULL && strlen(m->alias) > 1) {
-            sprintf(blah,"alias_%s",tt);
-            DeviceConfig.set(&blah[0], m->alias);
-        }
-    }
-	//if(tt != NULL)
-	//	free(tt);
-    if (MidiOut && MidiIn) {
-        if (zt_config_globals.auto_open_midi) {
-            i=0;
-            mod = MidiOut->devlist_head;
-            while(mod) {
-                m = MidiOut->outputDevices[mod->key];
-                sprintf(name,"open_out_device_%d",i);
-				DeviceConfig.set(&name[0], m->szName,0);
-                mod = mod->next; i++;
-            }
-            i=0;
-            mod = MidiIn->devlist_head;
-            while(mod) {
-                mi = MidiIn->midiInDev[mod->key];
-                sprintf(name,"open_in_device_%d",i);
-                DeviceConfig.set(&name[0], mi->szName,0);
-                mod = mod->next; i++;
-            }
-        }
-        for (unsigned j=0; j<MidiIn->numMidiDevs; j++) {
-            mi = MidiIn->midiInDev[j];
-            sprintf(name,"known_in_device_%d",j);
-            DeviceConfig.set(&name[0], mi->szName,0);
-        }
-    }
+    zt_save_midi_connections(DeviceConfig);
     DeviceConfig.save((char *)"devices.conf");
     zt_config_globals.save();
 
@@ -4548,6 +4483,7 @@ int main(int argc, char *argv[])
     // MIDI-only session never opens an output device.
 #endif
 
+    zt_midi_hotplug_start();
     while (1) {
       // Lua notifiers: fire play/stop on transport transitions, row on the
       // playhead advancing, and idle every iteration. Cheap when nothing is
@@ -4676,6 +4612,7 @@ int main(int argc, char *argv[])
       // on the main thread, so they can safely touch song / cursor
       // globals.
       zt_mm_drain_actions();
+      zt_midi_hotplug_pump();
 
       static int next_frame_redraw_all = 0;
       if(next_frame_redraw_all) {

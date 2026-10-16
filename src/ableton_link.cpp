@@ -354,6 +354,8 @@ int zt_ableton_link_defer_play(int row, int pattern, int pm) {
     return 1;
 }
 
+bool zt_ableton_link_play_pending(void) { return g_play_armed; }
+
 int zt_ableton_link_available(void) {
 #ifdef ZT_HAS_ABLETON_LINK
     return 1;

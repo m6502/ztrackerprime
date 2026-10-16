@@ -120,8 +120,8 @@ std::vector<ZTMidiDestination> zt_midi_destinations()
     if (MidiOut) {
         for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
             const auto *dev = MidiOut->outputDevices[i];
-            devices.push_back({dev->szName, dev->alias, dev->opened != 0,
-                               dev->type == OUTPUTDEVICE_TYPE_MIDI});
+            devices.push_back({dev->available ? dev->szName : "", dev->available ? dev->alias : "", dev->opened != 0,
+                               dev->available && dev->type == OUTPUTDEVICE_TYPE_MIDI});
         }
     }
     return devices;
@@ -139,9 +139,13 @@ void zt_reconnect_midi_instruments()
 {
     if (!song) return;
     const auto devices = zt_midi_destinations();
-    for (int i = 0; i < ZTM_MAX_INSTS; ++i)
+    bool changed = false;
+    for (int i = 0; i < ZTM_MAX_INSTS; ++i) {
+        const auto previous = song->instruments[i]->midi_device;
         zt_reconnect_midi_route(*song->instruments[i], devices);
-    if (UIP_InstEditor) UIP_InstEditor->reset = 1;
+        changed |= previous != song->instruments[i]->midi_device;
+    }
+    if (changed && UIP_InstEditor) UIP_InstEditor->reset = 1;
 }
 
 extern void InitializePlugins(midiOut *mout);
@@ -219,6 +223,11 @@ UINT midiOut::AddDevice(int dev) {
     intlist *t;
     UINT error;
     if ((unsigned int)dev >= numOuputDevices) return MMSYSERR_BADDEVICEID;
+    if (!outputDevices[dev]->available) return MMSYSERR_BADDEVICEID;
+    auto &state = zt_midi_connections(true)[outputDevices[dev]->szName];
+    state.reopen = true;
+    state.explicitly_closed = false;
+    state.forgotten = false;
     if (QueryDevice(dev)) return 0;
     error = outputDevices[dev]->open();
     if (error)
@@ -420,10 +429,11 @@ void CALLBACK midiInCallback(HMIDIIN handle, UINT uMsg, DWORD_PTR dwInstance, DW
 //	LPMIDIHDR		lpMIDIHeader;
 //	unsigned char *	ptr;
 
-    (void)dwInstance;
+    // The callback owns a reference to its device until close() drains it.
+    // Avoid traversing the global input list while another input reconnects.
     (void)dwParam2;
 
-    midiInDevice *dev = MidiIn->GetDevice( handle );
+    midiInDevice *dev = reinterpret_cast<midiInDevice *>(dwInstance);
     (void)dev;
 
     switch ( uMsg ) {
@@ -614,7 +624,9 @@ int midiInDevice::open(void) {
     if (opened)
         if (close())
             return -1;
-    if (!(error = midiInOpen(&handle, devNum, (DWORD_PTR)midiInCallback, (DWORD_PTR)devNum, CALLBACK_FUNCTION))) {
+    SysXFlag = 0;
+    SysXAccumLen = 0;
+    if (!(error = midiInOpen(&handle, devNum, (DWORD_PTR)midiInCallback, (DWORD_PTR)this, CALLBACK_FUNCTION))) {
         opened=1;
         midiHdr.lpData = (LPSTR)&SysXBuffer[0];
         midiHdr.dwBufferLength = sizeof(SysXBuffer);
@@ -686,6 +698,11 @@ midiIn::~midiIn() {
 
 UINT midiIn::AddDevice(int dev) {
     if ((unsigned int)dev >= numMidiDevs) return MMSYSERR_BADDEVICEID;
+    if (!midiInDev[dev]->available) return MMSYSERR_BADDEVICEID;
+    auto &state = zt_midi_connections(false)[midiInDev[dev]->szName];
+    state.reopen = true;
+    state.explicitly_closed = false;
+    state.forgotten = false;
     if (QueryDevice(dev)) return 0;
     UINT error = midiInDev[dev]->open();
     if (error != MMSYSERR_NOERROR)

@@ -37,6 +37,9 @@ void   zt_ableton_link_teardown(void);
 /* Call once per main loop. */
 void   zt_ableton_link_pump(void);
 
+/* A quantized launch is armed: defer device changes as for active playback. */
+bool   zt_ableton_link_play_pending(void);
+
 /* Called by player::play() only: when Link is enabled, arm a start quantized
  * to the next downbeat and return nonzero (play() returns; the pump fires
  * play_immediately() at the downbeat). Returns 0 when Link is off: play() proceeds. */

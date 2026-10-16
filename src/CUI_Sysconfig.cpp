@@ -159,13 +159,13 @@ void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement*) {
             ZTMidiRoute route;
             snprintf(route.name, sizeof(route.name), "%s", destinations[i].name);
             // Do not guess between duplicate names.
-            wanted[i] = states[destinations[i].name].reopen &&
+            wanted[i] = !states[destinations[i].name].explicitly_closed && states[destinations[i].name].reopen &&
                         zt_resolve_midi_route(255, route, destinations).device == (int)i;
         }
         for (int i = 0; i < ZTM_MAX_INSTS; ++i) {
             const auto *inst = song->instruments[i];
             if (inst->midi_route.named() && inst->midi_device < wanted.size())
-                wanted[inst->midi_device] = true;
+                wanted[inst->midi_device] = !states[destinations[inst->midi_device].name].explicitly_closed;
         }
         for (size_t i = 0; i < wanted.size(); ++i) {
             if (!wanted[i]) continue;
@@ -174,7 +174,7 @@ void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement*) {
             else ++failed;
         }
         for (const auto &entry : states) {
-            if (!entry.second.reopen) continue;
+            if (!entry.second.reopen || entry.second.explicitly_closed) continue;
             ZTMidiRoute route;
             snprintf(route.name, sizeof(route.name), "%s", entry.first.c_str());
             if (zt_resolve_midi_route(255, route, destinations).device < 0) ++missing;
@@ -194,6 +194,7 @@ void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement*) {
     statusmsg = szStatmsg;
     status_change = 1;
     need_refresh++;
+    zt_midi_hotplug_rescan();
 }
 
 void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
@@ -209,7 +210,7 @@ void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
     midiInQueue.clear();
     int reopened = 0, failed = 0, missing = 0;
     for (const auto &entry : states) {
-        if (!entry.second.reopen) continue;
+        if (!entry.second.reopen || entry.second.explicitly_closed) continue;
         int match = -1;
         for (unsigned int i = 0; i < MidiIn->numMidiDevs; ++i) {
             const char *name = MidiIn->midiInDev[i]->szName;
@@ -229,6 +230,7 @@ void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
     statusmsg = szStatmsg;
     status_change = 1;
     need_refresh++;
+    zt_midi_hotplug_rescan();
 }
 
 // All captions are exactly 15 chars (= button xsize) and centred so the
@@ -319,7 +321,10 @@ static void forget_device_entries(const char *name, int is_output)
     const std::string device_config_path =
         (std::filesystem::path(cur_dir ? cur_dir : ".") / "devices.conf").string();
     conf device_config(device_config_path.c_str());
-    zt_midi_connections(is_output != 0).erase(name);
+    auto &state = zt_midi_connections(is_output != 0)[name];
+    state.reopen = false;
+    state.explicitly_closed = true;
+    state.forgotten = true;
     char key[512];
     char enc[256];
     encode_dev_key(name, enc);

@@ -105,6 +105,8 @@ set(ZT_SOURCES
   src/list.cpp
   src/main.cpp
   src/midi-io.cpp
+  src/midi_monitor.cpp
+  src/midi_hotplug.cpp
   src/module.cpp
   src/OutputDevices.cpp
   src/platform.cpp

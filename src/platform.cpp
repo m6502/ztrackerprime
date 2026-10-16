@@ -300,6 +300,10 @@ int zt_mutex_lock(zt_mutex_handle mutex, int timeout_ms)
         return pthread_mutex_lock((pthread_mutex_t *)mutex) == 0;
     }
 
+    if (timeout_ms == 0) {
+        return pthread_mutex_trylock((pthread_mutex_t *)mutex) == 0;
+    }
+
 #if defined(__APPLE__)
     /* macOS lacks pthread_mutex_timedlock in older SDKs; retry with short sleeps. */
     const int step_ms = 5;

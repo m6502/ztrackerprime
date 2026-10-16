@@ -62,6 +62,7 @@ static inline MMRESULT zt_midi_out_sysex(HMIDIOUT h, const unsigned char *bytes,
 #include <stdlib.h>
 #if defined(__linux__)
 #include <alsa/asoundlib.h>
+#include <unistd.h>
 #include <poll.h>
 #include <atomic>
 #include <thread>
@@ -193,11 +194,13 @@ static inline int zt_alsa_find_output_port_by_index(UINT index, int *client, int
     UINT count = 0;
     snd_seq_client_info_set_client(cinfo, -1);
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        if (snd_seq_client_info_get_pid(cinfo) == getpid()) continue;
         const int cl = snd_seq_client_info_get_client(cinfo);
         snd_seq_port_info_set_client(pinfo, cl);
         snd_seq_port_info_set_port(pinfo, -1);
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if (caps & SND_SEQ_PORT_CAP_NO_EXPORT) continue;
             if ((caps & SND_SEQ_PORT_CAP_WRITE) == 0 || (caps & SND_SEQ_PORT_CAP_SUBS_WRITE) == 0) {
                 continue;
             }
@@ -244,11 +247,13 @@ static inline UINT midiOutGetNumDevs(void) {
 
     snd_seq_client_info_set_client(cinfo, -1);
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        if (snd_seq_client_info_get_pid(cinfo) == getpid()) continue;
         const int cl = snd_seq_client_info_get_client(cinfo);
         snd_seq_port_info_set_client(pinfo, cl);
         snd_seq_port_info_set_port(pinfo, -1);
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if (caps & SND_SEQ_PORT_CAP_NO_EXPORT) continue;
             if ((caps & SND_SEQ_PORT_CAP_WRITE) && (caps & SND_SEQ_PORT_CAP_SUBS_WRITE)) {
                 count++;
             }
@@ -455,11 +460,13 @@ static inline int zt_alsa_find_input_port_by_index(UINT index, int *client, int 
     UINT count = 0;
     snd_seq_client_info_set_client(cinfo, -1);
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        if (snd_seq_client_info_get_pid(cinfo) == getpid()) continue;
         const int cl = snd_seq_client_info_get_client(cinfo);
         snd_seq_port_info_set_client(pinfo, cl);
         snd_seq_port_info_set_port(pinfo, -1);
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if (caps & SND_SEQ_PORT_CAP_NO_EXPORT) continue;
             // Mirror of the output path but for READ caps: a port we
             // can subscribe to in order to RECEIVE its messages.
             if ((caps & SND_SEQ_PORT_CAP_READ) == 0 || (caps & SND_SEQ_PORT_CAP_SUBS_READ) == 0) {
@@ -504,11 +511,13 @@ static inline UINT midiInGetNumDevs(void) {
     }
     snd_seq_client_info_set_client(cinfo, -1);
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+        if (snd_seq_client_info_get_pid(cinfo) == getpid()) continue;
         const int cl = snd_seq_client_info_get_client(cinfo);
         snd_seq_port_info_set_client(pinfo, cl);
         snd_seq_port_info_set_port(pinfo, -1);
         while (snd_seq_query_next_port(seq, pinfo) >= 0) {
             const unsigned int caps = snd_seq_port_info_get_capability(pinfo);
+            if (caps & SND_SEQ_PORT_CAP_NO_EXPORT) continue;
             if ((caps & SND_SEQ_PORT_CAP_READ) && (caps & SND_SEQ_PORT_CAP_SUBS_READ)) {
                 count++;
             }

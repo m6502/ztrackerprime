@@ -8,10 +8,14 @@
 
 #include "winmm_compat.h"
 #include "midi_route.h"
+#include "midi_monitor.h"
 
 // Session preferences survive repeated refreshes while a device is absent.
 struct ZTMidiConnectionState {
     bool reopen = false;
+    bool explicitly_closed = false;
+    bool forgotten = false;
+    ZTMidiRetry retry;
     std::string alias;
     int delay_ticks = 0;
     int bank_select = 0;
@@ -20,6 +24,8 @@ std::map<std::string, ZTMidiConnectionState> &zt_midi_connections(bool output);
 std::vector<ZTMidiDestination> zt_midi_destinations();
 void zt_capture_midi_instruments();
 void zt_reconnect_midi_instruments();
+class conf;
+void zt_save_midi_connections(conf &config);
 // The audio mixer also reads MidiOut and its open-device linked list.
 extern std::mutex zt_midi_output_mutex;
 
@@ -90,6 +96,7 @@ class OutputDevice {
     public:
         char szName[MAX_DEVICE_NAME];
         int opened;
+        bool available = true;
         int delay_ticks;
         char*alias;
         int type;
@@ -484,6 +491,8 @@ class midiInDevice {
         int devNum;
         MIDIINCAPS caps;                      // The MIDIINCAPS structure describes the capabilities of a MIDI input device.
         int opened;
+        bool available = true;
+        std::string native_id;
         // Set true on the main thread for the duration of close() so the
         // MIDI-in callback (other thread) stops re-arming the SysEx buffer
         // while midiInReset()/midiInClose() are draining it -- re-adding a
