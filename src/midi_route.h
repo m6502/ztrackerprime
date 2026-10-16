@@ -64,6 +64,27 @@ inline ZTMidiResolution zt_resolve_midi_route(
     return {only, only >= 0};
 }
 
+// Capture live numeric selections before replacing an enumeration. Existing
+// named identities stay intact, including portable aliases from another host.
+template<class Instrument>
+void zt_capture_midi_route(Instrument &inst, const std::vector<ZTMidiDestination> &devices)
+{
+    if (inst.midi_route.named() || inst.midi_device >= devices.size()) return;
+    const auto &dev = devices[inst.midi_device];
+    std::strncpy(inst.midi_route.name, dev.name ? dev.name : "", sizeof(inst.midi_route.name) - 1);
+    std::strncpy(inst.midi_route.alias, dev.alias ? dev.alias : "", sizeof(inst.midi_route.alias) - 1);
+}
+
+// Runtime reconnects only use retained identities. An unresolved old numeric
+// slot cannot safely identify newly arrived hardware after an enumeration change.
+template<class Instrument>
+void zt_reconnect_midi_route(Instrument &inst, const std::vector<ZTMidiDestination> &devices)
+{
+    if (!inst.midi_route.named()) return;
+    const auto result = zt_resolve_midi_route(255, inst.midi_route, devices);
+    inst.midi_device = result.device < 0 ? 255 : static_cast<unsigned char>(result.device);
+}
+
 struct ZTMidiRouteEntry {
     unsigned char instrument;
     ZTMidiRoute route;

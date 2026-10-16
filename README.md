@@ -93,6 +93,8 @@ Per-song settings: title, BPM, TPB, Send MIDI Clock, Send MIDI Stop/Start, MIDI 
 
 zTracker'-wide settings: Prebuffer, Panic on Stop, Auto-open MIDI, Full Screen, Record Velocity, the CCizer / SysEx folder paths, Skin Selection, MIDI In + MIDI Out Device Selection, per-device Latency / Reverse Bank Select / Device Alias. "Go to page 2" jumps to the second config page.
 
+After connecting or restarting a MIDI device, use **Refresh** in the relevant MIDI In or MIDI Out list. Output refresh restores instrument destinations by saved device name or unique alias, including devices missing when the song loaded. It retains aliases, latency and bank-select settings across repeated refreshes in the current session. Input refresh retries previously requested inputs. The status bar reports opened, failed and missing devices; failed opens keep their error message. Output refresh stops playback and clears queued notes before rebuilding the port list. Missing or ambiguous named destinations stay unavailable until their identity can be resolved.
+
 ![System Configuration](docs/screenshots/12-system-configuration.png)
 
 ### Global Configuration — `Ctrl+F12`

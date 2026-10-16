@@ -65,88 +65,169 @@ void BTNCLK_GotoGlobalConfig(UserInterfaceElement*) {
     doredraw++;
 }
 
-// Refresh re-enumerates the host's MIDI devices by destroying and recreating
-// the MidiOut / MidiIn process-wide singletons. Without preserving state,
-// `delete MidiOut` closes every open device handle and `new midiOut` opens
-// none, so a Refresh would silently close every device the user already had
-// open. Snapshot the open-device names beforehand and reopen them on the new
-// instance (post-refresh indices may differ if devices were added/removed,
-// so we match by name).
+static void encode_dev_key(const char *str, char w[256])
+{
+    const char *r = str ? str : "";
+    char *q = w;
+    for(; *r != '\0' && q < w + 255; r++, q++) {
+        if((*r >= 'a' && *r <= 'z') || (*r >= 'A' && *r <= 'Z') || (*r >= '0' && *r <= '9')) {
+            *q = *r;
+        } else {
+            *q = '_';
+        }
+    }
+    *q = '\0';
+}
+
+static ZTMidiConnectionState read_midi_connection_settings(conf &config, const char *name)
+{
+    ZTMidiConnectionState state;
+    char encoded[256], key[512];
+    encode_dev_key(name, encoded);
+    snprintf(key, sizeof(key), "alias_%s", encoded);
+    const char *value = config.get(key);
+    if (value) state.alias = value;
+    snprintf(key, sizeof(key), "latency_%s", encoded);
+    value = config.get(key);
+    if (value) state.delay_ticks = atoi(value);
+    snprintf(key, sizeof(key), "bank_%s", encoded);
+    value = config.get(key);
+    state.bank_select = value && (value[0] == 'y' || value[0] == 'Y');
+    return state;
+}
+
+// Remember requested devices even when startup could not find/open them.
+// Existing entries reflect session choices, including explicit closes.
+static void seed_midi_connections(bool output)
+{
+    if (!zt_config_globals.auto_open_midi) return;
+    const auto path = (std::filesystem::path(cur_dir ? cur_dir : ".") / "devices.conf").string();
+    conf config(path.c_str());
+    auto &states = zt_midi_connections(output);
+    for (int i = 0; i < MAX_MIDI_DEVS; ++i) {
+        char key[512];
+        snprintf(key, sizeof(key), "open_%s_device_%d", output ? "out" : "in", i);
+        const char *name = config.get(key);
+        if (!name || !name[0] || states.count(name)) continue;
+        auto state = output ? read_midi_connection_settings(config, name) : ZTMidiConnectionState{};
+        state.reopen = true;
+        states.emplace(name, state);
+    }
+}
+
 void BTNCLK_RefreshMidiOutDeviceList(UserInterfaceElement*) {
-    std::vector<std::string> previously_open;
-    for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
-        if (MidiOut->QueryDevice(i) && MidiOut->outputDevices[i]) {
-            previously_open.push_back(MidiOut->outputDevices[i]->szName);
-        }
-    }
-
-    delete MidiOut;
-    MidiOut = new midiOut;
-
-    int reopened = 0;
-    for (size_t k = 0; k < previously_open.size(); ++k) {
-        const std::string &name = previously_open[k];
+    // Queued playback events contain numeric output slots. Stop and discard
+    // them before changing the enumeration, and keep the audio callback out
+    // while replacing its device objects.
+    ztPlayer->stop();
+    if (!lock_mutex(song->hEditMutex)) return;
+    jazz_clear_all_states();
+    int reopened = 0, failed = 0, missing = 0, unavailable = 0;
+    {
+        std::lock_guard<std::mutex> audio_guard(zt_midi_output_mutex);
+        seed_midi_connections(true);
+        auto &states = zt_midi_connections(true);
+        zt_capture_midi_instruments();
         for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
-            if (MidiOut->outputDevices[i] &&
-                zcmp((char *)MidiOut->outputDevices[i]->szName, (char *)name.c_str())) {
-                if (MidiOut->AddDevice(i) == 0) {
-                    ++reopened;
-                }
-                break;
+            auto *dev = MidiOut->outputDevices[i];
+            auto &state = states[dev->szName];
+            state.reopen = state.reopen || MidiOut->QueryDevice(i);
+            state.alias = MidiOut->get_alias(i);
+            state.delay_ticks = MidiOut->get_delay_ticks(i);
+            state.bank_select = MidiOut->get_bank_select(i);
+        }
+        delete MidiOut;
+        MidiOut = new midiOut;
+        // Newly discovered ports also need their saved alias/latency/bank
+        // settings before resolving a song's portable aliases.
+        const auto config_path = (std::filesystem::path(cur_dir ? cur_dir : ".") / "devices.conf").string();
+        conf config(config_path.c_str());
+        for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
+            const char *name = MidiOut->outputDevices[i]->szName;
+            auto found = states.find(name);
+            if (found == states.end()) {
+                found = states.emplace(name, read_midi_connection_settings(config, name)).first;
             }
+            MidiOut->set_alias(i, (char *)found->second.alias.c_str());
+            MidiOut->set_delay_ticks(i, found->second.delay_ticks);
+            MidiOut->set_bank_select(i, found->second.bank_select);
+        }
+        zt_reconnect_midi_instruments();
+        const auto destinations = zt_midi_destinations();
+        std::vector<bool> wanted(destinations.size(), false);
+        for (size_t i = 0; i < destinations.size(); ++i) {
+            ZTMidiRoute route;
+            snprintf(route.name, sizeof(route.name), "%s", destinations[i].name);
+            // Do not guess between duplicate names.
+            wanted[i] = states[destinations[i].name].reopen &&
+                        zt_resolve_midi_route(255, route, destinations).device == (int)i;
+        }
+        for (int i = 0; i < ZTM_MAX_INSTS; ++i) {
+            const auto *inst = song->instruments[i];
+            if (inst->midi_route.named() && inst->midi_device < wanted.size())
+                wanted[inst->midi_device] = true;
+        }
+        for (size_t i = 0; i < wanted.size(); ++i) {
+            if (!wanted[i]) continue;
+            states[destinations[i].name].reopen = true;
+            if (MidiOut->AddDevice(i) == 0) ++reopened;
+            else ++failed;
+        }
+        for (const auto &entry : states) {
+            if (!entry.second.reopen) continue;
+            ZTMidiRoute route;
+            snprintf(route.name, sizeof(route.name), "%s", entry.first.c_str());
+            if (zt_resolve_midi_route(255, route, destinations).device < 0) ++missing;
+        }
+        for (int i = 0; i < ZTM_MAX_INSTS; ++i) {
+            const auto *inst = song->instruments[i];
+            if ((inst->midi_route.named() || inst->midi_legacy_device != 255) &&
+                !MidiOut->QueryDevice(inst->midi_device)) ++unavailable;
         }
     }
-
+    unlock_mutex(song->hEditMutex);
     midioutdevlist->OnChange();
     midioutdevlist->need_redraw++;
-    if (previously_open.empty()) {
-        snprintf(szStatmsg, sizeof(szStatmsg), "MIDI-OUT device list refreshed");
-    } else {
-        snprintf(szStatmsg, sizeof(szStatmsg),
-                 "MIDI-OUT refreshed; reopened %d/%d device%s",
-                 reopened, (int)previously_open.size(),
-                 previously_open.size() == 1 ? "" : "s");
-    }
+    snprintf(szStatmsg, sizeof(szStatmsg),
+             "MIDI-OUT: %d opened, %d failed, %d missing; %d instrument(s) unavailable",
+             reopened, failed, missing, unavailable);
     statusmsg = szStatmsg;
+    status_change = 1;
     need_refresh++;
 }
 
 void BTNCLK_RefreshMidiInDeviceList(UserInterfaceElement*) {
-    std::vector<std::string> previously_open;
+    seed_midi_connections(false);
+    auto &states = zt_midi_connections(false);
     for (unsigned int i = 0; i < MidiIn->numMidiDevs; ++i) {
-        if (MidiIn->QueryDevice(i) && MidiIn->midiInDev[i]) {
-            previously_open.push_back(MidiIn->midiInDev[i]->szName);
-        }
+        const char *name = MidiIn->midiInDev[i]->szName;
+        if (name && name[0])
+            states[name].reopen = states[name].reopen || MidiIn->QueryDevice(i);
     }
-
     delete MidiIn;
     MidiIn = new midiIn;
-
-    int reopened = 0;
-    for (size_t k = 0; k < previously_open.size(); ++k) {
-        const std::string &name = previously_open[k];
+    midiInQueue.clear();
+    int reopened = 0, failed = 0, missing = 0;
+    for (const auto &entry : states) {
+        if (!entry.second.reopen) continue;
+        int match = -1;
         for (unsigned int i = 0; i < MidiIn->numMidiDevs; ++i) {
-            if (MidiIn->midiInDev[i] &&
-                zcmp((char *)MidiIn->midiInDev[i]->szName, (char *)name.c_str())) {
-                if (MidiIn->AddDevice(i) == 0) {
-                    ++reopened;
-                }
-                break;
+            const char *name = MidiIn->midiInDev[i]->szName;
+            if (name && entry.first == name) {
+                if (match >= 0) { match = -1; break; }
+                match = i;
             }
         }
+        if (match < 0) ++missing;
+        else if (MidiIn->AddDevice(match) == 0) ++reopened;
+        else ++failed;
     }
-
     midiindevlist->OnChange();
     midiindevlist->need_redraw++;
-    if (previously_open.empty()) {
-        snprintf(szStatmsg, sizeof(szStatmsg), "MIDI-IN device list refreshed");
-    } else {
-        snprintf(szStatmsg, sizeof(szStatmsg),
-                 "MIDI-IN refreshed; reopened %d/%d device%s",
-                 reopened, (int)previously_open.size(),
-                 previously_open.size() == 1 ? "" : "s");
-    }
+    snprintf(szStatmsg, sizeof(szStatmsg), "MIDI-IN: %d opened, %d failed, %d missing",
+             reopened, failed, missing);
     statusmsg = szStatmsg;
+    status_change = 1;
     need_refresh++;
 }
 
@@ -227,19 +308,7 @@ static void restore_list_selection(ListBox *listbox, const char *caption, int fa
     listbox->setCursor(target);
 }
 
-static void encode_dev_key(const char *str, char w[256])
-{
-    const char *r = str ? str : "";
-    char *q = w;
-    for(; *r != '\0' && q < w + 255; r++, q++) {
-        if((*r >= 'a' && *r <= 'z') || (*r >= 'A' && *r <= 'Z') || (*r >= '0' && *r <= '9')) {
-            *q = *r;
-        } else {
-            *q = '_';
-        }
-    }
-    *q = '\0';
-}
+
 
 static void forget_device_entries(const char *name, int is_output)
 {
@@ -250,6 +319,7 @@ static void forget_device_entries(const char *name, int is_output)
     const std::string device_config_path =
         (std::filesystem::path(cur_dir ? cur_dir : ".") / "devices.conf").string();
     conf device_config(device_config_path.c_str());
+    zt_midi_connections(is_output != 0).erase(name);
     char key[512];
     char enc[256];
     encode_dev_key(name, enc);
@@ -302,7 +372,6 @@ void BTNCLK_ForgetMidiOutDevice(UserInterfaceElement *b) {
         snprintf(szStatmsg, sizeof(szStatmsg), "Closed MIDI-OUT device: %s", selected->caption);
     } else {
         midi_out_sel(dev_id);
-        snprintf(szStatmsg, sizeof(szStatmsg), "Opened MIDI-OUT device: %s", selected->caption);
     }
 
     midioutdevlist->OnChange();
@@ -342,7 +411,6 @@ void BTNCLK_ForgetMidiInDevice(UserInterfaceElement *b) {
         snprintf(szStatmsg, sizeof(szStatmsg), "Closed MIDI-IN device: %s", selected->caption);
     } else {
         midi_in_sel(dev_id);
-        snprintf(szStatmsg, sizeof(szStatmsg), "Opened MIDI-IN device: %s", selected->caption);
     }
 
     midiindevlist->OnChange();

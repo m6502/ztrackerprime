@@ -125,29 +125,34 @@ static const char *zt_decode_midi_error(int code) {
 
 void midi_out_sel(int dev) {
     int a;
+    if (!lock_mutex(song->hEditMutex)) return;
+    std::lock_guard<std::mutex> audio_guard(zt_midi_output_mutex);
     if ((unsigned int)dev < MidiOut->numOuputDevices) {
         if (MidiOut->QueryDevice(dev)) {
+            zt_capture_midi_instruments();
+            zt_midi_connections(true)[MidiOut->outputDevices[dev]->szName].reopen = false;
             MidiOut->RemDevice(dev);
-            sprintf(szStatmsg,"Closed[out]: %s",(MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName);
+            sprintf(szStatmsg,"Closed[out]: %s",MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
             statusmsg = szStatmsg;
             status_change = 1;
         } else {
+            zt_midi_connections(true)[MidiOut->outputDevices[dev]->szName].reopen = true;
             if ((a = MidiOut->AddDevice(dev))) {
                 char buf[1024];
                 snprintf(buf, sizeof(buf), "*** ERROR: Could not open %s (%d: %s)",
-                    (MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName,
+                    MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName,
                     a, zt_decode_midi_error(a));
                 set_error_status(buf);
             } else {
-                sprintf(szStatmsg,"Opened[out]: %s",(MidiOut->outputDevices[dev]->alias != NULL)?MidiOut->outputDevices[dev]->alias:MidiOut->outputDevices[dev]->szName);
+                sprintf(szStatmsg,"Opened[out]: %s",MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
                 statusmsg = szStatmsg;
                 status_change = 1;
             }
         }
+        zt_reconnect_midi_instruments();
     }
+    unlock_mutex(song->hEditMutex);
 }
-
-
 
 
 // ------------------------------------------------------------------------------------------------
@@ -157,11 +162,13 @@ void midi_in_sel(int dev) {
     int a;
     if ((unsigned int)dev < MidiIn->numMidiDevs) {
         if (MidiIn->QueryDevice(dev)) {
+            zt_midi_connections(false)[MidiIn->midiInDev[dev]->szName].reopen = false;
             MidiIn->RemDevice(dev);
             sprintf(szStatmsg,"Closed[in]: %s",MidiIn->midiInDev[dev]->szName);
             statusmsg = szStatmsg;
             status_change = 1;
         } else {
+            zt_midi_connections(false)[MidiIn->midiInDev[dev]->szName].reopen = true;
             if ((a = MidiIn->AddDevice(dev))) {
                 char buf[1024];
                 snprintf(buf, sizeof(buf), "*** ERROR: Could not open %s (%d: %s)",
@@ -2961,6 +2968,7 @@ void MidiOutDeviceSelector::OnSelect(LBNode *selected) {
             return;
         }
         song->instruments[cur_inst]->set_midi_device(selected->int_data);
+        zt_capture_midi_instruments();
         this->selectNone();
         selected->checked = true;
     }

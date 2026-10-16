@@ -2469,9 +2469,9 @@ void setup_midi()
         temp = Config->get(szKey);
         if(temp) {
 	        if(temp[0] == 'Y' || temp[0] == 'y')
-    		    ((MidiOutputDevice*)(MidiOut->outputDevices[j]))->reverse_bank_select = 1;
+                MidiOut->set_bank_select(j, 1);
                 else
-                    ((MidiOutputDevice*)(MidiOut->outputDevices[j]))->reverse_bank_select = 0;
+                    MidiOut->set_bank_select(j, 0);
 		}
     }
 //	if(tt != NULL)
@@ -2609,7 +2609,7 @@ int postAction ()
 		sprintf(val,"%d",m->delay_ticks);
 		DeviceConfig.set(&blah[0], val);
 		sprintf(blah,"bank_%s",tt);
-		DeviceConfig.set(&blah[0], ( ((MidiOutputDevice*)m )->reverse_bank_select)?"Yes":"No");
+		DeviceConfig.set(&blah[0], MidiOut->get_bank_select(j) ? "Yes" : "No");
         if(m->alias != NULL && strlen(m->alias) > 1) {
             sprintf(blah,"alias_%s",tt);
             DeviceConfig.set(&blah[0], m->alias);
@@ -3934,7 +3934,10 @@ static void audio_mixer(void *udata, SDL_AudioStream *stream, int additional_amo
   // the fun sounds would play random noise instead of going quiet.
   memset(mixbuf, 0, (size_t)additional_amount);
 
-  MidiOut->MixAudio(udata, mixbuf, additional_amount);
+  {
+    std::lock_guard<std::mutex> guard(zt_midi_output_mutex);
+    MidiOut->MixAudio(udata, mixbuf, additional_amount);
+  }
   SDL_PutAudioStreamData(stream, mixbuf, additional_amount);
   free(mixbuf);
 }

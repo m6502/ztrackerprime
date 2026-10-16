@@ -88,7 +88,7 @@ CUI_PatternTools::CUI_PatternTools() {
 void CUI_PatternTools::layout() {
     const int x = (CHARS_X - tools_width) / 2;
     const int y = (CHARS_Y - tools_height) / 2;
-    const int rows[] = {5, 8, 16, 19, 22, 29, 32, 35, 38, 45};
+    const int rows[] = {6, 9, 17, 20, 23, 30, 33, 36, 39, 45};
     for (int i = 0; i < 10; ++i) {
         buttons[i]->x = x + 4;
         buttons[i]->y = y + rows[i];
@@ -213,20 +213,20 @@ void CUI_PatternTools::draw(Drawable *surface) {
     surface->fillRect(col(x - 1), row(y), col(x + tools_width + 1) - 1,
                       row(y + tools_height + 1) - 1, COLORS.Background);
     box(surface, x, y, tools_width, tools_height, " Pattern tools ");
-    box(surface, x + 2, y + 3, tools_width - 4, 8, " Song cleanup ");
-    box(surface, x + 2, y + 12, tools_width - 4, 12, " Move / Swap Patterns ");
-    box(surface, x + 2, y + 25, tools_width - 4, 16, " Move / Swap Tracks ");
+    box(surface, x + 2, y + 4, tools_width - 4, 8, " Song cleanup ");
+    box(surface, x + 2, y + 13, tools_width - 4, 12, " Move / Swap Patterns ");
+    box(surface, x + 2, y + 26, tools_width - 4, 16, " Move / Swap Tracks ");
     char text[96], source[16];
     int pattern_source = g_song_tools_selection.pattern_index(song);
     if (pattern_source >= 0) std::snprintf(source, sizeof(source), "%03d", pattern_source);
     else std::snprintf(source, sizeof(source), "---");
     std::snprintf(text, sizeof(text), "Source pattern: %s     Current position: %03d", source, cur_edit_pattern);
-    printBG(col(x + 4), row(y + 14), text, COLORS.Text, COLORS.Background, surface);
+    printBG(col(x + 4), row(y + 15), text, COLORS.Text, COLORS.Background, surface);
     int track_source = g_song_tools_selection.source_track;
     if (track_source >= 0) std::snprintf(source, sizeof(source), "%02d", track_source + 1);
     else std::snprintf(source, sizeof(source), "--");
     std::snprintf(text, sizeof(text), "Source track: %s        Current track: %02d", source, cur_edit_track + 1);
-    printBG(col(x + 4), row(y + 27), text, COLORS.Text, COLORS.Background, surface);
+    printBG(col(x + 4), row(y + 28), text, COLORS.Text, COLORS.Background, surface);
     printBG(col(x + 3), row(y + 43), message, COLORS.Text, COLORS.Background, surface);
     UI->full_refresh(); UI->draw(surface);
     surface->unlock();

@@ -1,4 +1,5 @@
 #include "zt.h"
+#include <algorithm>
 
 
 
@@ -20,7 +21,7 @@ void InitializePlugins(midiOut *mout)
     // index (the selection-breaking bug the enable-audio spike found when the
     // audio plugins sat at indices 0,1 ahead of MIDI).
     unsigned int i = mout->numOuputDevices;
-    unsigned int devs = midiOutGetNumDevs();
+    unsigned int devs = std::min<unsigned int>(midiOutGetNumDevs(), MAX_MIDI_OUTS - i);
     unsigned int total = i+devs;
     mout->numOuputDevices += devs;
     for (;i<total;i++) {
@@ -57,6 +58,13 @@ MidiOutputDevice::~MidiOutputDevice() {
 }
 int MidiOutputDevice::open(void) {
     int error;
+    // Host indexes may change between a refresh and a manual open. Refuse
+    // a stale slot rather than opening whichever device now occupies it.
+    MIDIOUTCAPS current{};
+    if (midiOutGetDevCaps(devNum, &current, sizeof(current))) return MMSYSERR_BADDEVICEID;
+    zt_sanitize_device_name(current.szPname);
+    if (strcmp(current.szPname, szName)) return MMSYSERR_BADDEVICEID;
+
     if (opened) {
         if (close())
             return -1;

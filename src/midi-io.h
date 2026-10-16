@@ -3,8 +3,25 @@
 
 #include <atomic>
 #include <mutex>
+#include <map>
+#include <string>
 
 #include "winmm_compat.h"
+#include "midi_route.h"
+
+// Session preferences survive repeated refreshes while a device is absent.
+struct ZTMidiConnectionState {
+    bool reopen = false;
+    std::string alias;
+    int delay_ticks = 0;
+    int bank_select = 0;
+};
+std::map<std::string, ZTMidiConnectionState> &zt_midi_connections(bool output);
+std::vector<ZTMidiDestination> zt_midi_destinations();
+void zt_capture_midi_instruments();
+void zt_reconnect_midi_instruments();
+// The audio mixer also reads MidiOut and its open-device linked list.
+extern std::mutex zt_midi_output_mutex;
 
 // Truncate a MIDI device name at the first control character and trim trailing
 // whitespace, in place. Drivers (and stale config) occasionally hand us names

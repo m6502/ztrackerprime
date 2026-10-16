@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix='zt-song-tools-') as tmp:
     report = app / 'checks.txt'
     commands = ['wait 100', f'lua function check(n,c) local f=assert(io.open("{report}","a")); f:write((c and "ok " or "FAIL ")..n.."\\n"); f:close() end']
     checks = []
-    rows = [5,8,16,19,22,29,32,35,38,45]
+    rows = [6,9,17,20,23,30,33,36,39,45]
 
     def key(chord):
         commands.extend([f'key {chord}', 'wait 70'])

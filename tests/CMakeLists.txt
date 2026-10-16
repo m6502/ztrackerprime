@@ -225,6 +225,9 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         add_test(NAME warning_fixes COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_warning_fixes.py")
+        add_test(NAME midi_reconnect COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_midi_reconnect.py")
         add_test(NAME midi_export_bank COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_midi_export_bank.py")

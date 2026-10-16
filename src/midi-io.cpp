@@ -42,6 +42,7 @@
 #include "sysex_inq.h"
 #include "midi_clock_sync.h"
 #include "midi_timestamp.h"
+#include <algorithm>
 #if defined(__APPLE__)
 #include <mach/mach_time.h>
 #endif
@@ -105,6 +106,44 @@ void midiOutDevice::reset(void) {
     this->clear_notestates();
 }
 */
+std::mutex zt_midi_output_mutex;
+
+std::map<std::string, ZTMidiConnectionState> &zt_midi_connections(bool output)
+{
+    static std::map<std::string, ZTMidiConnectionState> outputs, inputs;
+    return output ? outputs : inputs;
+}
+
+std::vector<ZTMidiDestination> zt_midi_destinations()
+{
+    std::vector<ZTMidiDestination> devices;
+    if (MidiOut) {
+        for (unsigned int i = 0; i < MidiOut->numOuputDevices; ++i) {
+            const auto *dev = MidiOut->outputDevices[i];
+            devices.push_back({dev->szName, dev->alias, dev->opened != 0,
+                               dev->type == OUTPUTDEVICE_TYPE_MIDI});
+        }
+    }
+    return devices;
+}
+
+void zt_capture_midi_instruments()
+{
+    if (!song) return;
+    const auto devices = zt_midi_destinations();
+    for (int i = 0; i < ZTM_MAX_INSTS; ++i)
+        zt_capture_midi_route(*song->instruments[i], devices);
+}
+
+void zt_reconnect_midi_instruments()
+{
+    if (!song) return;
+    const auto devices = zt_midi_destinations();
+    for (int i = 0; i < ZTM_MAX_INSTS; ++i)
+        zt_reconnect_midi_route(*song->instruments[i], devices);
+    if (UIP_InstEditor) UIP_InstEditor->reset = 1;
+}
+
 extern void InitializePlugins(midiOut *mout);
 
 midiOut::midiOut() {
@@ -179,6 +218,8 @@ void midiOut::set_alias(int dev, char *n) {
 UINT midiOut::AddDevice(int dev) {
     intlist *t;
     UINT error;
+    if ((unsigned int)dev >= numOuputDevices) return MMSYSERR_BADDEVICEID;
+    if (QueryDevice(dev)) return 0;
     error = outputDevices[dev]->open();
     if (error)
         return error;
@@ -565,6 +606,11 @@ midiInDevice::~midiInDevice(void) {
 
 int midiInDevice::open(void) {
     int error;
+    MIDIINCAPS current{};
+    if (midiInGetDevCaps(devNum, &current, sizeof(current))) return MMSYSERR_BADDEVICEID;
+    zt_sanitize_device_name(current.szPname);
+    if (!szName || strcmp(current.szPname, szName)) return MMSYSERR_BADDEVICEID;
+
     if (opened)
         if (close())
             return -1;
@@ -575,7 +621,9 @@ int midiInDevice::open(void) {
         midiHdr.dwFlags = 0;
         midiInPrepareHeader(handle, &midiHdr, sizeof(MIDIHDR));
         midiInAddBuffer(handle, &midiHdr, sizeof(MIDIHDR));
-        return midiInStart(handle);
+        error = midiInStart(handle);
+        if (error) close();
+        return error;
     }
     return error;
 }
@@ -615,9 +663,8 @@ MMRESULT midiInDevice::reset(void) {
 
 midiIn::midiIn() {
     unsigned int i;
-    numMidiDevs = midiInGetNumDevs();
-    if (!(numMidiDevs<MAX_MIDI_INS)) 
-        return;
+    devlist_head = NULL;
+    numMidiDevs = std::min<unsigned int>(midiInGetNumDevs(), MAX_MIDI_INS);
     for (i=0;i<numMidiDevs;i++) {
         midiInDev[i] = new midiInDevice(i);
     }
@@ -625,18 +672,21 @@ midiIn::midiIn() {
 }
 
 midiIn::~midiIn() {
-    intlist *t=devlist_head,*tm;
-    while(t) {
-        tm = t->next;
+    while (devlist_head) {
+        intlist *t = devlist_head;
+        // close() drains callbacks; keep this node discoverable until it
+        // returns, then unlink it before the next device's callbacks run.
         midiInDev[t->key]->close();
-   //     delete t;
-        t = tm;
+        devlist_head = t->next;
+        delete t;
     }
     for (unsigned int i=0;i<numMidiDevs;i++)
         delete midiInDev[i];
 }
 
 UINT midiIn::AddDevice(int dev) {
+    if ((unsigned int)dev >= numMidiDevs) return MMSYSERR_BADDEVICEID;
+    if (QueryDevice(dev)) return 0;
     UINT error = midiInDev[dev]->open();
     if (error != MMSYSERR_NOERROR)
         return error;
