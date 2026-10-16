@@ -6,6 +6,11 @@
 #define ZT_WINMM_COMPAT_H
 
 #if defined(_WIN32)
+// Windows SDK macros collide with std::min/max and chrono::time_point::min.
+// Keep this header safe for consumers outside the application CMake target.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif

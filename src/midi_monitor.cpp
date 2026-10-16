@@ -231,21 +231,21 @@ struct ZTMidiMonitor::Impl {
 
     void run() {
         auto next_scan = Clock::now();
-        auto debounce = Clock::time_point::min();
-        auto first_notification = Clock::time_point::min();
+        auto debounce = (Clock::time_point::min)();
+        auto first_notification = (Clock::time_point::min)();
         while (running) {
             wait_for_changes();
             const auto now = Clock::now();
             if (notified.exchange(false)) {
-                if (first_notification == Clock::time_point::min()) first_notification = now;
-                debounce = std::min(now + std::chrono::milliseconds(250), first_notification + std::chrono::seconds(1));
+                if (first_notification == (Clock::time_point::min)()) first_notification = now;
+                debounce = (std::min)(now + std::chrono::milliseconds(250), first_notification + std::chrono::seconds(1));
             }
             const bool forced = requested.exchange(false);
             if (!idle) {
                 if (forced) requested = true;
                 continue;
             }
-            const bool changed = debounce != Clock::time_point::min() && now >= debounce;
+            const bool changed = debounce != (Clock::time_point::min)() && now >= debounce;
             if (!forced && !changed && now < next_scan) continue;
             const unsigned scanning_request = request_id.load();
             auto snapshot = scan();
@@ -261,8 +261,8 @@ struct ZTMidiMonitor::Impl {
 #else
             next_scan = now + std::chrono::seconds(3);
 #endif
-            debounce = Clock::time_point::min();
-            first_notification = Clock::time_point::min();
+            debounce = (Clock::time_point::min)();
+            first_notification = (Clock::time_point::min)();
         }
 #if defined(__linux__)
         if (seq) { snd_seq_close(seq); seq = nullptr; }

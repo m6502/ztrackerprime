@@ -39,6 +39,13 @@ void publish(std::vector<ZTDetectedMidiPort> outputs, std::vector<ZTDetectedMidi
 '''
 source += '\n'.join(line for line in (root / 'src/midi_hotplug.cpp').read_text().splitlines()
                     if not line.startswith('#include'))
+# Model Windows headers defining min/max before the application code.
+source = source.replace('namespace {', r'''
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+namespace {
+''', 1)
+
 source += r'''
 int main() {
     config_data = {{"open_out_device_0", "Synth A"}, {"known_out_device_0", "Synth A"},

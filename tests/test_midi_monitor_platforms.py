@@ -154,6 +154,17 @@ implementation = (root / 'src/midi_monitor.cpp').read_text()
 implementation = implementation.replace('#include "winmm_compat.h"', '#include "native_api.h"')
 implementation = implementation.replace('defined(__linux__)', 'defined(ZT_TEST_LINUX)')
 implementation = implementation.replace('defined(__APPLE__)', 'defined(ZT_TEST_MAC)')
+# MinGW does not reliably expose the Windows SDK macro pollution seen with
+# MSVC. Force it after the standard headers to cover chrono::min() as well
+# as std::min(), even on Linux/macOS test runners.
+implementation = implementation.replace('namespace {', r'''
+#if defined(ZT_TEST_WINDOWS)
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+namespace {
+''', 1)
+
 with tempfile.TemporaryDirectory(prefix='zt-midi-platforms-') as tmp:
     tmp = Path(tmp)
     (tmp / 'native_api.h').write_text(stub)

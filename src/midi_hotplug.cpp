@@ -118,7 +118,7 @@ void refresh_device_list(ListBox *list) {
     list->OnChange();
     if (list->num_elements > 0) {
         const int found = list->findItem((char *)caption.c_str());
-        list->setCursor(found >= 0 ? found : std::min(index, list->num_elements - 1));
+        list->setCursor(found >= 0 ? found : (std::min)(index, list->num_elements - 1));
     }
     list->need_redraw++;
 }

@@ -413,6 +413,9 @@ else()
 endif()
 
 if(WIN32)
+  # Set before any Windows/third-party header is parsed, independent of include
+  # order and compiler (MSVC's SDK exposes min/max macros by default).
+  target_compile_definitions(zt PRIVATE NOMINMAX)
   target_link_libraries(zt PRIVATE odbc32 odbccp32 winmm)
 endif()
 
