@@ -135,7 +135,7 @@ void midi_out_sel(int dev) {
             state.explicitly_closed = true;
             state.retry.reset();
             MidiOut->RemDevice(dev);
-            sprintf(szStatmsg,"Closed[out]: %s",MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
+            snprintf(szStatmsg, sizeof(szStatmsg), "Closed[out]: %s", MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
             statusmsg = szStatmsg;
             status_change = 1;
         } else {
@@ -151,7 +151,7 @@ void midi_out_sel(int dev) {
                     a, zt_decode_midi_error(a));
                 set_error_status(buf);
             } else {
-                sprintf(szStatmsg,"Opened[out]: %s",MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
+                snprintf(szStatmsg, sizeof(szStatmsg), "Opened[out]: %s", MidiOut->get_alias(dev)[0] ? MidiOut->get_alias(dev) : MidiOut->outputDevices[dev]->szName);
                 statusmsg = szStatmsg;
                 status_change = 1;
             }
@@ -174,7 +174,7 @@ void midi_in_sel(int dev) {
             state.explicitly_closed = true;
             state.retry.reset();
             MidiIn->RemDevice(dev);
-            sprintf(szStatmsg,"Closed[in]: %s",MidiIn->midiInDev[dev]->szName);
+            snprintf(szStatmsg, sizeof(szStatmsg), "Closed[in]: %s", MidiIn->midiInDev[dev]->szName);
             statusmsg = szStatmsg;
             status_change = 1;
         } else {
@@ -189,7 +189,7 @@ void midi_in_sel(int dev) {
                     MidiIn->midiInDev[dev]->szName, a, zt_decode_midi_error(a));
                 set_error_status(buf);
             } else {
-                sprintf(szStatmsg,"Opened[in]: %s",MidiIn->midiInDev[dev]->szName);
+                snprintf(szStatmsg, sizeof(szStatmsg), "Opened[in]: %s", MidiIn->midiInDev[dev]->szName);
                 statusmsg = szStatmsg;
                 status_change = 1;
             }
