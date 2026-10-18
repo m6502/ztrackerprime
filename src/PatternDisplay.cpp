@@ -3,6 +3,7 @@
 #include "PatternDisplay.h"
 #include "pattern_display_layout.h"
 #include "track_color.h"
+#include <algorithm>
 
 
 
@@ -186,23 +187,6 @@ int PatternDisplay::update()
       Keys.getkey() ;
       need_refresh++ ;
       need_redraw++ ;
-      
-      if(cur_track>this->tracks+this->starttrack-1) {
-        
-        this->starttrack++;
-        
-        if (this->starttrack > MAX_TRACKS - this->tracks) {
-
-          this->starttrack = MAX_TRACKS - this->tracks ;
-          cur_track = MAX_TRACKS - 1;
-        }
-      }
-      
-      if(cur_track<this->starttrack) {
-        
-        if (this->starttrack>0) this->starttrack--;
-        else cur_track = 0;
-      }
     }
   }
 
@@ -264,6 +248,11 @@ void PatternDisplay::disp_playing_row(int x, int y, int pattern, int row, Drawab
 ////    if (e) ctrack = ctrack;
 
     this->printNote(str,e);
+    // Paint the content separately from the editor-style track separator.
+    // This also clears the last digit when a NUL effect shortens the text.
+    const int length = (int)strlen(str);
+    memset(str + length, ' ', tracksize - 1 - length);
+    str[tracksize - 1] = '\0';
 
     color = COLORS.EditText;
     TColor cellbg = bg;
@@ -275,6 +264,10 @@ void PatternDisplay::disp_playing_row(int x, int y, int pattern, int row, Drawab
       color  = zt_track_text_for_bg(cellbg);
     }
     printBG(col(x + 4 + (ctrack*tracksize)),row(y),str,color,cellbg,S);
+    const int separator_x = col(x + 4 + (ctrack + 1) * tracksize - 1);
+    printBG(separator_x,row(y)," ",COLORS.Text,COLORS.Background,S);
+    if (ctrack < tracks - 1)
+      printchar(separator_x,row(y),168,COLORS.Lowlight,S);
   }
 }
 
@@ -291,27 +284,41 @@ void PatternDisplay::update_frame(void)
     
   case 0:
 
-    tracks = 24;
-    tracksize = 3;
+    tracksize = 7;
 
     break;
 
   case 1:
 
 
-    tracksize = 7;
+    tracksize = 8; // note, instrument, effect letter, separator
     
-    // <Manu> Control del número de tracks que se muestran mientras se reproduce una canción (10 por defecto) [EN: controls how many tracks are shown while a song is playing (default 10)]
-    //tracks = 10;
-    tracks = ((INTERNAL_RESOLUTION_X /*- LEFT_LINE_NUMBER_MARGIN*/) / (tracksize * FONT_SIZE_X)) - 1 ;
-
     break ;
 
-  default:
+  case 2:
+    tracksize = 14; // note, instrument, volume, length, separator
+    break;
 
+  case 3:
+    tracksize = 20; // regular fields, effect + parameter, separator
+    break;
+
+  default:
+    cur_pat_view = 1;
+    tracksize = 8;
     break ;
   } ;
   
+  // Leave room for row numbers, the left border and the right border.
+  const int available = INTERNAL_RESOLUTION_X / FONT_SIZE_X - (x + 4) - 1;
+  tracks = (std::max)(1, (std::min)(MAX_TRACKS, available / tracksize));
+
+  // Reconcile the viewport after navigation, format changes and resizing.
+  cur_track = (std::max)(0, (std::min)(MAX_TRACKS - 1, cur_track));
+  starttrack = (std::max)(0, (std::min)(MAX_TRACKS - tracks, starttrack));
+  if (cur_track < starttrack) starttrack = cur_track;
+  if (cur_track >= starttrack + tracks) starttrack = cur_track - tracks + 1;
+
   frame->x = x+4;
   frame->y = y;
   frame->ysize=ysize;
@@ -333,33 +340,38 @@ void PatternDisplay::disp_track_headers(Drawable *S)
   
   for(num_track = this->starttrack; num_track < (this->starttrack + this->tracks); num_track++) {    
 
-//    if (this->cur_pat_view >1) sprintf(str," Track %.2d ",num_track+1);
-//    else sprintf(str,"%.2d",num_track+1);
-    
-    // <Manu> Cambio el codigo comentado por este switch [EN: replacing the commented-out code with this switch]
-
-    switch(this->cur_pat_view)
+    const char *custom = song->track_name[num_track];
+    if (custom[0]) {
+      // Keep the last cell free for the gap, even with a maximum-length name.
+      snprintf(str, tracksize, "%.*s", ZTM_TRACKNAME_MAXLEN - 1, custom);
+    } else switch(this->cur_pat_view)
     {
     case 0:
 
-      sprintf(str,"%.2d",num_track+1);
+      snprintf(str,sizeof(str),"%.2d",num_track+1);
 
       break ;
 
     case 1:
     
-      sprintf(str,"Trk %.2d",num_track+1);
+      snprintf(str,sizeof(str),"Trk %.2d",num_track+1);
 
       break ;
 
     default:
 
-      sprintf(str," Track %.2d ",num_track+1);
+      snprintf(str,sizeof(str)," Track %.2d ",num_track+1);
 
       break ;
     };
-    
-    
+
+    const int length = (int)strlen(str);
+    const int left = (tracksize - 1 - length) / 2;
+    memmove(str + left, str, length);
+    memset(str, ' ', left);
+    memset(str + left + length, ' ', tracksize - 1 - left - length);
+    str[tracksize - 1] = '\0';
+
     if (song->track_mute[num_track]) {
 
       if (num_track == cur_track) bg = COLORS.EditText;
@@ -382,6 +394,9 @@ void PatternDisplay::disp_track_headers(Drawable *S)
     }
 
     printBG(col(4+x+(p*(this->tracksize))),row(y-1),str,bg,hbg,S);
+    // Keep a visible one-character gap between header backgrounds.
+    printBG(col(4+x+p*tracksize+tracksize-1),row(y-1)," ",
+            COLORS.Text,COLORS.Background,S);
     p++;
   }
 }

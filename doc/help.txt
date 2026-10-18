@@ -206,11 +206,13 @@
                   systems where the OS eats plain F-keys)
  CTRL-SHIFT-M   : Quick MIDI export of current song
  F10            : Song message editor
- F5             : Song play. PgUp / PgDn toggles between the pattern
-                  display and the per-track VU meter view (32 channels
-                  visible; up/down on the VU view scrolls through all
-                  64 tracks). Left/right/space/alt-1..0/alt-f9/alt-f10
-                  drive playback control as before.
+ F5             : Song play. PgDn cycles Compact / Regular / Full / VU
+                  meters; PgUp cycles backwards. The last view is saved
+                  across restarts. Regular shows note, instrument, volume
+                  and length; Full also shows the complete effect. The
+                  VU view shows 32 channels; up/down scrolls all 64 tracks.
+                  Left/right/space/alt-1..0/alt-f9/alt-f10 drive playback
+                  control as before.
  F6             : Pattern Play - will play the current pattern being edited.
  SHIFT-F6       : CC Envelope editor. Per-instrument: each instrument owns
                   up to 32 envelope curves. If the instrument has a CCizer

@@ -264,6 +264,7 @@ ZTConf::ZTConf() {
     midi_stop_start = 1; // default_midistopstart;
     instrument_global_volume = 127;
     cur_edit_mode = VIEW_REGULAR;
+    playback_view = PLAYBACK_COMPACT;
     default_tpb = 8;
     default_bpm = 138;
     prebuffer_rows = 8;
@@ -334,6 +335,11 @@ int ZTConf::load()
   if(Config->get("default_highlight_increment"))      highlight_increment = atoi(Config->get("default_highlight_increment"));
   if(Config->get("default_lowlight_increment"))       lowlight_increment = atoi(Config->get("default_lowlight_increment"));
   if(Config->get("default_view_mode"))                cur_edit_mode = atoi(Config->get("default_view_mode"));
+  if(Config->get("playback_view")) {
+      playback_view = atoi(Config->get("playback_view"));
+      if (playback_view < PLAYBACK_COMPACT || playback_view > PLAYBACK_VU)
+          playback_view = PLAYBACK_COMPACT;
+  }
   if(Config->get("post_load_page")) {
       post_load_page = atoi(Config->get("post_load_page"));
       if (post_load_page < 0 || post_load_page >= POST_LOAD_PAGE_COUNT)
@@ -511,6 +517,8 @@ int ZTConf::save() {
     Config->set("prebuffer_rows", s);
     sprintf(s, "%d", cur_edit_mode);
     Config->set("default_view_mode", s);
+    snprintf(s, sizeof(s), "%d", playback_view);
+    Config->set("playback_view", s);
 
     sprintf(s, "%d", post_load_page);
     Config->set("post_load_page", s);

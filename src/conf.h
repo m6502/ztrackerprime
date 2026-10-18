@@ -12,6 +12,8 @@
 
 enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_EXTEND };
 
+enum E_playback_view { PLAYBACK_COMPACT = 1, PLAYBACK_REGULAR, PLAYBACK_FULL, PLAYBACK_VU };
+
 // Where to land after a successful song load. Default is Instrument
 // Editor (F3) — matches the long-standing behaviour. Pattern Editor
 // (F2) suits arrangers who go straight to writing notes; Song Config
@@ -100,6 +102,7 @@ class ZTConf {
         int midi_stop_start; // default_midistopstart;
         int instrument_global_volume;
         int cur_edit_mode;
+        int playback_view; // E_playback_view, remembered across restarts
         int default_tpb;
         int default_bpm;
         int prebuffer_rows;

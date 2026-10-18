@@ -63,7 +63,9 @@ CUI_Playsong::CUI_Playsong(void)
     vu->num_channels = 32;
     UI_VUMeters->add_element(vu,0);
 
-    UI = UI_PatternDisplay;
+    const int view = zt_config_globals.playback_view;
+    pattern_display->cur_pat_view = view == PLAYBACK_VU ? PLAYBACK_COMPACT : view;
+    UI = view == PLAYBACK_VU ? UI_VUMeters : UI_PatternDisplay;
 }
 
 
@@ -173,21 +175,26 @@ void CUI_Playsong::update()
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
 
-#ifndef DISABLE_VUMETERS
-
     case SDLK_PAGEUP:
     case SDLK_PAGEDOWN:
-      
-      if (UI == UI_PatternDisplay) UI = UI_VUMeters;
-      else UI = UI_PatternDisplay;
+    {
+      const int current = UI == UI_VUMeters ? PLAYBACK_VU : pattern_display->cur_pat_view;
+      const int direction = key == SDLK_PAGEDOWN ? 1 : -1;
+      const int count = PLAYBACK_VU - PLAYBACK_COMPACT + 1;
+      const int view = PLAYBACK_COMPACT + (current - PLAYBACK_COMPACT + direction + count) % count;
+      zt_config_globals.playback_view = view;
+      UI = view == PLAYBACK_VU ? UI_VUMeters : UI_PatternDisplay;
+      if (UI == UI_PatternDisplay) {
+        pattern_display->cur_pat_view = view;
+        pattern_display->update_frame();
+      }
       
       UI->full_refresh();
       clear++;
       act++;
       
       break;
-
-#endif
+    }
 
       // ----------------------------------------------------------------------
       // ----------------------------------------------------------------------
@@ -225,7 +232,15 @@ void CUI_Playsong::draw(Drawable *S)
       clear = 0 ;
     }
     
-    printtitle(PAGE_TITLE_ROW_Y,"Play Song (F5)",COLORS.Text,COLORS.Background,S);
+    const char *title = "Play Song (F5) - VU meters (PgUp/PgDn)";
+    if (UI == UI_PatternDisplay) {
+      switch (pattern_display->cur_pat_view) {
+      case 2: title = "Play Song (F5) - Regular (PgUp/PgDn)"; break;
+      case 3: title = "Play Song (F5) - Full (PgUp/PgDn)"; break;
+      default: title = "Play Song (F5) - Compact (PgUp/PgDn)"; break;
+      }
+    }
+    printtitle(PAGE_TITLE_ROW_Y,title,COLORS.Text,COLORS.Background,S);
     need_refresh = 0;
     updated=2;
     

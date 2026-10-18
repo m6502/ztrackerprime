@@ -263,6 +263,9 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         add_test(NAME vu_refresh COMMAND "${CMAKE_COMMAND}" -E env
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_vu_refresh.py")
+        add_test(NAME playback_view_layout COMMAND "${CMAKE_COMMAND}" -E env
+            "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/tests/test_playback_view_layout.py")
         if(TARGET PkgConfig::SDL3PC)
             add_test(NAME drawing COMMAND "${CMAKE_COMMAND}" -E env
                 "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
