@@ -239,6 +239,9 @@
  CTRL-F9        : Track Solo (pattern editor)
  CTRL-F10       : Save Song As...
  F11            : Song Configuration and Order editor
+                  Tab / Shift-Tab switches between the Order List and the
+                  last focused setting. Up/down navigates within each side;
+                  the settings column wraps between Title and Sync Offset.
  F12            : System Configuration (midi dev select)
  SHIFT-CTRL-F12 : Open Palette Editor (live color editing + presets)
  ALT-F12        : About

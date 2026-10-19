@@ -87,6 +87,8 @@ Free-form notes attached to the song. Saved into the `.zt` file, useful for chor
 
 Per-song settings: title, BPM, TPB, Send MIDI Clock, Send MIDI Stop/Start, MIDI In Sync (slave to incoming Start/Stop/Continue), Chase MIDI Tempo (slave BPM to incoming `0xF8` MIDI Clock), row Highlight / Lowlight increments. The right column is the Order List — the song's playback sequence of pattern indices.
 
+Tab / Shift+Tab switches between the Order List and the last focused setting. Up / Down navigates within each side; the settings column wraps between Title and Sync Offset ms.
+
 ![Song Configuration](docs/screenshots/11-song-configuration.png)
 
 ### System Configuration — `F12`
@@ -362,7 +364,7 @@ Fixed bugs:
 
 - About page text box height is clamped so it can never overlap the bottom toolbar at non-default resolutions.
 
-- Order List: pressing Up while at row 0 cycles focus back to the previous control (e.g. MIDI Stop/Start), matching the Down-into-the-list path.
+- Order List: Up at position 000 and Down at the last position keep the cursor in the list. Tab / Shift+Tab switches to the settings column and remembers the last focused setting.
 
 - Songconfig: Title / BPM / TPB labels right-align with the field/slider start, and the Title field is the same width as the BPM/TPB sliders.
 

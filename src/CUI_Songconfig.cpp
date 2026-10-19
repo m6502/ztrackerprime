@@ -15,6 +15,7 @@ CUI_Songconfig::CUI_Songconfig(void) {
     int base_y = TRACKS_ROW_Y;
 
     last_bpm_seen = -1;
+    last_settings_focus = 0;
 
     tpb_tab[0] = 2;
     tpb_tab[1] = 4;
@@ -266,7 +267,29 @@ void CUI_Songconfig::update()
     if (t->changed)
         file_changed++;
 
+    // Tab switches panes; arrows navigate within the focused pane.
+    const KBKey nav_key = Keys.checkkey();
+    const KBMod nav_mods = Keys.getstate();
+    if (nav_key == SDLK_TAB && (nav_mods == KS_NO_SHIFT_KEYS || nav_mods == KS_SHIFT)) {
+        Keys.getkey();
+        if (UI->cur_element == 13) {
+            UI->set_focus(last_settings_focus);
+        } else {
+            last_settings_focus = UI->cur_element;
+            UI->set_focus(13);
+        }
+        need_refresh++;
+    } else if (nav_mods == KS_NO_SHIFT_KEYS &&
+        ((UI->cur_element == 0 && nav_key == SDLK_UP) ||
+         (UI->cur_element == 12 && nav_key == SDLK_DOWN))) {
+        Keys.getkey();
+        UI->set_focus(UI->cur_element == 0 ? 12 : 0);
+        need_refresh++;
+    }
+
     UI->update();
+    if (UI->cur_element >= 0 && UI->cur_element < 13)
+        last_settings_focus = UI->cur_element;
     vs = (ValueSlider *)UI->get_element(1);
     if (vs->from_input) vs->from_input = 0;  // BPM slider takes any [min,max]; clamp already applied
     if (vs->value != last_bpm_seen) {
