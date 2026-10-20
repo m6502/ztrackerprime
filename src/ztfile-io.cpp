@@ -728,6 +728,13 @@ int zt_module::save(char *fn, int compressed)
         build_song_message(&buffer);
         writeblock("SMSG",&buffer,compressed,f,lpDS);
     }
+    // PNTS: raw single-byte text, one logical line per order position.
+    // Omit an empty notes column. Older readers skip this optional chunk.
+    if (position_notes && position_notes->getsize() > ZTM_ORDERLIST_LEN - 1) {
+        buffer.flush();
+        buffer.write(position_notes->getbuffer(), position_notes->getsize());
+        writeblock("PNTS", &buffer, compressed, f, lpDS);
+    }
     build_ZT_order_list(&buffer);
     writeblock("ZTol",&buffer,compressed,f,lpDS);
     build_ZT_pattern_lengths(&buffer);
@@ -1393,6 +1400,24 @@ int zt_module::load(char *fn)
     while(ret!=-1) {
         ret = readblock(&header[0],&buffer,compressed,f,input);
         if (ret!=-1) {
+            if (cmp_hd(&header[0], "PNTS")) {
+                // Validate before replacing the initialized blank column.
+                // Limit each note to 1024 bytes, matching the editor.
+                int lines = 1, column = 0;
+                bool valid = true;
+                const char *data = buffer.getbuffer();
+                for (int i = 0; i < buffer.getsize(); ++i) {
+                    unsigned char c = (unsigned char)data[i];
+                    if (c == '\n') { ++lines; column = 0; }
+                    else if (c < 32 || ++column > 1024) { valid = false; break; }
+                    if (lines > ZTM_ORDERLIST_LEN) { valid = false; break; }
+                }
+                if (valid && lines == ZTM_ORDERLIST_LEN) {
+                    position_notes->flush();
+                    position_notes->write(data, buffer.getsize());
+                }
+                recognized_chunks++;
+            }
             if (cmp_hd(&header[0], "SMSG")) { load_song_message(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "ARPG")) { load_arpeggio(&buffer); recognized_chunks++; }
             if (cmp_hd(&header[0], "MMAC")) { load_MIDI_macro(&buffer); recognized_chunks++; }

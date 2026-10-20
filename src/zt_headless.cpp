@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 
 #include "keybuffer.h"
 #include "lua_engine.h"
@@ -23,6 +24,7 @@
 // Pulled from main.cpp -- the global key ring and the "user requested
 // quit" flag. We don't pull main.cpp's full surface in here; just the
 // symbols the script driver needs to talk to.
+extern void textinputhandler(const SDL_Event *e);
 extern KeyBuffer Keys;
 extern int       do_exit;
 // Synthetic mouse injection (defined in main.cpp). Reuses the exact Keys /
@@ -51,6 +53,7 @@ static Uint64      g_wait_until_ms    = 0;
 static bool        g_pending_click_up = false;
 static int         g_click_up_x       = 0;
 static int         g_click_up_y       = 0;
+static std::string g_pending_text;
 
 // ---------------------------------------------------------------------------
 // CLI plumbing.
@@ -222,6 +225,11 @@ static void exec_command(SDL_Surface *frame_surface, const char *cmd, char *args
         Keys.insert(k, m, 0, code);
         return;
     }
+    // Deliver one text byte per frame through the real typed-text handler.
+    if (!strcmp(cmd, "text")) {
+        g_pending_text = args;
+        return;
+    }
     // `lua <code>` -- run a line through the embedded Lua engine, same as
     // typing it into the Ctrl+Alt+L console. Lets scripts set up state the
     // key/mouse surface can't reach (e.g. zt.instrument(0).device = 1).
@@ -310,6 +318,15 @@ void zt_headless_pump(SDL_Surface *frame_surface) {
         zt_inject_mouse(0, 1, g_click_up_x, g_click_up_y);
         return;
     }
+    if (!g_pending_text.empty()) {
+        char byte[2] = {g_pending_text.front(), 0};
+        SDL_Event event = {};
+        event.type = SDL_EVENT_TEXT_INPUT;
+        event.text.text = byte;
+        textinputhandler(&event);
+        g_pending_text.erase(0, 1);
+        return;
+    }
     if (g_wait_until_ms && SDL_GetTicks() < g_wait_until_ms) return;
     g_wait_until_ms = 0;
 
@@ -340,7 +357,7 @@ void zt_headless_pump(SDL_Surface *frame_surface) {
 
         // `click` queues the DOWN and sets g_pending_click_up; return so this
         // frame processes the DOWN before we inject the UP next pump.
-        if (g_wait_until_ms || g_script_done || g_pending_click_up) return;
+        if (g_wait_until_ms || g_script_done || g_pending_click_up || !g_pending_text.empty()) return;
     }
 
     // EOF: stop driving the loop. The main loop continues to render

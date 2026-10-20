@@ -558,7 +558,7 @@ songmsg::~songmsg() {
  *
  ******/
 int songmsg::isempty() {
-    return this->songmessage->isempty();
+    return this->songmessage->getsize() == 0;
 }
 
 
@@ -771,6 +771,8 @@ void zt_module::init(void)
     memset(filename,0,ZTM_FILENAME_MAXLEN);
     
     songmessage = new songmsg();
+    position_notes = new CDataBuf;
+    for (int pos = 1; pos < ZTM_ORDERLIST_LEN; ++pos) position_notes->pushc('\n');
 //    songmessage = new CDataBuf();
     
     for(i=0;i<ZTM_MAX_PATTERNS;i++)
@@ -830,6 +832,9 @@ void zt_module::de_init(void) {
             delete this->instruments[i];
         this->instruments[i] = NULL;
     }
+
+    delete position_notes;
+    position_notes = NULL;
 
     // delete songmessage
     if (this->songmessage)

@@ -87,7 +87,9 @@ Free-form notes attached to the song. Saved into the `.zt` file, useful for chor
 
 Per-song settings: title, BPM, TPB, Send MIDI Clock, Send MIDI Stop/Start, MIDI In Sync (slave to incoming Start/Stop/Continue), Chase MIDI Tempo (slave BPM to incoming `0xF8` MIDI Clock), row Highlight / Lowlight increments. The right column is the Order List — the song's playback sequence of pattern indices.
 
-Tab / Shift+Tab switches between the Order List and the last focused setting. Up / Down navigates within each side; the settings column wraps between Title and Sync Offset ms.
+Position Notes fills the space beside the Order List with one editable line per song position (000–255). Both columns scroll together while keeping independent caret positions; switching panes brings that pane's caret back into view. Notes are saved in the `.zt` file separately from F10's Song Message. Enter moves to the next position; Backspace and Delete cannot merge lines. Long notes scroll horizontally (up to 1024 characters per position).
+
+Tab cycles through the settings, Order List, and Position Notes; Shift+Tab reverses direction. Click a note to place the caret. Up / Down navigates within each pane; the settings column wraps between Title and Sync Offset ms. In notes, Home / End moves to the beginning / end of the line, and Page Up / Page Down moves by a screenful.
 
 ![Song Configuration](docs/screenshots/11-song-configuration.png)
 

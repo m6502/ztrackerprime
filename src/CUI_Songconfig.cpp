@@ -197,6 +197,40 @@ CUI_Songconfig::CUI_Songconfig(void) {
         oe->y = 13;
         oe->xsize = 9;
         oe->ysize = 32 ;
+
+        CommentEditor *notes = new CommentEditor;
+        UI->add_element(notes, 14);
+        notes->fixed_lines = ZTM_ORDERLIST_LEN;
+        notes->bWordWrap = false;
+        notes->x = 69;
+        notes->y = oe->y;
+        notes->target = song->position_notes;
+        layout_notes();
+}
+
+void CUI_Songconfig::layout_notes() {
+    // cursor_y is relative to the shared viewport. Preserve its absolute
+    // order position even when notes scroll it outside the visible rows.
+    const int order_position = oe->list_start + oe->cursor_y;
+    int rows = INTERNAL_RESOLUTION_Y / 8 - oe->y - 7;
+    if (rows < 1) rows = 1;
+    if (rows > ZTM_ORDERLIST_LEN) rows = ZTM_ORDERLIST_LEN;
+    oe->ysize = rows;
+    if (oe->list_start > ZTM_ORDERLIST_LEN - rows) oe->list_start = ZTM_ORDERLIST_LEN - rows;
+    CommentEditor *notes = (CommentEditor *)UI->get_element(14);
+    notes->target = song->position_notes;
+    notes->xsize = INTERNAL_RESOLUTION_X / 8 - notes->x - 1;
+    notes->ysize = rows - 1;
+    notes->refresh_display();
+    // Focus brings that pane's own caret into view without moving either
+    // caret. Settings leave the current shared viewport alone.
+    if (UI->cur_element == 13 || UI->cur_element == 14) {
+        int selected = UI->cur_element == 14 ? notes->cursor_line() : order_position;
+        if (oe->list_start > selected) oe->list_start = selected;
+        if (oe->list_start + rows <= selected) oe->list_start = selected - rows + 1;
+    }
+    oe->cursor_y = order_position - oe->list_start;
+    notes->startline = oe->list_start;
 }
 
 void CUI_Songconfig::enter(void) {
@@ -247,6 +281,7 @@ void CUI_Songconfig::enter(void) {
     }
     UI->set_focus(target);
     UI->cur_element = target;
+    layout_notes();
 }
 
 void CUI_Songconfig::leave(void) {
@@ -258,7 +293,7 @@ void CUI_Songconfig::update()
     // Reserve 7 rows at the bottom for the 55 px toolbar (ceil(55/8));
     // one extra row of safety was previously added but it left the order
     // list one row short of the F1 Help bottom edge.
-    oe->ysize =  ((INTERNAL_RESOLUTION_Y/8) - oe->y - 7) ;
+    layout_notes();
 
     ValueSlider *vs;
     TextInput *t;
@@ -272,12 +307,14 @@ void CUI_Songconfig::update()
     const KBMod nav_mods = Keys.getstate();
     if (nav_key == SDLK_TAB && (nav_mods == KS_NO_SHIFT_KEYS || nav_mods == KS_SHIFT)) {
         Keys.getkey();
-        if (UI->cur_element == 13) {
-            UI->set_focus(last_settings_focus);
-        } else {
-            last_settings_focus = UI->cur_element;
-            UI->set_focus(13);
-        }
+        int current = UI->cur_element;
+        if (current < 13) last_settings_focus = current;
+        int target;
+        if (nav_mods == KS_SHIFT)
+            target = current == 14 ? 13 : current == 13 ? last_settings_focus : 14;
+        else
+            target = current == 13 ? 14 : current == 14 ? last_settings_focus : 13;
+        UI->set_focus(target);
         need_refresh++;
     } else if (nav_mods == KS_NO_SHIFT_KEYS &&
         ((UI->cur_element == 0 && nav_key == SDLK_UP) ||
@@ -287,7 +324,16 @@ void CUI_Songconfig::update()
         need_refresh++;
     }
 
+    layout_notes();
     UI->update();
+    CommentEditor *notes = (CommentEditor *)UI->get_element(14);
+    if (UI->cur_element == 14) {
+        const int order_position = oe->list_start + oe->cursor_y;
+        oe->list_start = notes->startline;
+        oe->cursor_y = order_position - oe->list_start;
+    } else {
+        notes->startline = oe->list_start;
+    }
     if (UI->cur_element >= 0 && UI->cur_element < 13)
         last_settings_focus = UI->cur_element;
     vs = (ValueSlider *)UI->get_element(1);
@@ -474,7 +520,11 @@ void CUI_Songconfig::update()
 
 void CUI_Songconfig::draw(Drawable *S) {
     int base_y = TRACKS_ROW_Y;
+    layout_notes();
     if (S->lock()==0) {
+        // Both panes share a viewport; repaint both when either changes.
+        oe->need_redraw = 1;
+        UI->get_element(14)->need_redraw = 1;
         UI->draw(S);
         draw_status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Song Configuration (F11)",COLORS.Text,COLORS.Background,S);
@@ -537,8 +587,8 @@ void CUI_Songconfig::draw(Drawable *S) {
             snprintf(field,sizeof(field),"%-28s", m);
             printBG(row(25),col(base_y+11),field,COLORS.Highlight,COLORS.Background,S);
         }
-        // Order List label aligned to the OE x-origin (col 59) — NOT shifted.
-        print(row(59),col(11),"Order List",COLORS.Text,S);
+        print(row(58),col(11),"Order List",COLORS.Text,S);
+        print(row(69),col(11),"Notes",COLORS.Text,S);
         printchar(row(20 + 27) + 1,col(base_y+2),0x84,COLORS.Highlight,S);
         printchar(row(20 + 27) + 1,col(base_y+3),0x84,COLORS.Highlight,S);
 

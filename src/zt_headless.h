@@ -17,6 +17,7 @@
 //                                                   key ctrl+s,
 //                                                   key down, key tab,
 //                                                   key space, key return)
+//                       text <text>          type single-byte text, one byte per frame
 //                       mousemove <x> <y>    move the cursor to pixel (x,y)
 //                       mousedown <x> <y>    press left button at (x,y)
 //                       mouseup   <x> <y>    release left button at (x,y)

@@ -26,13 +26,22 @@ with tempfile.TemporaryDirectory(prefix='zt-songconfig-focus-') as tmp:
                  'key end', 'wait 50', 'key end', 'wait 50', f'shot {app}/last-order.png',
                  'key down', 'wait 50', f'shot {app}/down-at-end.png',
                  'key home', 'wait 50', 'key home', 'wait 50', f'shot {app}/reset-order.png']
-    # Both Tab directions switch panes and restore every individual setting.
-    key('tab')
+    # The notes pane sits between orders and settings in the Tab cycle.
+    key('tab'); shot('notes-focus')
+    key('shift+tab'); shot('orders-from-notes')
+    key('shift+tab'); shot('settings-from-orders')
+    key('tab'); shot('orders-from-settings')
+    # Check both directions while crossing the new third pane as needed.
+    key('shift+tab')
     for index in range(13):
         shot(f'setting-{index}')
         for chord, label in [('tab', 'tab'), ('shift+tab', 'shift-tab')]:
-            key(chord); shot(f'order-{index}-{label}')
-            key(chord); shot(f'return-{index}-{label}')
+            key(chord)
+            if chord == 'shift+tab': key(chord)
+            shot(f'order-{index}-{label}')
+            key(chord)
+            if chord == 'tab': key(chord)
+            shot(f'return-{index}-{label}')
         key('down')
     shot('settings-down-wrap')
     for index in reversed(range(13)):
@@ -41,14 +50,14 @@ with tempfile.TemporaryDirectory(prefix='zt-songconfig-focus-') as tmp:
     # Changing panes preserves the order row and the digit being edited.
     key('down'); key('tab'); key('down'); key('right')
     shot('order-position')
-    key('tab'); shot('remembered-bpm')
+    key('tab'); key('tab'); shot('remembered-bpm')
     key('f11'); key('down'); shot('expected-bpm-at-order-position')
     key('tab'); shot('restored-order-position')
     key('up'); key('left'); shot('order-position-reset')
 
     # The left-side focus is also retained when returning from another page.
     key('tab'); key('f2'); key('f11'); shot('reentry-order')
-    key('tab'); shot('reentry-setting')
+    key('tab'); key('tab'); shot('reentry-setting')
     key('up'); key('tab')
     commands += ['key f11', 'wait 50', f'shot {app}/toggle-title.png',
                  'key f11', 'wait 50', f'shot {app}/toggle-order.png',
@@ -63,6 +72,9 @@ with tempfile.TemporaryDirectory(prefix='zt-songconfig-focus-') as tmp:
     for name in ('up-at-start', 'back-at-start', 'reset-order'):
         assert (app / f'{name}.png').read_bytes() == order, \
             f'Order List lost focus or moved past position 000: {name}'
+    assert (app / 'notes-focus.png').read_bytes() != order
+    assert (app / 'orders-from-notes.png').read_bytes() == order
+    assert (app / 'orders-from-settings.png').read_bytes() == order
     assert (app / 'second-order.png').read_bytes() != order, 'Down did not move to position 001'
     assert (app / 'last-order.png').read_bytes() == (app / 'down-at-end.png').read_bytes(), \
         'Down moved past the last order or changed focus'

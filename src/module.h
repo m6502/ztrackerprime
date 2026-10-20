@@ -358,6 +358,8 @@ class zt_module
 #endif /* USE_MIDIMACROS */
         
         songmsg *songmessage;
+        // 256 position notes separated by 255 immutable newlines.
+        CDataBuf *position_notes;
         //CDataBuf *songmessage;
         
         pattern *patterns[ZTM_MAX_PATTERNS];

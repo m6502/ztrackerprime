@@ -97,6 +97,7 @@ class CUI_Songconfig : public CUI_Page {
 
         int last_bpm_seen;
         int last_settings_focus;
+        void layout_notes();
 
         CUI_Songconfig();
 

@@ -253,6 +253,13 @@ class CommentEditor : public TextBox {
         // Clamped to [0, target->getsize()] every refresh_display.
         unsigned int cursor;
 
+        // Optional fixed-line mode for the F11 position notes column.
+        // ysize keeps TextBox's convention: visible rows minus one.
+        int fixed_lines;
+        int cursor_line() const;
+        void select_line(int line, int column = -1);
+        int mouseupdate(int cur_element) override;
+
         CommentEditor();
         ~CommentEditor();
 

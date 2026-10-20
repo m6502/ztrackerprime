@@ -3405,6 +3405,7 @@ int AliasTextInput::update() {
 //
 //
 CommentEditor::CommentEditor() {
+    fixed_lines = 0;
     bUseColors = FALSE;
     bWordWrap = true;
     target = NULL;
@@ -3554,7 +3555,83 @@ static bool zt_textbox_locate_offset(const char *text, bool bUseColors,
     return false;
 }
 
+int CommentEditor::cursor_line() const {
+    int line = 0;
+    if (target) {
+        const char *buf = target->getbuffer();
+        for (unsigned int i = 0; i < cursor && i < (unsigned)target->getsize(); ++i)
+            if (buf[i] == '\n') ++line;
+    }
+    return line;
+}
+
+void CommentEditor::select_line(int line, int column) {
+    if (!target) return;
+    const char *buf = target->getbuffer();
+    unsigned int n = target->getsize(), start = 0;
+    if (column < 0) {
+        unsigned int s = cursor < n ? cursor : n;
+        while (s > 0 && buf[s - 1] != '\n') --s;
+        column = cursor - s;
+    }
+    if (line < 0) line = 0;
+    if (fixed_lines && line >= fixed_lines) line = fixed_lines - 1;
+    for (int l = 0; l < line && start < n; ++l) {
+        while (start < n && buf[start] != '\n') ++start;
+        if (start < n) ++start;
+    }
+    cursor = start;
+    while (column-- > 0 && cursor < n && buf[cursor] != '\n') ++cursor;
+}
+
+int CommentEditor::mouseupdate(int cur_element) {
+    if (!fixed_lines) return TextBox::mouseupdate(cur_element);
+    if (xsize < 3 || ysize < 0) return cur_element;
+    if (Keys.checkkey() == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT)) &&
+        checkclick(col(x), row(y), col(x + xsize), row(y + ysize + 1))) {
+        int column = MousePressX / 8 - x - 1 + soff;
+        select_line(startline + MousePressY / 8 - y, column < 0 ? 0 : column);
+        Keys.getkey();
+        need_refresh++;
+        need_redraw++;
+        return ID;
+    }
+    return cur_element;
+}
+
 void CommentEditor::draw(Drawable *S, int active) {
+    if (fixed_lines) {
+        if (xsize < 3 || ysize < 0 || !target) return;
+        // No wrapping or embedded color codes: every logical line occupies
+        // exactly one order row. Only the focused column shows a caret.
+        const char *buf = target->getbuffer();
+        unsigned int n = target->getsize(), at = 0;
+        S->fillRect(col(x), row(y), col(x + xsize) - 1,
+                    row(y + ysize + 1) - 1, COLORS.EditBG);
+        int line = 0;
+        while (at < n && line < startline) if (buf[at++] == '\n') ++line;
+        for (int r = 0; r <= ysize && startline + r < fixed_lines; ++r) {
+            int column = 0;
+            while (at < n && buf[at] != '\n') {
+                if (column >= soff && column - soff < xsize - 2) {
+                    int px = col(x + 1 + column - soff), py = row(y + r);
+                    if (active && at == cursor) {
+                        printchar(px, py, 0xDB, COLORS.EditText, S);
+                        printchar(px, py, (unsigned char)buf[at], COLORS.EditBG, S);
+                    } else printchar(px, py, (unsigned char)buf[at], COLORS.EditText, S);
+                }
+                ++at; ++column;
+            }
+            if (active && at == cursor && column >= soff && column - soff < xsize - 2)
+                printchar(col(x + 1 + column - soff), row(y + r), 0xDB, COLORS.EditText, S);
+            if (at < n) ++at;
+        }
+        frm.type = 0; frm.x = x; frm.y = y;
+        frm.xsize = xsize; frm.ysize = ysize + 1;
+        frm.draw(S, active);
+        screenmanager.Update(col(x - 1), row(y - 1), col(x + xsize + 1), row(y + ysize + 2));
+        return;
+    }
     // Base render: paints the block at the cursor position via the
     // 0xDB byte we placed in _display.
     TextBox::draw(S, active);
@@ -3594,6 +3671,56 @@ int CommentEditor::update() {
     int ret=0;
     key = Keys.checkkey();
     unsigned char ch = Keys.getactualchar();
+    if (fixed_lines && target && key) {
+        refresh_display();
+        const char *buf = target->getbuffer();
+        unsigned int n = target->getsize(), begin = cursor, end = cursor;
+        while (begin > 0 && buf[begin - 1] != '\n') --begin;
+        while (end < n && buf[end] != '\n') ++end;
+        bool handled = true, modified = false;
+        switch (key) {
+        case SDLK_RETURN: case SDLK_DOWN: select_line(cursor_line() + 1); break;
+        case SDLK_UP: select_line(cursor_line() - 1); break;
+        case SDLK_PAGEUP: select_line(cursor_line() - (ysize + 1)); break;
+        case SDLK_PAGEDOWN: select_line(cursor_line() + (ysize + 1)); break;
+        case SDLK_HOME: cursor = begin; break;
+        case SDLK_END: cursor = end; break;
+        case SDLK_LEFT: if (cursor > begin) --cursor; break;
+        case SDLK_RIGHT: if (cursor < end) ++cursor; break;
+        case SDLK_BACKSPACE:
+            if (cursor > begin) { target->erase_at(--cursor); modified = true; }
+            break;
+        case SDLK_DELETE:
+            if (cursor < end) { target->erase_at(cursor); modified = true; }
+            break;
+        default:
+            if (key == SDLK_SPACE && ch >= 32) {
+                if (end - begin < 1024) {
+                    target->insert_at(cursor++, (char)ch);
+                    modified = true;
+                }
+            } else handled = false;
+        }
+        if (handled) {
+            Keys.getkey();
+            if (modified) { file_changed++; changed = 1; }
+            int line = cursor_line();
+            if (startline > line) startline = line;
+            if (startline + ysize < line) startline = line - ysize;
+            int max_start = fixed_lines - (ysize + 1);
+            if (max_start < 0) max_start = 0;
+            if (startline > max_start) startline = max_start;
+            unsigned int line_start = cursor;
+            buf = target->getbuffer();
+            while (line_start > 0 && buf[line_start - 1] != '\n') --line_start;
+            int column = cursor - line_start;
+            if (soff > column) soff = column;
+            if (xsize > 2 && column >= soff + xsize - 2) soff = column - (xsize - 3);
+            refresh_display();
+            need_refresh++; need_redraw++;
+        }
+        return 0;
+    }
     if (key) {
         const unsigned int n =
             target ? (unsigned int)(target->getsize() < 0 ? 0 : target->getsize())

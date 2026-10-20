@@ -27,6 +27,7 @@ Each line is one command. Blank lines and lines starting with `#` are ignored.
 | Command | Effect |
 |---|---|
 | `key <chord>` | Inject a synthetic keystroke. Chord syntax: zero or more `shift+ / ctrl+ / alt+ / meta+ / cmd+` modifier prefixes followed by the key name. |
+| `text <text>` | Type single-byte text through the typed-text handler, one byte per frame. Use `key return` for newlines. |
 | `wait <ms>` | Defer the next command for `<ms>` milliseconds (capped at 60000). The main loop keeps running, so the page renders and processes the last batch of keys before the next fires. |
 | `shot <path>` | Dump the current screen surface to a PNG at `<path>`. Parent directory must already exist. |
 | `window_event <event>` | Inject an SDL window event: `focus_lost`, `focus_gained`, `exposed`, or `restored`. Useful for testing repaint behavior. |
