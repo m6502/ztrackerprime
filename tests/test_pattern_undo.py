@@ -11,9 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from drawing_harness import ROOT, function
 
 source = r'''
+#include "CDataBuf.h"
 #include "platform/undo.h"
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 // Reproduce Windows headers' function-like macros at the include site.
 #define min(a, b) windows_min_macro_must_not_expand(a, b)
 #define max(a, b) windows_max_macro_must_not_expand(a, b)
@@ -33,8 +35,10 @@ int zt_mutex_lock(zt_mutex_handle, int) {
 int zt_mutex_unlock(zt_mutex_handle) { assert(locks == 1); --locks; return 1; }
 int lock_mutex(zt_mutex_handle m, int t) { return zt_mutex_lock(m, t); }
 int unlock_mutex(zt_mutex_handle m) { return zt_mutex_unlock(m); }
-// Only patterns are needed in this fixture; use production de_init() below.
-zt_module::zt_module(int, int) : songmessage(nullptr), hEditMutex(nullptr) {
+// Use production teardown, including ownership of the notes buffer.
+zt_module::zt_module(int, int)
+    : songmessage(nullptr), position_notes(new CDataBuf), hEditMutex(nullptr) {
+    position_notes->pushc('\n');
     for (auto &p : patterns) p = nullptr;
     for (auto &i : instruments) i = nullptr;
     for (auto &a : arpeggios) a = nullptr;
@@ -46,6 +50,12 @@ songmsg::~songmsg() {}
 arpeggio::~arpeggio() {}
 midimacro::~midimacro() {}
 '''
+# Keep real buffer allocation/destruction without the SDL-dependent methods.
+for signature in [
+    'CDataBuf::CDataBuf()', 'CDataBuf::~CDataBuf()',
+    'void CDataBuf::pushc(const char c)', 'void CDataBuf::flush(void)',
+]:
+    source += function('src/CDataBuf.cpp', signature)
 for signature in [
     'event::event(void)', 'event::event(event *e)', 'event::~event(void)', 'int event::blank(void)',
     'track::track(short int len)', 'track::~track(void)', 'void track::reset(void)',
@@ -170,6 +180,7 @@ int main() {
     // is reused by a new song. Also invalidate a transaction across teardown.
     { PatternUndo::Edit edit(history, song); edit.watch(0);
       fixture.de_init(); fixture.patterns[0] = new pattern(64); }
+    assert(fixture.position_notes == nullptr);
     assert(history.undo_count() == 0 && history.redo_count() == 0);
     assert(history.undo(song) == -1 && history.redo(song) == -1);
     { PatternUndo::Edit edit(history, song); edit.watch(0); put(0, 0, 0, 60); }
@@ -368,7 +379,7 @@ with tempfile.TemporaryDirectory(prefix='zt-pattern-undo-') as tmp:
     cpp = Path(tmp) / 'test.cpp'
     cpp.write_text(source)
     exe = Path(tmp) / 'test'
-    flags = ['-std=c++17', '-O2', '-Wall', '-Wextra', '-I' + str(ROOT / 'src')]
+    flags = ['-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror=delete-incomplete', '-I' + str(ROOT / 'src')]
     if '--sanitize' in sys.argv:
         flags += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer']
     subprocess.run(shlex.split(os.environ.get('CXX', 'c++')) + flags +
