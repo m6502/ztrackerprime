@@ -3103,6 +3103,7 @@ static void zt_queue_full_redraw(void)
 // fullscreen transition). Tells zt_backend_set_video_mode NOT to push window
 // size/fullscreen back to SDL, which can cause problem swith full-screen on macOS
 static bool g_zt_os_driven_resize = false;
+static void zt_fit_window_to_display(void);
 
 static void zt_handle_resize_event(int w, int h)
 {
@@ -3357,6 +3358,9 @@ static int zt_handle_platform_window_event(const SDL_Event *e)
     case SDL_EVENT_WINDOW_RESTORED:
         zt_request_ui_full_refresh();
         return 1;
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+        zt_fit_window_to_display();
+        return 1;
     case SDL_EVENT_WINDOW_RESIZED:
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         zt_handle_resize_event((int)e->window.data1, (int)e->window.data2);
@@ -3530,6 +3534,36 @@ int action(Screen *S)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// The zoomed minimum (MINIMUM_SCREEN_WIDTH * ZOOM) can exceed a narrow display
+// (e.g. 1680 px at 2x on a 1440 px portrait monitor). Cap both the minimum and
+// the window itself to the usable area of the window's display; the canvas
+// stays at its minimum and is scaled down to fit.
+static void zt_fit_window_to_display(void)
+{
+  int min_w = (int)(MINIMUM_SCREEN_WIDTH  * (float)ZOOM);
+  int min_h = (int)(MINIMUM_SCREEN_HEIGHT * (float)ZOOM);
+
+  SDL_Rect usable;
+  const SDL_DisplayID display = SDL_GetDisplayForWindow(zt_main_window);
+  const bool have_bounds = display && SDL_GetDisplayUsableBounds(display, &usable) &&
+                           usable.w > 0 && usable.h > 0;
+  if (have_bounds) {
+    if (min_w > usable.w) min_w = usable.w;
+    if (min_h > usable.h) min_h = usable.h;
+  }
+  SDL_SetWindowMinimumSize(zt_main_window, min_w, min_h);
+
+  if (!have_bounds ||
+      (SDL_GetWindowFlags(zt_main_window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED))) {
+    return;
+  }
+  int w = 0, h = 0;
+  SDL_GetWindowSize(zt_main_window, &w, &h);
+  if (w > usable.w || h > usable.h) {
+    SDL_SetWindowSize(zt_main_window, w > usable.w ? usable.w : w, h > usable.h ? usable.h : h);
+  }
+}
+
 static int zt_backend_set_video_mode(char *errstr)
 {
   // HIGH_PIXEL_DENSITY: render at the display's native pixel resolution instead
@@ -3588,12 +3622,6 @@ static int zt_backend_set_video_mode(char *errstr)
     }
   }
 
-  if (!g_zt_os_driven_resize) {
-    SDL_SetWindowMinimumSize(zt_main_window,
-                             (int)(MINIMUM_SCREEN_WIDTH  * (float)ZOOM),
-                             (int)(MINIMUM_SCREEN_HEIGHT * (float)ZOOM));
-  }
-
   // Apply an explicit windowed mode change. Not on first creation (the window
   // already has the right size) and not while fullscreen (SDL_SetWindowSize
   // would change the size the window restores to on exit, and the flag is
@@ -3602,6 +3630,9 @@ static int zt_backend_set_video_mode(char *errstr)
       !(SDL_GetWindowFlags(zt_main_window) & SDL_WINDOW_FULLSCREEN)) {
     SDL_SetWindowSize(zt_main_window, RESOLUTION_X, RESOLUTION_Y);
     SDL_SetWindowFullscreen(zt_main_window, zt_config_globals.full_screen ? SDL_WINDOW_FULLSCREEN : 0);
+  }
+  if (!g_zt_os_driven_resize) {
+    zt_fit_window_to_display();
   }
   return 1;
 }
