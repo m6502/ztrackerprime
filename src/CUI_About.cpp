@@ -6,12 +6,15 @@ CUI_About::CUI_About(void) {
     UI = new UserInterface();
 
     TextBox *l = new TextBox();
+    tb = l;
     UI->add_element(l,0);
     l->x = 1;
     // Font cells are a fixed 8x8 regardless of INTERNAL_RESOLUTION, so
     // xsize is in characters. The longest line we want to fully contain
     // is "This fork is currently maintained by Manuel Montoto (Debvgger)"
     // (62 chars from column 2). Right edge aligns with end of "(Debvgger)".
+    // Narrower screens shrink it to the full width; the text is
+    // reflowed for whatever width it gets (see draw()).
     l->xsize = 66;
     // Layout policy (CUI_About::draw will scale the bmAbout bitmap to
     // fit between the page title row and the textbox top, so this is
@@ -37,8 +40,10 @@ CUI_About::CUI_About(void) {
     if (box_size < 6) box_size = 6;
     l->y     = box_top;
     l->ysize = box_size;
-    l->bWordWrap = true ;
-    l->text =R"about_text(
+    l->bWordWrap = false ;   // pre-wrapped by zt_reflow_text
+    l->text = NULL;
+    shown_width = -1;
+    source_text =R"about_text(
 |H|About|U|
 
 zTracker Prime is a fork of the original zTracker project from 2001, which was a clone of Impulse Tracker, itself a clone of Scream Tracker. The original zTracker was developed by Christopher Micali until 2002.
@@ -133,6 +138,15 @@ void CUI_About::draw(Drawable *S) {
         // below where this 319px-tall bitmap ends — so the two never
         // overlap on screens tall enough to fit both.
         S->copy(CurrentSkin->bmAbout,5,row(9));
+
+        tb->xsize = 66;
+        if (tb->xsize > TextBox::full_width_xsize()) tb->xsize = TextBox::full_width_xsize();
+        if (tb->text_width() != shown_width) {
+            shown_width = tb->text_width();
+            shown_text = zt_reflow_text(source_text, shown_width);
+            tb->text = shown_text.c_str();
+            tb->startline = 0;
+        }
     /*
     if (640 == INTERNAL_RESOLUTION_X && 480 == INTERNAL_RESOLUTION_Y) {
         S->copy(CurrentSkin->bmAbout,5,row(12));

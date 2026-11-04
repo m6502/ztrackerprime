@@ -3,6 +3,8 @@
 
 #include "module.h"
 #include "lc_sdl_wrapper.h"
+#include <string>
+#include <vector>
 
 void midi_sel(int dev);
 
@@ -223,6 +225,11 @@ class AboutBox : public UserInterfaceElement {
 
 };
 
+// Word-wraps text for a TextBox `width` columns wide, rejoining
+// hand-wrapped paragraphs and keeping "KEY : text" hanging indents.
+// See the definition in UserInterface.cpp.
+std::string zt_reflow_text(const char *src, int width, std::vector<int> *src_line_of = nullptr);
+
 class TextBox : public UserInterfaceElement {
     public:
         bool bEof,bUseColors,bWordWrap;
@@ -241,6 +248,10 @@ class TextBox : public UserInterfaceElement {
         // grows by 1 col per 8px of extra resolution. Centralized so
         // callers don't copy-paste the formula.
         static int full_width_xsize();
+
+        // Columns available for text: the box keeps a one-column pad
+        // on each side, inside the frame.
+        int text_width() const { return xsize - 2; }
 };
 
 class CommentEditor : public TextBox {

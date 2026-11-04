@@ -1905,6 +1905,240 @@ int TextBox::update()
 // ------------------------------------------------------------------------------------------------
 //
 //
+// ------------------------------------------------------------------------------------------------
+// zt_reflow_text
+//
+// Word-wraps text for display in a TextBox that is `width` columns wide.
+// Hand-wrapped source text (doc/help.txt was wrapped at ~75 columns) is
+// first rejoined into paragraphs, then wrapped again at the real width,
+// keeping hanging indents:
+//
+//     " Spacebar    : Turns Edit mode on"    ->  continuation lines start
+//                                                under "Turns"
+//
+// A source line continues the previous paragraph only when the previous
+// line was "full" (the next word would not have fitted in the original
+// width), so short deliberate line breaks are kept as they are. Lines
+// that need no rewrapping are copied verbatim.
+//
+// "|X|" colour codes are zero width; tabs are expanded to two spaces
+// (TextBox::draw also draws a tab as two columns).
+//
+// src_line_of, if given, receives for every output line the source line
+// index of the paragraph it belongs to (used to keep the scroll position
+// when the width changes).
+
+static int zt_reflow_vis_width(const std::string &s, size_t a, size_t b)
+{
+    int w = 0;
+    for (size_t i = a; i < b; i++) {
+        if (s[i] == '|' && i + 1 < b && s[i + 1] != '|') {
+            // |X| colour code (or a lone '|' at the very end)
+            if (i + 2 < b && s[i + 2] == '|') { i += 2; continue; }
+        }
+        if (s[i] == '|' && i + 1 < b && s[i + 1] == '|') { w++; i++; continue; }
+        w++;
+    }
+    return w;
+}
+
+static int zt_reflow_vis(const std::string &s) { return zt_reflow_vis_width(s, 0, s.size()); }
+
+// Byte offset just past `cols` visible columns of s (colour codes that
+// follow are kept with the preceding text).
+static size_t zt_reflow_cut(const std::string &s, int cols)
+{
+    size_t i = 0;
+    int w = 0;
+    while (i < s.size() && w < cols) {
+        if (s[i] == '|' && i + 2 < s.size() && s[i + 1] != '|' && s[i + 2] == '|') { i += 3; continue; }
+        if (s[i] == '|' && i + 1 < s.size() && s[i + 1] == '|') { i += 2; w++; continue; }
+        i++; w++;
+    }
+    return i;
+}
+
+struct ZtReflowLine {
+    std::string text;   // tabs expanded, trailing blanks removed
+    int indent;         // leading spaces
+    int len;            // visible length
+    int first_word;     // visible length of the first word
+    int hang;           // column after "KEY : ", or -1
+    bool entry;         // has a " : " separator near the start
+};
+
+static ZtReflowLine zt_reflow_analyse(const std::string &raw)
+{
+    ZtReflowLine L;
+    for (char c : raw) {
+        if (c == '\r') continue;
+        if (c == '\t') L.text += "  ";
+        else L.text += c;
+    }
+    while (!L.text.empty() && L.text.back() == ' ') L.text.pop_back();
+    L.indent = 0;
+    while (L.indent < (int)L.text.size() && L.text[L.indent] == ' ') L.indent++;
+    L.len = zt_reflow_vis(L.text);
+    size_t e = L.indent;
+    while (e < L.text.size() && L.text[e] != ' ') e++;
+    L.first_word = zt_reflow_vis_width(L.text, L.indent, e);
+
+    L.hang = -1;
+    L.entry = false;
+    // " : " within the first 36 columns: "KEY    : description".
+    size_t sep = L.text.find(" : ", L.indent);
+    if (sep != std::string::npos && sep < 36) {
+        L.entry = true;
+        size_t h = sep + 3;
+        while (h < L.text.size() && L.text[h] == ' ') h++;
+        L.hang = zt_reflow_vis_width(L.text, 0, h);
+    } else {
+        // "Key name: description" (colon glued to a short label).
+        size_t c = L.text.find(": ", L.indent);
+        if (c != std::string::npos && c < 24) {
+            size_t h = c + 2;
+            while (h < L.text.size() && L.text[h] == ' ') h++;
+            L.hang = zt_reflow_vis_width(L.text, 0, h);
+        }
+    }
+    return L;
+}
+
+std::string zt_reflow_text(const char *src, int width, std::vector<int> *src_line_of)
+{
+    // A source line counts as "full" (wrapped by its author rather than
+    // broken on purpose) when the next word would have pushed it past
+    // this many columns (doc/help.txt: deliberate breaks measure <= 62,
+    // the author's own wraps >= 65).
+    const int SOURCE_FULL = 64;
+
+    std::string out;
+    if (src_line_of) src_line_of->clear();
+    if (!src) return out;
+    if (width < 8) width = 8;
+
+    std::vector<ZtReflowLine> lines;
+    {
+        const char *p = src;
+        while (*p) {
+            const char *q = p;
+            while (*q && *q != '\n') q++;
+            lines.push_back(zt_reflow_analyse(std::string(p, q - p)));
+            p = *q ? q + 1 : q;
+        }
+    }
+
+    auto emit = [&](const std::string &s, int srcline) {
+        out += s;
+        out += '\n';
+        if (src_line_of) src_line_of->push_back(srcline);
+    };
+
+    size_t i = 0;
+    while (i < lines.size()) {
+        const ZtReflowLine &head = lines[i];
+        if (head.text.empty()) { emit("", (int)i); i++; continue; }
+
+        // Collect continuation lines.
+        size_t j = i + 1;
+        int cont_indent = -1;
+        int last_len = head.len;
+        while (j < lines.size()) {
+            const ZtReflowLine &L = lines[j];
+            if (L.text.empty()) break;
+            if (L.text[L.indent] == '|') break;              // header / colour line
+            if (L.indent < head.indent) break;
+            if (L.indent == head.indent && (L.entry || L.hang >= 0)) break; // next "KEY : " entry
+            if (head.entry && L.indent != head.hang) break;  // entries continue under the text
+            if (cont_indent >= 0 && L.indent != cont_indent) break;
+            if (cont_indent < 0 && L.indent != head.indent && L.indent != head.hang) break;
+            if (last_len + 1 + L.first_word <= SOURCE_FULL) break;   // deliberate break
+            cont_indent = L.indent;
+            last_len = L.len;
+            j++;
+        }
+
+        if (j == i + 1 && head.len <= width) {
+            emit(head.text, (int)i);
+            i++;
+            continue;
+        }
+
+        // Prefix kept verbatim on the first output line.
+        int hang = (cont_indent >= 0) ? cont_indent : (head.hang >= 0 ? head.hang : head.indent);
+        size_t prefix_end;
+        if (hang > head.indent && hang <= width / 2 && (head.hang == hang)) {
+            prefix_end = zt_reflow_cut(head.text, hang);
+        } else {
+            if (hang > width / 2) hang = head.indent + 2;
+            if (hang > width / 2) hang = 0;
+            prefix_end = head.indent;
+        }
+
+        // Body: rest of the head plus the continuation lines, as words
+        // with the separator that preceded each one.
+        std::vector<std::pair<std::string, std::string>> words; // (sep, word)
+        auto split = [&](const std::string &s, size_t from, bool joined) {
+            size_t k = from;
+            bool first = true;
+            while (k < s.size()) {
+                size_t sp = k;
+                while (k < s.size() && s[k] == ' ') k++;
+                size_t ws = k;
+                while (k < s.size() && s[k] != ' ') k++;
+                if (ws == k) break;
+                std::string sep = s.substr(sp, ws - sp);
+                if (first && joined) sep = " ";
+                first = false;
+                words.push_back({sep, s.substr(ws, k - ws)});
+            }
+        };
+        split(head.text, prefix_end, false);
+        for (size_t k = i + 1; k < j; k++) split(lines[k].text, lines[k].indent, true);
+
+        std::string cur = head.text.substr(0, prefix_end);
+        int cur_w = zt_reflow_vis(cur);
+        bool line_has_word = false;
+        std::string pad(hang, ' ');
+        for (auto &sw : words) {
+            std::string sep = line_has_word ? sw.first : std::string();
+            std::string word = sw.second;
+            int sep_w = (int)sep.size();
+            int word_w = zt_reflow_vis(word);
+            if (line_has_word && cur_w + sep_w + word_w > width) {
+                emit(cur, (int)i);
+                cur = pad; cur_w = hang; line_has_word = false;
+                sep.clear(); sep_w = 0;
+            }
+            // Word longer than a whole line: hard-break it.
+            while (cur_w + word_w > width) {
+                int room = width - cur_w;
+                if (room <= 0) { emit(cur, (int)i); cur = pad; cur_w = hang; continue; }
+                size_t cut = zt_reflow_cut(word, room);
+                cur += word.substr(0, cut);
+                emit(cur, (int)i);
+                word = word.substr(cut);
+                word_w = zt_reflow_vis(word);
+                cur = pad; cur_w = hang;
+            }
+            cur += sep + word;
+            cur_w += sep_w + word_w;
+            line_has_word = true;
+        }
+        if (line_has_word || cur_w > 0) emit(cur, (int)i);
+        i = j;
+    }
+    // The source's final newline produces no extra empty line.
+    if (!out.empty() && src[strlen(src) - 1] != '\n') out.pop_back();
+    return out;
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
 int nextline(const char *str, int p) {
     while(str[p]) {
         if (str[p]=='\n')
@@ -2045,7 +2279,7 @@ void TextBox::draw(Drawable *S, int)
   
         if (p>=soff)  {
     
-          if (cx<x+xsize-4) printchar(col(x + 1 +cx), row(y + line), text[sc], use, S);
+          if (cx<text_width()) printchar(col(x + 1 +cx), row(y + line), text[sc], use, S);
           else {
       
             if (bWordWrap) {
@@ -3536,9 +3770,9 @@ static bool zt_textbox_locate_offset(const char *text, bool bUseColors,
                     if (sc == target_sc) {
                         *out_cx = cx;
                         *out_line = line;
-                        return (cx < xsize - 4);
+                        return (cx < xsize - 2);
                     }
-                    if (cx < xsize - 4) {
+                    if (cx < xsize - 2) {   // == TextBox::text_width()
                         cx++;
                     } else {
                         // Wrap (matches TextBox::draw's bWordWrap branch).

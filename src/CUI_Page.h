@@ -77,6 +77,12 @@ class CUI_About : public CUI_Page {
 //        int textx,texty,numtexts,curtext;
 //        char *texts[3];
 
+        // About text, reflowed into shown_text for the box width.
+        TextBox *tb;
+        const char *source_text;
+        std::string shown_text;
+        int shown_width;
+
         CUI_About();
 
         void enter(void);
@@ -212,6 +218,16 @@ class CUI_Help : public CUI_Page {
         // to jump tb->startline forward/back to the next/prev section.
         int *section_lines;
         int section_count;
+
+        // help.txt as loaded; tb->text points into shown_text, which is
+        // source_text reflowed for shown_width columns. shown_src_line
+        // maps each shown line to its source line.
+        std::string source_text;
+        std::string shown_text;
+        std::vector<int> shown_src_line;
+        int shown_width;
+        void relayout();
+        void find_sections();
 
         CUI_Help();
         ~CUI_Help();

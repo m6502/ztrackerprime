@@ -49,7 +49,7 @@ CUI_Config::CUI_Config(void) {
 
     cb = new CheckBox;
     UI->add_element(cb,0);
-    cb->x = 20;
+    cb->x = 17;
     cb->y = 14;
     cb->xsize = 3;
     cb->value = &zt_config_globals.autoload_ztfile;
@@ -59,8 +59,9 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(ti,1);
     ti->frame = 1;
     // Sit on the same row as the Autoload .ZT checkbox, to the right of
-    // the "Autoload File" label that draws at col 28 (label is 13 cols).
-    ti->x = 42;
+    // the "Autoload File" label that draws at col 25 (label is 13 cols).
+    // xsize is capped to the screen width in draw().
+    ti->x = 39;
     ti->y = 14;
     ti->xsize = 30;
     ti->length = 50;
@@ -69,9 +70,9 @@ CUI_Config::CUI_Config(void) {
     ti = new TextInput;
     UI->add_element(ti,2);
     ti->frame = 1;
-    ti->x = 20;
+    ti->x = 17;
     ti->y = 16;
-    ti->xsize = 52;   // ends col 72 — matches Autoload File textfield right edge
+    ti->xsize = 52;   // ends col 69 — matches Autoload File textfield right edge
     ti->length = 50;
     ti->str = (unsigned char*)zt_config_globals.default_directory;
 
@@ -79,7 +80,7 @@ CUI_Config::CUI_Config(void) {
     // Velocity, which has moved to F12 Sysconfig).
     vs = new ValueSlider;
     UI->add_element(vs,3);
-    vs->x = 20;
+    vs->x = 17;
     vs->y = 18;
     vs->xsize = 15;
     vs->ysize = 1;
@@ -89,7 +90,7 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,4);
-    vs->x = 20;
+    vs->x = 17;
     vs->y = 20;
     vs->xsize = 15;
     vs->ysize = 1;
@@ -110,7 +111,7 @@ CUI_Config::CUI_Config(void) {
 
     vs = new ValueSlider;
     UI->add_element(vs,5);
-    vs->x = 20;
+    vs->x = 17;
     vs->y = 21;
     vs->xsize = 15;
     vs->ysize = 1;
@@ -121,7 +122,7 @@ CUI_Config::CUI_Config(void) {
     // Post-Load Page: where to land after a successful song load.
     vs = new ValueSlider;
     UI->add_element(vs, 6);
-    vs->x = 20;
+    vs->x = 17;
     vs->y = 23;
     vs->xsize = 15;
     vs->ysize = 1;
@@ -136,7 +137,7 @@ CUI_Config::CUI_Config(void) {
     UI->add_element(b,7);
     b->caption = "   Go to page 1   ";   // symmetric with Sysconfig's "Go to page 2" button (same x, y, xsize)
     b->xsize = 18;
-    b->x = 4;   // matches Sysconfig F12 button x so the button doesn't jump on page switch
+    b->x = 1;   // one-column left margin, like the labels
     b->y = 12;
     b->ysize = 1;
     b->OnClick = (ActFunc)BTNCLK_GotoSystemConfig;
@@ -192,12 +193,11 @@ CUI_Config::CUI_Config(void) {
     tb = new TextBox;
     UI->add_element(tb, 8);
     tb->no_tab_stop = 1;  // read-only help; swallows UP/DOWN, exclude from focus cycle
-    // Align left edge with the 'Go to page 1' button (x=4) above so the
-    // page balances visually. Right edge stays where it was — same column
-    // count, just shifted right by 3.
-    tb->x = 4;
+    // Frame on col 1, under the 'Go to page 1' button. Width is set
+    // in draw(): right frame at col 76, or the screen edge minus one.
+    tb->x = 2;
     tb->y = 26;
-    tb->xsize = 72;   // ends col 76 — matches F12 MIDI list right edge
+    tb->xsize = 74;
     {
         const int max_rows = (INTERNAL_RESOLUTION_Y / 8);
         int remain = max_rows - tb->y - 1 - 9;
@@ -332,6 +332,16 @@ void CUI_Config::update() {
 
 void CUI_Config::draw(Drawable *S) {
     char buf[1024];
+    {
+        // Keep the right-hand fields inside the screen (one blank column
+        // before the edge; TextInput's frame sits at x + xsize).
+        const int last = (INTERNAL_RESOLUTION_X / 8) - 2;
+        TextInput *ti = (TextInput *)UI->get_element(1);   // Autoload File
+        if (ti) { ti->xsize = 30; if (ti->x + ti->xsize > last) ti->xsize = last - ti->x; }
+        ti = (TextInput *)UI->get_element(2);               // Default Dir
+        if (ti) { ti->xsize = 52; if (ti->x + ti->xsize > last) ti->xsize = last - ti->x; }
+        if (tb) tb->xsize = (last < 76 ? last : 76) - tb->x;
+    }
     if (S->lock()==0) {
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
         const char *view_mode_name = "Regular";
@@ -441,19 +451,19 @@ void CUI_Config::draw(Drawable *S) {
         draw_status(S);
         status(S);
         printtitle(PAGE_TITLE_ROW_Y,"Global Configuration (Ctrl+F12)",COLORS.Text,COLORS.Background,S);
-        // Labels right-align so text ends at col 18 (1-char gap before
-        // the col-20 controls).
-        print(row(7),col(14),"Autoload .ZT",COLORS.Text,S);
-        print(row(28),col(14),"Autoload File",COLORS.Text,S);
-        print(row(8),col(16),"Default Dir",COLORS.Text,S);
+        // Labels right-align so text ends at col 15 (1-char gap before
+        // the col-17 controls); the longest one starts at col 1.
+        print(row(4),col(14),"Autoload .ZT",COLORS.Text,S);
+        print(row(25),col(14),"Autoload File",COLORS.Text,S);
+        print(row(5),col(16),"Default Dir",COLORS.Text,S);
         // Record Velocity moved to F12 (Sysconfig).
-        print(row(5),col(18),"Autosave (sec)",COLORS.Text,S);
+        print(row(2),col(18),"Autosave (sec)",COLORS.Text,S);
 #ifdef _ACTIVAR_CAMBIO_TAMANYO_COLUMNAS
-        print(row(7),col(20),"Default View",COLORS.Text,S);
+        print(row(4),col(20),"Default View",COLORS.Text,S);
 #endif
         // Row Highlight / Row Lowlight live in F11 (Songconfig) only.
-        print(row(4),col(21),"Default Pat Len",COLORS.Text,S);
-        print(row(5),col(23),"Post-Load Page",COLORS.Text,S);
+        print(row(1),col(21),"Default Pat Len",COLORS.Text,S);
+        print(row(2),col(23),"Post-Load Page",COLORS.Text,S);
 //        print(row(2),col(25)," .ZT directory",COLORS.Text,S);
 
         //printtitle(32,"Current Global Settings",COLORS.Text,COLORS.Background,S);

@@ -203,48 +203,67 @@ CUI_Help::CUI_Help(void) {
     }
     free(help_file);
 
-    // Build section anchor list. Section headers look like
-    //   |L|%==|H|Section Title|L|==%|U|
-    // and always sit at the start of a line. Walk tb->text once,
-    // recording the line index (number of \n encountered before the
-    // line) for each match. Two-pass: count, then fill.
-    {
-        const char *t = tb->text;
+    // Keep the loaded text as the reflow source; what the TextBox shows
+    // is rebuilt for the current width in relayout().
+    source_text = tb->text;
+    if (needfree) delete[] tb->text;
+    needfree = 0;
+    tb->text = NULL;
+    shown_width = -1;
+    relayout();
+}
+
+// Section anchors: line numbers (in the shown, reflowed text) of the
+// "|L|%==|H|Title" headers, for Tab / Shift-Tab.
+void CUI_Help::find_sections() {
+    if (section_lines) {
+        delete[] section_lines;
+        section_lines = NULL;
+    }
+    section_count = 0;
+    const char *t = tb->text;
+    if (!t) return;
+    int count = 0;
+    for (int pass = 0; pass < 2; pass++) {
         int line_idx = 0;
-        int count = 0;
         for (int i = 0; t[i]; ) {
-            int line_start = i;
-            int line_end = line_start;
+            int line_end = i;
             while (t[line_end] && t[line_end] != '\n') line_end++;
-            // Match the marker at the very start of the line, allowing
-            // for one optional leading space (defensive — the file's
-            // headers all start at column 0 today).
-            int p = line_start;
+            int p = i;
             if (t[p] == ' ') p++;
             if (line_end - p >= 8 && strncmp(t + p, "|L|%==|H|", 9) == 0) {
-                count++;
+                if (pass == 0) count++;
+                else section_lines[section_count++] = line_idx;
             }
             line_idx++;
             i = (t[line_end] == '\n') ? line_end + 1 : line_end;
         }
-        if (count > 0) {
+        if (pass == 0) {
+            if (count == 0) return;
             section_lines = new int[count];
-            section_count = 0;
-            line_idx = 0;
-            for (int i = 0; t[i]; ) {
-                int line_start = i;
-                int line_end = line_start;
-                while (t[line_end] && t[line_end] != '\n') line_end++;
-                int p = line_start;
-                if (t[p] == ' ') p++;
-                if (line_end - p >= 8 && strncmp(t + p, "|L|%==|H|", 9) == 0) {
-                    section_lines[section_count++] = line_idx;
-                }
-                line_idx++;
-                i = (t[line_end] == '\n') ? line_end + 1 : line_end;
-            }
         }
     }
+}
+
+// Reflow the help text for the TextBox's current width, keeping the
+// paragraph at the top of the view in place.
+void CUI_Help::relayout() {
+    int top_src = 0;
+    if (shown_width >= 0 && tb->startline >= 0
+        && tb->startline < (int)shown_src_line.size())
+        top_src = shown_src_line[tb->startline];
+
+    shown_width = tb->text_width();
+    shown_text = zt_reflow_text(source_text.c_str(), shown_width, &shown_src_line);
+    tb->text = shown_text.c_str();
+
+    int start = 0;
+    for (size_t i = 0; i < shown_src_line.size(); i++) {
+        if (shown_src_line[i] >= top_src) { start = (int)i; break; }
+    }
+    tb->startline = start;
+    tb->bEof = false;
+    find_sections();
 }
 
 CUI_Help::~CUI_Help() {
@@ -480,6 +499,7 @@ void CUI_Help::draw(Drawable *S) {
     tb->xsize = TextBox::full_width_xsize();
     // Bottom-anchor: fill from tb->y down to ~5 rows above screen bottom.
     tb->ysize = (INTERNAL_RESOLUTION_Y/8) - tb->y - 8;
+    if (tb->text_width() != shown_width) relayout();
 
     if (S->lock()==0) {
         UI->draw(S);
