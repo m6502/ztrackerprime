@@ -3535,23 +3535,42 @@ int action(Screen *S)
 //
 //
 // The zoomed minimum (MINIMUM_SCREEN_WIDTH * ZOOM) can exceed a narrow display
-// (e.g. 1680 px at 2x on a 1440 px portrait monitor). Cap both the minimum and
-// the window itself to the usable area of the window's display; the canvas
-// stays at its minimum and is scaled down to fit.
+// (e.g. a 1440 px wide portrait monitor at 3x). The minimum is capped against
+// the SMALLEST connected display, never the window's current one: a minimum
+// that changes with the display makes the compositor grow the window back
+// while it is dragged across a monitor edge, and it flickers between sizes.
+static void zt_cap_to_smallest_display(int *w, int *h)
+{
+  int count = 0;
+  SDL_DisplayID *displays = SDL_GetDisplays(&count);
+  if (!displays) {
+    return;
+  }
+  for (int i = 0; i < count; i++) {
+    SDL_Rect usable;
+    if (SDL_GetDisplayUsableBounds(displays[i], &usable) && usable.w > 0 && usable.h > 0) {
+      if (*w > usable.w) *w = usable.w;
+      if (*h > usable.h) *h = usable.h;
+    }
+  }
+  SDL_free(displays);
+}
+
 static void zt_fit_window_to_display(void)
 {
+  // The headless dummy display has no physical size worth fitting to.
+  if (zt_headless_active()) {
+    return;
+  }
   int min_w = (int)(MINIMUM_SCREEN_WIDTH  * (float)ZOOM);
   int min_h = (int)(MINIMUM_SCREEN_HEIGHT * (float)ZOOM);
+  zt_cap_to_smallest_display(&min_w, &min_h);
+  SDL_SetWindowMinimumSize(zt_main_window, min_w, min_h);
 
   SDL_Rect usable;
   const SDL_DisplayID display = SDL_GetDisplayForWindow(zt_main_window);
   const bool have_bounds = display && SDL_GetDisplayUsableBounds(display, &usable) &&
                            usable.w > 0 && usable.h > 0;
-  if (have_bounds) {
-    if (min_w > usable.w) min_w = usable.w;
-    if (min_h > usable.h) min_h = usable.h;
-  }
-  SDL_SetWindowMinimumSize(zt_main_window, min_w, min_h);
 
   if (!have_bounds ||
       (SDL_GetWindowFlags(zt_main_window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED))) {
