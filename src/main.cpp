@@ -3580,6 +3580,43 @@ int action(Screen *S)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// Window caption: "<version> - <absolute song path>", plus " *" while there
+// are unsaved changes. song->filename is relative to the directory that was
+// current when it was loaded/saved (the file dialogs chdir), so it is resolved
+// the moment it changes, not later.
+static void zt_update_window_title(void)
+{
+  static std::string last_filename;
+  static std::string abs_path;
+  static std::string last_title;
+
+  std::string fn = song ? (const char *)song->filename : "";
+  if (fn.find_first_not_of(' ') == std::string::npos) {
+    fn.clear();
+  }
+  if (fn != last_filename) {
+    last_filename = fn;
+    abs_path.clear();
+    if (!fn.empty()) {
+      std::error_code ec;
+      const std::filesystem::path abs = std::filesystem::absolute(fn, ec);
+      abs_path = ec ? fn : abs.lexically_normal().string();
+    }
+  }
+
+  std::string title = ZTRACKER_VERSION;
+  if (!abs_path.empty()) {
+    title += " - " + abs_path;
+  }
+  if (file_changed > 0) {
+    title += " *";
+  }
+  if (title != last_title) {
+    last_title = title;
+    zt_set_window_title(title.c_str());
+  }
+}
+
 // The zoomed minimum (MINIMUM_SCREEN_WIDTH * ZOOM) can exceed a narrow display
 // (e.g. a 1440 px wide portrait monitor at 3x). The minimum is capped against
 // the SMALLEST connected display, never the window's current one: a minimum
@@ -3647,7 +3684,7 @@ static int zt_backend_set_video_mode(char *errstr)
 
   if (!zt_main_window) {
     SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, "1");
-    zt_main_window = SDL_CreateWindow("zt", RESOLUTION_X, RESOLUTION_Y, window_flags);
+    zt_main_window = SDL_CreateWindow(ZTRACKER_VERSION, RESOLUTION_X, RESOLUTION_Y, window_flags);
     if (!zt_main_window) {
       sprintf(errstr, "Couldn't create SDL window: %s\n", SDL_GetError());
       zt_show_error("Error", errstr);
@@ -4701,6 +4738,7 @@ int main(int argc, char *argv[])
         break;
       }
 
+      zt_update_window_title();
       zt_apply_pending_window_title();
 
       // Drain any MIDI mapping action posts captured by the MIDI
