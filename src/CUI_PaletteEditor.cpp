@@ -25,16 +25,25 @@ static void palette_changed(void);
 // the bottom and operate on the snapshot taken on entry, so adjustments
 // are composable and reversible (ESC restores the snapshot exactly).
 //
+// Layout (computed from the canvas size every frame, see pe_layout()):
+//
+//   Colours            selected colour                Palettes & Skins
+//   ## Background      Name  #RRGGBB                  Acid Gas
+//   ## Highlight       [swatch]   R [=========] 164   ...
+//   ...  (all 18)                 G / B               [skin] default
+//                      pattern-editor preview         Bright / Contrast /
+//                      (rows, beats, cursor row,      Tint bars, Hue,
+//                       selection, caret, LCD bars)   [ ] Reset skin
+//
 // Navigation:
-//   Arrow keys           - move within current panel (grid or presets)
-//   Tab / Shift+Tab      - switch focus between swatch grid and preset panel
-//   Mouse                - left-click any swatch, RGB slider, preset, or
-//                          global slider; drag a slider to scrub
-//   R / G / B            - keyboard-select a channel of the focused swatch
-//   + / -                - increase/decrease selected channel by 1
-//                          (Shift for x16)
-//   0..9                 - replace selected channel with that decimal digit
-//   Enter                - on a preset, load that preset
+//   Tab / Shift+Tab      - cycle colour list -> R/G/B sliders -> presets
+//   Colour list          - Up/Down pick a colour, Right/Enter edit it
+//   Sliders              - Up/Down pick R/G/B, Left/Right -/+1 (Shift x16),
+//                          0..9 type a value, +/- also step
+//   Presets              - Up/Down/PgUp/PgDn/Home/End move, Enter loads,
+//                          Left goes back to the colour list
+//   R / G / B            - jump to that channel of the selected colour
+//   Mouse                - click a colour, preset or bar; drag bars to scrub
 //   [ / ]                - global brightness -/+ 8
 //   ; / '                - global contrast   -/+ 4
 //   T                    - cycle global tint hue (none, purple, red, blue,
@@ -45,43 +54,11 @@ static void palette_changed(void);
 //                          to pattern editor
 // ---------------------------------------------------------------------------
 
-// Layout constants (character cells are 8x8 px).
-// Each slot: 1 row label + PE_SWATCH_H rows swatch + 3 rows R/G/B sliders.
-// Step of 8 leaves a 1-row gap before the next row's label.
-#define PE_GRID_COL_X       6
-#define PE_GRID_COL_STEP    23
-#define PE_GRID_ROW_Y       12
-#define PE_GRID_ROW_STEP    8
-#define PE_GRID_COLS        3
-#define PE_GRID_ROWS        ((NUM_PALETTE_SLOTS + PE_GRID_COLS - 1) / PE_GRID_COLS)
-
-#define PE_SWATCH_W         5
+#define PE_LIST_W           17   // colour list: 2-col swatch, gap, 14-col name
+#define PE_PRESET_W         22   // preset panel content width
+#define PE_SWATCH_W         6    // big swatch of the selected colour
 #define PE_SWATCH_H         3
-
-#define PE_SLIDER_W_CHARS   10   // RGB slider width in char cells (80 px)
-
-#define PE_PRESET_X         76
-#define PE_PRESET_Y         12
-#define PE_PRESET_W         22
-#define PE_PRESET_VISIBLE   24   // visible preset rows (1-row pitch)
-
-// Global controls strip — single horizontal row above the swatch grid,
-// well clear of the toolbar at the bottom of the screen.
-#define PE_GLOBAL_ROW_Y     10   // char-row directly under the page title
-#define PE_GLOBAL_X         2
-#define PE_GLOBAL_BAR_W     14   // chars per slider
-#define PE_GLOBAL_LABEL_W   12   // label cells before each bar
-#define PE_GLOBAL_NUMBER_W  4    // value readout after each bar
-#define PE_GLOBAL_GROUP_W   (PE_GLOBAL_LABEL_W + PE_GLOBAL_BAR_W + PE_GLOBAL_NUMBER_W + 2)
-
-// Checkbox: "[X] Reset skin" — shares row 10 with the global slider strip,
-// to the right of the tint slider. Keeping it on row 10 means swatch slot
-// labels (which are printed at PE_GRID_ROW_Y - 1 = row 11) don't overlap
-// with the checkbox.
-#define PE_CHECKBOX_X       (PE_GLOBAL_X + 3 * PE_GLOBAL_GROUP_W + 1)
-#define PE_CHECKBOX_Y       PE_GLOBAL_ROW_Y
-#define PE_CHECKBOX_LABEL   "Reset skin"
-#define PE_CHECKBOX_W       (3 + 1 + (int)sizeof(PE_CHECKBOX_LABEL))
+#define PE_CHECKBOX_LABEL   "Reset skin on load"
 
 struct PaletteSlot {
     const char *name;
@@ -212,6 +189,8 @@ CUI_PaletteEditor::CUI_PaletteEditor(void) {
     selected_slot = 0;
     focus_panel = 0;
     channel_edit = 0;
+    preset_sel = 0;
+    preset_top = 0;
     dirty = 0;
     status_line[0] = '\0';
     num_presets = 0;
@@ -296,7 +275,10 @@ void CUI_PaletteEditor::enter(void) {
     cur_state = STATE_PALETTE_EDITOR;
     for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
         snapshot[i] = *slot_color_ptr(i);
+        entry_colors[i] = snapshot[i];
     }
+    snprintf(entry_skin, sizeof(entry_skin), "%s",
+             CurrentSkin ? CurrentSkin->strSkinName : "");
     dirty = 0;
     channel_edit = 0;
     brightness = 0;
@@ -513,78 +495,124 @@ void CUI_PaletteEditor::apply_channel_set(int value) {
     palette_changed();
 }
 
-// Geometry helpers used by both draw() and update() so click hit-tests stay
-// in sync with what the user sees.
+// ---------------------------------------------------------------------------
+// Layout. Shared by draw() and update() so click hit-tests always match
+// what is on screen. Everything is in character cells unless noted.
+// ---------------------------------------------------------------------------
 
-static void slot_origin(int slot, int *x0, int *y0, int *x1, int *y1) {
-    int gr = slot / PE_GRID_COLS;
-    int gc = slot % PE_GRID_COLS;
-    int cx = PE_GRID_COL_X + gc * PE_GRID_COL_STEP;
-    int cy = PE_GRID_ROW_Y + gr * PE_GRID_ROW_STEP;
-    *x0 = col(cx);
-    *y0 = row(cy);
-    *x1 = col(cx + PE_SWATCH_W);
-    *y1 = row(cy + PE_SWATCH_H);
+struct PeLayout {
+    int cols, rows;
+    int top, bottom;        // content rows, inclusive
+    int list_x;             // colour list: swatch list_x..+1, name from list_x+3
+    int mid_x, mid_w;       // middle column (selected colour + preview)
+    int pre_x, pre_w;       // preset panel content (frame drawn around it)
+    int pre_y, pre_rows;    // first preset row, visible preset rows
+    int glob_y;             // Bright; Contrast +1; Tint +2; Hue +3; Reset +4
+    int prev_y;             // pattern preview: track header row
+    int hint_y;             // hint, global keys, status: hint_y .. hint_y+2
+};
+
+static PeLayout pe_layout(void) {
+    PeLayout L;
+    L.cols = INTERNAL_RESOLUTION_X / 8;
+    L.rows = INTERNAL_RESOLUTION_Y / 8;
+    L.top = PAGE_TITLE_ROW_Y + 2;
+    L.hint_y = L.rows - 9;          // three lines, above the toolbar
+    L.bottom = L.hint_y - 2;
+    L.list_x = 1;
+    L.pre_w = PE_PRESET_W;
+    L.pre_x = L.cols - 2 - L.pre_w;
+    L.mid_x = L.list_x + PE_LIST_W + 2;
+    L.mid_w = L.pre_x - 2 - L.mid_x;
+    L.glob_y = L.bottom - 4;
+    L.pre_y = L.top + 1;            // row L.top is the panel header
+    L.pre_rows = (L.glob_y - 2) - L.pre_y + 1;
+    if (L.pre_rows < 3) L.pre_rows = 3;
+    L.prev_y = L.top + 6;
+    return L;
 }
 
-static void rgb_slider_rect(int slot, int channel, int *x0, int *y0, int *x1, int *y1) {
-    int sx0, sy0, sx1, sy1;
-    slot_origin(slot, &sx0, &sy0, &sx1, &sy1);
-    int rgb_y = sy1 + 1;
-    *x0 = sx0 + col(2);                          // 2 chars left for "R"/"G"/"B"
-    *x1 = *x0 + col(PE_SLIDER_W_CHARS);
-    *y0 = rgb_y + (channel - 1) * row(1);
+static int pe_hit(int mx, int my, int x0, int y0, int x1, int y1) {
+    return mx >= x0 && mx < x1 && my >= y0 && my < y1;
+}
+
+// Pixel rect of colour-list entry i.
+static void list_item_rect(const PeLayout &L, int i, int *x0, int *y0, int *x1, int *y1) {
+    *x0 = col(L.list_x);
+    *x1 = col(L.list_x + PE_LIST_W);
+    *y0 = row(L.top + 1 + i);
+    *y1 = *y0 + row(1);
+}
+
+// Pixel rect of the R (1) / G (2) / B (3) bar of the selected colour.
+static void rgb_slider_rect(const PeLayout &L, int channel, int *x0, int *y0, int *x1, int *y1) {
+    *x0 = col(L.mid_x + PE_SWATCH_W + 4);
+    *x1 = col(L.mid_x + L.mid_w - 4);
+    *y0 = row(L.top + 1 + channel);
     *y1 = *y0 + row(1) - 2;
 }
 
-static void global_slider_rect(int which, int *x0, int *y0, int *x1, int *y1) {
-    // which: 0 = brightness, 1 = contrast, 2 = tint amount
-    // Three groups laid out horizontally on PE_GLOBAL_ROW_Y.
-    int group_x = PE_GLOBAL_X + which * PE_GLOBAL_GROUP_W;
-    *y0 = row(PE_GLOBAL_ROW_Y);
+// Pixel rect of global bar 0 = brightness, 1 = contrast, 2 = tint amount.
+static void global_slider_rect(const PeLayout &L, int which, int *x0, int *y0, int *x1, int *y1) {
+    *x0 = col(L.pre_x + 9);
+    *x1 = col(L.pre_x + L.pre_w - 5);
+    *y0 = row(L.glob_y + which);
     *y1 = *y0 + row(1) - 2;
-    *x0 = col(group_x + PE_GLOBAL_LABEL_W);
-    *x1 = *x0 + col(PE_GLOBAL_BAR_W);
+}
+
+static int slider_value_at(int mx, int x0, int x1, int range) {
+    return clampi((mx - x0) * range / (x1 - x0 - 1), 0, range);
+}
+
+// Keep the selected preset inside the visible part of the list.
+void CUI_PaletteEditor::clamp_preset_view(void) {
+    const PeLayout L = pe_layout();
+    if (num_presets <= 0) { preset_sel = 0; preset_top = 0; return; }
+    preset_sel = clampi(preset_sel, 0, num_presets - 1);
+    if (preset_sel < preset_top) preset_top = preset_sel;
+    if (preset_sel >= preset_top + L.pre_rows) preset_top = preset_sel - L.pre_rows + 1;
+    preset_top = clampi(preset_top, 0, num_presets > L.pre_rows ? num_presets - L.pre_rows : 0);
 }
 
 void CUI_PaletteEditor::update(void) {
     static int digit_accum = -1;
     static int digit_channel = 0;
     // Mouse-drag tracking for slider scrubbing while button is held.
-    // 0 = no drag, 1..3 = swatch RGB channel, 10/11/12 = global brightness/
+    // 0 = no drag, 1..3 = R/G/B bar, 10/11/12 = global brightness/
     // contrast/tint amount.
     static int drag_kind = 0;
-    static int drag_slot = 0;
+
+    const PeLayout L = pe_layout();
+
+    auto set_global = [&](int which, int x) {
+        int gx0, gy0, gx1, gy1;
+        global_slider_rect(L, which, &gx0, &gy0, &gx1, &gy1);
+        int frac = slider_value_at(x, gx0, gx1, 1000);
+        if (which == 0)      brightness = -128 + (frac * 255) / 1000;
+        else if (which == 1) contrast   = -100 + (frac * 200) / 1000;
+        else {
+            tint_amount = (frac * 255) / 1000;
+            // Scrubbing the amount with no hue selected would do nothing;
+            // pick the first real hue so the drag is visible.
+            if (tint_amount > 0 && tint_index == 0) tint_index = 1;
+        }
+        recompute_globals();
+    };
 
     UI->update();
     if (!Keys.size()) {
-        // Continue scrubbing while button is held even without new key events.
+        // Continue scrubbing while the button is held.
         if (drag_kind && bMouseIsDown) {
             int x = LastX;
             if (drag_kind >= 1 && drag_kind <= 3) {
                 int rx0, ry0, rx1, ry1;
-                rgb_slider_rect(drag_slot, drag_kind, &rx0, &ry0, &rx1, &ry1);
-                int v = clampi((x - rx0) * 255 / (rx1 - rx0 - 1), 0, 255);
+                rgb_slider_rect(L, drag_kind, &rx0, &ry0, &rx1, &ry1);
                 channel_edit = drag_kind;
-                int saved = selected_slot;
-                selected_slot = drag_slot;
-                apply_channel_set(v);
-                selected_slot = saved;
-            } else if (drag_kind == 10 || drag_kind == 11 || drag_kind == 12) {
-                int gx0, gy0, gx1, gy1;
-                global_slider_rect(drag_kind - 10, &gx0, &gy0, &gx1, &gy1);
-                int frac = clampi((x - gx0) * 1000 / (gx1 - gx0 - 1), 0, 1000);
-                if (drag_kind == 10)      brightness = -128 + (frac * 256) / 1000;
-                else if (drag_kind == 11) contrast   = -100 + (frac * 200) / 1000;
-                else {
-                    tint_amount = (frac * 255) / 1000;
-                    // If the user is scrubbing the tint amount but no hue is
-                    // selected, the slider would silently do nothing. Bump
-                    // to the first real hue (Purple) so dragging visibly
-                    // tints the palette.
-                    if (tint_amount > 0 && tint_index == 0) tint_index = 1;
-                }
-                recompute_globals();
+                apply_channel_set(slider_value_at(x, rx0, rx1, 255));
+                need_refresh++;
+            } else if (drag_kind >= 10 && drag_kind <= 12) {
+                set_global(drag_kind - 10, x);
+                need_refresh++;
             }
         } else if (drag_kind && !bMouseIsDown) {
             drag_kind = 0;
@@ -600,6 +628,11 @@ void CUI_PaletteEditor::update(void) {
         digit_accum = -1;
         digit_channel = 0;
     };
+    auto pick_preset = [&](int i) {
+        if (i < 0 || i >= num_presets) return;
+        if (preset_is_skin[i]) load_skin_full(preset_path[i]);
+        else load_palette_file(preset_path[i]);
+    };
 
     if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_UP << 8) | SDL_BUTTON_LEFT))) {
         drag_kind = 0;
@@ -609,110 +642,96 @@ void CUI_PaletteEditor::update(void) {
     if (key == ((unsigned int)((SDL_EVENT_MOUSE_BUTTON_DOWN << 8) | SDL_BUTTON_LEFT))) {
         int mx = MousePressX;
         int my = MousePressY;
+        reset_accum();
+        need_refresh++;
 
-        // 1. Preset list (1-row pitch list down the right column).
-        int ppx = col(PE_PRESET_X);
-        int ppy = row(PE_PRESET_Y);
-        int ppw = col(PE_PRESET_W);
-        int visible = num_presets < PE_PRESET_VISIBLE ? num_presets : PE_PRESET_VISIBLE;
-        for (int i = 0; i < visible; ++i) {
-            int ly = ppy + row(2 + i);
-            if (mx >= ppx && mx < ppx + ppw && my >= ly && my < ly + row(1)) {
-                focus_panel = 1;
-                selected_slot = i;
-                channel_edit = 0;
-                if (preset_is_skin[i]) {
-                    load_skin_full(preset_path[i]);
-                } else {
-                    load_palette_file(preset_path[i]);
-                }
-                reset_accum();
-                need_refresh++;
-                return;
-            }
-        }
-
-        // 2. Per-slot RGB sliders.
-        for (int slot = 0; slot < NUM_PALETTE_SLOTS; ++slot) {
-            for (int ch = 1; ch <= 3; ++ch) {
-                int rx0, ry0, rx1, ry1;
-                rgb_slider_rect(slot, ch, &rx0, &ry0, &rx1, &ry1);
-                if (mx >= rx0 && mx < rx1 && my >= ry0 && my < ry1) {
-                    focus_panel = 0;
-                    selected_slot = slot;
-                    channel_edit = ch;
-                    int v = clampi((mx - rx0) * 255 / (rx1 - rx0 - 1), 0, 255);
-                    apply_channel_set(v);
-                    drag_kind = ch;
-                    drag_slot = slot;
-                    reset_accum();
-                    need_refresh++;
-                    return;
-                }
-            }
-        }
-
-        // 3. Swatch hit-test (selects without scrubbing).
+        // Colour list.
         for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
             int x0, y0, x1, y1;
-            slot_origin(i, &x0, &y0, &x1, &y1);
-            if (mx >= x0 && mx < x1 && my >= y0 && my < y1) {
+            list_item_rect(L, i, &x0, &y0, &x1, &y1);
+            if (pe_hit(mx, my, x0, y0, x1, y1)) {
                 focus_panel = 0;
                 selected_slot = i;
                 channel_edit = 0;
-                reset_accum();
-                snprintf(status_line, sizeof(status_line),
-                         "Selected %s - drag the R/G/B bars or press R/G/B then 0-9",
-                         g_slots[i].name);
-                need_refresh++;
                 return;
             }
         }
 
-        // 3b. "Reset skin to default on palette load" checkbox.
-        {
-            int cbx0 = col(PE_CHECKBOX_X);
-            int cbx1 = cbx0 + col(PE_CHECKBOX_W);
-            int cby0 = row(PE_CHECKBOX_Y);
-            int cby1 = cby0 + row(1);
-            if (mx >= cbx0 && mx < cbx1 && my >= cby0 && my < cby1) {
-                reset_skin_on_palette = !reset_skin_on_palette;
-                snprintf(status_line, sizeof(status_line),
-                         "Reset skin to default on palette load: %s",
-                         reset_skin_on_palette ? "ON" : "OFF");
-                doredraw++;
-                need_refresh++;
-                screenmanager.UpdateAll();
+        // R/G/B bars of the selected colour.
+        for (int ch = 1; ch <= 3; ++ch) {
+            int x0, y0, x1, y1;
+            rgb_slider_rect(L, ch, &x0, &y0, &x1, &y1);
+            if (pe_hit(mx, my, x0, y0, x1, y1 + 2)) {
+                focus_panel = 0;
+                channel_edit = ch;
+                apply_channel_set(slider_value_at(mx, x0, x1, 255));
+                drag_kind = ch;
                 return;
             }
         }
 
-        // 4. Global brightness / contrast / tint sliders.
+        // Presets.
+        for (int i = 0; i < L.pre_rows && preset_top + i < num_presets; ++i) {
+            int y0 = row(L.pre_y + i);
+            if (pe_hit(mx, my, col(L.pre_x), y0, col(L.pre_x + L.pre_w), y0 + row(1))) {
+                focus_panel = 1;
+                channel_edit = 0;
+                preset_sel = preset_top + i;
+                pick_preset(preset_sel);
+                return;
+            }
+        }
+
+        // Global bars.
         for (int which = 0; which < 3; ++which) {
-            int gx0, gy0, gx1, gy1;
-            global_slider_rect(which, &gx0, &gy0, &gx1, &gy1);
-            if (mx >= gx0 && mx < gx1 && my >= gy0 && my < gy1) {
-                int frac = clampi((mx - gx0) * 1000 / (gx1 - gx0 - 1), 0, 1000);
-                if (which == 0)      brightness = -128 + (frac * 256) / 1000;
-                else if (which == 1) contrast   = -100 + (frac * 200) / 1000;
-                else {
-                    tint_amount = (frac * 255) / 1000;
-                    if (tint_amount > 0 && tint_index == 0) tint_index = 1;
-                }
+            int x0, y0, x1, y1;
+            global_slider_rect(L, which, &x0, &y0, &x1, &y1);
+            if (pe_hit(mx, my, x0, y0, x1, y1 + 2)) {
+                set_global(which, mx);
                 drag_kind = 10 + which;
-                recompute_globals();
-                reset_accum();
                 return;
             }
+        }
+
+        // Hue (cycles) and Reset skin rows.
+        int rx0 = col(L.pre_x), rx1 = col(L.pre_x + L.pre_w);
+        if (pe_hit(mx, my, rx0, row(L.glob_y + 3), rx1, row(L.glob_y + 4))) {
+            tint_index = (tint_index + 1) % NUM_TINTS;
+            if (tint_index != 0 && tint_amount == 0) tint_amount = 64;
+            recompute_globals();
+            snprintf(status_line, sizeof(status_line),
+                     "Tint: %s (amount %d)", g_tints[tint_index].label, tint_amount);
+            return;
+        }
+        if (pe_hit(mx, my, rx0, row(L.glob_y + 4), rx1, row(L.glob_y + 5))) {
+            reset_skin_on_palette = !reset_skin_on_palette;
+            snprintf(status_line, sizeof(status_line),
+                     "Reset skin to default on palette load: %s",
+                     reset_skin_on_palette ? "ON" : "OFF");
+            doredraw++;
+            screenmanager.UpdateAll();
+            return;
         }
         return;
     }
 
+    need_refresh++;
+
     switch (key) {
         case SDLK_ESCAPE:
+            // Back to the skin and colours this page was entered with
+            // (`snapshot` is only the anchor for the global adjustments;
+            // direct edits and preset loads overwrite it).
+            if (CurrentSkin && entry_skin[0] && strcmp(CurrentSkin->strSkinName, entry_skin) != 0) {
+                Skin *old = CurrentSkin;
+                Skin *todel = CurrentSkin->switchskin(entry_skin);
+                if (old == todel) strcpy(zt_config_globals.skin, CurrentSkin->strSkinName);
+                delete todel;
+            }
             for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
                 TColor *c = slot_color_ptr(i);
-                if (c) *c = snapshot[i];
+                if (c) *c = entry_colors[i];
+                snapshot[i] = entry_colors[i];
             }
             dirty = 0;
             channel_edit = 0;
@@ -725,126 +744,77 @@ void CUI_PaletteEditor::update(void) {
             return;
 
         case SDLK_TAB:
-            focus_panel = (focus_panel + 1) % 2;
-            channel_edit = 0;
-            selected_slot = 0;
+            // colours -> sliders -> presets -> colours (Shift: reverse)
             reset_accum();
-            need_refresh++;
+            if (kstate & KS_SHIFT) {
+                if (focus_panel == 1)       { focus_panel = 0; channel_edit = 1; }
+                else if (channel_edit)      { channel_edit = 0; }
+                else                        { focus_panel = 1; clamp_preset_view(); }
+            } else {
+                if (focus_panel == 1)       { focus_panel = 0; channel_edit = 0; }
+                else if (channel_edit == 0) { channel_edit = 1; }
+                else                        { channel_edit = 0; focus_panel = 1; clamp_preset_view(); }
+            }
             return;
 
         case SDLK_UP:
+        case SDLK_DOWN: {
             reset_accum();
-            if (focus_panel == 0) {
-                // Walk up through R/G/B sliders within a slot, then jump to
-                // the previous row's B slider (and so on). This mirrors what
-                // the eye does when scanning the column visually.
-                if (channel_edit > 1) {
-                    channel_edit--;
-                } else if (channel_edit == 1) {
-                    channel_edit = 0;
-                } else {
-                    int rr = selected_slot / PE_GRID_COLS;
-                    int cc = selected_slot % PE_GRID_COLS;
-                    if (rr > 0) {
-                        selected_slot = (rr - 1) * PE_GRID_COLS + cc;
-                        channel_edit = 3;   // land on previous row's B
-                    }
-                }
+            int dir = (key == SDLK_UP) ? -1 : 1;
+            if (focus_panel == 1) {
+                preset_sel += dir;
+                clamp_preset_view();
+            } else if (channel_edit) {
+                channel_edit = clampi(channel_edit + dir, 1, 3);
             } else {
-                if (selected_slot > 0) selected_slot--;
+                selected_slot = clampi(selected_slot + dir, 0, NUM_PALETTE_SLOTS - 1);
             }
-            need_refresh++;
             return;
+        }
 
-        case SDLK_DOWN:
+        case SDLK_PAGEUP:
+        case SDLK_PAGEDOWN:
+        case SDLK_HOME:
+        case SDLK_END:
             reset_accum();
-            if (focus_panel == 0) {
-                if (channel_edit == 0) {
-                    channel_edit = 1;       // swatch -> R
-                } else if (channel_edit < 3) {
-                    channel_edit++;         // R -> G -> B
-                } else {
-                    int rr = selected_slot / PE_GRID_COLS;
-                    int cc = selected_slot % PE_GRID_COLS;
-                    int next = (rr + 1) * PE_GRID_COLS + cc;
-                    if (next < NUM_PALETTE_SLOTS) {
-                        selected_slot = next;
-                        channel_edit = 0;   // land on the next swatch
-                    }
-                }
-            } else {
-                if (selected_slot < num_presets - 1) selected_slot++;
+            if (focus_panel == 1) {
+                if (key == SDLK_PAGEUP)        preset_sel -= L.pre_rows - 1;
+                else if (key == SDLK_PAGEDOWN) preset_sel += L.pre_rows - 1;
+                else if (key == SDLK_HOME)     preset_sel = 0;
+                else                           preset_sel = num_presets - 1;
+                clamp_preset_view();
+            } else if (!channel_edit) {
+                if (key == SDLK_HOME || key == SDLK_PAGEUP) selected_slot = 0;
+                else selected_slot = NUM_PALETTE_SLOTS - 1;
             }
-            need_refresh++;
             return;
 
         case SDLK_LEFT:
+        case SDLK_RIGHT: {
             reset_accum();
-            if (focus_panel == 0) {
-                int cc = selected_slot % PE_GRID_COLS;
-                if (cc > 0) selected_slot--;
-            } else {
-                focus_panel = 0;
-                if (selected_slot >= NUM_PALETTE_SLOTS) selected_slot = NUM_PALETTE_SLOTS - 1;
+            int dir = (key == SDLK_LEFT) ? -1 : 1;
+            if (focus_panel == 1) {
+                if (dir < 0) { focus_panel = 0; channel_edit = 0; }
+            } else if (channel_edit) {
+                apply_channel_delta(dir * ((kstate & KS_SHIFT) ? 16 : 1));
+            } else if (dir > 0) {
+                channel_edit = 1;
             }
-            channel_edit = 0;
-            need_refresh++;
             return;
-
-        case SDLK_RIGHT:
-            reset_accum();
-            if (focus_panel == 0) {
-                int cc = selected_slot % PE_GRID_COLS;
-                if (cc < PE_GRID_COLS - 1 && (selected_slot + 1) < NUM_PALETTE_SLOTS) {
-                    selected_slot++;
-                } else {
-                    focus_panel = 1;
-                    selected_slot = 0;
-                }
-            }
-            channel_edit = 0;
-            need_refresh++;
-            return;
+        }
 
         case SDLK_RETURN:
             reset_accum();
-            if (focus_panel == 1 && selected_slot >= 0 && selected_slot < num_presets) {
-                if (preset_is_skin[selected_slot]) {
-                    load_skin_full(preset_path[selected_slot]);
-                } else {
-                    load_palette_file(preset_path[selected_slot]);
-                }
-            }
+            if (focus_panel == 1) pick_preset(preset_sel);
+            else if (!channel_edit) channel_edit = 1;
             return;
 
         case SDLK_R:
-            if (focus_panel == 0) {
-                channel_edit = 1;
-                reset_accum();
-                snprintf(status_line, sizeof(status_line),
-                         "Editing R channel of %s", g_slots[selected_slot].name);
-                need_refresh++;
-            }
-            return;
-
         case SDLK_G:
-            if (focus_panel == 0) {
-                channel_edit = 2;
-                reset_accum();
-                snprintf(status_line, sizeof(status_line),
-                         "Editing G channel of %s", g_slots[selected_slot].name);
-                need_refresh++;
-            }
-            return;
-
         case SDLK_B:
-            if (focus_panel == 0) {
-                channel_edit = 3;
-                reset_accum();
-                snprintf(status_line, sizeof(status_line),
-                         "Editing B channel of %s", g_slots[selected_slot].name);
-                need_refresh++;
-            }
+            reset_accum();
+            focus_panel = 0;
+            channel_edit = (key == SDLK_R) ? 1 : (key == SDLK_G) ? 2 : 3;
             return;
 
         case SDLK_PLUS:
@@ -912,7 +882,6 @@ void CUI_PaletteEditor::update(void) {
         case SDLK_S:
             if (kstate & KS_CTRL) {
                 save_palette_file("custom.conf");
-                need_refresh++;
                 return;
             }
             handled = 0;
@@ -943,191 +912,267 @@ void CUI_PaletteEditor::update(void) {
 // Drawing
 // ---------------------------------------------------------------------------
 
+extern char *printNote(char *str, event *r, int cur_edit_mode);
+extern void draw_bar(int x, int y, int xsize, int ysize, int value, int maxval, TColor bg, Drawable *S);
+
+// 1-pixel rectangle outline drawn with fillRect (Drawable::drawVLine is a
+// no-op).
+static void draw_outline(Drawable *S, int x0, int y0, int x1, int y1, TColor c) {
+    S->fillRect(x0, y0, x1 - 1, y0, c);
+    S->fillRect(x0, y1 - 1, x1 - 1, y1 - 1, c);
+    S->fillRect(x0, y0, x0, y1 - 1, c);
+    S->fillRect(x1 - 1, y0, x1 - 1, y1 - 1, c);
+}
+
+// Print at most `width` characters (text that does not fit is cut, never
+// drawn past the column it was given).
+static void print_cut(int cx, int cy, const char *s, int width, TColor fg, Drawable *S) {
+    if (width <= 0) return;
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%.*s", width < 255 ? width : 255, s);
+    print(col(cx), row(cy), buf, fg, S);
+}
+
 static void draw_slider_bar(Drawable *S, int x0, int y0, int x1, int y1,
                             int value, int max_value, TColor fill,
                             int highlight) {
-    TColor border = highlight ? COLORS.Highlight : COLORS.Lowlight;
-    S->fillRect(x0, y0, x1, y1, COLORS.EditBG);
+    S->fillRect(x0, y0, x1 - 1, y1 - 1, COLORS.EditBG);
     int span = x1 - x0 - 2;
     if (span < 1) span = 1;
     int filled = (value * span) / (max_value > 0 ? max_value : 1);
     if (filled < 0) filled = 0;
     if (filled > span) filled = span;
     if (filled > 0) {
-        S->fillRect(x0 + 1, y0 + 1, x0 + 1 + filled, y1 - 1, fill);
+        S->fillRect(x0 + 1, y0 + 1, x0 + filled, y1 - 2, fill);
     }
-    S->drawHLine(y0,     x0, x1, border);
-    S->drawHLine(y1 - 1, x0, x1, border);
-    S->drawVLine(x0,     y0, y1, border);
-    S->drawVLine(x1 - 1, y0, y1, border);
+    draw_outline(S, x0, y0, x1, y1, highlight ? COLORS.Highlight : COLORS.Lowlight);
 }
 
-static void draw_swatch(Drawable *S, int slot, int selected, int channel_edit) {
-    int x0, y0, x1, y1;
-    slot_origin(slot, &x0, &y0, &x1, &y1);
-
-    TColor c = *slot_color_ptr(slot);
-    unsigned char r, g, b;
-    unpack_rgb(c, &r, &g, &b);
-
-    S->fillRect(x0, y0, x1, y1, c);
-    TColor border = selected ? COLORS.Highlight : COLORS.Lowlight;
-    S->drawHLine(y0,     x0, x1, border);
-    S->drawHLine(y1 - 1, x0, x1, border);
-    S->drawVLine(x0,     y0, y1, border);
-    S->drawVLine(x1 - 1, y0, y1, border);
-
-    // Pattern-line preview to the right of the swatch. Width is sized
-    // for the 8-char preview text ("C-5 01..") plus a 1-char border
-    // padding on each side; the swatch's own width is intentionally
-    // narrower than this.
-    int px0 = x1 + col(1);
-    int py0 = y0;
-    int px1 = px0 + col(9);
-    int py1 = py0 + row(PE_SWATCH_H);
-    S->fillRect(px0, py0, px1, py1, COLORS.EditBG);
-    print(px0 + 2, py0 + 2,              "C-5 01..", c, S);
-    print(px0 + 2, py0 + 2 + row(1) + 1, "...v40..", c, S);
-    S->drawHLine(py0,     px0, px1, COLORS.Lowlight);
-    S->drawHLine(py1 - 1, px0, px1, COLORS.Lowlight);
-    S->drawVLine(px0,     py0, py1, COLORS.Lowlight);
-    S->drawVLine(px1 - 1, py0, py1, COLORS.Lowlight);
-
-    print(x0, y0 - row(1), g_slots[slot].name, COLORS.Text, S);
-
-    // Three RGB sliders beneath the swatch — clickable.
-    static const TColor chan_fill[3] = {
-        0xFFE04040,   // R: red
-        0xFF40C040,   // G: green
-        0xFF4080E0,   // B: blue
-    };
-    static const char *chan_label[3] = { "R", "G", "B" };
-    int values[3] = { (int)r, (int)g, (int)b };
-    for (int ch = 1; ch <= 3; ++ch) {
-        int rx0, ry0, rx1, ry1;
-        rgb_slider_rect(slot, ch, &rx0, &ry0, &rx1, &ry1);
-        int hl = (selected && channel_edit == ch);
-        TColor lc = hl ? COLORS.Highlight : COLORS.Text;
-        print(x0, ry0, chan_label[ch - 1], lc, S);
-        draw_slider_bar(S, rx0, ry0, rx1, ry1,
-                        values[ch - 1], 255, chan_fill[ch - 1], hl);
-        char buf[8];
-        snprintf(buf, sizeof(buf), "%3d", values[ch - 1]);
-        print(rx1 + col(1) - 4, ry0, buf, lc, S);
+// Fake pattern editor showing every pattern colour in its real role:
+// track headers, LCD bars, EditBG / EditBGlow / EditBGhigh beat rows, the
+// cursor row (CursorRowLow / CursorRowHigh), a selection (SelectedBGLow /
+// SelectedBGHigh, Highlight text) and the caret.
+static void draw_pattern_preview(Drawable *S, const PeLayout &L, int selected_slot) {
+    char str[64];
+    event ev;
+    int fs = (int)strlen(printNote(str, &ev, VIEW_REGULAR));
+    int mode = VIEW_REGULAR;
+    if (L.mid_w < 4 + fs + 1) {
+        mode = VIEW_SQUISH;
+        fs = (int)strlen(printNote(str, &ev, VIEW_SQUISH));
     }
-}
+    int tracks = (L.mid_w - 4) / (fs + 1);
+    if (tracks < 1) return;
+    if (tracks > 8) tracks = 8;
 
-static void draw_global_slider(Drawable *S, int which, const char *label,
-                               int value, int min_v, int max_v,
-                               TColor fill) {
-    int x0, y0, x1, y1;
-    global_slider_rect(which, &x0, &y0, &x1, &y1);
-    int label_x = col(PE_GLOBAL_X + which * PE_GLOBAL_GROUP_W);
-    print(label_x, y0, label, COLORS.Text, S);
-    int range = max_v - min_v;
-    int v = value - min_v;
-    draw_slider_bar(S, x0, y0, x1, y1, v, range, fill, 0);
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%+5d", value);
-    print(x1 + 2, y0, buf, COLORS.Text, S);
+    const int lo = zt_config_globals.lowlight_increment > 0 ? zt_config_globals.lowlight_increment : 4;
+    const int hi = zt_config_globals.highlight_increment > 0 ? zt_config_globals.highlight_increment : 16;
+    auto beat = [&](int r) { return (r % lo) == 0 || (r % hi) == 0; };
+
+    const int x_rows = L.mid_x;          // row numbers
+    const int x_trk = L.mid_x + 4;       // first track
+    const int y_rows = L.prev_y + 2;     // first pattern row
+    const int nrows = L.bottom - y_rows + 1;
+    if (nrows < 4) return;
+
+    // Cursor row: an off-beat row, or a beat row while CursorRowHigh is
+    // the colour being edited, so both cursor colours can be seen.
+    const bool want_beat = (selected_slot == 14);
+    int cur_r = 1;
+    for (int r = 1; r < nrows; ++r) {
+        if (beat(r) == want_beat) { cur_r = r; break; }
+    }
+    // Selection: last track, three rows around the first beat row after
+    // the cursor (one beat row, SelectedBGHigh; off-beat ones, SelectedBGLow).
+    int sel_mid = cur_r + 2;
+    while (sel_mid < nrows - 1 && !beat(sel_mid)) sel_mid++;
+    const int sel_t = tracks - 1;
+    const int sel_r0 = sel_mid - 1, sel_r1 = sel_mid + 1;
+
+    // Track headers and LCD bars.
+    for (int t = 0; t < tracks; ++t) {
+        int x = x_trk + t * (fs + 1);
+        char hdr[64];
+        snprintf(hdr, sizeof(hdr), " Track %.2d", t + 1);
+        for (int k = (int)strlen(hdr); k < fs && k < 63; ++k) hdr[k] = ' ';
+        hdr[fs < 63 ? fs : 63] = 0;
+        printBG(col(x), row(L.prev_y), hdr, COLORS.Brighttext, COLORS.Lowlight, S);
+        static const int levels[8] = { 80, 55, 95, 40, 70, 60, 85, 50 };
+        draw_bar(col(x), row(L.prev_y + 1) + 1, col(fs), row(1) - 2,
+                 levels[t], 100, COLORS.Black, S);
+    }
+
+    for (int r = 0; r < nrows; ++r) {
+        int y = row(y_rows + r);
+        bool is_cur = (r == cur_r);
+        snprintf(str, sizeof(str), "%.3d", r);
+        printBG(col(x_rows), y, str, is_cur ? COLORS.Highlight : COLORS.Text, COLORS.Background, S);
+        printchar(col(x_rows + 3), y, 146, COLORS.Lowlight, S);
+
+        for (int t = 0; t < tracks; ++t) {
+            TColor bg = COLORS.EditBG;
+            if (!(r % lo)) bg = COLORS.EditBGlow;
+            if (!(r % hi)) bg = COLORS.EditBGhigh;
+            if (is_cur) bg = beat(r) ? COLORS.CursorRowHigh : COLORS.CursorRowLow;
+            TColor fg = COLORS.EditText;
+            if (t == sel_t && r >= sel_r0 && r <= sel_r1) {
+                fg = COLORS.Highlight;
+                if (bg == COLORS.EditBGlow || bg == COLORS.EditBGhigh) bg = COLORS.SelectedBGHigh;
+                else bg = is_cur ? COLORS.SelectedBGHigh : COLORS.SelectedBGLow;
+            }
+
+            event e;
+            if (((r + t * 2) % 4) == 0) {
+                static const unsigned char notes[8] = { 48, 52, 55, 60, 43, 50, 57, 62 };
+                e.note = notes[(r / 4 + t) % 8];
+                e.inst = (unsigned char)(t + 1);
+                e.vol = (unsigned char)(0x40 + ((r * 7 + t * 13) % 0x3F));
+            }
+            printNote(str, &e, mode);
+            str[fs] = 0;
+            int x = x_trk + t * (fs + 1);
+            printBG(col(x), y, str, fg, bg, S);
+            if (is_cur && t == 0) {
+                char caret[4] = { str[0], str[1], str[2], 0 };
+                printBG(col(x), y, caret, COLORS.EditBG, COLORS.Highlight, S);
+            }
+            if (t < tracks - 1) printchar(col(x + fs), y, 168, COLORS.Lowlight, S);
+            else                printchar(col(x + fs), y, 145, COLORS.Highlight, S);
+        }
+    }
 }
 
 void CUI_PaletteEditor::draw(Drawable *S) {
     if (S->lock() != 0) return;
 
+    const PeLayout L = pe_layout();
+    clamp_preset_view();
+
     UI->draw(S);
+    // Clear the page area (title row to just above the toolbar): values
+    // and labels are printed without a background.
+    S->fillRect(0, row(PAGE_TITLE_ROW_Y + 1), col(L.cols) - 1, row(L.hint_y + 3) - 1,
+                COLORS.Background);
     draw_status(S);
 
     printtitle(PAGE_TITLE_ROW_Y,
                "Palette Editor (Shift+Ctrl+F12)",
                COLORS.Text, COLORS.Background, S);
 
+    // --- Colour list ------------------------------------------------------
+    print_cut(L.list_x, L.top, "Colours", PE_LIST_W, COLORS.Text, S);
     for (int i = 0; i < NUM_PALETTE_SLOTS; ++i) {
-        int sel = (focus_panel == 0 && i == selected_slot);
-        draw_swatch(S, i, sel, sel ? channel_edit : 0);
-    }
-
-    // Preset panel — dense 1-row list so all skins fit alongside palettes.
-    int px = col(PE_PRESET_X);
-    int py = row(PE_PRESET_Y);
-    int visible = num_presets < PE_PRESET_VISIBLE ? num_presets : PE_PRESET_VISIBLE;
-    int panel_height_rows = 2 + visible + 1;
-    // IT-style listbox: black panel background under the title, with the
-    // header row using the panel chrome color so the list reads as a
-    // self-contained widget.
-    S->fillRect(px - 2, py - 2,
-                px + col(PE_PRESET_W) + 2,
-                py + row(panel_height_rows),
-                COLORS.Black);
-    S->drawHLine(py - 2,                                  px - 2, px + col(PE_PRESET_W) + 2, COLORS.Lowlight);
-    S->drawHLine(py + row(panel_height_rows) - 1,         px - 2, px + col(PE_PRESET_W) + 2, COLORS.Lowlight);
-    S->drawVLine(px - 2,                                  py - 2, py + row(panel_height_rows), COLORS.Lowlight);
-    S->drawVLine(px + col(PE_PRESET_W) + 1,               py - 2, py + row(panel_height_rows), COLORS.Lowlight);
-
-    {
-        char head[32];
-        snprintf(head, sizeof(head), " %-20s ", "Palettes & Skins");
-        printBG(px, py, head, COLORS.Brighttext, COLORS.Black, S);
-    }
-    for (int i = 0; i < visible; ++i) {
-        int sel = (focus_panel == 1 && i == selected_slot);
-        TColor fg = sel ? COLORS.Highlight : COLORS.EditText;
-        TColor bg = sel ? COLORS.SelectedBGHigh : COLORS.Black;
-        char line[64];
-        snprintf(line, sizeof(line), " %-20.20s ", preset_label[i]);
-        printBG(px, py + row(2 + i), line, fg, bg, S);
-    }
-
-    // Global brightness / contrast / tint slider strip — single horizontal
-    // row positioned above the swatch grid so it can never collide with the
-    // toolbar at the bottom of the screen.
-    draw_global_slider(S, 0, "Brightness  ", brightness, -128, 127, 0xFFE0E0E0);
-    draw_global_slider(S, 1, "Contrast    ", contrast,   -100, 100, 0xFFD0D080);
-    {
         int x0, y0, x1, y1;
-        global_slider_rect(2, &x0, &y0, &x1, &y1);
-        int label_x = col(PE_GLOBAL_X + 2 * PE_GLOBAL_GROUP_W);
-        char lbl[32];
-        snprintf(lbl, sizeof(lbl), "Tint %-7s", g_tints[tint_index].label);
-        print(label_x, y0, lbl, COLORS.Text, S);
-        TColor fill = (tint_index == 0) ? COLORS.Lowlight : g_tints[tint_index].color;
-        draw_slider_bar(S, x0, y0, x1, y1, tint_amount, 255, fill, 0);
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%5d", tint_amount);
-        print(x1 + 2, y0, buf, COLORS.Text, S);
+        list_item_rect(L, i, &x0, &y0, &x1, &y1);
+        TColor c = *slot_color_ptr(i);
+        S->fillRect(x0, y0 + 1, x0 + col(2) - 1, y1 - 2, c);
+        draw_outline(S, x0, y0 + 1, x0 + col(2), y1 - 1, COLORS.Lowlight);
+
+        char name[32];
+        snprintf(name, sizeof(name), " %-14.14s", g_slots[i].name);
+        bool sel = (i == selected_slot);
+        TColor fg = sel ? COLORS.Highlight : COLORS.Text;
+        TColor bg = (sel && focus_panel == 0 && !channel_edit) ? COLORS.SelectedBGHigh : COLORS.Background;
+        printBG(x0 + col(2), y0, name, fg, bg, S);
     }
 
-    // "Reset skin to default on palette load" checkbox just under the
-    // global slider strip. Click anywhere on the row to toggle.
+    // --- Selected colour ----------------------------------------------------
     {
-        char box[64];
-        snprintf(box, sizeof(box), "[%c] %s",
-                 reset_skin_on_palette ? 'X' : ' ',
-                 PE_CHECKBOX_LABEL);
-        print(col(PE_CHECKBOX_X), row(PE_CHECKBOX_Y), box,
-              reset_skin_on_palette ? COLORS.Highlight : COLORS.Text, S);
+        TColor c = *slot_color_ptr(selected_slot);
+        unsigned char r, g, b;
+        unpack_rgb(c, &r, &g, &b);
+        char head[64];
+        snprintf(head, sizeof(head), "%s  #%02X%02X%02X", g_slots[selected_slot].name, r, g, b);
+        print_cut(L.mid_x, L.top, head, L.mid_w, COLORS.Brighttext, S);
+        if (dirty && L.mid_w >= (int)strlen(head) + 12)
+            print(col(L.mid_x + L.mid_w - 10), row(L.top), "[modified]", COLORS.LCDHigh, S);
+
+        int sx0 = col(L.mid_x), sy0 = row(L.top + 2);
+        int sx1 = col(L.mid_x + PE_SWATCH_W), sy1 = row(L.top + 2 + PE_SWATCH_H);
+        S->fillRect(sx0, sy0, sx1 - 1, sy1 - 1, c);
+        draw_outline(S, sx0, sy0, sx1, sy1, COLORS.Lowlight);
+
+        static const TColor chan_fill[3] = { 0xFFE04040, 0xFF40C040, 0xFF4080E0 };
+        static const char *chan_label[3] = { "R", "G", "B" };
+        int values[3] = { (int)r, (int)g, (int)b };
+        for (int ch = 1; ch <= 3; ++ch) {
+            int x0, y0, x1, y1;
+            rgb_slider_rect(L, ch, &x0, &y0, &x1, &y1);
+            int hl = (focus_panel == 0 && channel_edit == ch);
+            TColor lc = hl ? COLORS.Highlight : COLORS.Text;
+            print(x0 - col(2), y0, chan_label[ch - 1], lc, S);
+            draw_slider_bar(S, x0, y0, x1, y1, values[ch - 1], 255, chan_fill[ch - 1], hl);
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%3d", values[ch - 1]);
+            print(x1 + col(1), y0, buf, lc, S);
+        }
     }
 
-    // Hint / status line at the bottom of the page area (rows 60–61, well
-    // above the toolbar which starts around row 62).
-    int hy = row(PE_GRID_ROW_Y + PE_GRID_ROWS * PE_GRID_ROW_STEP);
-    const char *hint;
-    if (focus_panel == 0) {
-        if (channel_edit) {
-            hint = "Editing channel: 0-9 or +/- (Shift x16). Up/Down step R/G/B. Click bar to scrub. Tab cancels.";
-        } else {
-            hint = "Click swatch / RGB bar / preset / global. Up/Down step R/G/B. R/G/B keys. [/] bright ;/' contrast T tint Y/U amount Ctrl+S save ESC revert";
+    draw_pattern_preview(S, L, selected_slot);
+
+    // --- Presets --------------------------------------------------------------
+    {
+        int px = col(L.pre_x), pw = col(L.pre_w);
+        int py = row(L.top), ph = row(1 + L.pre_rows);
+        S->fillRect(px - 2, py - 2, px + pw + 1, py + ph + 1, COLORS.Black);
+        draw_outline(S, px - 2, py - 2, px + pw + 2, py + ph + 2, COLORS.Lowlight);
+        char head[40];
+        bool more_up = preset_top > 0;
+        bool more_dn = preset_top + L.pre_rows < num_presets;
+        snprintf(head, sizeof(head), " %-18s%s ", "Palettes & Skins",
+                 more_up && more_dn ? "^v" : more_up ? " ^" : more_dn ? " v" : "  ");
+        printBG(px, py, head, COLORS.Brighttext, COLORS.Black, S);
+        for (int i = 0; i < L.pre_rows && preset_top + i < num_presets; ++i) {
+            int p = preset_top + i;
+            bool sel = (p == preset_sel);
+            TColor fg = sel ? COLORS.Highlight : COLORS.EditText;
+            TColor bg = (sel && focus_panel == 1) ? COLORS.SelectedBGHigh : COLORS.Black;
+            char line[64];
+            snprintf(line, sizeof(line), " %-20.20s ", preset_label[p]);
+            printBG(px, row(L.pre_y + i), line, fg, bg, S);
         }
-    } else {
-        hint = "Click preset / Arrows: move  Enter: load  Tab/Left: back to grid  ESC: revert";
     }
-    print(col(2), hy, hint, COLORS.Text, S);
-    if (status_line[0]) {
-        print(col(2), hy + row(1), status_line, COLORS.Brighttext, S);
+
+    // --- Global adjustments -----------------------------------------------------
+    {
+        struct { const char *label; int value, min_v, max_v; TColor fill; const char *fmt; } g[3] = {
+            { "Bright",   brightness,  -128, 127, 0xFFE0E0E0, "%+4d" },
+            { "Contrast", contrast,    -100, 100, 0xFFD0D080, "%+4d" },
+            { "Tint",     tint_amount,    0, 255,
+              tint_index == 0 ? COLORS.Lowlight : g_tints[tint_index].color, "%4d" },
+        };
+        for (int w = 0; w < 3; ++w) {
+            int x0, y0, x1, y1;
+            global_slider_rect(L, w, &x0, &y0, &x1, &y1);
+            print(col(L.pre_x), y0, g[w].label, COLORS.Text, S);
+            draw_slider_bar(S, x0, y0, x1, y1, g[w].value - g[w].min_v,
+                            g[w].max_v - g[w].min_v, g[w].fill, 0);
+            char buf[16];
+            snprintf(buf, sizeof(buf), g[w].fmt, g[w].value);
+            print(x1 + 2, y0, buf, COLORS.Text, S);
+        }
+        char line[40];
+        snprintf(line, sizeof(line), "Hue      %s", g_tints[tint_index].label);
+        print_cut(L.pre_x, L.glob_y + 3, line, L.pre_w, COLORS.Text, S);
+        snprintf(line, sizeof(line), "[%c] %s", reset_skin_on_palette ? 'X' : ' ', PE_CHECKBOX_LABEL);
+        print_cut(L.pre_x, L.glob_y + 4, line, L.pre_w,
+                  reset_skin_on_palette ? COLORS.Highlight : COLORS.Text, S);
     }
-    if (dirty) {
-        print(col(70), hy, "[modified]", COLORS.LCDHigh, S);
-    }
+
+    // --- Hints and status ---------------------------------------------------------
+    const char *hint;
+    if (focus_panel == 1)
+        hint = "Up/Dn PgUp/PgDn: preset  Enter/click: load  Left/Tab: colours";
+    else if (channel_edit)
+        hint = "Up/Dn: R/G/B  Left/Right or +/-: step (Shift x16)  0-9: value  Tab: presets";
+    else
+        hint = "Up/Dn: colour  Right/Enter or R/G/B: edit  Tab: next panel  Drag bars";
+    const int w = L.cols - 2;
+    print_cut(1, L.hint_y, hint, w, COLORS.Text, S);
+    print_cut(1, L.hint_y + 1,
+              "[ ] bright  ; ' contrast  T hue  Y/U tint  Ctrl+S save  ESC revert",
+              w, COLORS.Text, S);
+    if (status_line[0]) print_cut(1, L.hint_y + 2, status_line, w, COLORS.Brighttext, S);
 
     need_refresh = 0;
     updated = 2;

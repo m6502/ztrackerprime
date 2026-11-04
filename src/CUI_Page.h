@@ -127,13 +127,17 @@ class CUI_Sysconfig : public CUI_Page {
 
 class CUI_PaletteEditor : public CUI_Page {
     public:
-        int selected_slot;     // index within the focused panel
-        int focus_panel;       // 0 = swatch grid, 1 = preset panel
-        int channel_edit;      // 0 = none, 1 = R, 2 = G, 3 = B
+        int selected_slot;     // colour being edited (index into the slot list)
+        int focus_panel;       // 0 = colour list / R,G,B sliders, 1 = presets
+        int channel_edit;      // 0 = colour list, 1 = R, 2 = G, 3 = B slider
+        int preset_sel;        // highlighted preset
+        int preset_top;        // first preset shown (the list scrolls)
         int dirty;             // unsaved changes vs. snapshot
         TColor snapshot[32];   // saved COLORS.* on entry (the "anchor" the
                                // global brightness/contrast/tint operate on)
         char status_line[128];
+        TColor entry_colors[32];  // COLORS.* on entry, restored by ESC
+        char   entry_skin[64];    // skin on entry, restored by ESC
 
         // Dynamic preset list — built at enter() from palettes/*.conf and
         // skins/*/colors.conf so users can switch between every shipped look
@@ -169,6 +173,7 @@ class CUI_PaletteEditor : public CUI_Page {
         void draw(Drawable *S);
 
         void load_palette_file(const char *path_or_fname);
+        void clamp_preset_view(void);
         // Full skin switch — same code path as F12 Sysconfig skin selector.
         // Used when the user picks a "[skin] xxx" preset so the new skin's
         // PNG templates are loaded from disk, not just the colors.conf.
