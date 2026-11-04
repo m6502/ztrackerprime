@@ -12,15 +12,20 @@
 #ifndef ZT_EDITOR_LAYOUT_H
 #define ZT_EDITOR_LAYOUT_H
 
-// Column where the LAST character of every left-side label sits.
-// "Slot"   prints at col 6  -> chars 6..9     -> right edge col 10.
-// "Name"   prints at col 6  -> chars 6..9     -> right edge col 10.
-// "Length" prints at col 4  -> chars 4..9     -> right edge col 10.
-// "Speed"  prints at col 5  -> chars 5..9     -> right edge col 10.
-// "Repeat" prints at col 4  -> chars 4..9     -> right edge col 10.
-// "NumCC"  prints at col 5  -> chars 5..9     -> right edge col 10.
-// "CC#"    prints at col 7  -> chars 7..9     -> right edge col 10.
-#define ZT_EDITOR_LABEL_RIGHT_COL  10
+// Column just past the LAST character of every left-side label. The
+// longest labels start at col 1 (one blank column of screen margin):
+// "Slot"   prints at col 3  -> chars 3..6     -> right edge col 7.
+// "Name"   prints at col 3  -> chars 3..6     -> right edge col 7.
+// "Length" prints at col 1  -> chars 1..6     -> right edge col 7.
+// "Speed"  prints at col 2  -> chars 2..6     -> right edge col 7.
+// "Repeat" prints at col 1  -> chars 1..6     -> right edge col 7.
+// "NumCC"  prints at col 2  -> chars 2..6     -> right edge col 7.
+// "CC#"    prints at col 4  -> chars 4..6     -> right edge col 7.
+#define ZT_EDITOR_LABEL_RIGHT_COL  7
+
+// Preset list on the right of both editors, just past the 32-col Name
+// field (frame at col 40); it runs to one column before the screen edge.
+#define ZT_EDITOR_PRESET_X         43
 
 // Where every textfield / slider / data-grid starts. One column after
 // the label's right edge, so the visible gap is exactly one space.

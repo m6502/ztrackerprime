@@ -273,8 +273,8 @@ CUI_Midimacroeditor::CUI_Midimacroeditor(void) {
     // Enter to apply). Replaces the invisible P-cycle.
     MmPresetSelector *ps = new MmPresetSelector;
     UI->add_element(ps, PRESET_LIST_ID);
-    ps->x = 47; ps->y = BASE_Y + 2;
-    ps->xsize = 38;
+    ps->x = ZT_EDITOR_PRESET_X; ps->y = BASE_Y + 2;
+    ps->xsize = CHARS_X - 2 - ZT_EDITOR_PRESET_X;   // updated in draw()
     ps->ysize = MM_PRESET_COUNT - 1;   // ListBox interprets ysize as last visible row
 }
 
@@ -300,7 +300,19 @@ void CUI_Midimacroeditor::leave(void) {
 
 // ---------------------------------------------------------------------------
 
+// The preset list follows the window width. Called before UI->update()
+// (mouse hit area) and before UI->draw() (so the first frame after a
+// resize already uses the new width).
+static void mm_layout(UserInterface *UI) {
+    if (UserInterfaceElement *ps = UI->get_element(PRESET_LIST_ID)) {
+        int w = CHARS_X - 2 - ps->x;
+        if (ps->xsize != w) { ps->xsize = w; ps->need_redraw++; }
+    }
+}
+
+
 void CUI_Midimacroeditor::update() {
+    mm_layout(UI);
     UI->update();
 
     ValueSlider *vs;
@@ -579,6 +591,7 @@ void CUI_Midimacroeditor::update() {
 void CUI_Midimacroeditor::draw(Drawable *S) {
     if (S->lock() != 0) return;
 
+    mm_layout(UI);
     UI->draw(S);
     draw_status(S);
     {
@@ -592,9 +605,9 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
     int cur_len = m ? mm_length(m) : 0;
     char buf[64];
 
-    print(row(6),  col(BASE_Y),     "Slot",   COLORS.Text, S);
-    print(row(6),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
-    print(row(4),  col(BASE_Y + 4), "Length", COLORS.Text, S);
+    print(row(3),  col(BASE_Y),     "Slot",   COLORS.Text, S);
+    print(row(3),  col(BASE_Y + 2), "Name",   COLORS.Text, S);
+    print(row(1),  col(BASE_Y + 4), "Length", COLORS.Text, S);
 
     // Hint: a macro whose name ends in `.syx` is dispatched as a SysEx
     // file send by the playback engine — the data grid below is ignored.
@@ -612,11 +625,12 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
             hint = "(SysEx file mode: FILE NOT FOUND -- playback no-op)";
             hint_color = COLORS.LCDHigh;     // red, matches LCD highlight
         }
-        print(row(36), col(BASE_Y + 2), hint, hint_color, S);
+        // Own row between Length and the data grid header.
+        print(col(1), row(BASE_Y + 5), hint, hint_color, S);
     }
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
-    print(row(47), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
+    print(col(ZT_EDITOR_PRESET_X), row(BASE_Y), "Presets (Tab, Enter=apply, P=cycle)", COLORS.Text, S);
 
     // Data grid header
     print(row(DATA_X - 3), row(DATA_HDR_Y), "##", COLORS.Text, S);
@@ -663,12 +677,12 @@ void CUI_Midimacroeditor::draw(Drawable *S) {
         snprintf(invoke, sizeof(invoke),
                  "Trigger from pattern: Z%02Xyy  (yy substitutes for any P1 byte; range 00-7F)",
                  mm_slot);
-        print(row(4), col(hint_y),     invoke, COLORS.Highlight, S);
-        print(row(4), col(hint_y + 1),
-              "Status bytes (0x80+) start a new MIDI msg: B0=CC, 90=NoteOn, C0=ProgChg, E0=PitchBend",
+        print(row(1), col(hint_y),     invoke, COLORS.Highlight, S);
+        print(row(1), col(hint_y + 1),
+              "Status bytes (80+) start a message: B0=CC 90=NoteOn C0=ProgChg E0=PitchBend",
               COLORS.Text, S);
-        print(row(4), col(hint_y + 2),
-              "Shift+E=END, Shift+X=PARAM1, .=clear, Shift+Del=clear data, Ctrl+Del=wipe slot",
+        print(row(1), col(hint_y + 2),
+              "Shift+E=END  Shift+X=PARAM1  .=clear  Shift+Del=clear data  Ctrl+Del=wipe slot",
               COLORS.Text, S);
     }
 

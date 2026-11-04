@@ -56,7 +56,7 @@
 // SPACE_AT_BOTTOM mirrors the CUI_Patterneditor constant: 8 rows are
 // reserved at the bottom of the screen for the toolbar.
 #define SPACE_AT_BOTTOM 8
-#define GRID_X          4
+#define GRID_X          1
 #define GRID_HDR_Y      (BASE_Y + 15)
 #define GRID_Y          (BASE_Y + 16)
 #define GRID_VISIBLE    14
@@ -423,8 +423,8 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // 11 -- Preset list (always-visible, SkinSelector-style).
     ArPresetSelector *ps = new ArPresetSelector;
     UI->add_element(ps, PRESET_LIST_ID);
-    ps->x = 47; ps->y = BASE_Y + 2;
-    ps->xsize = 32;
+    ps->x = ZT_EDITOR_PRESET_X; ps->y = BASE_Y + 2;
+    ps->xsize = CHARS_X - 2 - ZT_EDITOR_PRESET_X;   // updated in draw()
     ps->ysize = AR_PRESET_COUNT - 1;
 
     // 12 -- Keyjazz slot. Tab here (or click) to enter keyjazz mode;
@@ -435,10 +435,10 @@ CUI_Arpeggioeditor::CUI_Arpeggioeditor(void) {
     // typeahead).
     ArKeyjazzFocus *kj = new ArKeyjazzFocus;
     UI->add_element(kj, KEYJAZZ_ID);
-    kj->x = 4;
-    kj->y = CHARS_Y - SPACE_AT_BOTTOM - 7;
-    kj->xsize = 80;
-    kj->ysize = 3;
+    kj->x = 1;
+    kj->y = CHARS_Y - SPACE_AT_BOTTOM - 8;   // updated in draw()
+    kj->xsize = CHARS_X - 2;
+    kj->ysize = 4;                           // header + upper/lower/sharps
 }
 
 // Migrate legacy out-of-range values (loaded from old .zt files) into
@@ -493,7 +493,23 @@ void CUI_Arpeggioeditor::leave(void) {
 
 // ---------------------------------------------------------------------------
 
+// Width/height-dependent pieces follow the window size. Called before
+// UI->update() (mouse hit areas) and before UI->draw() (so the first
+// frame after a resize already uses the new sizes).
+static void ar_layout(UserInterface *UI) {
+    if (UserInterfaceElement *ps = UI->get_element(PRESET_LIST_ID)) {
+        int w = CHARS_X - 2 - ps->x;
+        if (ps->xsize != w) { ps->xsize = w; ps->need_redraw++; }
+    }
+    if (UserInterfaceElement *kj = UI->get_element(KEYJAZZ_ID)) {
+        kj->y = CHARS_Y - SPACE_AT_BOTTOM - 8;
+        kj->xsize = CHARS_X - 2;
+    }
+}
+
+
 void CUI_Arpeggioeditor::update() {
+    ar_layout(UI);
     UI->update();
 
     ValueSlider *vs;
@@ -862,6 +878,7 @@ void CUI_Arpeggioeditor::update() {
 void CUI_Arpeggioeditor::draw(Drawable *S) {
     if (S->lock() != 0) return;
 
+    ar_layout(UI);
     UI->draw(S);
     draw_status(S);
     {
@@ -876,16 +893,17 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     int  length     = a ? a->length     : 1;
     int  repeat_pos = a ? a->repeat_pos : 0;
 
-    print(row(6), col(BASE_Y),     "Slot",   COLORS.Text, S);
-    print(row(6), col(BASE_Y + 2), "Name",   COLORS.Text, S);
-    print(row(4), col(BASE_Y + 5), "Length", COLORS.Text, S);
-    print(row(5), col(BASE_Y + 7), "Speed",  COLORS.Text, S);
-    print(row(4), col(BASE_Y + 9), "Repeat", COLORS.Text, S);
-    print(row(5), col(BASE_Y + 11), "NumCC", COLORS.Text, S);
-    print(row(7), col(BASE_Y + 13), "CC#",   COLORS.Text, S);
+    print(row(3), col(BASE_Y),     "Slot",   COLORS.Text, S);
+    print(row(3), col(BASE_Y + 2), "Name",   COLORS.Text, S);
+    print(row(1), col(BASE_Y + 5), "Length", COLORS.Text, S);
+    print(row(2), col(BASE_Y + 7), "Speed",  COLORS.Text, S);
+    print(row(1), col(BASE_Y + 9), "Repeat", COLORS.Text, S);
+    print(row(2), col(BASE_Y + 11), "NumCC", COLORS.Text, S);
+    print(row(4), col(BASE_Y + 13), "CC#",   COLORS.Text, S);
 
     // Label above the inline Preset listbox (Tab to focus, Enter to apply).
-    print(row(47), col(BASE_Y), "Presets (Tab/Arrows/Enter/Space; P=cycle)", COLORS.Text, S);
+    print(col(ZT_EDITOR_PRESET_X), row(BASE_Y), "Presets (Tab, Enter=apply, P=cycle)", COLORS.Text, S);
+
 
     // Grid header
     {
@@ -939,26 +957,29 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
     // between dim "Tab here..." (not focused) and active "[ACTIVE]"
     // (focused) so the user can see whether the keys will fire notes.
     {
-        int kj_y = CHARS_Y - SPACE_AT_BOTTOM - 7;
+        int kj_y = CHARS_Y - SPACE_AT_BOTTOM - 8;   // header + 3 key lines
         bool active = (UI->cur_element == KEYJAZZ_ID);
         char hdr[96];
         if (active) {
             snprintf(hdr, sizeof(hdr),
                      "[KEYJAZZ ACTIVE -- octave %d  press notes; Tab to leave]",
                      base_octave);
-            printBG(col(4), row(kj_y), hdr,
+            printBG(col(1), row(kj_y), hdr,
                     COLORS.EditBG, COLORS.Highlight, S);
         } else {
             snprintf(hdr, sizeof(hdr),
                      " Keyjazz (Tab here to enter; current octave %d) ",
                      base_octave);
-            print(row(4), col(kj_y), hdr, COLORS.Lowlight, S);
+            print(row(1), col(kj_y), hdr, COLORS.Lowlight, S);
         }
-        print(row(4), col(kj_y + 1),
+        print(row(1), col(kj_y + 1),
               "  upper:  Q=C  W=D  E=E  R=F  T=G  Y=A  U=B  I=C+1  O=D+1  P=E+1",
               active ? COLORS.Text : COLORS.Lowlight, S);
-        print(row(4), col(kj_y + 2),
-              "  lower:  Z=C-1 X=D-1 C=E-1 V=F-1 B=G-1 N=A-1 M=B-1   sharps: 2/3/5/6/7  S/D/G/H/J",
+        print(row(1), col(kj_y + 2),
+              "  lower:  Z=C-1 X=D-1 C=E-1 V=F-1 B=G-1 N=A-1 M=B-1",
+              active ? COLORS.Text : COLORS.Lowlight, S);
+        print(row(1), col(kj_y + 3),
+              "  sharps: 2/3/5/6/7 (upper row)  S/D/G/H/J (lower row)",
               active ? COLORS.Text : COLORS.Lowlight, S);
     }
 
@@ -972,11 +993,11 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         snprintf(hdr, sizeof(hdr),
                  "Trigger from pattern: R%04X on a row with a note (loops at repeat_pos)",
                  ar_slot);
-        print(row(4), col(hint_y),     hdr, COLORS.Highlight, S);
-        print(row(4), col(hint_y + 1),
+        print(row(1), col(hint_y),     hdr, COLORS.Highlight, S);
+        print(row(1), col(hint_y + 1),
               "Tab into grid; arrows nav cells; digits 0-9 type value; '-' negate pitch",
               COLORS.Text, S);
-        print(row(4), col(hint_y + 2),
+        print(row(1), col(hint_y + 2),
               "'.' clear; P=preset; Shift+Del=clear data; Ctrl+Del=wipe slot",
               COLORS.Text, S);
     }
@@ -986,7 +1007,8 @@ void CUI_Arpeggioeditor::draw(Drawable *S) {
         char hint[80];
         snprintf(hint, sizeof(hint), "GRID @ step %03X col %d | Tab to leave | digits=value | P=preset",
                  ar_cur_step, ar_cur_col);
-        printBG(col(2), row(CHARS_Y - SPACE_AT_BOTTOM - 5), hint, COLORS.Highlight, COLORS.Background, S);
+        // Row between the keyjazz panel and the doc block.
+        printBG(col(1), row(CHARS_Y - SPACE_AT_BOTTOM - 4), hint, COLORS.Highlight, COLORS.Background, S);
     }
 
     need_refresh = 0; updated = 2;

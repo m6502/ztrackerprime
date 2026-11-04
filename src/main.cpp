@@ -4771,6 +4771,28 @@ int main(int argc, char *argv[])
         }
       }
 
+      // A key nobody takes would stay at the head of the key queue forever
+      // and block every key (and mouse click) queued behind it -- the app
+      // looks frozen. Seen with a letter on a slider (F4 / Shift+F4) and in
+      // a popup's list (F3-again "Create 16 MIDI Channels"). Keys are only
+      // appended at the tail, by the event loop above, so if the entry at
+      // the head now is the same one that was there before the previous
+      // action(), then global_keys, the page or popup and its widgets have
+      // all been offered it and passed: drop it.
+      {
+        static int   unclaimed_tail = -1;
+        static KBKey unclaimed_key  = 0;
+        if (Keys.size() && (int)Keys.tail == unclaimed_tail && Keys.checkkey() == unclaimed_key) {
+          Keys.getkey();
+        }
+        if (Keys.size()) {
+          unclaimed_tail = (int)Keys.tail;
+          unclaimed_key  = Keys.checkkey();
+        } else {
+          unclaimed_tail = -1;
+        }
+      }
+
       if (action(screen_buffer)) {
         break;
       }

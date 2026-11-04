@@ -98,7 +98,10 @@ static void cc_make_dir_recursive(const char *path) {
 // File list pane (left)
 #define CC_FILE_X       2
 #define CC_FILE_Y       (CC_BASE_Y + 2)
-#define CC_FILE_W       26
+// Width beyond 80 columns goes a third to the file list, the rest to the
+// sliders (see cc_slider_w()); at 80 columns the layout is the classic one.
+static int cc_extra(void) { int e = CHARS_X - 80; return e > 0 ? e : 0; }
+#define CC_FILE_W       (26 + cc_extra() / 3)
 
 // Slot grid pane (right). Each column owns a fixed character span and
 // is drawn with its own print() — never one packed sprintf — so a long
@@ -113,10 +116,21 @@ static void cc_make_dir_recursive(const char *path) {
 #define CC_CC_COL       (CC_GRID_X + 5)                // "PB  " / "127 " — 4 chars
 #define CC_NAME_COL     (CC_GRID_X + 10)               // 18-char field
 #define CC_SLIDER_X     (CC_GRID_X + 28)               // ValueSlider widget x
-#define CC_SLIDER_W     10                             // ValueSlider xsize
+#define CC_SLIDER_W     cc_slider_w()                  // ValueSlider xsize, >= 10
 #define CC_LEARN_COL    (CC_SLIDER_X + CC_SLIDER_W + 5) // "B0 4A" or "PB ch3" or "----"
 
 #define CC_SPACE_BOTTOM 8
+
+// Slider track fills what is left of the row after the 4-char value the
+// widget prints, a gap and a 7-char Learn field ("PB ch16").
+static int cc_slider_w(void) {
+    int w = CHARS_X - 1 - 7 - 5 - CC_SLIDER_X;
+    return w < 10 ? 10 : w;
+}
+
+static const char *CC_HELP =
+    "Tab focus  Up/Dn pick  Click slider  Lt/Rt value  L learn  U unbind  "
+    "B bank  [/] channel  Ctrl+S save  ESC back";
 
 // IDs for tagged UI elements. The slider pool starts at CC_SLIDER_ID_BASE
 // and runs for ZT_CCIZER_MAX_SLOTS. Tab-stop pool occupies the lower IDs.
@@ -466,8 +480,7 @@ void CUI_CcConsole::enter(void) {
     // grid stub (CC_GRIDFOCUS_ID).
     UI->cur_element = CC_FILELIST_ID;
     focus = 0;
-    snprintf(status_line, sizeof(status_line),
-             "Tab focus | Up/Dn pick | Click slider | Lt/Rt val | L learn | U unbind | B bank | [/] ch | Ctrl+S | ESC");
+    status_line[0] = '\0';   // key help is drawn separately (CC_HELP)
     Keys.flush();
     need_refresh++;
     UI->enter();
@@ -489,9 +502,10 @@ void CUI_CcConsole::update(void) {
         int rows_for_list = grid_max_rows - 1;
         if (rows_for_list < 1) rows_for_list = 1;
         file_selector->ysize = rows_for_list - 1;   // ListBox: ysize = LAST row index
+        file_selector->xsize = CC_FILE_W;           // follows the window width
         file_selector->need_redraw = 1;             // see position_sliders rationale
     }
-    if (grid_focus) grid_focus->need_redraw = 1;
+    if (grid_focus) { grid_focus->x = CC_GRID_X; grid_focus->need_redraw = 1; }
     // Page focus is derived from UI->cur_element. file_cur mirrors
     // the listbox so existing references (status messages, draw-side
     // guards) keep working without poking the listbox each line.
@@ -722,9 +736,10 @@ void CUI_CcConsole::draw(Drawable *S) {
     int grid_max_rows = total_rows - CC_GRID_Y - CC_SPACE_BOTTOM - 2;
     if (grid_max_rows < 4) grid_max_rows = 4;
 
+    // Down to the last help line (two rows above the toolbar).
     S->fillRect(col(1), row(CC_BASE_Y - 1),
                 INTERNAL_RESOLUTION_X - 2,
-                row(CC_GRID_Y + grid_max_rows + 2),
+                row(total_rows - 6) - 1,
                 COLORS.Background);
 
     // Title shows the destination of every CC the page sends out:
@@ -737,9 +752,12 @@ void CUI_CcConsole::draw(Drawable *S) {
     char inst_field[80];
     if (cur_inst >= 0 && cur_inst < MAX_INSTS && song->instruments[cur_inst]) {
         const char *iname = (const char *)song->instruments[cur_inst]->title;
-        if (iname && *iname) {
+        // Instrument titles are space padded; trim them for the line.
+        int ilen = iname ? (int)strlen(iname) : 0;
+        while (ilen > 0 && iname[ilen - 1] == ' ') ilen--;
+        if (ilen > 0) {
             snprintf(inst_field, sizeof(inst_field),
-                     "inst %02d:%s", cur_inst, iname);
+                     "inst %02d:%.*s", cur_inst, ilen, iname);
         } else {
             snprintf(inst_field, sizeof(inst_field), "inst %02d", cur_inst);
         }
@@ -771,12 +789,19 @@ void CUI_CcConsole::draw(Drawable *S) {
         snprintf(port_field, sizeof(port_field), "port (none)");
     }
 
-    char title[200];
-    snprintf(title, sizeof(title),
-             "Paketti CCizer (Shift+F3)   %s   %s   ch %d%s",
-             inst_field, port_field, channel,
-             learning ? "   [LEARN]" : "");
-    printtitle(PAGE_TITLE_ROW_Y, title, COLORS.Text, COLORS.Background, S);
+    printtitle(PAGE_TITLE_ROW_Y, "Paketti CCizer (Shift+F3)", COLORS.Text, COLORS.Background, S);
+
+    // Where the CCs go, on its own line (it used to be packed into the
+    // title, which got cut on both sides on narrow windows).
+    {
+        char dest[240];
+        snprintf(dest, sizeof(dest), "Sending to %s   %s   ch %d%s",
+                 inst_field, port_field, channel, learning ? "   [LEARN]" : "");
+        int w = CHARS_X - 2;
+        if (w > (int)sizeof(dest) - 1) w = (int)sizeof(dest) - 1;
+        if (w > 0) dest[w] = 0;
+        print(col(1), row(CC_BASE_Y), dest, learning ? COLORS.Highlight : COLORS.Text, S);
+    }
 
     // ----- File list pane (left) -----
     // The ListBox widget paints its own rows (with the F11/F4-style
@@ -871,9 +896,22 @@ void CUI_CcConsole::draw(Drawable *S) {
         }
     }
 
-    // ----- Status line -----
-    print(col(2), row(CC_GRID_Y + grid_max_rows + 1),
-          status_line, COLORS.Lowlight, S);
+    // ----- Status line, then the key help (wrapped to the width) -----
+    {
+        const int w = CHARS_X - 2;
+        char sbuf[200];
+        snprintf(sbuf, sizeof(sbuf), "%.*s", w < 199 ? w : 199, status_line);
+        print(col(1), row(CC_GRID_Y + grid_max_rows + 1), sbuf, COLORS.Brighttext, S);
+        std::string help = zt_reflow_text(CC_HELP, w);
+        int hy = CC_GRID_Y + grid_max_rows + 2;
+        size_t p0 = 0;
+        for (int line = 0; line < 2 && p0 < help.size(); ++line) {
+            size_t p1 = help.find('\n', p0);
+            if (p1 == std::string::npos) p1 = help.size();
+            print(col(1), row(hy + line), help.substr(p0, p1 - p0).c_str(), COLORS.Lowlight, S);
+            p0 = p1 + 1;
+        }
+    }
 
     // Slider widgets paint here.
     UI->draw(S);

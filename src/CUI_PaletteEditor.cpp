@@ -525,7 +525,7 @@ static PeLayout pe_layout(void) {
     L.mid_x = L.list_x + PE_LIST_W + 2;
     L.mid_w = L.pre_x - 2 - L.mid_x;
     L.glob_y = L.bottom - 4;
-    L.pre_y = L.top + 1;            // row L.top is the panel header
+    L.pre_y = L.top + 2;            // row L.top is the panel header, then a gap
     L.pre_rows = (L.glob_y - 2) - L.pre_y + 1;
     if (L.pre_rows < 3) L.pre_rows = 3;
     L.prev_y = L.top + 6;
@@ -1113,7 +1113,7 @@ void CUI_PaletteEditor::draw(Drawable *S) {
     // --- Presets --------------------------------------------------------------
     {
         int px = col(L.pre_x), pw = col(L.pre_w);
-        int py = row(L.top), ph = row(1 + L.pre_rows);
+        int py = row(L.top), ph = row(L.pre_y - L.top + L.pre_rows);
         S->fillRect(px - 2, py - 2, px + pw + 1, py + ph + 1, COLORS.Black);
         draw_outline(S, px - 2, py - 2, px + pw + 2, py + ph + 2, COLORS.Lowlight);
         char head[40];
