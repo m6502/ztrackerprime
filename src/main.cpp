@@ -3120,10 +3120,18 @@ void mousewheelhandler(SDL_MouseWheelEvent *e) {
         if (zt_main_window) {
             SDL_GetWindowSize(zt_main_window, &win_w, &win_h);
         }
+        const float wanted_zoom = ZOOM;
         if (!set_video_mode(win_w, win_h, errstr)) {
             ZOOM = old_zoom;
             (void)set_video_mode(win_w, win_h, errstr);
             return;
+        }
+        if (ZOOM < wanted_zoom) {
+            // set_video_mode capped it: more would not fit the display.
+            snprintf(szStatmsg, sizeof(szStatmsg),
+                     "Zoom limited to %.1fx (display too small for more)", ZOOM);
+            statusmsg = szStatmsg;
+            status_change = 1;
         }
         zt_request_ui_full_refresh();
     }
@@ -3739,8 +3747,36 @@ static int zt_backend_set_video_mode(char *errstr)
   return 1;
 }
 
+// Largest zoom (in 0.1 steps) at which the minimum canvas still fits the
+// SMALLEST connected display -- the same display the window minimum is
+// capped against. Beyond it the window could not hold MINIMUM * ZOOM and
+// the canvas would be squeezed into it at a non-integer scale. Returns 0
+// when no display is known.
+static float zt_max_zoom_for_displays(void)
+{
+  int w = 1 << 30, h = 1 << 30;
+  zt_cap_to_smallest_display(&w, &h);
+  if (w == (1 << 30) || h == (1 << 30)) {
+    return 0.0f;
+  }
+  float zw = (float)w / (float)MINIMUM_SCREEN_WIDTH;
+  float zh = (float)h / (float)MINIMUM_SCREEN_HEIGHT;
+  float z = std::floor((zw < zh ? zw : zh) * 10.0f + 0.001f) / 10.0f;
+  return z < 0.5f ? 0.5f : z;
+}
+
 int set_video_mode(int w, int h, char *errstr)
 {
+  // Cap the zoom like the window size: it must leave room for the minimum
+  // canvas on every display (mouse wheel, Size presets and zt.conf all
+  // come through here).
+  if (!zt_headless_active()) {
+    const float max_zoom = zt_max_zoom_for_displays();
+    if (max_zoom > 0.0f && ZOOM > max_zoom) {
+      ZOOM = max_zoom;
+    }
+  }
+
   // While the window is fullscreen it is the screen size, not the requested w/h
   // (e.g. a Size preset's 1280). Drive the internal canvas off the ACTUAL size
   // so the requested ZOOM is applied exactly -- otherwise the requested-sized

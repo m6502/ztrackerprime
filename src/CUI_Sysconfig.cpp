@@ -14,18 +14,22 @@ static ValueSlider *midiout_latency_slider;
 static CheckBox *midiout_bank_select;
 static TextInput *midiout_alias_input;
 static SkinSelector *skin_selector;
+static TextInput *ccizer_folder_input;
+static TextInput *syx_folder_input;
 void midi_out_sel(int dev);
 void midi_in_sel(int dev);
 
-// Keep the MIDI controls on the same 80-column grid they historically used,
-// but distribute any additional horizontal space between the two lists.  The
-// midpoint itself remains a one-character gutter.
+// Two columns split at the screen midpoint, one blank column of margin at
+// each screen edge (as on Global Config). Frames sit at x - 1 and x + xsize:
+// the MIDI In list's frame is on col 1 and col midpoint - 1, the MIDI Out
+// list's and the skin list's on col midpoint and col CHARS_X - 2. The
+// left-hand folder fields stop one column short of the skin list.
 static void layout_midi_device_columns()
 {
-    const int left_x = 4;
+    const int left_x = 2;
     const int midpoint = CHARS_X / 2;
     const int right_x = midpoint + 1;
-    const int right_edge = CHARS_X - 4;
+    const int right_edge = CHARS_X - 2;
     const int left_width = midpoint - left_x - 1;
     const int right_width = right_edge - right_x;
 
@@ -39,6 +43,9 @@ static void layout_midi_device_columns()
 
     skin_selector->x = right_x;
     skin_selector->xsize = right_edge - right_x;
+
+    if (ccizer_folder_input) ccizer_folder_input->xsize = midpoint - 2 - ccizer_folder_input->x;
+    if (syx_folder_input)    syx_folder_input->xsize    = midpoint - 2 - syx_folder_input->x;
 
     midiindevlist->x = left_x;
     midiindevlist->xsize = left_width;
@@ -451,7 +458,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         UI->add_element(b,tabindex++);
         b->caption = "   Go to page 2   ";
         b->xsize = 18;
-        b->x = 4;   // align start with "MIDI Out Device Selection" label below
+        b->x = 1;   // same place as Global Config's 'Go to page 1' button
         b->y = 12;
         b->ysize = 1;
         b->OnClick = (ActFunc)BTNCLK_GotoGlobalConfig;
@@ -459,7 +466,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
         // Left column controls at col 20 to match Global Config (Ctrl+F12).
-        vs->x = 4 + 16;
+        vs->x = 17;
         vs->y = base_y;
         vs->xsize = 15+1;
         vs->ysize = 1;
@@ -469,7 +476,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
-        cb->x = 4 + 16;
+        cb->x = 17;
         cb->y = base_y + 2;   // Panic on stop
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_send_panic;
@@ -490,7 +497,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
-        cb->x = 4 + 16;
+        cb->x = 17;
         cb->y = base_y + 3;   // Auto-open MIDI — adjacent to Panic on stop
         cb->xsize = 3;
         cb->value = &zt_config_globals.auto_open_midi;
@@ -498,7 +505,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         cb = new CheckBox;
         UI->add_element(cb,tabindex++); // Full Screen cb — update() reads via get_element(5)
-        cb->x = 4+16;
+        cb->x = 17;
         cb->y = base_y + 4;   // adjacent to Auto-open MIDI; matches F11 tight checkbox stack
         cb->xsize = 3;
         cb->value = &zt_config_globals.full_screen;
@@ -507,7 +514,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         // Record Velocity (moved from Ctrl+F12 Global Config).
         cb = new CheckBox;
         UI->add_element(cb,tabindex++);
-        cb->x = 4+16;
+        cb->x = 17;
         cb->y = base_y + 5;
         cb->xsize = 3;
         cb->value = &zt_config_globals.record_velocity;
@@ -517,11 +524,12 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti = new TextInput;
         UI->add_element(ti, tabindex++);
         ti->frame  = 1;
-        ti->x      = 4 + 16;                          // matches left-column controls
+        ti->x      = 17;                              // matches left-column controls
         ti->y      = base_y + 7;                      // gap row 6 between Record Velocity (+5) and this
-        ti->xsize  = 27;                              // ends col 47 -- one col gap before Skin Selection at col 49
+        ti->xsize  = 21;                              // set by layout_midi_device_columns()
         ti->length = MAX_PATH;
         ti->str    = (unsigned char*)zt_config_globals.ccizer_folder;
+        ccizer_folder_input = ti;
 
         // SysEx folder picker (audit L13). Two rows below the CCizer
         // folder, not one -- frame=1 TextInputs draw a top border at
@@ -534,16 +542,17 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
         ti = new TextInput;
         UI->add_element(ti, tabindex++);
         ti->frame  = 1;
-        ti->x      = 4 + 16;
+        ti->x      = 17;
         ti->y      = base_y + 9;
-        ti->xsize  = 27;                              // matches CCizer field width
+        ti->xsize  = 21;                              // matches CCizer field width
         ti->length = MAX_PATH;
         ti->str    = (unsigned char*)zt_config_globals.syx_folder;
+        syx_folder_input = ti;
 
 #ifndef DISABLED_CONFIGURATION_VALUES
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
-        vs->x = 4+16;
+        vs->x = 17;
         vs->y = base_y + 10;
         vs->xsize = 15+4;
         vs->ysize = 1;
@@ -553,7 +562,7 @@ CUI_Sysconfig::CUI_Sysconfig(void) {
 
         vs = new ValueSlider;
         UI->add_element(vs,tabindex++);
-        vs->x = 4+16;
+        vs->x = 17;
         vs->y = base_y + 12;
         vs->xsize = 15+4;
         vs->ysize = 1;
@@ -721,27 +730,28 @@ void CUI_Sysconfig::draw(Drawable *S) {
         printtitle(PAGE_TITLE_ROW_Y,"System Configuration (F12)",COLORS.Text,COLORS.Background,S);
         // Labels shifted +3 rows from legacy position: row 12 holds the
         // "Go to page 2" button, rows 11 and 13 are empty gaps.
-        // Labels right-align so text ends at col 18 (1-char gap before
-        // col-20 controls). Matches Global Config (Ctrl+F12).
-        print(row(4),col(TRACKS_ROW_Y+3),"      Prebuffer",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+5),"  Panic on stop",COLORS.Text,S);
+        // Labels right-align so text ends at col 15 (1-char gap before
+        // col-17 controls). Matches Global Config (Ctrl+F12).
+        print(row(1),col(TRACKS_ROW_Y+3),"      Prebuffer",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+5),"  Panic on stop",COLORS.Text,S);
         // "MIDI-IN Slave" label intentionally omitted — see F11 (Songconfig).
-        print(row(4),col(TRACKS_ROW_Y+6)," Auto-open MIDI",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+6)," Auto-open MIDI",COLORS.Text,S);
 
-        print(row(4),col(TRACKS_ROW_Y+7),"    Full Screen",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+10),"  CCizer Folder",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+12),"  SysEx Folder", COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+7),"    Full Screen",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+8),"Record Velocity",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+10),"  CCizer Folder",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+12),"  SysEx Folder", COLORS.Text,S);
 #ifndef DISABLED_CONFIGURATION_VALUES
-        print(row(4),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
-        print(row(4),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+13),"     Key Repeat",COLORS.Text,S);
+        print(row(1),col(TRACKS_ROW_Y+15),"       Key Wait",COLORS.Text,S);
 #endif
-        const int midi_out_x = CHARS_X / 2 + 1;
+        // Right-column labels start on the lists' frame column, as the
+        // left ones do on col 1.
+        const int midi_out_x = CHARS_X / 2;
         print(row(midi_out_x),col(TRACKS_ROW_Y+2),"Skin Selection",COLORS.Text,S);
 
-        // MIDI In remains at col 4; MIDI Out begins one column right of
-        // centre.  Both lists extend to four columns from their outer edge.
-        print(row(4),col(28),"MIDI In Device Selection",COLORS.Text,S);
+        // MIDI In on the left half, MIDI Out on the right half.
+        print(row(1),col(28),"MIDI In Device Selection",COLORS.Text,S);
         print(row(midi_out_x),col(28),"MIDI Out Device Selection",COLORS.Text,S);
 
         // Labels stay aligned with the MIDI Out list's left edge.

@@ -52,7 +52,7 @@ extern char errstr[2048];   // shared error buffer in main.cpp
 //     determines how much actually fits on each page; the headless
 //     screenshot tooling captures THIS surface)
 //
-// Internal canvas = window / zoom. MINIMUM_SCREEN_WIDTH/HEIGHT is 512x480,
+// Internal canvas = window / zoom. MINIMUM_SCREEN_WIDTH/HEIGHT is 640x480,
 // enforced inside set_video_mode, so internal can never go smaller.
 struct ResPreset {
     const char *label;
