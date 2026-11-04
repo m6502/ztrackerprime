@@ -52,7 +52,7 @@ extern char errstr[2048];   // shared error buffer in main.cpp
 //     determines how much actually fits on each page; the headless
 //     screenshot tooling captures THIS surface)
 //
-// Internal canvas = window / zoom. MINIMUM_SCREEN_WIDTH/HEIGHT is 840x480,
+// Internal canvas = window / zoom. MINIMUM_SCREEN_WIDTH/HEIGHT is 512x480,
 // enforced inside set_video_mode, so internal can never go smaller.
 struct ResPreset {
     const char *label;
@@ -68,7 +68,7 @@ static const ResPreset MM_RES_PRESETS[] = {
     { "Medium     1440x900  1.5x",     1440,  900, 1.5f }, //   960x600   12 px
     { "Large      1920x1080 2.0x",     1920, 1080, 2.0f }, //   960x540   16 px
     { "Huge       2560x1440 2.0x",     2560, 1440, 2.0f }, //  1280x720   16 px
-    { "Massive    2560x1440 3.0x",     2560, 1440, 3.0f }, //   853x480 (clamped) 24 px
+    { "Massive    2560x1440 3.0x",     2560, 1440, 3.0f }, //   853x480   24 px
 };
 static const int MM_RES_PRESET_COUNT =
     (int)(sizeof(MM_RES_PRESETS) / sizeof(MM_RES_PRESETS[0]));

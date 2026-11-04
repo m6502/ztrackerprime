@@ -7,8 +7,8 @@
 #define MAX_PATH 260
 
 
-#define DEFAULT_RESOLUTION_X       1024
-#define DEFAULT_RESOLUTION_Y       700
+#define DEFAULT_RESOLUTION_X       1680
+#define DEFAULT_RESOLUTION_Y       960
 
 enum E_edit_viewmode { VIEW_SQUISH, VIEW_REGULAR, VIEW_FX, VIEW_BIG }; //, VIEW_EXTEND };
 

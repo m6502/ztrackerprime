@@ -138,7 +138,7 @@ static inline void zt_text_input_stop(void) {
 #define RESOLUTION_X                    (zt_config_globals.screen_width)
 #define RESOLUTION_Y                    (zt_config_globals.screen_height)
 
-#define MINIMUM_SCREEN_WIDTH            840
+#define MINIMUM_SCREEN_WIDTH            512
 #define MINIMUM_SCREEN_HEIGHT           480
 
 #define INITIAL_ROW 1 // <Manu> Never set to 0, there are some -1 in calculations

@@ -1047,7 +1047,7 @@ void status(const char *msg,Drawable *S)
     // "Stopped" on a window wider than 640px.
     const int max_cols = INTERNAL_RESOLUTION_X / FONT_SIZE_X;
     char wipe[256];
-    int n = max_cols - 3;
+    int n = max_cols - 2;
     if (n < 0) n = 0;
     if (n > (int)sizeof(wipe) - 1) n = sizeof(wipe) - 1;
     memset(wipe, ' ', n);
@@ -1058,9 +1058,9 @@ void status(const char *msg,Drawable *S)
     const bool error_active = (SDL_GetTicks() < statusmsg_error_until_ms);
     const TColor fg = error_active ? COLORS.Background : COLORS.Text;
     const TColor bg = error_active ? COLORS.Highlight  : COLORS.Background;
-    printBG(col(3),row(INITIAL_ROW + 6),wipe,fg,bg,S);
-    printBGCC(col(3),row(INITIAL_ROW + 6),msg,fg,bg,S);
-    screenmanager.Update(col(3),row(INITIAL_ROW + 6),col(max_cols)-1,row(10));
+    printBG(col(2),row(INITIAL_ROW + 6),wipe,fg,bg,S);
+    printBGCC(col(2),row(INITIAL_ROW + 6),msg,fg,bg,S);
+    screenmanager.Update(col(2),row(INITIAL_ROW + 6),col(max_cols)-1,row(10));
 }
 
 // set_error_status — copy `msg` into the status buffer and arm the
@@ -1310,11 +1310,51 @@ int initConsole(int& Width, int& Height, int& FullScreen, int& Flags, Screen* S)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// Header blocks: "Song Name" labels at the left screen edge, "Instrument"
+// labels flush right. Song/file name and instrument name fields use their
+// full width when it fits and shrink together, down to about half, on narrow
+// canvases.
+struct ZtHeaderLayout {
+  int name_x;        // first data column of song/file name
+  int name_w;
+  int inst_label_x;  // " Instrument" label column
+  int inst_x;        // first data column of the instrument field ("NN: name")
+  int inst_name_w;   // chars of instrument name after "NN: "
+};
+
+static ZtHeaderLayout zt_header_layout(void)
+{
+  enum { NAME_W_MAX = 25, NAME_W_MIN = 13, INST_W_MAX = 24, INST_W_MIN = 12 };
+  // Fixed chars: frame col + 9 label + border, name border, gap, 11 label +
+  // border, "NN: ", instrument border.
+  const int chars = INTERNAL_RESOLUTION_X / FONT_SIZE_X;
+  const int budget = chars - 30;
+  int name_w = NAME_W_MAX;
+  int inst_w = INST_W_MAX;
+  const int deficit = (NAME_W_MAX + INST_W_MAX) - budget;
+  if (deficit > 0) {
+    name_w -= (deficit + 1) / 2;
+    inst_w -= deficit / 2;
+  }
+  if (name_w < NAME_W_MIN) name_w = NAME_W_MIN;
+  if (inst_w < INST_W_MIN) inst_w = INST_W_MIN;
+
+  ZtHeaderLayout hl;
+  hl.name_x = 11;
+  hl.name_w = name_w;
+  hl.inst_name_w = inst_w;
+  hl.inst_x = chars - 1 - (inst_w + 4);
+  hl.inst_label_x = hl.inst_x - 12;
+  return hl;
+}
+
 void draw_status_vars(Drawable *S)
 {
   char s[64];
 
-  int posx_columna2 = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 30 ;
+  const ZtHeaderLayout hl = zt_header_layout();
+  const int inst_field_w = hl.inst_name_w + 4;
+  int posx_columna2 = hl.inst_x;
 
 
   sprintf(s,"%.2d",song->instruments[cur_inst]->channel+1);
@@ -1324,13 +1364,13 @@ void draw_status_vars(Drawable *S)
   printBG(col(posx_columna2),row(INITIAL_ROW + 3),s,COLORS.Data,COLORS.Black,S); // Octave
 
   sprintf(s,"%.3d/255",cur_edit_order);
-  printBG(col(12),row(INITIAL_ROW + 2),s,COLORS.Data,COLORS.Black,S); // ORDER
+  printBG(col(hl.name_x),row(INITIAL_ROW + 2),s,COLORS.Data,COLORS.Black,S); // ORDER
 
   sprintf(s,"%.3d/255",cur_edit_pattern);
-  printBG(col(12),row(INITIAL_ROW + 3),s,COLORS.Data,COLORS.Black,S); // PATTERN
+  printBG(col(hl.name_x),row(INITIAL_ROW + 3),s,COLORS.Data,COLORS.Black,S); // PATTERN
 
   sprintf(s,"%.3d/%.3d",cur_edit_row,song->patterns[cur_edit_pattern]->length-1);
-  printBG(col(12),row(INITIAL_ROW + 4),s,COLORS.Data,COLORS.Black,S); // ROW
+  printBG(col(hl.name_x),row(INITIAL_ROW + 4),s,COLORS.Data,COLORS.Black,S); // ROW
 
   sprintf(s,"%.3d/%.3d",song->tpb,song->bpm);
 
@@ -1342,13 +1382,14 @@ void draw_status_vars(Drawable *S)
 
   printBG(col(posx_columna2),row(INITIAL_ROW + 1),s,COLORS.Data,COLORS.Black,S); // ORDER
 
-  sprintf(s,"%.2d:                       ",cur_inst);
-  printBG(col(posx_columna2),row(INITIAL_ROW),s,COLORS.Data,COLORS.Black,S); // ORDER
+  memset(s, ' ', inst_field_w);
+  s[inst_field_w] = '\0';
+  printBG(col(posx_columna2),row(INITIAL_ROW),s,COLORS.Data,COLORS.Black,S);
 
-  sprintf(s,"%.2d: %.24s",cur_inst,song->instruments[cur_inst]->title);
-  printBG(col(posx_columna2),row(INITIAL_ROW),s,COLORS.Data,COLORS.Black,S); // ORDER
+  sprintf(s,"%.2d: %.*s",cur_inst,hl.inst_name_w,song->instruments[cur_inst]->title);
+  printBG(col(posx_columna2),row(INITIAL_ROW),s,COLORS.Data,COLORS.Black,S); // INSTRUMENT
 
-  screenmanager.Update( col(10), row(INITIAL_ROW - 1), col(79), row(10) );
+  screenmanager.Update( 0, row(INITIAL_ROW - 1), INTERNAL_RESOLUTION_X - 1, row(10) );
 
 }
 
@@ -1368,51 +1409,51 @@ void draw_status(Drawable *S)
     S->copy(BG_IMAGE,0,0);
     S->lock();
 #endif
-    print(col(2),row(INITIAL_ROW),    "Song Name",COLORS.Text,S);
-    print(col(2),row(INITIAL_ROW + 1),"File Name",COLORS.Text,S);
-    print(col(2),row(INITIAL_ROW + 2),"    Order",COLORS.Text,S);
-    print(col(2),row(INITIAL_ROW + 3),"  Pattern",COLORS.Text,S);
-    print(col(2),row(INITIAL_ROW + 4),"      Row",COLORS.Text,S);
+    const ZtHeaderLayout hl = zt_header_layout();
+    const int nx = hl.name_x;
+    const int label_x = nx - 10;
 
+    print(col(label_x),row(INITIAL_ROW),    "Song Name",COLORS.Text,S);
+    print(col(label_x),row(INITIAL_ROW + 1),"File Name",COLORS.Text,S);
+    print(col(label_x),row(INITIAL_ROW + 2),"    Order",COLORS.Text,S);
+    print(col(label_x),row(INITIAL_ROW + 3),"  Pattern",COLORS.Text,S);
+    print(col(label_x),row(INITIAL_ROW + 4),"      Row",COLORS.Text,S);
 
-    int posx_columna2 = (INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 30 - 12 ;
+    print(col(hl.inst_label_x),row(INITIAL_ROW),    " Instrument",COLORS.Text,S);
+    print(col(hl.inst_label_x),row(INITIAL_ROW + 1),"    TPB/BPM",COLORS.Text,S);
+    print(col(hl.inst_label_x),row(INITIAL_ROW + 2),"    Channel",COLORS.Text,S);
+    print(col(hl.inst_label_x),row(INITIAL_ROW + 3),"     Octave",COLORS.Text,S);
 
-    print(col(posx_columna2),row(INITIAL_ROW),    " Instrument",COLORS.Text,S);
-    print(col(posx_columna2),row(INITIAL_ROW + 1),"    TPB/BPM",COLORS.Text,S);
-    print(col(posx_columna2),row(INITIAL_ROW + 2),"    Channel",COLORS.Text,S);
-    print(col(posx_columna2),row(INITIAL_ROW + 3),"     Octave",COLORS.Text,S);
+    char blank[64];
+    memset(blank, ' ', hl.name_w);
+    blank[hl.name_w] = '\0';
 
-    printline(col(12),row(INITIAL_ROW - 1),0x86,25,COLORS.Lowlight,S);
-    printline(col(19),row(INITIAL_ROW + 2),0x81,18,COLORS.Highlight,S);
-    printBG(col(12),row(INITIAL_ROW),"                         ",COLORS.Data,COLORS.Black,S);
-    printBG(col(12),row(INITIAL_ROW),(char *)song->title,COLORS.Data,COLORS.Black,S);
-    printBG(col(12),row(INITIAL_ROW + 1),"                         ",COLORS.Data,COLORS.Black,S);
-    strcpy(fn,(const char *)song->filename);
-    fn[25] = 0;
-    printBG(col(12),row(INITIAL_ROW + 1),(char *)fn,COLORS.Data,COLORS.Black,S);
+    printline(col(nx),row(INITIAL_ROW - 1),0x86,hl.name_w,COLORS.Lowlight,S);
+    printline(col(nx + 7),row(INITIAL_ROW + 2),0x81,hl.name_w - 7,COLORS.Highlight,S);
+    printBG(col(nx),row(INITIAL_ROW),blank,COLORS.Data,COLORS.Black,S);
+    snprintf(fn, sizeof(fn), "%.*s", hl.name_w, (const char *)song->title);
+    printBG(col(nx),row(INITIAL_ROW),fn,COLORS.Data,COLORS.Black,S);
+    printBG(col(nx),row(INITIAL_ROW + 1),blank,COLORS.Data,COLORS.Black,S);
+    snprintf(fn, sizeof(fn), "%.*s", hl.name_w, (const char *)song->filename);
+    printBG(col(nx),row(INITIAL_ROW + 1),fn,COLORS.Data,COLORS.Black,S);
 
     draw_status_vars(S);
 
-//  sprintf(s,"%.2d: %.24s",cur_inst,song->instruments[cur_inst]->title);
-//  printBG(col(50),row(3),s,COLORS.Data,COLORS.Black,S); // ORDER
-
-    printline(col(12),row(INITIAL_ROW + 5),0x81,7,COLORS.Highlight,S);
+    printline(col(nx),row(INITIAL_ROW + 5),0x81,7,COLORS.Highlight,S);
 
     for (i=INITIAL_ROW;i<=(INITIAL_ROW + 4);i++)
-        printchar(col(11),row(i),0x84,COLORS.Lowlight,S);
+        printchar(col(nx - 1),row(i),0x84,COLORS.Lowlight,S);
     for (i=(INITIAL_ROW + 2);i<=(INITIAL_ROW + 4);i++)
-        printchar(col(19),row(i),0x83,COLORS.Highlight,S);
+        printchar(col(nx + 7),row(i),0x83,COLORS.Highlight,S);
     for (i=INITIAL_ROW;i<=(INITIAL_ROW + 1);i++)
-        printchar(col(37),row(i),0x83,COLORS.Highlight,S);
+        printchar(col(nx + hl.name_w),row(i),0x83,COLORS.Highlight,S);
 
+    const int posx_columna2 = hl.inst_x;
+    const int inst_field_w = hl.inst_name_w + 4;
 
+    printline(col(posx_columna2),row(INITIAL_ROW - 1),0x86,inst_field_w,COLORS.Lowlight,S);         // Over inst
 
-
-    posx_columna2 += 12 ;
-
-    printline(col(posx_columna2),row(INITIAL_ROW - 1),0x86,28,COLORS.Lowlight,S);         // Over inst
-
-    printchar(col(posx_columna2 + 28),row(INITIAL_ROW),0x83,COLORS.Highlight,S); // end of inst
+    printchar(col(posx_columna2 + inst_field_w),row(INITIAL_ROW),0x83,COLORS.Highlight,S); // end of inst
 
     printchar(col(posx_columna2 + 7),row(INITIAL_ROW + 1),0x83,COLORS.Highlight,S);
     printchar(col(posx_columna2 + 2),row(INITIAL_ROW + 2),0x83,COLORS.Highlight,S);
@@ -1421,7 +1462,7 @@ void draw_status(Drawable *S)
 
     printchar(col(posx_columna2),row(INITIAL_ROW + 4),0x81,COLORS.Highlight,S);
 
-    printline(col(posx_columna2 + 7),row(INITIAL_ROW + 1),0x81,21,COLORS.Highlight,S);       // Under inst
+    printline(col(posx_columna2 + 7),row(INITIAL_ROW + 1),0x81,inst_field_w - 7,COLORS.Highlight,S);       // Under inst
 
     printline(col(posx_columna2 + 2),row(INITIAL_ROW + 2),0x81,5,COLORS.Highlight,S);
 
@@ -1438,7 +1479,7 @@ void draw_status(Drawable *S)
     }
     */
 
-    screenmanager.Update( col(10), row(INITIAL_ROW - 1), col(INTERNAL_RESOLUTION_X / FONT_SIZE_X) - 2, row(INITIAL_ROW + 7) );
+    screenmanager.Update( 0, row(INITIAL_ROW - 1), INTERNAL_RESOLUTION_X - 1, row(INITIAL_ROW + 7) );
 }
 
 
@@ -2168,7 +2209,12 @@ void redrawscreen(Drawable *S)
         for(int y=0;y<INTERNAL_RESOLUTION_Y/8;y++)
             printchar(0,row(y),131,COLORS.Highlight,S);
 
-        print(col(textcenter(header)),row(HEADER_ROW),header,COLORS.Text,S);
+        {
+            const ZtHeaderLayout hl = zt_header_layout();
+            const int banner_x = textcenter(header);
+            if (banner_x > hl.name_x + hl.name_w + 1 && banner_x + (int)strlen(header) <= hl.inst_label_x)
+                print(col(banner_x),row(HEADER_ROW),header,COLORS.Text,S);
+        }
 //      sprintf(header,"015/128 - C:012 N:013");
 //      printLCD(col(2),row(55),header,S);
         draw_status(S);
