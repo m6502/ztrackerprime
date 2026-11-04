@@ -149,14 +149,24 @@
     void Drawable::flip(void) {
     }
 
+    // Draws pixels x .. x2-1 of row y, clipped to the surface. Unclipped,
+    // a line past the right edge kept writing into the next pixel row (and
+    // past the end of the buffer on the last row).
     void Drawable::drawHLine(int y, int x, int x2, TColor c) {
+        if (!surface || !surface->pixels) return;
+        if (y < 0 || y >= surface->h) return;
+        if (x < 0) x = 0;
+        if (x2 > surface->w) x2 = surface->w;
+        if (x >= x2) return;
         TColor *screen = (TColor *)surface->pixels;
         screen += y * (surface->pitch / (int)sizeof(TColor)) + x;
-        TColor *end;
-        end = screen + (x2-x);
+        TColor *end = screen + (x2 - x);
         for(;screen<end;screen++)
             *screen = c;
     };
+    // Never implemented (a no-op since the original import); the widgets
+    // that call it were laid out without vertical edges. Use fillRect for
+    // a vertical line.
     void Drawable::drawVLine(int x, int y, int y2, TColor c) {
         (void)x; (void)y; (void)y2; (void)c;
     };
