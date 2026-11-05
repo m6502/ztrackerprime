@@ -1095,6 +1095,22 @@ extern int g_posx_tracks ;
 // ------------------------------------------------------------------------------------------------
 //
 //
+// Printed width of a printBGCC string: "|X|" color codes take no columns.
+static int cc_visible_len(const char *s)
+{
+  int n = 0;
+  for (int c = 0; s[c]; c++) {
+    if (s[c] == '|' && s[c+1] != '|') {
+      if (s[c+1]) c++;
+      if (s[c+1]) c++;
+      continue;
+    }
+    if (s[c] == '|') c++;
+    n++;
+  }
+  return n;
+}
+
 void update_status(Drawable *S)
 {
   int i,o=0;
@@ -1126,6 +1142,13 @@ void update_status(Drawable *S)
     else {
 
       sprintf(szStatmsg,"Looping, Pattern: |H|%.3d|U|/|H|255|U|, Row: |H|%.3d|U|/|H|%.3d|U|, Time: %s, BPM: |H|%d|U|, TPB: |H|%d|U|, Step: |H|%d|U|  ",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
+    }
+
+    if (cc_visible_len(szStatmsg) > INTERNAL_RESOLUTION_X / FONT_SIZE_X - 2) {
+      if (ztPlayer->playmode)
+        sprintf(szStatmsg,"Playing Ord |H|%.3d|U|/|H|%.3d|U| Pat |H|%.3d|U| Row |H|%.3d|U|/|H|%.3d|U| %s BPM |H|%d|U| TPB |H|%d|U| Step |H|%d|U|",ztPlayer->playing_cur_order,ztPlayer->num_real_orders,ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
+      else
+        sprintf(szStatmsg,"Looping Pat |H|%.3d|U| Row |H|%.3d|U|/|H|%.3d|U| %s BPM |H|%d|U| TPB |H|%d|U| Step |H|%d|U|",ztPlayer->playing_cur_pattern,ztPlayer->playing_cur_row,song->patterns[ztPlayer->playing_cur_pattern]->length,time,song->bpm,song->tpb,cur_step);
     }
 
     statusmsg = szStatmsg;

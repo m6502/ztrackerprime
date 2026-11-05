@@ -374,7 +374,12 @@ void printBGCC(int x, int y, const char *str, TColor col, TColor bg, Drawable *S
                     use = col;
                     break;
             }
-            c+=2;
+            // Step past the code letter and its closing '|', but never past
+            // the terminator: a string ending in a code would otherwise print
+            // whatever stale bytes follow it in the buffer.
+            if (str[c]) c++;
+            if (str[c]) c++;
+            if (!str[c]) break;
         } else if (str[c] == '|' && str[c+1] == '|') c++;
         
         // Same branchless-store + hoisted-bounds treatment as printBG; also
