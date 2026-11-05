@@ -164,9 +164,15 @@
         for(;screen<end;screen++)
             *screen = c;
     };
-    // Never implemented (a no-op since the original import); the widgets
-    // that call it were laid out without vertical edges. Use fillRect for
-    // a vertical line.
+    // y2 is exclusive, like x2 in drawHLine.
     void Drawable::drawVLine(int x, int y, int y2, TColor c) {
-        (void)x; (void)y; (void)y2; (void)c;
+        if (!surface || !surface->pixels) return;
+        if (x < 0 || x >= surface->w) return;
+        if (y < 0) y = 0;
+        if (y2 > surface->h) y2 = surface->h;
+        if (y >= y2) return;
+        const int stride = surface->pitch / (int)sizeof(TColor);
+        TColor *screen = (TColor *)surface->pixels + y * stride + x;
+        for (int i = y; i < y2; i++, screen += stride)
+            *screen = c;
     };

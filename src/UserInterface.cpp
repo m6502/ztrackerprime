@@ -1483,11 +1483,9 @@ void VUPlay::draw(Drawable *S, int)
     }
   }
 
-  // Outline. The previous code's drawHLine/drawVLine sat next to a
-  // "why doesn't this work" comment; calling Drawable::drawHLine/VLine
-  // is fine in current SDL3 wrapper, leaving them in for the visual.
+  // Bottom and right edges of the track rows (y+1 .. y+track_count).
   S->drawHLine((y+track_count+1)*8,(x)*8,(x+71)*8,COLORS.Highlight);
-  S->drawVLine((x+71)*8,y*8,(y+track_count)*8,COLORS.Highlight);
+  S->drawVLine((x+71)*8,(y+1)*8,(y+track_count+1)*8+1,COLORS.Highlight);
 
   screenmanager.UpdateWH(col(x),row(y),col(x+71),row(y+track_count+2));
 }
@@ -1620,7 +1618,7 @@ void BarGraph::draw(Drawable *S, int) {
     S->drawHLine(y,x,x+xsize,COLORS.Lowlight);
     S->drawVLine(x,y,y+ysize-1,COLORS.Lowlight);
     S->drawHLine(y+ysize-1,x,x+xsize,COLORS.Highlight);
-    S->drawVLine(x+xsize,y,y+ysize-1,COLORS.Highlight);
+    S->drawVLine(x+xsize-1,y,y+ysize,COLORS.Highlight);
     screenmanager.Update(col(x-1),row(y-1),col(x+xsize+1),row(y+1));
     this->changed = 0;
 }
@@ -1677,7 +1675,7 @@ void LCDDisplay::draw(Drawable *S, int) {
     S->drawHLine(y,x,x+xsize,COLORS.Lowlight);
     S->drawVLine(x,y,y+ysize-1,COLORS.Lowlight);
     S->drawHLine(y+ysize,x,x+xsize,COLORS.Highlight);
-    S->drawVLine(x+xsize,y,y+ysize-1,COLORS.Highlight);
+    S->drawVLine(x+xsize-1,y,y+ysize+1,COLORS.Highlight);
     x+=2;
     screenmanager.UpdateWH(x,y,xsize,ysize);
     this->changed = 0;

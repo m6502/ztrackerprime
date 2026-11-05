@@ -207,7 +207,6 @@ CUI_Savescreen::CUI_Savescreen(void)
   ti->xsize  = SAVE_TEXTINPUT_SIZE_X ;
   ti->ysize  = 1 ;
   ti->length = SAVE_TEXTINPUT_SIZE_X ;
-  ti->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   ti->str = (unsigned char *)&save_filename[0];
 
@@ -220,7 +219,6 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_zt->xsize = strlen(b_zt->caption)+1;
   b_zt->state = b_zt->updown = 1;
   b_zt->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
-  b_zt->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   b_mid = new Button;
   UI->add_element(b_mid, 5);
@@ -230,7 +228,6 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid->ysize = 1;
   b_mid->xsize = strlen(b_mid->caption) + 1;
   b_mid->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
-  b_mid->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   b_mid_mt = new Button;
   UI->add_element(b_mid_mt, 6);
@@ -240,7 +237,6 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid_mt->ysize = 1;
   b_mid_mt->xsize = strlen(b_mid_mt->caption) + 1;
   b_mid_mt->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
-  b_mid_mt->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   b_mid_pertrack = new Button;
   UI->add_element(b_mid_pertrack, 7);
@@ -250,7 +246,6 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid_pertrack->ysize = 1;
   b_mid_pertrack->xsize = strlen(b_mid_pertrack->caption) + 1;
   b_mid_pertrack->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
-  b_mid_pertrack->auto_anchor_at_current_pos(ANCHOR_LEFT | ANCHOR_DOWN) ;
 
   /*b_gba = new Button;
   UI->add_element(b_gba, 6);
@@ -428,12 +423,19 @@ void CUI_Savescreen::draw(Drawable *S)
   fl->ysize = SAVE_FILE_LIST_SIZE_Y_CHARS ;
   dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
   dr->ysize = DRIVE_LIST_SIZE_Y ;
+  // Placed from the same macros as the file list (not anchored to the
+  // window bottom, which rounds differently and loses the gap).
+  ti->y             = SAVE_TEXTINPUT_POS_Y ;
+  b_zt->y           = SAVE_ZT_BUTTON_POS_Y ;
+  b_mid->y          = SAVE_MID_BUTTON_POS_Y ;
+  b_mid_mt->y       = SAVE_MID_MT_BUTTON_POS_Y ;
+  b_mid_pertrack->y = SAVE_MID_PT_BUTTON_POS_Y ;
 
   if (clear) {
 
     if (S->lock() == 0) {
 
-      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,424,COLORS.Background);
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - LOW_PANEL_SIZE_Y_PIXELS - 1,COLORS.Background);
       S->unlock();
       clear=0;
     }

@@ -260,7 +260,7 @@ void CUI_Loadscreen::draw(Drawable *S)
 
     if (S->lock() == 0) {
 
-      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,424,COLORS.Background);
+      S->fillRect(col(1),row(12),INTERNAL_RESOLUTION_X,INTERNAL_RESOLUTION_Y - LOW_PANEL_SIZE_Y_PIXELS - 1,COLORS.Background);
       S->unlock();
       clear=0;
     }
