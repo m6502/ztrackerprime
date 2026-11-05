@@ -78,24 +78,21 @@ shot docs/screenshots/15-about.png
 key f2
 wait 100
 
-key f2
-wait 100
+# From here on every page is left with a single F2 back to the Pattern
+# Editor: F2 pressed while already there opens the options popup, which
+# would swallow the next keys, and ESC on the Load page opens the menu.
 key ctrl+l
 wait 250
 shot docs/screenshots/16-load-dialog.png
-key esc
-wait 100
-
 key f2
 wait 100
+
 key ctrl+alt+l
 wait 250
 shot docs/screenshots/17-lua-console.png
-key esc
+key f2
 wait 100
 
-key f2
-wait 200
 key esc
 wait 250
 shot docs/screenshots/18-main-menu.png
