@@ -257,9 +257,26 @@ void CUI_LuaConsole::draw(Drawable *S)
             const char *t = g_lua.lines[li % LUA_CONSOLE_MAX_LINES];
             int len = t ? (int)strlen(t) : 0;
             if (len <= 0) { vis.push_back(std::string()); continue; }
-            for (int off = 0; off < len; off += sb_max) {
-                int n = len - off; if (n > sb_max) n = sb_max;
-                vis.push_back(std::string(t + off, (size_t)n));
+            int indent = 0;
+            while (indent < len && t[indent] == ' ') indent++;
+            if (indent > sb_max / 2) indent = 0;
+            int off = 0;
+            bool cont = false;
+            while (off < len) {
+                int room = sb_max - (cont ? indent : 0);
+                int n = len - off;
+                if (n > room) {
+                    n = room;
+                    int sp = n;
+                    while (sp > 0 && t[off + sp] != ' ') sp--;
+                    if (sp > 0) n = sp;
+                }
+                std::string r = cont ? std::string((size_t)indent, ' ') : std::string();
+                r.append(t + off, (size_t)n);
+                vis.push_back(r);
+                off += n;
+                while (off < len && t[off] == ' ') off++;
+                cont = true;
             }
         }
         const int total = (int)vis.size();

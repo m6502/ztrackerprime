@@ -4,7 +4,7 @@
 
 // Base position (In characters)
 
-#define FILE_LISTS_BASE_X_CHARS            2
+#define FILE_LISTS_BASE_X_CHARS            1
 #define FILE_LISTS_BASE_Y_CHARS            13
 
 

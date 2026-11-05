@@ -49,16 +49,57 @@
 #endif
 
 #define SX_BASE_Y       (TRACKS_ROW_Y + 0)
-#define SX_FILE_X       2
+#define SX_FILE_X       2   // list frame sits at x-1
 #define SX_FILE_Y       (SX_BASE_Y + 3)
 #define SX_FILE_W       38
 #define SX_RECV_X       (SX_FILE_X + SX_FILE_W + 2)
+#define SX_RECV_W       (CHARS_X - 1 - SX_RECV_X)
 #define SX_RECV_Y       (SX_BASE_Y + 3)
 #define SX_SPACE_BOTTOM 8
 
 // IDs for the page's UI element pool. Only one tab-stop today (the
 // file selector) so the layout is simple, but it leaves room to grow.
 #define SX_FILELIST_ID  50
+
+// Word-wraps s to `width` columns; continuation rows are indented by `indent`.
+static std::vector<std::string> sx_wrap(const std::string &s, int width, int indent)
+{
+    std::vector<std::string> out;
+    if (width <= indent + 4) indent = 0;
+    if (width <= 0) return out;
+    size_t off = 0;
+    while (off < s.size()) {
+        int room = width - (out.empty() ? 0 : indent);
+        size_t n = s.size() - off;
+        if ((int)n > room) {
+            n = (size_t)room;
+            size_t sp = n;
+            while (sp > 0 && s[off + sp] != ' ') sp--;
+            if (sp > 0) n = sp;
+        }
+        std::string r = out.empty() ? std::string() : std::string((size_t)indent, ' ');
+        out.push_back(r + s.substr(off, n));
+        off += n;
+        while (off < s.size() && s[off] == ' ') off++;
+    }
+    return out;
+}
+
+// Prints s clipped to `width` columns; long paths keep their tail.
+static void sx_print_clipped(int x, int y, const char *s, int width, TColor c, Drawable *S, bool keep_tail = false)
+{
+    char buf[1400];
+    int len = (int)strlen(s);
+    if (width <= 0) return;
+    if (len <= width) {
+        snprintf(buf, sizeof(buf), "%s", s);
+    } else if (keep_tail && width > 3) {
+        snprintf(buf, sizeof(buf), "...%s", s + len - (width - 3));
+    } else {
+        snprintf(buf, sizeof(buf), "%.*s", width, s);
+    }
+    print(x, y, buf, c, S);
+}
 
 static CUI_SysExLibrarian *g_self_for_listbox = NULL;   // OnSelect back-pointer
 
@@ -481,7 +522,7 @@ void CUI_SysExLibrarian::enter(void) {
     }
     if (max_seq + 1 > recv_seq) recv_seq = max_seq + 1;
     snprintf(status_line, sizeof(status_line),
-             "Up/Dn pick file | Enter or Space or S send | R rescan | C clear log | ESC exit");
+             "Up/Dn: pick  Enter/S: send  R: rescan  C: clear log  Esc: back");
     Keys.flush();
     need_refresh++;
     UI->enter();
@@ -500,6 +541,8 @@ void CUI_SysExLibrarian::update(void) {
     // repaint) can't blank it. See references/foot-guns.md
     // "Vanishing sibling widgets on `needaclear`".
     if (file_selector) {
+        file_selector->x     = SX_FILE_X;
+        file_selector->xsize = SX_FILE_W;
         file_selector->ysize = file_max_rows - 1;
         file_selector->need_redraw = 1;
     }
@@ -550,6 +593,10 @@ void CUI_SysExLibrarian::draw(Drawable *S) {
     int total_rows    = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
     int file_max_rows = total_rows - SX_FILE_Y - SX_SPACE_BOTTOM - 3;
     if (file_max_rows < 4) file_max_rows = 4;
+    if (file_selector) {
+        file_selector->x     = SX_FILE_X;
+        file_selector->xsize = SX_FILE_W;
+    }
 
     S->fillRect(col(1), row(SX_BASE_Y - 1),
                 INTERNAL_RESOLUTION_X - 2,
@@ -578,32 +625,36 @@ void CUI_SysExLibrarian::draw(Drawable *S) {
         }
     }
     char title[160];
+    int  name_room = CHARS_X - 10 - (int)strlen("SysEx Librarian (Shift+F5)   Out: ");
+    if (name_room < 8) name_room = 8;
     snprintf(title, sizeof(title),
-             "SysEx Librarian (Shift+F5)   Out: %s", out_name);
+             "SysEx Librarian (Shift+F5)   Out: %.*s", name_room, out_name);
     printtitle(PAGE_TITLE_ROW_Y, title, COLORS.Text, COLORS.Background, S);
 
     // Folder line
     {
-        char fbuf[160];
-        snprintf(fbuf, sizeof(fbuf), "Folder: %s", folder[0] ? folder : "(none)");
-        print(col(2), row(SX_BASE_Y + 1), fbuf, COLORS.Lowlight, S);
+        print(col(1), row(SX_BASE_Y + 1), "Folder:", COLORS.Lowlight, S);
+        sx_print_clipped(col(9), row(SX_BASE_Y + 1), folder[0] ? folder : "(none)",
+                         CHARS_X - 10, COLORS.Lowlight, S, true);
     }
 
     // ----- File list pane -----
     // The ListBox widget paints its own rows (with the F11/F4-style
     // black-bar highlight) via UI->draw(S) further below. Here we
     // only paint the "Files (.syx)" title above it.
-    print(col(SX_FILE_X), row(SX_FILE_Y - 1), "Files (.syx)",
+    print(col(SX_FILE_X - 1), row(SX_FILE_Y - 1), "Files (.syx)",
           COLORS.Brighttext, S);
 
     // ----- Recent receive pane -----
     print(col(SX_RECV_X), row(SX_RECV_Y - 1), "Recent receive",
           COLORS.Brighttext, S);
     if (recent_count == 0) {
-        print(col(SX_RECV_X), row(SX_RECV_Y),
-              "(none yet -- send a request file to trigger a dump)",
-              COLORS.Lowlight, S);
+        int ln = 0;
+        for (const std::string &l : sx_wrap("(none yet -- send a request file to trigger a dump)", SX_RECV_W, 1))
+            print(col(SX_RECV_X), row(SX_RECV_Y + ln++), l.c_str(), COLORS.Lowlight, S);
     } else {
+        int recv_last = total_rows - SX_SPACE_BOTTOM - 3;
+        int ln = 0;
         for (int i = 0; i < recent_count; i++) {
             const RecentLog *r = &recent[i];
             // Hex preview of the first few bytes.
@@ -620,14 +671,33 @@ void CUI_SysExLibrarian::draw(Drawable *S) {
             snprintf(line, sizeof(line),
                      "%s  %5d B  %-24s %s",
                      r->timestamp, r->length, hex, r->saved_as);
-            print(col(SX_RECV_X), row(SX_RECV_Y + i),
-                  line, COLORS.Text, S);
+            std::vector<std::string> rows;
+            if ((int)strlen(line) <= SX_RECV_W) {
+                rows.push_back(line);
+            } else {
+                // Narrow pane: time, size and the hex bytes that fit, then
+                // the file name on its own row.
+                std::string first = std::string(r->timestamp) + "  " + std::to_string(r->length) + " B ";
+                for (int k = 0; k < prev_n && (int)first.size() + 3 <= SX_RECV_W; k++) {
+                    char tmp[4];
+                    snprintf(tmp, sizeof(tmp), " %02X", r->preview[k]);
+                    first += tmp;
+                }
+                rows.push_back(first);
+                std::string name = std::string("  ") + r->saved_as;
+                if ((int)name.size() > SX_RECV_W) name.resize((size_t)SX_RECV_W);
+                rows.push_back(name);
+            }
+            for (const std::string &l : rows) {
+                if (SX_RECV_Y + ln > recv_last) break;
+                print(col(SX_RECV_X), row(SX_RECV_Y + ln++), l.c_str(), COLORS.Text, S);
+            }
         }
     }
 
     // ----- Status line -----
-    print(col(2), row(total_rows - SX_SPACE_BOTTOM - 1),
-          status_line, COLORS.Lowlight, S);
+    sx_print_clipped(col(1), row(total_rows - SX_SPACE_BOTTOM - 1),
+                     status_line, CHARS_X - 2, COLORS.Lowlight, S);
 
     // Paint the listbox + any other UI elements last so they sit on top
     // of the page-level fillRect/title prints.

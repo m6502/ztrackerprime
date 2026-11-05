@@ -38,7 +38,7 @@
 // Grid layout. The page targets a 640px-wide internal resolution so
 // every column has a fixed character width and the highlight bar
 // renders as a clean rectangle.
-#define KB_LIST_X        2
+#define KB_LIST_X        0
 #define KB_LIST_Y        11
 #define KB_DESC_COL      1     // action description (English)
 #define KB_DESC_WIDTH    36
@@ -62,7 +62,7 @@ CUI_KeyBindings::CUI_KeyBindings(void)
 int CUI_KeyBindings::visible_rows(void) const
 {
     int total_rows = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
-    int rows = total_rows - KB_LIST_Y - 8 /*toolbar*/ - 2 /*status*/;
+    int rows = total_rows - KB_LIST_Y - 8 /*toolbar*/ - 3 /*status, up to 2 lines*/;
     if (rows < 4) rows = 4;
     return rows;
 }
@@ -75,7 +75,7 @@ void CUI_KeyBindings::enter(void)
     Keys.flush();
     zt_mm_set_learn_target(ZT_ACTION_NONE, -1);
     snprintf(status_line, sizeof(status_line),
-             "UP/DN/L/R move  ENTER edit  DEL clear  Ctrl+S save  Ctrl+R reset  Ctrl+Shift+R reset-all  ESC exit");
+             "Arrows: move  Enter: edit  Del: clear  Ctrl+S: save  Ctrl+R: reset  Ctrl+Shift+R: reset all  Esc: back");
 }
 
 void CUI_KeyBindings::leave(void)
@@ -382,13 +382,26 @@ void CUI_KeyBindings::draw(Drawable *S)
 
     // Status line just above the toolbar reservation.
     int total_rows = INTERNAL_RESOLUTION_Y / CHARACTER_SIZE_Y;
-    int status_y = total_rows - 8 - 1;
+    int status_y = total_rows - 8 - 2;
     if (status_y < KB_LIST_Y + rows + 1) status_y = KB_LIST_Y + rows + 1;
     S->fillRect(col(1), row(status_y),
-                INTERNAL_RESOLUTION_X - 2, row(status_y + 1),
+                INTERNAL_RESOLUTION_X - 2, row(status_y + 2),
                 COLORS.Background);
-    print(col(2), row(status_y), status_line,
-          (capturing || learn_a != ZT_ACTION_NONE) ? COLORS.Highlight : COLORS.Text, S);
+    {
+        TColor c = (capturing || learn_a != ZT_ACTION_NONE) ? COLORS.Highlight : COLORS.Text;
+        std::string msg = status_line;
+        int width = CHARS_X - 2;
+        for (int ln = 0; ln < 2 && !msg.empty(); ln++) {
+            size_t cut = msg.size();
+            if ((int)cut > width) {
+                cut = msg.rfind(' ', width);
+                if (cut == std::string::npos || cut == 0) cut = width;
+            }
+            print(col(1), row(status_y + ln), msg.substr(0, cut).c_str(), c, S);
+            size_t next = msg.find_first_not_of(' ', cut);
+            msg = (next == std::string::npos) ? std::string() : msg.substr(next);
+        }
+    }
 
     S->unlock();
     screenmanager.UpdateAll();
