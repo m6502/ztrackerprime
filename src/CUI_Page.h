@@ -495,7 +495,7 @@ class CUI_TrackOptions : public CUI_Page {
 
 // Instrument Editor options popup (press F3 again while on the Instrument
 // Editor). Pick a MIDI Out device from the in-dialog list, then "Create 16
-// Channels" generates 16 instruments (channels 1..16) for it. Mirrors the
+// Instruments" generates 16 instruments (channels 1..16) for it. Mirrors the
 // CUI_PEParms F2-again popup pattern.
 class CUI_IEParms : public CUI_Page {
     public:

@@ -2044,7 +2044,7 @@ void global_keys(Drawable *S)
         case CMD_SWITCH_IEDIT:
             if (cur_state == STATE_IEDIT) {
                 // Already on the Instrument Editor -> F3 again opens the
-                // options popup (Create 16 Channels), mirroring F2-again.
+                // options popup (Create 16 Instruments), mirroring F2-again.
                 popup_window(UIP_IEParms); clear++;
                 doredraw++;
             } else {
@@ -4774,7 +4774,7 @@ int main(int argc, char *argv[])
       // A key nobody takes would stay at the head of the key queue forever
       // and block every key (and mouse click) queued behind it -- the app
       // looks frozen. Seen with a letter on a slider (F4 / Shift+F4) and in
-      // a popup's list (F3-again "Create 16 MIDI Channels"). Keys are only
+      // a popup's list (F3-again "Add 16 Instruments"). Keys are only
       // appended at the tail, by the event loop above, so if the entry at
       // the head now is the same one that was there before the previous
       // action(), then global_keys, the page or popup and its widgets have

@@ -98,9 +98,9 @@ int inst_create_16_channels_for_device(unsigned int dev) {
     if (created == 0)
         sprintf(szStatmsg, "No empty instrument slots available");
     else if (created < 16)
-        sprintf(szStatmsg, "Created %d channels for %s (no more empty slots)", created, devname);
+        sprintf(szStatmsg, "Created %d instruments for %s (channels 1-%d; no more empty slots)", created, devname, created);
     else
-        sprintf(szStatmsg, "Created 16 channels for %s", devname);
+        sprintf(szStatmsg, "Created 16 instruments for %s (channels 1-16)", devname);
     statusmsg = szStatmsg; need_refresh++;
     return created;
 }

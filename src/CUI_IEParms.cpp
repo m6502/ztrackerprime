@@ -3,7 +3,7 @@
 
 // Instrument Editor options popup -- opened by pressing F3 again while already
 // on the Instrument Editor (mirrors the F2-again CUI_PEParms popup). Pick a
-// MIDI Out device from the in-dialog list, then "Create 16 Channels" generates
+// MIDI Out device from the in-dialog list, then "Create 16 Instruments" generates
 // 16 instruments (channels 1..16) for that device, named "<device> Channel
 // 01".."<device> Channel 16", into the next empty slots. The same generation
 // (using the current instrument's device) is also bound to Alt+G in the
@@ -61,19 +61,20 @@ CUI_IEParms::CUI_IEParms(void) {
     dev_list = new IEGenDeviceList;
     UI->add_element(dev_list, 0);
     dev_list->x     = (start_x / 8) + 4;
-    dev_list->y     = (start_y / 8) + 5;
+    dev_list->y     = (start_y / 8) + 7;   // below the two-line explanation
     dev_list->xsize = 40;
-    dev_list->ysize = 7;
+    dev_list->ysize = 5;                   // rows 7..12 (ysize = last row index)
 
-    // "Create 16 Channels" button -- xsize >= caption length so the right
-    // border doesn't clip the last character. Caption padded with spaces.
+    // "Create 16 Instruments" button -- xsize >= caption length so the right
+    // border doesn't clip the last character. Caption padded with spaces;
+    // x centres the 24-col button in the 48-col window.
     btn_create16 = new Button;
     UI->add_element(btn_create16, 1);
-    btn_create16->x = (start_x / 8) + 13;
+    btn_create16->x = (start_x / 8) + 12;
     btn_create16->y = (start_y / 8) + 14;
-    btn_create16->xsize = 22;
+    btn_create16->xsize = 24;
     btn_create16->ysize = 1;
-    btn_create16->caption = " Create 16 Channels ";
+    btn_create16->caption = " Create 16 Instruments ";
     btn_create16->OnClick = (ActFunc)BTNCLK_Create16Channels;
 }
 
@@ -146,8 +147,8 @@ void CUI_IEParms::draw(Drawable *S) {
     for (; start_y % 8; start_y--) ;
 
     dev_list->x     = (start_x / 8) + 4;
-    dev_list->y     = (start_y / 8) + 5;
-    btn_create16->x = (start_x / 8) + 13;
+    dev_list->y     = (start_y / 8) + 7;
+    btn_create16->x = (start_x / 8) + 12;
     btn_create16->y = (start_y / 8) + 14;
 
     if (S->lock() == 0) {
@@ -158,8 +159,10 @@ void CUI_IEParms::draw(Drawable *S) {
             printchar(start_x + window_width - row(1) + 1, row(i), 146, COLORS.Lowlight, S);
         }
         printline(start_x, start_y, 143, window_width / 8, COLORS.Highlight, S);
-        print(col(textcenter("Create 16 MIDI Channels")), start_y + row(2), "Create 16 MIDI Channels", COLORS.Text, S);
-        print(start_x + col(4), start_y + row(4), "Pick a MIDI Out device:", COLORS.Text, S);
+        print(col(textcenter("Add 16 Instruments (one per MIDI channel)")), start_y + row(2),
+              "Add 16 Instruments (one per MIDI channel)", COLORS.Text, S);
+        print(start_x + col(4), start_y + row(4), "Creates instruments for channels 1-16 in", COLORS.Text, S);
+        print(start_x + col(4), start_y + row(5), "the next empty slots. MIDI Out device:", COLORS.Text, S);
         print(start_x + col(4), start_y + row(16),
               "Up/Dn: pick   Enter: create   Esc: cancel", COLORS.Lowlight, S);
 

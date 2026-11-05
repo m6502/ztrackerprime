@@ -181,7 +181,7 @@
                   Pressing F2 again closes the popup.
  F3             : Instrument editor. Pressing F3 again (while already on it)
                   opens a popup where you PICK a MIDI Out device from a list
-                  and hit "Create 16 Channels": it fills the next 16 empty
+                  and hit "Create 16 Instruments": it fills the next 16 empty
                   instrument slots with that device on channels 1-16, named
                   "<device> Channel 01" .. "<device> Channel 16" (e.g.
                   "IAC Bus 1 Channel 01"). Up/Dn pick, Enter creates, Esc
