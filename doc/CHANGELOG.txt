@@ -4,6 +4,15 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_11_11 (macOS: one universal app, runs on macOS 10.15 and newer)
+-------------------------------------------------------------------------
+
+        + macOS downloads are now a single universal app that runs natively
+          on both Intel and Apple Silicon Macs, from macOS 10.15 (Catalina)
+          onward on Intel and 11.0 (Big Sur) on Apple Silicon. SDL3 is
+          bundled inside the app, so nothing needs to be installed with
+          Homebrew. Previously the builds required a recent macOS.
+
 zt 2026_06_23 (F2: combined Pattern & Track Options dialog)
 ----------------------------------------------------------
 
