@@ -3,7 +3,7 @@
 # Builds `zt` on every push and every PR against master, across:
 #   - Windows x86 (32-bit, XP-compatible) -- MinGW-w64 cross from Ubuntu
 #   - Windows x64 (modern)                -- MSVC on windows-latest
-#   - macOS arm64                          -- Apple Silicon (macos-14)
+#   - macOS arm64                          -- Apple Silicon (macos-15)
 #   - macOS x86_64                         -- Intel (macos-26-intel)
 #   - Linux x86_64                         -- ubuntu-24.04
 #
@@ -201,7 +201,7 @@ jobs:
   # ---------------------------------------------------------------------------
   macos-arm64:
     name: macOS arm64
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
