@@ -318,7 +318,7 @@ The full list-pane construction pattern (with code) lives in [`references/list-p
 
 - Push topic branches to `origin`, open PRs against `master`, don't merge without maintainer approval.
 - Keep PRs small and focused: 1 feature, ~30–300 LOC.
-- `doc/CHANGELOG.txt` gets a section per PR.
+- **Every user-visible change updates `doc/CHANGELOG.txt` in the same commit/PR — no exceptions, no asking.** Add a section at the top (below the legend): `zt YYYY_MM_DD (short title)` + a dashed underline, then `+` feature / `*` fix / `!` notice bullets in plain user language. The release workflow publishes exactly the sections dated after the previous `v*` tag as the release notes, so a missing entry means a missing release note.
 - Tag AI-assisted commits: `Co-Authored-By: Claude <noreply@anthropic.com>` (or current model identifier).
 - Don't duplicate content across PRs.
 

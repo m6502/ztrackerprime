@@ -4,6 +4,156 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_11_11 (Modernized file browser on the Load and Save pages)
+------------------------------------------------------------------
+
+        + The Load (Ctrl-L) and Save (Ctrl-Shift-S) pages have a new file
+          browser: Places on the left (Home, filesystem root and mounted
+          volumes on Linux/macOS; drive letters on Windows) and a combined
+          directory + file list on the right, directories first with a
+          trailing slash. Enter opens a directory, Backspace goes to the
+          parent, Tab moves between Places, the browser and save controls.
+
+        * CI: macOS builds moved off the retired macos-14 GitHub runners,
+          which had left every build stuck in the queue.
+
+zt 2026_11_05 (Small-window polish, Palette Editor, wording)
+------------------------------------------------------------
+
+        + Revamped Palette Editor: colour slot list, live preview pattern,
+          tint presets with an adjustable amount, and a "Reset skin on load"
+          option.
+
+        + The window caption shows the version, the song path and an
+          unsaved-changes marker.
+
+        + Header adapts to narrow windows; minimum window width lowered to
+          512 pixels. Many screens (Help, About, Config, System
+          Configuration and others) were reworked to look correct at the
+          smallest window size.
+
+        * Multi-monitor fixes: no more window-size flickering when dragging
+          the window to a screen it doesn't fit on, and no more wrong window
+          width after a mix of saved size, zoom and screen orientation.
+
+        * Fixed a bug that could make the program lag or even freeze when
+          typing keys where they weren't expected (Arpeggio, MIDI Macro,
+          CC Console and Palette editors).
+
+        * Fixed an overflow bug in horizontal line drawing.
+
+        * Clearer wording about Instruments vs. MIDI channels ("Create 16
+          Instruments").
+
+zt 2026_10_20 (Song Configuration: Position Notes, Tab navigation)
+------------------------------------------------------------------
+
+        + Position Notes: an editable note line beside every Order List
+          position (000-255), saved in the .zt file separately from the F10
+          Song Message. Up to 1024 characters per position, horizontal
+          scrolling, both columns scroll together.
+
+        * Tab / Shift-Tab cycles between the settings, the Order List and
+          Position Notes, remembering the last focused setting. Up/Down no
+          longer jumps from one side to the other.
+
+        * Fixed a pattern undo bug (found by the macOS tests) that affected
+          all platforms.
+
+zt 2026_10_18 (Play view sizes)
+-------------------------------
+
+        + F5 play view: PgDn / PgUp cycle Compact / Regular / Full / VU
+          meters. Regular shows note, instrument, volume and length; Full
+          adds the complete effect; VU shows 32 channels and scrolls through
+          all 64 tracks. The last view is remembered across restarts.
+
+zt 2026_10_16 (Live MIDI device monitoring and reconnection)
+------------------------------------------------------------
+
+        + MIDI devices are monitored automatically. When playback is
+          stopped, returning devices reconnect to their instruments by name
+          or unique alias; new devices appear in F12 without being enabled
+          automatically; a device you close yourself stays closed. Linux and
+          macOS use device-change notifications, Windows checks every ~3
+          seconds. Failed opens retry with increasing delays (up to 30 s).
+          See doc/midi-connections.md.
+
+        * Refresh in the MIDI In / MIDI Out lists now restores instrument
+          destinations by saved device name or alias, keeps aliases, latency
+          and bank-select settings, stops playback and clears queued notes
+          before rebuilding, and reports opened / failed / missing devices.
+
+zt 2026_10_15 (Undo/redo, block tools, Pattern Tools popup)
+-----------------------------------------------------------
+
+        + Much improved undo/redo: Ctrl-Z undoes up to 128 pattern edits,
+          Ctrl-Y redoes. Alt-Z clears the selected block.
+
+        + Block operations on the selection (tracks in the block only,
+          pattern length unchanged): Ctrl-Shift-G Duplicate, Ctrl-Shift-E
+          Expand (new, the opposite of Halve), Ctrl-Shift-H Halve,
+          Ctrl-Shift-R Reverse. Alt-L twice selects the whole pattern.
+
+        + Ctrl-Shift-F2 opens the new Pattern Tools popup: Defrag song,
+          Clear unused patterns, Move / Swap patterns, and Move / Swap
+          tracks (current pattern or whole song, carrying names, colours,
+          mutes and CC draw settings). All actions can be undone.
+
+        * Fixed a drawing bug when the program regained focus after
+          stopping a song.
+
+zt 2026_10_01 (Assorted fixes and UI polish)
+--------------------------------------------
+
+        * Polish and fixes on the Save page, Song Configuration, System
+          Configuration and SysEx Librarian; default directory and save
+          filename handling fixed; bank select is now included in MIDI
+          export. Assorted macOS fixes.
+
+zt 2026_09_30 (Transpose without selection, drawing optimizations)
+------------------------------------------------------------------
+
+        + Alt-Q / Alt-A transpose the note under the cursor by a semitone
+          when there is no selection; Alt-Shift-Q / Alt-Shift-A transpose by
+          an octave.
+
+        * Faster pattern drawing (draw cache) and assorted fixes, with new
+          drawing, MIDI routing and track-properties tests.
+
+zt 2026_09_18 (Command line MIDI export)
+---------------------------------------
+
+        + MIDI export is multitrack: one MIDI track per zTracker track,
+          keeping each event's MIDI channel.
+
+        + New command line option to export a song without opening the UI:
+              zt mysong.zt --export-multitrack-midi mysong.mid
+
+zt 2026_08_14 (UI polish)
+-------------------------
+
+        * Assorted UI polish in the Pattern Editor, confirmation dialogs and
+          System Configuration.
+
+zt 2026_07_18 (MIDI export / display fixes)
+-------------------------------------------
+
+        * Fixed a pattern display bug causing a visual jump during playback.
+
+        * Exporting a MIDI file no longer overwrites the song's file name or
+          confuses Quick Save.
+
+zt 2026_06_23 (macOS native menu bar)
+-------------------------------------
+
+        + macOS: native menu bar (zTracker / File / View / Song / Playback /
+          Settings / Window / Help), each item showing its shortcut. View >
+          Size matches the in-app Window Size list.
+
+        * macOS: green-button fullscreen no longer reverts, and fullscreen /
+          HiDPI rendering is improved.
+
 zt 2026_06_23 (F2: combined Pattern & Track Options dialog)
 ----------------------------------------------------------
 
