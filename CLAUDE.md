@@ -300,7 +300,7 @@ If the trace doesn't show how the reported input produces the symptom, the model
 - **Keep PRs focused.** Manuel's preferred size: 1 feature, ~30–300 LOC. Large kitchen-sink PRs are tolerated when the body has a clear table of contents.
 - Tag commits with `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>` (or current model).
 - Don't merge to master without Manuel's approval — open PRs and let him review/merge.
-- `doc/CHANGELOG.txt` gets a section per PR.
+- **Every user-visible change updates `doc/CHANGELOG.txt` in the same commit/PR — no exceptions, no asking.** Add a section at the top (below the legend): `zt YYYY_MM_DD (short title)` + a dashed underline, then `+` feature / `*` fix / `!` notice bullets in plain user language. The release workflow publishes exactly the sections dated after the previous `v*` tag as the release notes, so a missing entry means a missing release note.
 - Don't duplicate content across PRs.
 - Push branches directly to `origin` (no fork needed; Esa has write access).
 
