@@ -591,7 +591,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # Release — runs only on tag pushes (v*). Gathers the release-* artifacts
   # from each platform job and publishes the GitHub Release directly. The
-  # release notes are the doc/CHANGELOG.txt entries added since the previous
+  # release notes are the doc/CHANGELOG.txt sections dated after the previous
   # v* tag, so pushing a tag is the whole release process.
   #
   # Codesigning / notarization are intentionally skipped for this first pass
@@ -623,10 +623,14 @@ jobs:
         run: |
           set -euo pipefail
           PREV=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-          if [ -n "$PREV" ]; then
-            git diff --unified=0 "$PREV" "$GITHUB_REF_NAME" -- doc/CHANGELOG.txt \
-              | sed -n '/^+++/d; s/^+//p' > release-notes.txt
-          fi
+          SINCE=0
+          [ -n "$PREV" ] && SINCE=$(git log -1 --format=%cd --date=format:%Y%m%d "$PREV")
+          awk -v since="$SINCE" '
+            /^zt [0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]/ {
+              d = substr($2, 1, 10); gsub("_", "", d); keep = (d + 0 > since + 0)
+            }
+            keep
+          ' doc/CHANGELOG.txt > release-notes.txt
           if [ ! -s release-notes.txt ]; then
             echo "See doc/CHANGELOG.txt for details." > release-notes.txt
           fi
