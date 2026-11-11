@@ -6,7 +6,6 @@
 
 class Button ;
 class CheckBox ;
-class DirList ;
 class DriveList ;
 class FileList ;
 class InstEditor ;
@@ -299,7 +298,6 @@ class CUI_Loadscreen : public CUI_Page {
         int clear;
 
         FileList *fl;
-        DirList *dl;
         DriveList *dr;
 
         CUI_Loadscreen();
@@ -316,7 +314,6 @@ class CUI_Savescreen : public CUI_Page {
         int clear;
 
         FileList *fl;
-        DirList *dl;
         DriveList *dr;
 
         TextInput *ti;

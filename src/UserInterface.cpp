@@ -2321,6 +2321,7 @@ ListBox::ListBox()
   is_sorted = false;
   use_key_select = true;
   wrap_focus_at_edges = true;
+  show_inactive_selection = true;
   empty_message = NULL;
   use_checks = false;
   check_on = 251;
@@ -3000,7 +3001,7 @@ void ListBox::draw(Drawable *S, int active) {
             }
             node = node->next;
         }
-        if (cy == cur_sel) {
+        if (cy == cur_sel && (active || show_inactive_selection)) {
             if (active)
                 b = COLORS.Highlight;
             else

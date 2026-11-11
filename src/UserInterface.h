@@ -345,6 +345,8 @@ class ListBox : public UserInterfaceElement {
         // jumping into a different list confused users who navigate by
         // arrow + Enter).
         bool wrap_focus_at_edges;
+        // Places hides its cursor when focus moves to the file browser.
+        bool show_inactive_selection;
         unsigned char check_on, check_off;
         const char *empty_message;
         LBNode *items;

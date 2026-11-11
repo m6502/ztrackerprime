@@ -39,7 +39,7 @@ source += r'''
 void check(int type, const std::string &input, const std::string &expected, bool valid,
            bool file_exists = false) {
     for (auto &b : buttons) b.state = 0;
-    buttons[type + 3].state = 1;
+    buttons[type + 2].state = 1;
     memset(save_filename, 0, sizeof(save_filename));
     memcpy(save_filename, input.data(), input.size());
     saves = popups = need_refresh = status_change = 0;

@@ -112,11 +112,11 @@ int file_exists(const char *fn)
 // ------------------------------------------------------------------------------------------------
 //
 //
-// Save-format buttons live at element IDs 4..7 (ZT, MID, MID-Multitrack,
+// Save-format buttons live at element IDs 3..6 (ZT, MID, MID-Multitrack,
 // MID-PerTrack). Radio-style: clicking any one toggles it on and clears the
 // others.
-#define SAVEBTN_ID_FIRST 4
-#define SAVEBTN_ID_LAST  7
+#define SAVEBTN_ID_FIRST 3
+#define SAVEBTN_ID_LAST  6
 
 void BTNCLK_ToggleZTMID(UserInterfaceElement *b)
 {
@@ -163,6 +163,7 @@ void fl_enter(UserInterfaceElement *uie)
 CUI_Savescreen::CUI_Savescreen(void)
 {
   UI = new UserInterface;
+  clear = 1;
 
   fl = new FileList;
   UI->add_element(fl,0);
@@ -170,7 +171,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   fl->x     = FILE_LIST_POS_X_CHARS ;
   fl->y     = FILE_LIST_POS_Y_CHARS ;
 
-  fl->xsize = FILE_LIST_SIZE_X_CHARS ;
+  fl->xsize = FILE_LIST_SIZE_X_CHARS;
   fl->ysize = SAVE_FILE_LIST_SIZE_Y_CHARS ;
 
   //  fl->str = &save_filename[0]; fl->refresh();
@@ -178,19 +179,8 @@ CUI_Savescreen::CUI_Savescreen(void)
   //    strcpy(fl->filepattern,"*.zt");
 
 
-  dl = new DirList;
-  UI->add_element(dl,1);
-
-  dl->x     = DIRECTORY_LIST_POS_X ;
-  dl->y     = DIRECTORY_LIST_POS_Y ;
-
-  dl->xsize = DIRECTORY_LIST_SIZE_X_CHARS ;
-  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
-
-
-  
   dr = new DriveList;
-  UI->add_element(dr,2);
+  UI->add_element(dr,1);
 
   dr->x     = DRIVE_LIST_POS_X ;
   dr->y     = DRIVE_LIST_POS_Y;
@@ -200,18 +190,18 @@ CUI_Savescreen::CUI_Savescreen(void)
 
 
   ti = new TextInput;
-  UI->add_element(ti,3);
+  UI->add_element(ti,2);
   
   ti->x      = SAVE_TEXTINPUT_POS_X ;
   ti->y      = SAVE_TEXTINPUT_POS_Y ;
   ti->xsize  = SAVE_TEXTINPUT_SIZE_X ;
   ti->ysize  = 1 ;
-  ti->length = SAVE_TEXTINPUT_SIZE_X ;
+  ti->length = std::min(SAVE_TEXTINPUT_SIZE_X, MAX_PATH);
 
   ti->str = (unsigned char *)&save_filename[0];
 
   b_zt = new Button;
-  UI->add_element(b_zt, 4); 
+  UI->add_element(b_zt, 3);
   b_zt->x = SAVE_ZT_BUTTON_POS_X ;
   b_zt->y = SAVE_ZT_BUTTON_POS_Y ;
   b_zt->caption = " Save as .ZT ";
@@ -221,7 +211,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_zt->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
 
   b_mid = new Button;
-  UI->add_element(b_mid, 5);
+  UI->add_element(b_mid, 4);
   b_mid->x = SAVE_MID_BUTTON_POS_X;
   b_mid->y = SAVE_MID_BUTTON_POS_Y;
   b_mid->caption = " Save as .MID";
@@ -230,7 +220,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
 
   b_mid_mt = new Button;
-  UI->add_element(b_mid_mt, 6);
+  UI->add_element(b_mid_mt, 5);
   b_mid_mt->x = SAVE_MID_MT_BUTTON_POS_X;
   b_mid_mt->y = SAVE_MID_MT_BUTTON_POS_Y;
   b_mid_mt->caption = " Save as Multitrack .MID";
@@ -239,7 +229,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid_mt->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
 
   b_mid_pertrack = new Button;
-  UI->add_element(b_mid_pertrack, 7);
+  UI->add_element(b_mid_pertrack, 6);
   b_mid_pertrack->x = SAVE_MID_PT_BUTTON_POS_X;
   b_mid_pertrack->y = SAVE_MID_PT_BUTTON_POS_Y;
   b_mid_pertrack->caption = " Save per-track .MID";
@@ -248,7 +238,7 @@ CUI_Savescreen::CUI_Savescreen(void)
   b_mid_pertrack->OnClick = (ActFunc)BTNCLK_ToggleZTMID;
 
   /*b_gba = new Button;
-  UI->add_element(b_gba, 6);
+  UI->add_element(b_gba, 5);
   b_gba->x = SAVE_GBA_BUTTON_POS_X;
   b_gba->y = SAVE_GBA_BUTTON_POS_Y;
   b_gba->caption = " Export to GBA";
@@ -264,13 +254,12 @@ void CUI_Savescreen::enter(void)
 {
   zt_config_globals.apply_default_directory(true);
   need_refresh = 1;
+  clear = 1;
+  UI->set_focus(0);
   is_saving = 0;
   FileList *fl;
-  DirList *dl;
   fl = (FileList *)UI->get_element(0);
-  dl = (DirList *)UI->get_element(1);
-  ((DriveList *)UI->get_element(2))->OnChange();
-  dl->OnChange();
+  ((DriveList *)UI->get_element(1))->OnChange();
   fl->OnChange();
   if (song->filename[0] && song->filename[0]!=' ')
     strcpy(save_filename, (const char *)song->filename);
@@ -321,7 +310,7 @@ static bool prepare_save_filename(const char *extension)
 void begin_save(void)
 {
   //int i = strlen(ls_filename)-3; if (i<0) i=0;
-  if (((Button *)UIP_Savescreen->UI->get_element(4))->state) {
+  if (((Button *)UIP_Savescreen->UI->get_element(3))->state) {
 
     UIP_SaveMsg->filetype = 1;
 
@@ -343,9 +332,9 @@ void begin_save(void)
   // All three ensure a .mid extension; the per-track exporter appends its
   // own _trackNN suffix per file.
   int mid_filetype = 0;
-  if (((Button *)UIP_Savescreen->UI->get_element(5))->state) mid_filetype = 2;
-  else if (((Button *)UIP_Savescreen->UI->get_element(6))->state) mid_filetype = 3;
-  else if (((Button *)UIP_Savescreen->UI->get_element(7))->state) mid_filetype = 4;
+  if (((Button *)UIP_Savescreen->UI->get_element(4))->state) mid_filetype = 2;
+  else if (((Button *)UIP_Savescreen->UI->get_element(5))->state) mid_filetype = 3;
+  else if (((Button *)UIP_Savescreen->UI->get_element(6))->state) mid_filetype = 4;
 
   if (mid_filetype) {
 
@@ -380,20 +369,22 @@ void begin_save(void)
 void CUI_Savescreen::update()
 {
   FileList *fl;
-  DirList *dl;
   DriveList *dr;
   int key=0;
 
   UI->update();
 
   fl = (FileList *)UI->get_element(0);
-  dl = (DirList *)UI->get_element(1);
-  dr = (DriveList *)UI->get_element(2);
+  dr = (DriveList *)UI->get_element(1);
 
-  if (dl->updated || dr->updated) {
-
-    dl->OnChange();
+  if (fl->updated) {
+    fl->updated = 0;
+    dr->OnChange();
+  }
+  if (dr->updated) {
+    dr->updated = 0;
     fl->OnChange();
+    UI->set_focus(0);
   }
 
   if (Keys.size()) {
@@ -420,11 +411,13 @@ void CUI_Savescreen::update()
 //
 void CUI_Savescreen::draw(Drawable *S)
 {
+  fl->xsize = FILE_LIST_SIZE_X_CHARS;
   fl->ysize = SAVE_FILE_LIST_SIZE_Y_CHARS ;
-  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
   dr->ysize = DRIVE_LIST_SIZE_Y ;
   // Placed from the same macros as the file list (not anchored to the
   // window bottom, which rounds differently and loses the gap).
+  ti->xsize = SAVE_TEXTINPUT_SIZE_X;
+  ti->length = std::min(SAVE_TEXTINPUT_SIZE_X, MAX_PATH);
   ti->y             = SAVE_TEXTINPUT_POS_Y ;
   b_zt->y           = SAVE_ZT_BUTTON_POS_Y ;
   b_mid->y          = SAVE_MID_BUTTON_POS_Y ;
@@ -447,6 +440,7 @@ void CUI_Savescreen::draw(Drawable *S)
 
   if (S->lock() == 0) {
 
+    draw_file_browser_header(S);
     UI->draw(S);
 
     if (!is_saving) draw_status(S);

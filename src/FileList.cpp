@@ -6,14 +6,44 @@
 #include <algorithm>
 
 
+namespace {
+void browser_error(const std::error_code &error) {
+    snprintf(szStatmsg, sizeof(szStatmsg), "Cannot browse: %.160s", error.message().c_str());
+    statusmsg = szStatmsg;
+    status_change = 1;
+    need_refresh++;
+}
+
+bool change_directory(const std::filesystem::path &path) {
+    std::error_code error;
+    // Verify readability before changing the process working directory.
+    std::filesystem::directory_iterator probe(path, error);
+    if (!error) std::filesystem::current_path(path, error);
+    if (error) {
+        browser_error(error);
+        return false;
+    }
+    char current[1024];
+    zt_get_current_directory(sizeof(current), current);
+    snprintf(szStatmsg, sizeof(szStatmsg), "Browsing %.160s", current);
+    statusmsg = szStatmsg;
+    status_change = 1;
+    need_refresh++;
+    return true;
+}
+}
+
 // ------------------------------------------------------------------------------------------------
 //
 //
 DriveList::DriveList() {
-    empty_message = (char *)"No drives found";
-    is_sorted = true;
+    empty_message = "No places found";
+    show_inactive_selection = false;
+    use_checks = false;
+    wrap_focus_at_edges = false;
+    is_sorted = false;
     OnChange();
-    updated = 1;
+    updated = 0;
     
 }
 
@@ -45,209 +75,76 @@ void DriveList::draw(Drawable *S, int active) {
 void DriveList::OnChange() 
 {
     clear();
+    places.clear();
 #ifdef _WIN32
-    int i;
-    int r;
-    char str[4];
-    char cap[16],cur[512],save[16];
-    strcpy(str,"A:\\");
-    r = GetLogicalDrives();
-    LBNode *p;
-    save[0] = 0;
-    zt_get_current_directory(512,cur);
-
-    for(i=0;i<26;i++) {
-        if (r&1) {
-            strcpy((char *)&cap[0], "  A:");
-            cap[2]+=i;
-            str[0] = 'A' + i;
-            switch(GetDriveType(str)) {
-                case DRIVE_CDROM:
-                case DRIVE_REMOVABLE:
-                    cap[0] = (char)225;
-                    break;
-                default:
-                    cap[0] = (char)224;
-                    break;
-            }
-            p = insertItem((char *)&cap[0]);
-            p->int_data = i;
-            if (tolower(cur[0])==tolower(str[0]))
-                strcpy((char *)save,(const char *)cap);
+    DWORD mask = GetLogicalDrives();
+    for (int i = 0; i < 26; ++i) {
+        if (mask & (1u << i)) {
+            std::string drive(1, static_cast<char>('A' + i));
+            drive += ":";
+            places.push_back({drive, drive + "\\"});
         }
-        r>>=1;
     }
-    i = findItem((char *)save);
-    if (i>=0)
-        setCursor(i);
 #else
-    LBNode *p = insertItem((char *)"/");
-    p->int_data = 0;
-    setCursor(0);
+    places = file_browser::places();
 #endif
-}
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void DriveList::OnSelect(LBNode *selected) {
+    for (size_t i = places.size(); i > 0; --i) {
+        auto *node = insertItem(const_cast<char *>(places[i - 1].name.c_str()));
+        node->int_data = static_cast<int>(i - 1);
+    }
+    // Highlight the most specific place containing the current directory.
+    std::error_code error;
+    auto current = std::filesystem::current_path(error).generic_string();
+    size_t best_length = 0;
+    for (size_t i = 0; !error && i < places.size(); ++i) {
+        auto path = places[i].path.generic_string();
 #ifdef _WIN32
-    std::filesystem::current_path(&selected->caption[2]);
-#else
-    std::filesystem::current_path(selected->caption);
+        current = file_browser::folded(current);
+        path = file_browser::folded(path);
+        if (path.size() > 1 && path.back() == '/') path.pop_back();
 #endif
-    OnChange();
-    updated++;
-    ListBox::OnSelect(selected);
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-DirList::DirList() 
-{
-    empty_message = (char *)"";
-    is_sorted = true;
-    use_checks = false;
-    updated = 1;
-    OnChange();
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void DirList::enter(void) {
-    OnChange();
-}
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-int DirList::update() {
-    int key = Keys.checkkey();
-    int act=0;
-    int ret=0;
-    switch(key) {
-        case SDLK_LEFT: ret = -1; act++; break;
+        if ((path == "/" || file_browser::within(current, path)) && path.size() > best_length) {
+            setCursor(static_cast<int>(i));
+            best_length = path.size();
+        }
     }
-    if (act) {
+    need_redraw++;
+
+}
+
+
+// ------------------------------------------------------------------------------------------------
+//
+//
+int DriveList::update() {
+    if (Keys.checkkey() == SDLK_RIGHT) {
         Keys.getkey();
         need_refresh++;
-        need_redraw++;
-        return ret;
-    } else
+        return -1; // Browser is element 0; Places is element 1.
+    }
     return ListBox::update();
 }
 
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void DirList::draw(Drawable *S, int active) {
-    ListBox::draw(S,active);
-    updated = 0;
+void DriveList::OnSelect(LBNode *selected) {
+    if (!selected || selected->int_data < 0 ||
+        static_cast<size_t>(selected->int_data) >= places.size()) return;
+    if (change_directory(places[selected->int_data].path)) {
+        updated = 1;
+        need_refresh++;
+    }
 }
 
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-bool is_root_directory(const std::filesystem::path &dir_path)
-{
-    if (std::filesystem::exists(dir_path) && std::filesystem::is_directory(dir_path)) {
-
-        bool result = (dir_path == dir_path.root_path()) ;
-        return result ;
-    }
-
-    return false;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void DirList::OnChange()
-{
-    clear();
-
-    std::filesystem::path current_dir = std::filesystem::current_path();
-
-    if(!is_root_directory(current_dir))
-    {
-        insertItem((char *)"..");
-    }
-
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-
-        if (entry.is_directory()) {
-
-            const std::string dirName = entry.path().filename().string();
-            insertItem((char *)dirName.c_str());
-        }
-    }
-
-/*
-    long res,hnd;
-    _finddata_t f;
-    hnd = res = _findfirst("*.*",&f);
-    while(res != -1) {
-        if (f.attrib & _A_SUBDIR) {
-            LBNode *p  = insertItem(f.name);
-        }
-        res = _findnext(hnd, &f);
-    }
-    _findclose(hnd);
-*/
-    need_redraw++;
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void DirList::OnSelect(LBNode *selected) {
-    std::filesystem::current_path(selected->caption);
-    OnChange();
-    updated++;
-    char d[1024];
-    zt_get_current_directory(1024,d);
-    sprintf(szStatmsg,"Browsing %.70s",d);
-    statusmsg = szStatmsg;
-    status_change = 1;    
-    ListBox::OnSelect(selected);
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 FileList::FileList() 
 {
     empty_message = (char *)"";
-    is_sorted = true;
+    is_sorted = false;
     use_checks = false;
     // File Load/Save users navigate by arrow + Enter; the base
     // ListBox behavior of jumping focus to a sibling list when Up/Down
     // hits an edge sent them into the wrong list and lost their place.
     // Clamp at edges instead — Tab still moves between lists.
     wrap_focus_at_edges = false;
-    updated = 1;
+    updated = 0;
     OnChange();
     onEnter = NULL;
 }
@@ -271,15 +168,28 @@ int FileList::update()
     int act=0;
     int ret=0;
     switch(key) {
-        case SDLK_RIGHT: ret = 1; act++; break;
+        case SDLK_LEFT: ret = 1; act++; break;
+        case SDLK_BACKSPACE:
+            Keys.getkey();
+            navigate("..");
+            need_refresh++;
+            return 0;
     }
     if (act) {
         Keys.getkey();
         need_refresh++;
         need_redraw++;
         return ret;
-    } else
-    return ListBox::update();
+    }
+    int result = ListBox::update();
+    // Mouse activation runs before update(). Rebuild only after ListBox has
+    // finished processing the click against the old rows.
+    if (!pending_directory.empty()) {
+        auto path = pending_directory;
+        pending_directory.clear();
+        navigate(path);
+    }
+    return result;
 }
 
 
@@ -288,7 +198,7 @@ int FileList::update()
 //
 //
 void FileList::enter(void) {
-    OnChange();
+    // Preserve selection when focus returns from Places or the save controls.
 }
 
 
@@ -318,7 +228,10 @@ void FileList::draw(Drawable *S, int active)
     if (node) {
 
       strc((char *)str, node->caption);
-      foreground_color = node->int_data;
+      const auto &entry = entries[node->int_data];
+      foreground_color = entry.directory ? COLORS.EditText :
+          (file_browser::folded(std::filesystem::path(entry.name).extension().string()) == ".zt"
+              ? COLORS.Data : COLORS.Highlight);
       node = node->next;
     } 
 
@@ -360,51 +273,44 @@ void FileList::draw(Drawable *S, int active)
 // ------------------------------------------------------------------------------------------------
 //
 //
-void FileList::AddFiles(const char *pattern, TColor c) 
-{
-    std::string wanted_ext = pattern ? pattern : "";
-    std::transform(wanted_ext.begin(), wanted_ext.end(), wanted_ext.begin(), ::tolower);
-
-    for (const auto& entry : std::filesystem::directory_iterator(".")) {
-        std::string ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-
-        if (entry.is_regular_file() && ext == wanted_ext) {
-            LBNode* p = insertItem((char *)entry.path().filename().string().c_str());
-            p->int_data = c; // Set the integer data
-        }
-    }
-}
-
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void FileList::OnChange() 
+void FileList::OnChange()
 {
     clear();
-    AddFiles(".zt", COLORS.Data);
-    AddFiles(".it", COLORS.Highlight);
-    
-    // <Manu> Quiero que muestre tambien los .mid, asi que añado esta linea [EN: I want it to show .mid files too, so I'm adding this line]
-    AddFiles(".mid", COLORS.Highlight);
-    
+    typeahead_len = 0;
+    std::error_code error;
+    auto current = std::filesystem::current_path(error);
+    if (!error) entries = file_browser::entries(current, error);
+    else entries.clear();
+    // ListBox's unsorted insertion prepends, so insert in reverse order.
+    for (size_t i = entries.size(); i > 0; --i) {
+        const auto &entry = entries[i - 1];
+        auto caption = entry.name + (entry.directory && entry.name != ".." ? "/" : "");
+        auto *node = insertItem(const_cast<char *>(caption.c_str()));
+        node->int_data = static_cast<int>(i - 1);
+    }
+    if (error) browser_error(error);
     need_redraw++;
 }
 
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
-void FileList::OnSelect(LBNode *selected) {
-    if (onEnter)
-        onEnter(this);
-    updated++;
-    ListBox::OnSelect(selected);
-    SDL_Delay(1);
+void FileList::navigate(const std::filesystem::path &path)
+{
+    std::error_code error;
+    auto previous = std::filesystem::current_path(error);
+    if (!change_directory(path)) return;
+    OnChange();
+    updated = 1;
+    if (path == ".." && !error) {
+        auto caption = previous.filename().string() + "/";
+        setCursor(findItem(const_cast<char *>(caption.c_str())));
+    }
 }
 
+void FileList::OnSelect(LBNode *selected)
+{
+    if (!selected || selected->int_data < 0 ||
+        static_cast<size_t>(selected->int_data) >= entries.size()) return;
+    auto entry = entries[selected->int_data];
+    if (entry.directory) pending_directory = entry.name;
+    else if (onEnter) onEnter(this);
+    need_refresh++;
+}

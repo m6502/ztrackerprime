@@ -9,6 +9,11 @@
 #
 # Add a test by creating tests/test_<topic>.cpp and listing it below.
 
+add_executable(test_file_browser test_file_browser.cpp)
+target_include_directories(test_file_browser PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_file_browser PRIVATE cxx_std_17)
+add_test(NAME file_browser COMMAND test_file_browser)
+
 add_executable(test_presets
     test_presets.cpp
     module_stub.cpp
@@ -241,6 +246,8 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             "CXX=${CMAKE_CXX_COMPILER}" "${Python3_EXECUTABLE}"
             "${CMAKE_SOURCE_DIR}/tests/test_save_filename.py")
         if(TARGET zt)
+            add_test(NAME file_browser_ui COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_file_browser_ui.py" "$<TARGET_FILE:zt>")
             add_test(NAME song_tools_ui COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_song_tools_ui.py" "$<TARGET_FILE:zt>")
             add_test(NAME playback_focus COMMAND "${Python3_EXECUTABLE}"
@@ -289,7 +296,7 @@ endif()
 # Virtual MIDI graph changes must not occur during other app screenshot tests.
 if(TARGET test_midi_monitor)
     foreach(name midi_monitor midi_hotplug_ui lua_api sysconfig_focus songconfig_focus position_notes
-                 song_tools_ui playback_focus pattern_undo_ui default_directory)
+                 song_tools_ui playback_focus pattern_undo_ui default_directory file_browser_ui)
         if(TEST ${name})
             set_tests_properties(${name} PROPERTIES RESOURCE_LOCK midi_graph)
         endif()

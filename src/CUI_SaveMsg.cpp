@@ -139,7 +139,6 @@ void CUI_SaveMsg::enter(void) {
 }
 void CUI_SaveMsg::leave(void) {
     FileList *fl;
-    DirList *dl;
 
     zt_thread_set_current_priority(OldPriority);
     zt_timer_stop(strtimer);
@@ -154,10 +153,8 @@ void CUI_SaveMsg::leave(void) {
 
     if (cur_state == STATE_SAVE) {
         fl = (FileList *)UIP_Savescreen->UI->get_element(0);
-        dl = (DirList *)UIP_Savescreen->UI->get_element(1);
         
         fl->OnChange();
-        dl->OnChange();
         
 //        fl->set_cursor(save_filename);
         fl->setCursor(fl->findItem((char*)song->filename));

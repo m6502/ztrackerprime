@@ -41,9 +41,8 @@
 #include "lc_sdl_wrapper.h"
 #include "UserInterface.h"
 #include "FileList.h"
-#include "CUI_FileLists_Common.hpp"
-
 #include "zt.h"
+#include "CUI_FileLists_Common.hpp"
 
 char load_filename[MAX_PATH + 1];
 //char szSearch[256];
@@ -124,7 +123,7 @@ CUI_Loadscreen::CUI_Loadscreen(void)
   fl->x     = FILE_LIST_POS_X_CHARS ;
   fl->y     = FILE_LIST_POS_Y_CHARS ;
 
-  fl->xsize = FILE_LIST_SIZE_X_CHARS ;
+  fl->xsize = FILE_LIST_SIZE_X_CHARS;
   fl->ysize = LOAD_FILE_LIST_SIZE_Y_CHARS ;
 
   //fl->str = &load_filename[0]; 
@@ -132,17 +131,8 @@ CUI_Loadscreen::CUI_Loadscreen(void)
   fl->onEnter = (ActFunc)filelist_onEnter;
   //    strcpy(fl->filepattern,"*.zt");
 
-  dl = new DirList;
-  UI->add_element(dl,1);
-
-  dl->x     = DIRECTORY_LIST_POS_X ;
-  dl->y     = DIRECTORY_LIST_POS_Y ;
-  
-  dl->xsize = DIRECTORY_LIST_SIZE_X_CHARS ;
-  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
-
   dr = new DriveList;
-  UI->add_element(dr,2);
+  UI->add_element(dr,1);
 
   dr->x     = DRIVE_LIST_POS_X ;
   dr->y     = DRIVE_LIST_POS_Y;
@@ -177,14 +167,13 @@ void CUI_Loadscreen::enter(void)
 {
   zt_config_globals.apply_default_directory(true);
   need_refresh = 1;
+  clear = 1;
+  UI->set_focus(0);
   is_loading = 0;
   cur_state = STATE_LOAD;
   FileList *fl;
-  DirList *dl;
   fl = (FileList *)UI->get_element(0);
-  dl = (DirList *)UI->get_element(1);
-  ((DriveList *)UI->get_element(2))->OnChange();
-  dl->OnChange();
+  ((DriveList *)UI->get_element(1))->OnChange();
   fl->OnChange();
   if (song->filename[0] && song->filename[0]!=' ') strcpy(load_filename, (const char *)song->filename);
 //    fl->set_cursor(load_filename);
@@ -210,7 +199,6 @@ void CUI_Loadscreen::leave(void)
 void CUI_Loadscreen::update() 
 {
   FileList *fl ;
-  DirList *dl ;
   DriveList *dr ;
   int key ;
   
@@ -219,13 +207,16 @@ void CUI_Loadscreen::update()
   UI->update();
   
   fl = (FileList *)UI->get_element(0);
-  dl = (DirList *)UI->get_element(1);
-  dr = (DriveList *)UI->get_element(2);
+  dr = (DriveList *)UI->get_element(1);
   
-  if (dl->updated || dr->updated) {
-
-    dl->OnChange();
+  if (fl->updated) {
+    fl->updated = 0;
+    dr->OnChange();
+  }
+  if (dr->updated) {
+    dr->updated = 0;
     fl->OnChange();
+    UI->set_focus(0);
   }
   
   if (Keys.size()) {
@@ -252,8 +243,8 @@ void CUI_Loadscreen::update()
 //
 void CUI_Loadscreen::draw(Drawable *S) 
 {
+  fl->xsize = FILE_LIST_SIZE_X_CHARS;
   fl->ysize = LOAD_FILE_LIST_SIZE_Y_CHARS ;
-  dl->ysize = DIRECTORY_LIST_SIZE_Y_CHARS ;
   dr->ysize = DRIVE_LIST_SIZE_Y ;
 
   if (clear) {
@@ -272,6 +263,7 @@ void CUI_Loadscreen::draw(Drawable *S)
 
   if (S->lock()==0) {
 
+    draw_file_browser_header(S);
     UI->draw(S); 
 
     if (!is_loading) draw_status(S);
