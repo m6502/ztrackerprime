@@ -163,8 +163,50 @@ void find_insts(unsigned char iflag[MAX_INSTS], zt_module *song)
 }
 
 
+// ------------------------------------------------------------------------------------------------
+// Tempo (T) and ticks per beat (A) during an export.
+//
+// The player only ANNOUNCES a T or A change: it puts an ET_BPM / ET_TPB event in
+// the buffer, and the live output loop is what applies it (playback.cpp, the
+// ET_BPM / ET_TPB cases before apply_speed()). The exporters run the same player
+// but only wrote the buffer's MIDI events, so a T or A in the song was lost: the
+// file kept the song's starting tempo, and every row kept the starting TPB's
+// length (which also changes how many slide steps fall in a row). Note that until
+// 2026-11-12 live playback dropped them too: it called set_speed(), which reloads
+// the SONG's bpm/tpb, so neither command ever did anything anywhere.
+//
+// export_tempo_event() does what the live loop does, for every exporter. It
+// returns the new tempo in microseconds per quarter note when the caller must
+// write a tempo meta-event (see push_tempo), and 0 otherwise. Applied as the
+// buffer is read, like the live loop, so it takes effect from the next subtick
+// and the row being played gets the new length -- the same as playing the song.
+static int export_tempo_event(midi_event *e)
+{
+  if (e->type == ET_BPM) {
+    if (e->command == 0) return 0;
+    ztPlayer->bpm = e->command;
+    ztPlayer->apply_speed();
+    return 60000000 / e->command;
+  }
+  if (e->type == ET_TPB) {
+    ztPlayer->tpb = e->data1;
+    ztPlayer->apply_speed();
+  }
+  return 0;
+}
 
-
+// A tempo meta-event (FF 51 03 tttttt) at dtime_ref ticks since the track's last event.
+static void push_tempo(CDataBuf *mp, int &dtime_ref, int us_per_quarter)
+{
+  push_varlen(mp, dtime_ref);
+  dtime_ref = 0;
+  mp->pushc(0xFF);
+  mp->pushc(0x51);
+  mp->pushc(0x03);
+  mp->pushc((us_per_quarter >> 16) & 0xff);
+  mp->pushc((us_per_quarter >> 8) & 0xff);
+  mp->pushc((us_per_quarter) & 0xff);
+}
 
 
 
@@ -296,7 +338,11 @@ int ZTImportExport::ExportMID(const char *fn, int format)
     //        buf->insert(0, ET_LOOP, 1, 0 , 0, 0, 0, 0, 0) ;
     
     while((e = buf->get_next_event())) {
-      
+
+      { // T / A: tempo into the conductor track (mtrk[0]), row length into the player
+        int us = export_tempo_event(e);
+        if (us) push_tempo(&mtrk[0], dtime[0], us);
+      }
 
       if(0 && e->type == ET_LOOP) {     // <Manu> Por ahora lo dejo asi para evitar problemas [EN: leaving it like this for now to avoid issues]
       
@@ -678,6 +724,11 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
 
     while ((e = buf->get_next_event())) {
 
+      { // T / A: tempo into the conductor track (mtrk[0]), row length into the player
+        int us = export_tempo_event(e);
+        if (us) push_tempo(&mtrk[0], dtime[0], us);
+      }
+
       if (e->type == ET_LOOP) continue; // skip, same as ExportMID
       if (e->inst >= MAX_INSTS) continue;
       if (e->track >= MAX_TRACKS) continue;
@@ -794,6 +845,14 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
 
     midi_event *e;
     while ((e = buf->get_next_event())) {
+
+      { // T / A: every file is played on its own, so each one carries the tempo
+        int us = export_tempo_event(e);
+        if (us) {
+          for (int t = 0; t < MAX_TRACKS; t++)
+            if (tflag[t]) push_tempo(&mtrk[t], dtime[t], us);
+        }
+      }
 
       if (e->type == ET_LOOP) continue;
       if (e->inst >= MAX_INSTS) continue;
