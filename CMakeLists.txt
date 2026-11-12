@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
+# Pin the macOS floor BEFORE project() so -mmacosx-version-min is baked into
+# every object. 10.15 is the lowest with std::filesystem; arm64 slices are
+# clamped to 11.0 by the linker. Ignored elsewhere.
+if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum macOS version")
+endif()
+
 set(MINGW_ROOT "W:/MINGW64" CACHE PATH "MinGW root directory (used with MinGW Makefiles generator)")
 
 if(CMAKE_GENERATOR MATCHES "MinGW Makefiles")
@@ -39,6 +46,8 @@ option(ZT_ENABLE_SANITIZERS "Enable AddressSanitizer + UndefinedBehaviorSanitize
 # the real wrapper. When OFF or the tree is absent, the wrapper builds as a
 # safe stub so the binary still works without Link.
 option(ZT_ENABLE_ABLETON_LINK "Sync tempo/transport with Ableton Link peers on the LAN" ON)
+
+option(ZT_MACOS_BUNDLE_SDL3 "Bundle SDL3 into the macOS .app for a self-contained build" ON)
 
 set(ZT_WINDOWS_LIB_DIR "${CMAKE_SOURCE_DIR}/extlibs" CACHE PATH "Directory containing Windows SDL libraries (.lib/.dll)")
 set(SDL3_INCLUDE_DIR "" CACHE PATH "Path containing SDL3/SDL.h (or SDL.h with SDL3 include root)")
@@ -305,7 +314,9 @@ string(TIMESTAMP ZT_BUILD_DATE "%Y_%m_%d")
 target_compile_definitions(zt PRIVATE ZT_BUILD_DATE="${ZT_BUILD_DATE}")
 
 find_package(PkgConfig QUIET)
-if(PkgConfig_FOUND)
+# An explicit SDL3_LIBRARY (CI's universal build) must beat a Homebrew sdl3.pc,
+# whose single-arch dylib would break the universal link.
+if(PkgConfig_FOUND AND (NOT DEFINED SDL3_LIBRARY OR SDL3_LIBRARY STREQUAL ""))
   pkg_check_modules(SDL3PC QUIET IMPORTED_TARGET sdl3)
 endif()
 
@@ -423,6 +434,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_link_libraries(zt PRIVATE asound)
 endif()
 
+set(ZT_SDL3_DYLIB_HINT "")
+if(APPLE)
+  if(DEFINED SDL3_LIBRARY AND NOT SDL3_LIBRARY STREQUAL "" AND SDL3_LIBRARY MATCHES "\\.dylib$")
+    set(ZT_SDL3_DYLIB_HINT "${SDL3_LIBRARY}")
+  elseif(PkgConfig_FOUND)
+    pkg_get_variable(ZT_SDL3_LIBDIR sdl3 libdir)
+    if(ZT_SDL3_LIBDIR AND EXISTS "${ZT_SDL3_LIBDIR}/libSDL3.0.dylib")
+      set(ZT_SDL3_DYLIB_HINT "${ZT_SDL3_LIBDIR}/libSDL3.0.dylib")
+    endif()
+  endif()
+endif()
+
 if(APPLE)
   string(TIMESTAMP ZT_BUILD_VERSION "%Y.%m.%d" UTC)
   target_link_libraries(zt PRIVATE "-framework CoreMIDI" "-framework CoreFoundation" "-framework Cocoa")
@@ -476,6 +499,11 @@ if(APPLE)
       "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/lua"
     VERBATIM
   )
+  add_custom_command(TARGET zt POST_BUILD
+    COMMAND plutil -replace LSMinimumSystemVersion -string "${CMAKE_OSX_DEPLOYMENT_TARGET}"
+      "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Info.plist"
+    VERBATIM
+  )
   if(ZT_ICON_COMPOSER)
     # Compile the Icon Composer source into the bundle: Assets.car is the
     # Liquid Glass icon used on macOS 26+. actool ALSO drops a zt.icns, but its
@@ -493,6 +521,17 @@ if(APPLE)
       COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_SOURCE_DIR}/zt.icns"
         "$<TARGET_BUNDLE_CONTENT_DIR:zt>/Resources/zt.icns"
+      VERBATIM
+    )
+  endif()
+  if(ZT_MACOS_BUNDLE_SDL3)
+    # Last macOS step: bundle SDL3 into Contents/Frameworks and re-sign.
+    add_custom_command(TARGET zt POST_BUILD
+      COMMAND ${CMAKE_COMMAND}
+        "-DZT_BIN=$<TARGET_FILE:zt>"
+        "-DZT_APP=$<TARGET_BUNDLE_DIR:zt>"
+        "-DZT_SDL3_HINT=${ZT_SDL3_DYLIB_HINT}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/bundle_sdl3_macos.cmake"
       VERBATIM
     )
   endif()

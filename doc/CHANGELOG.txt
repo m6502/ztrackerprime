@@ -4,8 +4,14 @@ Legend
    +  - Feature add
    *  - Fix/change
 
-zt 2026_11_11 (Modernized file browser on the Load and Save pages)
-------------------------------------------------------------------
+zt 2026_11_11 (macOS: one universal app, runs on macOS 10.15 and newer, Modernized file browser on the Load and Save pages)
+-------------------------------------------------------------------------
+
+        + macOS downloads are now a single universal app that runs natively
+          on both Intel and Apple Silicon Macs, from macOS 10.15 (Catalina)
+          onward on Intel and 11.0 (Big Sur) on Apple Silicon. SDL3 is
+          bundled inside the app, so nothing needs to be installed with
+          Homebrew. Previously the builds required a recent macOS.
 
         + The Load (Ctrl-L) and Save (Ctrl-Shift-S) pages have a new file
           browser: Places on the left (Home, filesystem root and mounted
