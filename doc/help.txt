@@ -272,26 +272,81 @@
 
 |L|%==|H|Effects|L|==%|U|
 
- A..xx : Set TPB (ticks per beat)
+ All effect values are HEXADECIMAL.
+
+ A..xx : Set TPB (ticks per beat = rows per beat), for the whole song from
+         this row on.  Only 02, 04, 06, 08, 0C (12), 18 (24) and 30 (48)
+         are accepted; anything else is ignored.  Play resets it to the
+         song's TPB.
  B  00 : Set "[" in the midi file.
  B  01 : Set "]" in the midi file.
  Cxxxx : Pattern break - setting the C marker denotes the end of a
          pattern.  ex: C0000 will skip to the next pattern, row 0
  D..xx : Delay note/volume/cut - by xxxx sub-ticks.
- Exxxx : Pitch slide down, E0000 will repeat the last portamento command.
- Fxxxx : Pitch slide up, F0000 will repeat the last portamento down command.
+ Exxxx : Pitch wheel slide down: the wheel moves down xxxx units 24 times
+         per beat, on this row only (repeat E on every row of the slide).
+         E0000 continues the slide of the row above with the same amount.
+ Fxxxx : Pitch wheel slide up, same as E.  F0000 continues the slide.
+         The wheel STAYS where a slide leaves it, also for the next notes:
+         W2000 puts it back in the centre.  E/F/W move the pitch WHEEL,
+         so they reach as far as the synth's bend range (usually +-2
+         semitones, see "Pitch bend range" below); with that range 1000
+         is one semitone, and F00AB rises about one semitone per beat.
+         To glide from one note to another, use Portamento (below).
  P.... : Send program change message for the current instrument.
  Q..xx : Retrig note every xx subticks
  R..xx : Start arpeggio xx.  R0000 will continue the last arpeggio
- Sxxyy : xx is the CC (Continuous Controller) number, yy is the value (0-80).
+ Sxxyy : Send a MIDI Control Change (CC): controller xx, value yy, both
+         00-7F (higher values are sent as 7F).  It goes once, at the start
+         of the row, to the channel of the track's instrument -- the one in
+         this cell or the last one used on the track (a track that has not
+         had an instrument yet sends nothing).
          ex. S0142 will set CC #01 (Mod Wheel) to a value of 42.
-         >=80 sends last value
- T..xx : Set tempo to xx bpm
- Wxxxx : Absolute pitch set, between 0 and 3FFF, 2000 is no pitch change,
-         0 is max down, 3FFF is max up
+         The synth keeps a CC's value until it gets another one.
+         Some useful controllers:
+           S01yy : Mod wheel (vibrato on most synths)
+           S07yy : Channel volume
+           S0Ayy : Pan (the same as X)
+           S40yy : Sustain pedal, 00 off, 7F on
+           S41yy : Portamento on / off      -- see Portamento below
+           S05yy : Portamento time          -- see Portamento below
+ T..xx : Set tempo to xx bpm, for the whole song from this row on.  Hex:
+         T0078 = 120 bpm, T003C = 60.  Range 3C-F0 (60-240).  Play resets
+         it to the song's tempo.
+ Wxxxx : Absolute pitch wheel set, between 0 and 3FFF, 2000 is no pitch
+         change (centre), 0 is max down, 3FFF is max up
  X..xx : Set panning, 00=left, 40=center, 7F=right
  Zxxyy : Send midimacro xx with parameter yy.  00 repeats the last used
          value
+
+ Portamento (glide from one note to the next) -- standard MIDI CCs, sent
+ with S.  It is a MODE of the channel, not an effect on one row: turn it
+ on, and every new note glides from the pitch of the previous note to its
+ own, over any distance (a semitone or two octaves alike), until it is
+ turned off.
+
+   S417F : Portamento ON  (CC 65, any value 40-7F is on)
+   S4100 : Portamento OFF (00-3F is off): notes jump to their pitch again
+   S05yy : Portamento time (CC 5), 00 = fastest ... 7F = slowest.  How long
+           a value lasts is up to the synth.
+   S54nn : The NEXT note glides from note nn instead of from the previous
+           one (CC 84, Portamento Control; not every synth has it).
+
+   The track needs its instrument before the first S (see S above):
+
+     C-4 01 ..... S417F   <- portamento on
+     ... .. ..... S0520   <- glide time
+     G-4 .. ..... .....   <- glides C-4 -> G-4
+     C-5 .. ..... .....   <- glides G-4 -> C-5
+     ... .. ..... S4100   <- portamento off
+     E-4 .. ..... .....   <- jumps to E-4
+
+   Some synths only glide between notes that overlap, in legato or mono
+   mode.  If a note does not glide, check the synth's portamento mode.
+
+ Pitch bend range: how far E, F and W reach is the synth's setting, usually
+ +-2 semitones.  Change it with RPN 0, three S commands in this order:
+   S6500  S6400  S06nn     nn = semitones, e.g. S060C = +-12
 
 |L|%==|H|Easter Eggs|L|==%|U|
 
