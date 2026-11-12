@@ -371,12 +371,21 @@ int player::init(void) {
 //
 void player::set_speed() {
 //int t,int b) {
-    int64_t a;
 //  tpb = t; bpm = b;
 
     // <Manu> Apply changes in real-time :-)
     this->bpm = song->bpm ;
     this->tpb = song->tpb ;
+
+    apply_speed();
+}
+
+// The timing half of set_speed(), from the player's CURRENT bpm/tpb. The T and A
+// commands set those and must call this, not set_speed(): set_speed() reloads
+// bpm/tpb from the song first (so an edit in Song Config is heard at once), and
+// T / A going through it were thrown away -- neither command did anything.
+void player::apply_speed() {
+    int64_t a;
 
     a = 1000000 / wTimerRes;
     subtick_len_ms = (int)(60 * a /(96*this->bpm));
@@ -1329,7 +1338,7 @@ void player::callback(void) {
         buf->rollback_cursor();
     if (set) { 
         //tpb = song->tpb; bpm = song->bpm;
-        set_speed();//song->tpb, this->bpm);
+        apply_speed(); // T / A: NOT set_speed(), which would reload the song's bpm/tpb
         need_refresh++;
     }
 

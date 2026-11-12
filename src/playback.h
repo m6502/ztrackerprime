@@ -261,7 +261,8 @@ class player {
         int kill_noel(int i);
         void clear_noel_with_midiout(void);
 
-        void set_speed();
+        void set_speed();     // take bpm/tpb from the SONG, then apply_speed()
+        void apply_speed();   // recompute timing from the player's own bpm/tpb (T / A)
 
         // Slave the live playback tempo to an externally supplied BPM
         // (derived from incoming MIDI Clock). Does NOT mutate song->bpm,
