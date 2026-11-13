@@ -12,7 +12,7 @@ ZTConf::ZTConf() {}
 ZTConf::~ZTConf() {}
 zt_module::zt_module(int, int) {}
 zt_module::~zt_module() { for (auto *p : patterns) delete p; }
-player::player(int, int, zt_module *s) : patt_memory(64) { song = s; }
+player::player(int, int, zt_module *s, bool) : patt_memory(64) { song = s; }
 player::~player() {}
 Skin::Skin() {}
 Skin::~Skin() {}

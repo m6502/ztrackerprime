@@ -2908,6 +2908,7 @@ void keyhandler(SDL_KeyboardEvent *e) {
             zclear_flag = 0;
 
         if (!pressed) {
+            if (ztPlayer) ztPlayer->release_audition((int)id);
             if (id == last_keyjazz) {
                 last_cmd_keyjazz = 0;
                 last_keyjazz = 0;

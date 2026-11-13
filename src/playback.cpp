@@ -43,6 +43,8 @@
 #include "ableton_link.h"
 #include <algorithm>
 #include <stdint.h>
+#include <vector>
+#include <memory>
 
 int mctr = 0;
 
@@ -235,7 +237,19 @@ void midi_buf::insert(short int tick, unsigned char type, unsigned int device, u
 // ------------------------------------------------------------------------------------------------
 //
 //
-player::player(int res,int prebuffer_rows, zt_module *ztm) {
+struct row_audition {
+    std::unique_ptr<player> engine;
+    struct scheduled { int tick; midi_event event; };
+    std::vector<scheduled> pending;
+    std::vector<midi_event> notes;
+    int key = 0, track = -1, tick = 0, pattern = -1, row = -1;
+    int generation = -1;
+    uint64_t next_us = 0;
+};
+
+player::player(int res,int prebuffer_rows, zt_module *ztm, bool enable_timer) {
+    audition = nullptr;
+    timer_enabled = enable_timer;
 //  this->tpb = song->tpb; this->bpm = song->bpm;
     this->song = ztm;
     this->wTimerRes = res;
@@ -251,7 +265,11 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
     this->playing_cur_row = 1;
     this->playing_cur_pattern = 0;
     this->playing_cur_order = 0;
-    init();
+    if (timer_enabled) init();
+    else {
+        cur_row = cur_pattern = cur_order = playmode = 0;
+        set_speed();
+    }
 
     //this->noteoff_eventlist = NULL;
     this->noteoff_eventlist = new s_note_off[4000];
@@ -274,8 +292,12 @@ player::player(int res,int prebuffer_rows, zt_module *ztm) {
 //
 player::~player(void) {
     //this->edit_lock = 0;
-    unlock_mutex(song->hEditMutex);
-    this->stop_timer();
+    clear_audition();
+    delete audition;
+    if (timer_enabled) {
+        unlock_mutex(song->hEditMutex);
+        this->stop_timer();
+    }
 //  delete this->hr_timer;
     this->wTimerID = 0;
     delete this->play_buffer[1];
@@ -665,105 +687,109 @@ void player::play_immediately(int row, int pattern,int pm, int loopmode)
 //
 void player::play_current_row()
 {
-  event *pEvent;
-  unsigned char set_note;
-  unsigned int p1;
-
-  for(int var_track = 0; var_track < 64; var_track++) {
-
-    if(!song->track_mute[var_track]) {
-    
-      pEvent = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(cur_edit_row);
-      
-      if(pEvent && pEvent->inst < MAX_INSTS) {
-
-        p1 = song->instruments[pEvent->inst]->default_volume;
-        
-        if (song->instruments[pEvent->inst]->global_volume != 0x7F && p1>0) {
-          p1 *= song->instruments[pEvent->inst]->global_volume;
-          p1 /= 0x7f;
-        }
-        
-        // <Manu> if(A = B) ?
-        /*if (pEvent = song->patterns[cur_edit_pattern]->tracks[var_track]->get_event(cur_edit_row))*/ {
-          
-          if (pEvent->vol<0x80) p1 = pEvent->vol ;
-        }
-
-        set_note = pEvent->note;
-        set_note += song->instruments[pEvent->inst]->transpose; 
-
-        // <Manu> Transposición [EN: transposition]
-
-
-        if (set_note>0x7f) set_note = 0x7f;
-
-        if (song->instruments[pEvent->inst]->midi_device!=0xff && song->instruments[pEvent->inst]->midi_device<=MAX_MIDI_DEVS) {
-
-          MidiOut->noteOn(song->instruments[pEvent->inst]->midi_device,set_note,song->instruments[pEvent->inst]->channel,p1,MAX_TRACKS,0);            
-          jazz_set_state(SDLK_8, set_note, song->instruments[pEvent->inst]->channel);
-        }
-      }
-    }
-  }
+    audition_current(-1, SDLK_8);
 }
 
-
-
-
-// ------------------------------------------------------------------------------------------------
-//
-//
 void player::play_current_note()
 {
-  event *e;
-  unsigned char set_note;
-  unsigned int p1;
-
-  e = song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row);
-
-  if(e && e->inst<MAX_INSTS) {
-
-    p1 = song->instruments[e->inst]->default_volume;
-
-    if (song->instruments[e->inst]->global_volume != 0x7F && p1>0) {
-
-      p1 *= song->instruments[e->inst]->global_volume;
-      p1 /= 0x7f;
-    }
-
-    // <Manu> if(A = B) ?
-
-    /*if (e=song->patterns[cur_edit_pattern]->tracks[cur_edit_track]->get_event(cur_edit_row))*/ {
-      
-      if (e->vol<0x80) p1 = e->vol;
-    }
-
-    set_note = e->note;
-    set_note += song->instruments[e->inst]->transpose;
-
-    // <Manu> Transposición
-
-
-    if (set_note>0x7f) set_note = 0x7f;
-
-    if (song->instruments[e->inst]->midi_device!=0xff && song->instruments[e->inst]->midi_device<=MAX_MIDI_DEVS) {
-
-      MidiOut->noteOn(song->instruments[e->inst]->midi_device,set_note,song->instruments[e->inst]->channel,p1,MAX_TRACKS /*cur_edit_track*/,0);
-
-      jazz_set_state(SDLK_4, set_note, song->instruments[e->inst]->channel);
-    }
-  }
+    audition_current(cur_edit_track, SDLK_4);
 }
 
+void player::clear_audition()
+{
+    if (!audition) return;
+    for (const auto &e : audition->notes)
+        MidiOut->noteOff(e.device, e.command, e.data1 & 0x0F, 0, 0);
+    audition->notes.clear();
+    audition->pending.clear();
+    audition->key = 0;
+    audition->engine->clear_noel();
+    audition->engine->clear_cc_envs();
+}
 
+void player::release_audition(int key)
+{
+    if (audition && audition->key == key) clear_audition();
+}
 
+void player::audition_current(int track, int key)
+{
+    if (!audition) {
+        audition = new row_audition;
+        audition->engine.reset(new player(wTimerRes, 1, song, false));
+    }
+    clear_audition();
+    audition_stop_requested = false;
+    player &preview = *audition->engine;
+    if (audition->generation != zt_song_generation ||
+        audition->pattern != cur_edit_pattern || cur_edit_row <= audition->row) {
+        for (int t = 0; t < MAX_TRACKS; ++t) preview.patt_memory.tracks[t]->reset();
+        preview.set_speed();
+    }
+    // Resolve omitted instruments from earlier rows when starting in mid-pattern.
+    for (int t = 0; t < MAX_TRACKS; ++t) {
+        if (track >= 0 && t != track) continue;
+        auto *memory = preview.patt_memory.tracks[t];
+        memory->default_inst = MAX_INSTS;
+        for (int row = cur_edit_row; row >= 0; --row) {
+            event *e = song->patterns[cur_edit_pattern]->tracks[t]->get_event(row);
+            if (e && e->inst < MAX_INSTS) { memory->default_inst = e->inst; break; }
+        }
+    }
+    audition->generation = zt_song_generation;
+    audition->pattern = preview.cur_pattern = cur_edit_pattern;
+    audition->row = preview.cur_row = cur_edit_row;
+    audition->key = key;
+    audition->track = track;
+    audition->tick = 0;
+    audition->next_us = SDL_GetTicks() * 1000;
+    preview.cur_subtick = preview.clock_count = preview.starts = 0;
+    preview.skip = 0xFFF;
+    if (playing) { preview.bpm = bpm; preview.tpb = tpb; preview.apply_speed(); }
+    pump_audition();
+}
+
+void player::pump_audition()
+{
+    if (audition_stop_requested.exchange(false)) clear_audition();
+    if (!audition || !audition->key) return;
+    if (audition->generation != zt_song_generation) { clear_audition(); return; }
+    player &preview = *audition->engine;
+    const uint64_t now = SDL_GetTicks() * 1000;
+    // Generate one subtick at a time, retaining delayed/retriggered events.
+    // This uses the same row effects, note lengths and envelopes as playback.
+    for (int steps = 0; audition->next_us <= now && steps < 256; ++steps) {
+        midi_buf &buffer = *preview.play_buffer[0];
+        buffer.reset();
+        preview.playback(&buffer, 1, audition->track);
+        for (int n = 0; n < buffer.listhead; ++n) {
+            midi_event e = buffer.event_buffer[n];
+            audition->pending.push_back({audition->tick + e.tick, e});
+        }
+        for (auto it = audition->pending.begin(); it != audition->pending.end();) {
+            if (it->tick > audition->tick) { ++it; continue; }
+            midi_event e = it->event;
+            it = audition->pending.erase(it);
+            if (preview.dispatch_event(&e, audition->track >= 0)) preview.apply_speed();
+            if (e.type == ET_NOTE_ON && (audition->track >= 0 || !song->track_mute[e.track]))
+                audition->notes.push_back(e);
+            if (e.type == ET_NOTE_OFF) {
+                auto &notes = audition->notes;
+                notes.erase(std::remove_if(notes.begin(), notes.end(), [&](const midi_event &n) {
+                    return n.device == e.device && n.command == e.command &&
+                           (n.data1 & 0x0F) == e.data1;
+                }), notes.end());
+            }
+        }
+        ++audition->tick;
+        audition->next_us += 60000000ULL / (96 * preview.bpm);
+    }
+}
 
 // ------------------------------------------------------------------------------------------------
-//
-//
 void player::stop(void)
 {
+    audition_stop_requested = true;
     stop_count++;
     playing = 0;
     pinit = 0;
@@ -972,7 +998,7 @@ void player::process_noel(midi_buf *buffer, int p_tick) {
         e = &noteoff_eventlist[i];
         if (e->length) e->length--;
         if (!e->length) {
-            tr = song->patterns[cur_pattern]->tracks[e->track];
+            tr = patt_memory.tracks[e->track];
             if (tr->last_note == e->note)
                 tr->last_note = 0x80;
             buffer->insert(p_tick,ET_NOTE_OFF,song->instruments[e->inst]->midi_device,e->note,song->instruments[e->inst]->channel,0x0,e->track,e->inst);
@@ -1083,6 +1109,7 @@ void zt_audition_env_clear_all(void) {
 }
 
 void zt_audition_env_pump(void) {
+    if (ztPlayer) ztPlayer->pump_audition();
     aud_ensure();
     if (!ztPlayer || !ztPlayer->song) return;
     int subtick_ms = ztPlayer->subtick_len_ms;
@@ -1224,11 +1251,91 @@ void player::release_track_envelopes(int track) {
 // ------------------------------------------------------------------------------------------------
 // j se usa primero como effect_data, y luego como var1
 //
+bool player::dispatch_event(midi_event *e, bool ignore_mute)
+{
+    unsigned short int usi;
+    const bool muted = e->track < MAX_TRACKS && song->track_mute[e->track] && !ignore_mute;
+    switch(e->type) {
+        case ET_LOOP:
+            // loop markers are consumed by the pattern loop logic elsewhere
+            break;
+        case ET_MSTART:
+            if (song->flag_SendMidiStopStart)
+                MidiOut->sendGlobal(0xFA);
+            break;
+        case ET_CLOCK:
+            MidiOut->clock();
+            break;
+        case ET_PITCH:
+            if (!muted) {
+                usi = (unsigned short int)e->data1<<8; usi+=e->data2;
+                MidiOut->pitchWheel(e->device,e->command,usi);
+            }
+            break;
+        case ET_CC:
+            if (!muted)
+                MidiOut->sendCC(e->device,e->command,(unsigned char)e->data1,(unsigned char)e->data2);
+            break;
+        case ET_PC:
+            if (!muted)
+                MidiOut->progChange(e->device,e->command,e->data1,(unsigned char)e->data2);
+            break;
+        case ET_NOTE_ON:
+                if (e->inst >= MAX_INSTS) break;
+
+                // <Manu>
+                song->instruments[e->inst]->MarkAsUsed() ;
+                MidiOut->noteOn(e->device,e->command,(unsigned char)e->data1&0x0F,(unsigned char)e->data2,e->track,muted,(e->data1&0xF0)>>4);
+                //fprintf(stderr, "%d: Note On\n", e->tick);
+            break;
+        case ET_NOTE_OFF:
+                MidiOut->noteOff(e->device,e->command,(unsigned char)e->data1,(unsigned char)e->data2,muted);
+                //fprintf(stderr, "%d: Note Off\n", e->tick);
+            break;
+        case ET_AT:
+            if (!muted)
+                MidiOut->afterTouch(e->device,e->command,(unsigned char)e->data1,(unsigned char)e->data2);
+            break;
+        case ET_PATT:
+            last_pattern = e->command;
+            break;
+        case ET_STATUS:
+            status_change = 1;
+            playing_cur_order = e->command;
+            playing_cur_pattern = e->data1;
+            playing_cur_row = e->extra;//e->data2;
+            break;
+        case ET_RAW:
+            if (!muted) {
+                unsigned int msg = (unsigned int)e->command
+                                 | ((unsigned int)e->data1 << 8)
+                                 | ((unsigned int)e->data2 << 16);
+                MidiOut->send(e->device, msg);
+            }
+            break;
+        case ET_LIGHT:
+            if (++ztPlayer->light_counter>=this->tpb) {
+                need_update_lights++;
+                light_counter = 0;
+                light_pos++;
+                if (light_pos>3)
+                    light_pos = 0;
+            }
+            break;
+        case ET_BPM:
+            this->bpm = e->command; return true;
+            break;
+        case ET_TPB:
+            this->tpb = e->data1; return true;
+            break;
+    }
+    return false;
+}
+
 void player::callback(void) {
     midi_buf *buf;
     midi_event *e;
     int set=0;
-    unsigned short int usi;
 
     buf = play_buffer[cur_buf];
 
@@ -1237,79 +1344,7 @@ void player::callback(void) {
         e = buf->get_next_event();
         while(e) {
             if (e->tick == playing_tick) {
-                switch(e->type) {
-                    case ET_LOOP:
-                        // loop markers are consumed by the pattern loop logic elsewhere
-                        break;
-                    case ET_MSTART:
-                        if (song->flag_SendMidiStopStart)
-                            MidiOut->sendGlobal(0xFA);
-                        break;
-                    case ET_CLOCK:
-                        MidiOut->clock();
-                        break;
-                    case ET_PITCH:
-                        if (!song->track_mute[e->track]) {
-                            usi = (unsigned short int)e->data1<<8; usi+=e->data2;
-                            MidiOut->pitchWheel(e->device,e->command,usi);
-                        }
-                        break;
-                    case ET_CC:
-                        if (!song->track_mute[e->track])
-                            MidiOut->sendCC(e->device,e->command,(unsigned char)e->data1,(unsigned char)e->data2);
-                        break;
-                    case ET_PC:
-                        if (!song->track_mute[e->track])
-                            MidiOut->progChange(e->device,e->command,e->data1,(unsigned char)e->data2);
-                        break;
-                    case ET_NOTE_ON:
-                            
-                            // <Manu>
-                            song->instruments[e->inst]->MarkAsUsed() ;
-                            MidiOut->noteOn(e->device,e->command,(unsigned char)e->data1&0x0F,(unsigned char)e->data2,e->track,song->track_mute[e->track],(e->data1&0xF0)>>4);
-                            //fprintf(stderr, "%d: Note On\n", e->tick);
-                        break;
-                    case ET_NOTE_OFF:
-                            MidiOut->noteOff(e->device,e->command,(unsigned char)e->data1,(unsigned char)e->data2,song->track_mute[e->track]);
-                            //fprintf(stderr, "%d: Note Off\n", e->tick);
-                        break;
-                    case ET_AT:
-                        if (!song->track_mute[e->track])
-                            MidiOut->afterTouch(e->device,e->command,(unsigned char)e->data1,(unsigned char)e->data2);
-                        break;
-                    case ET_PATT:
-                        last_pattern = e->command;
-                        break;
-                    case ET_STATUS:
-                        status_change = 1;
-                        playing_cur_order = e->command;
-                        playing_cur_pattern = e->data1;
-                        playing_cur_row = e->extra;//e->data2;
-                        break;
-                    case ET_RAW:
-                        if (!song->track_mute[e->track]) {
-                            unsigned int msg = (unsigned int)e->command
-                                             | ((unsigned int)e->data1 << 8)
-                                             | ((unsigned int)e->data2 << 16);
-                            MidiOut->send(e->device, msg);
-                        }
-                        break;
-                    case ET_LIGHT:
-                        if (++ztPlayer->light_counter>=this->tpb) {
-                            need_update_lights++; 
-                            light_counter = 0;
-                            light_pos++; 
-                            if (light_pos>3) 
-                                light_pos = 0;
-                        }                       
-                        break;
-                    case ET_BPM:
-                        this->bpm = e->command; set++;
-                        break;
-                    case ET_TPB:
-                        this->tpb = e->data1; set++;
-                        break;
-                }
+                if (dispatch_event(e)) set++;
             }
             e = buf->get_next_event();
         }
@@ -1392,7 +1427,7 @@ void player::num_orders(void) {
 // ------------------------------------------------------------------------------------------------
 //
 //
-void player::playback(midi_buf *buffer, int ticks) 
+void player::playback(midi_buf *buffer, int ticks, int audition_track)
 {
   int t,add,j,jstep ;
   unsigned char vol,chan,inst,flags ;
@@ -1430,14 +1465,15 @@ void player::playback(midi_buf *buffer, int ticks)
 
         if (clock_count == 0) {
 
-          if (song->flag_SendMidiClock) buffer->insert(p_tick,ET_CLOCK,0x0); //MidiOut->clock();
+          if (audition_track == -2 && song->flag_SendMidiClock) buffer->insert(p_tick,ET_CLOCK,0x0); //MidiOut->clock();
         }
 
         if (clock_count == 0 && song->flag_SlideOnSubtick) {    // feature 419820, tlr
 
           /* run pitchslides on clock_count. */                 // feature 419820, tlr
 
-          for(t=0;t<MAX_TRACKS;t++) {                           // feature 419820, tlr
+          for(t=0;t<MAX_TRACKS;t++) {
+            if (audition_track != -2 && ((audition_track >= 0 && t != audition_track) || (audition_track == -1 && song->track_mute[t]))) continue;                           // feature 419820, tlr
             //Track = song->patterns[cur_pattern]->tracks[t];   // feature 419820, tlr
             Track = patt_memory.tracks[t];
 
@@ -1471,10 +1507,10 @@ void player::playback(midi_buf *buffer, int ticks)
 
         //clock_count++;                                        // feature 419820, tlr
 
-        if (cur_subtick >= tick_len_ms)
+        if (audition_track == -2 && cur_subtick >= tick_len_ms)
           cur_subtick = 0;
 
-        if (cur_subtick == 0) {
+        if (audition_track == -2 && cur_subtick == 0) {
           cur_row++;
           if (skip<0xFFF) {
             if (playmode > 0) {
@@ -1587,6 +1623,7 @@ void player::playback(midi_buf *buffer, int ticks)
           if (die==0)
 
             for(t=0;t<MAX_TRACKS;t++) {
+            if (audition_track != -2 && ((audition_track >= 0 && t != audition_track) || (audition_track == -1 && song->track_mute[t]))) continue;
 
               add=0;  
               is_pitchslide=0;          // feature 419820, tlr
@@ -2084,8 +2121,10 @@ void player::playback(midi_buf *buffer, int ticks)
               //          }  // mute
             }  // For thru tracks
 
+            if (audition_track == -2) {
             buffer->insert(p_tick,ET_STATUS,0x0,ztPlayer->cur_order,ztPlayer->cur_pattern,0,0,0,ztPlayer->cur_row);
             buffer->insert(p_tick+1,ET_LIGHT,0x0);
+            }
         } // If subtick = 0
 
         clock_count++;  // feature 419820, tlr

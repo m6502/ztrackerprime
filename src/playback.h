@@ -44,6 +44,9 @@
 
 //#include "zt.h"
 #include "module.h"
+#include <atomic>
+
+struct row_audition;
 class zt_module ;
 
 // ---------------------------------------------------------------------------
@@ -135,6 +138,11 @@ class midi_buf {
 
 class player {
     private:
+        row_audition *audition;
+        bool timer_enabled;
+        std::atomic<bool> audition_stop_requested{false};
+        void audition_current(int track, int key);
+
         MMRESULT wTimerID;
         zt_timer_handle ztTimerID;
 #ifdef _WIN32
@@ -232,7 +240,7 @@ class player {
         void release_track_envelopes(int track);          // on note-off
 //      int clock_counter,clock_len_ms,clock_len_mms,clock_error,clock_error_flag;
         
-        player(int res,int prebuffer_rows, zt_module *ztm);
+        player(int res,int prebuffer_rows, zt_module *ztm, bool enable_timer = true);
         ~player(void);
 
         int init(void);
@@ -246,9 +254,13 @@ class player {
         void play_immediately(int row, int pattern, int pm, int loopmode=1);
         void play_current_row();
         void play_current_note();
+        void pump_audition();
+        void release_audition(int key);
+        void clear_audition();
+        bool dispatch_event(midi_event *e, bool ignore_mute = false);
         void stop(void);
         void callback(void); // reads buffers and actually plays them
-        void playback(midi_buf *buffer, int ticks); // fills buffer with x ticks
+        void playback(midi_buf *buffer, int ticks, int audition_track = -2); // fills buffer with x ticks
         int calc_pos(int midi_songpos, int *rowptr, int *orderptr);
 
         void insert_no(unsigned char note, unsigned char chan, short int len, unsigned char track);
