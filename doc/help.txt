@@ -330,7 +330,8 @@
    S05yy : Portamento time (CC 5), 00 = fastest ... 7F = slowest.  How long
            a value lasts is up to the synth.
    S54nn : The NEXT note glides from note nn instead of from the previous
-           one (CC 84, Portamento Control; not every synth has it).
+           one (CC 84, Portamento Control; not every synth has it).  nn is
+           the note number in hex, as zTracker counts: C-4 = 30, C-5 = 3C.
 
    The track needs its instrument before the first S (see S above):
 
@@ -343,6 +344,12 @@
 
    Some synths only glide between notes that overlap, in legato or mono
    mode.  If a note does not glide, check the synth's portamento mode.
+
+   Put the cursor on an S cell and the status line says what it does, e.g.
+   "CC 65 Portamento ON" or "CC 5 Portamento time = 32".
+
+   To start clean, S7900 (CC 121, Reset all controllers) turns portamento
+   off and centres the pitch wheel.
 
  Pitch bend range: how far E, F and W reach is the synth's setting, usually
  +-2 semitones.  Change it with RPN 0, three S commands in this order:

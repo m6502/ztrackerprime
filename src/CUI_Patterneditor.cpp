@@ -195,6 +195,67 @@ static int track_header_toggle_at_mouse(int tracks_shown, int field_size)
 // ------------------------------------------------------------------------------------------------
 //
 //
+// The status line of an Sxxyy cell: name the controller and say what the value
+// does, so S417F reads "Portamento ON" and not just "65 = 127". The values are
+// the ones playback sends (both clamped to 7F, playback.cpp case 'S').
+static void set_cc_msg(char *str, int cc, int raw_value)
+{
+  int v = raw_value > 0x7F ? 0x7F : raw_value;
+  const char *clamped = raw_value > 0x7F ? " (sent as 7F)" : "";
+  const char *onoff = v >= 0x40 ? "ON" : "OFF";
+  char note[4] = {0,0,0,0};
+
+  if (cc > 0x7F) cc = 0x7F;
+  switch (cc) {
+    case 0x00: sprintf(str,"Effect: CC 0 Bank select (MSB) = %d%s, used by the next program change",v,clamped); break;
+    case 0x20: sprintf(str,"Effect: CC 32 Bank select (LSB) = %d%s, used by the next program change",v,clamped); break;
+    case 0x01: sprintf(str,"Effect: CC 1 Mod wheel = %d%s",v,clamped); break;
+    case 0x02: sprintf(str,"Effect: CC 2 Breath = %d%s",v,clamped); break;
+    case 0x05: sprintf(str,"Effect: CC 5 Portamento time = %d%s (00 fastest ... 7F slowest)",v,clamped); break;
+    case 0x06: sprintf(str,"Effect: CC 6 Data entry = %d%s (after S6500 S6400: bend range +-%d semitones)",v,clamped,v); break;
+    case 0x07: sprintf(str,"Effect: CC 7 Channel volume = %d%s",v,clamped); break;
+    case 0x0A: sprintf(str,"Effect: CC 10 Pan = %d%s (00 left, 40 centre, 7F right)",v,clamped); break;
+    case 0x0B: sprintf(str,"Effect: CC 11 Expression = %d%s",v,clamped); break;
+    case 0x26: sprintf(str,"Effect: CC 38 Data entry (fine) = %d%s (bend range cents)",v,clamped); break;
+    case 0x40: sprintf(str,"Effect: CC 64 Sustain pedal %s (%d)%s",onoff,v,clamped); break;
+    case 0x41:
+      if (v >= 0x40) sprintf(str,"Effect: CC 65 Portamento ON (%d)%s: new notes glide from the previous one",v,clamped);
+      else           sprintf(str,"Effect: CC 65 Portamento OFF (%d)%s: notes jump to their pitch",v,clamped);
+      break;
+    case 0x42: sprintf(str,"Effect: CC 66 Sostenuto %s (%d)%s",onoff,v,clamped); break;
+    case 0x43: sprintf(str,"Effect: CC 67 Soft pedal %s (%d)%s",onoff,v,clamped); break;
+    case 0x44: sprintf(str,"Effect: CC 68 Legato footswitch %s (%d)%s",onoff,v,clamped); break;
+    case 0x47: sprintf(str,"Effect: CC 71 Resonance = %d%s",v,clamped); break;
+    case 0x48: sprintf(str,"Effect: CC 72 Release time = %d%s",v,clamped); break;
+    case 0x49: sprintf(str,"Effect: CC 73 Attack time = %d%s",v,clamped); break;
+    case 0x4A: sprintf(str,"Effect: CC 74 Cutoff (brightness) = %d%s",v,clamped); break;
+    case 0x54:
+      hex2note(note, (unsigned char)v);
+      sprintf(str,"Effect: CC 84 Portamento source: the NEXT note glides from %s (%d)%s",note,v,clamped);
+      break;
+    case 0x5B: sprintf(str,"Effect: CC 91 Reverb send = %d%s",v,clamped); break;
+    case 0x5D: sprintf(str,"Effect: CC 93 Chorus send = %d%s",v,clamped); break;
+    case 0x64:
+      sprintf(str,"Effect: CC 100 RPN select (LSB) = %d%s%s",v,clamped,
+              v == 0 ? " (with S6500: RPN 0 = pitch bend range, set by S06nn)" :
+              v == 0x7F ? " (with S657F: RPN null, deselect)" : "");
+      break;
+    case 0x65:
+      sprintf(str,"Effect: CC 101 RPN select (MSB) = %d%s%s",v,clamped,
+              v == 0 ? " (then S6400, S06nn: pitch bend range)" :
+              v == 0x7F ? " (with S647F: RPN null, deselect)" : "");
+      break;
+    case 0x78: sprintf(str,"Effect: CC 120 All sound off"); break;
+    case 0x79: sprintf(str,"Effect: CC 121 Reset all controllers (bend, portamento, pedals...)"); break;
+    case 0x7B: sprintf(str,"Effect: CC 123 All notes off"); break;
+    case 0x7E: sprintf(str,"Effect: CC 126 Mono mode on"); break;
+    case 0x7F: sprintf(str,"Effect: CC 127 Poly mode on"); break;
+    default:
+      sprintf(str,"Effect: Send CC: Controller: %d (0x%.2X) value: %d (0x%.2X)%s",cc,cc,v,v,clamped);
+      break;
+  }
+}
+
 void set_effect_data_msg(char *str, unsigned char effect, unsigned short int effect_data)
 {
   int temp = effect_data;
@@ -254,7 +315,7 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
     sprintf(str,"Effect: Send program change for current instrument");
     break;
   case 'S':
-    sprintf(str,"Effect: Send CC: Controller: %d (0x%.2X) value: %d (0x%.2X)",GET_HIGH_BYTE(effect_data),GET_HIGH_BYTE(effect_data), GET_LOW_BYTE(effect_data), GET_LOW_BYTE(effect_data));
+    set_cc_msg(str, GET_HIGH_BYTE(effect_data), GET_LOW_BYTE(effect_data));
     break;
   case 'X':
     effect_data = GET_LOW_BYTE(effect_data);

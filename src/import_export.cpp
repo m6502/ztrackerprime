@@ -549,7 +549,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
 //
 // Muted means muted, hence the default. It is worth knowing what it costs
 // downstream, though: two tracks sharing a MIDI channel produce overlapping
-// notes, and a monophonic target (the NES 2A03, via nesmusicpack) has to drop
+// notes, and a converter for a monophonic target (e.g. a chiptune) has to drop
 // one of each pair -- so exporting muted tracks can silently wreck a conversion.
 // The other direction has a price too: if a track is muted only so it does not
 // reach your synth while you compose, it disappears from the export.
@@ -753,8 +753,8 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
   // track since its last event, so with a 0 delta every MIDI track ends on its
   // final note and ALL TRAILING SILENCE IS LOST -- the rest of the last pattern,
   // and any whole pattern after the last note. A reader that derives the song
-  // length from the events (nesmusicpack does, to size a looping NES stream)
-  // then loops early: kumo's boss01 lost 62 of its 2048 rows, a full pattern.
+  // length from the events (a converter sizing a looping stream, for example)
+  // then loops early: one song lost 62 of its 2048 rows, a full pattern.
   for (int i = 0; i < total_mtrks; i++) {
 
     push_varlen(&mtrk[i], dtime[i]);
