@@ -1,6 +1,7 @@
 #include "pattern_display_layout.h"
 
 #include <cstdio>
+#include <initializer_list>
 
 static int failures = 0;
 
@@ -15,6 +16,21 @@ static int failures = 0;
 
 int main()
 {
+    // Use the maximum number of complete channels, then center the whole grid.
+    for (int columns : {80, 100, 104, 105, 106, 128, 180}) {
+        for (int width : {7, 8, 14, 20}) {
+            const auto layout = pattern_display_horizontal_layout(columns, width, 64);
+            CHECK_EQ(layout.tracks, (columns - 5) / width);
+            const int right = columns - layout.x - (4 + layout.tracks * width);
+            CHECK_EQ(right >= 0, 1);
+            CHECK_EQ(layout.x - right >= -1 && layout.x - right <= 1, 1);
+        }
+    }
+
+    // 840px / 8px = 105 columns: the editor and playback both fit five Full channels.
+    CHECK_EQ(pattern_display_horizontal_layout(105, 20, 64).tracks, 5);
+    CHECK_EQ(pattern_display_horizontal_layout(104, 20, 64).tracks, 4);
+
     int orders[256];
     int lengths[256];
     for (int i = 0; i < 256; ++i) {

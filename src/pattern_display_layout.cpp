@@ -1,4 +1,15 @@
 #include "pattern_display_layout.h"
+#include <algorithm>
+
+PatternDisplayHorizontalLayout pattern_display_horizontal_layout(int columns, int track_width, int max_tracks)
+{
+    // Match the editor's five-cell gutter. The last channel's separator
+    // also holds the right frame, so it needs no additional column.
+    const int available = columns - 5;
+    const int tracks = (std::max)(1, (std::min)(max_tracks, available / track_width));
+    return { 1 + (std::max)(0, available - tracks * track_width) / 2, tracks };
+}
+
 
 // ----------------------------------------------------------------------------------------
 //

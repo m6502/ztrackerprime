@@ -4,6 +4,9 @@
 // ---------------------------------------------------------
 // ---------------------------------------------------------
 
+struct PatternDisplayHorizontalLayout { int x; int tracks; };
+PatternDisplayHorizontalLayout pattern_display_horizontal_layout(int columns, int track_width, int max_tracks);
+
 struct PatternDisplayPosition
 {
     int order;

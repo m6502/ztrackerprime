@@ -302,3 +302,11 @@ if(TARGET test_midi_monitor)
         endif()
     endforeach()
 endif()
+
+add_executable(test_pattern_display_layout
+    test_pattern_display_layout.cpp
+    "${CMAKE_SOURCE_DIR}/src/pattern_display_layout.cpp"
+)
+target_include_directories(test_pattern_display_layout PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_pattern_display_layout PRIVATE cxx_std_17)
+add_test(NAME pattern_display_layout COMMAND test_pattern_display_layout)

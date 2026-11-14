@@ -54,17 +54,25 @@ def grid_pixels(path):
             row[i] = (row[i] + predict) & 255
         # Include the headers at row 11, excluding status and toolbar.
         if 88 <= y < height - 64:
-            pixels.extend(row[8 * bpp:(width - 8) * bpp])
+            # Exact-fit layouts use the rightmost cell for their frame.
+            pixels.extend(row[8 * bpp:])
         previous = row
     return bytes(pixels)
+
+
+def centered_origin(width, size):
+    count = min(64, (width // 8 - 5) // size)
+    return 1 + max(0, width // 8 - 5 - count * size) // 2
 
 
 def check_cell(path, column, text, pixels):
     """Check actual on-screen glyphs, including spacing and all effect digits."""
     data = path.read_bytes()
     width = struct.unpack_from('>I', data, 16)[0]
+    size = 20 if len(text) > 13 else 14 if len(text) > 7 else 8
+    column += centered_origin(width, size) - 1
     bpp = 4 if data[25] == 6 else 3
-    stride = (width - 16) * bpp
+    stride = (width - 8) * bpp
     font = (Path(__file__).resolve().parents[1] / 'skins/default/font.fnt').read_bytes()
     # The second painted row avoids the frame and is stable in this fixture.
     for n, char in enumerate(text):
@@ -85,10 +93,10 @@ def check_header_gaps(path, size, pixels):
     data = path.read_bytes()
     width = struct.unpack_from('>I', data, 16)[0]
     bpp = 4 if data[25] == 6 else 3
-    stride = (width - 16) * bpp
+    stride = (width - 8) * bpp
     background = pixels[:bpp]
-    for track in range(min(64, (width // 8 - 6) // size)):
-        x = (5 + (track + 1) * size - 1) * 8 - 8
+    for track in range(min(64, (width // 8 - 5) // size)):
+        x = (centered_origin(width, size) + 4 + (track + 1) * size - 1) * 8 - 8
         # The bottom pixel row contains the frame's horizontal border.
         for y in range(7):
             for bit in range(8):
@@ -101,23 +109,26 @@ def check_track_separators(path, size, pixels):
     data = path.read_bytes()
     width, height = struct.unpack_from('>II', data, 16)
     bpp = 4 if data[25] == 6 else 3
-    stride = (width - 16) * bpp
+    stride = (width - 8) * bpp
     background = pixels[:bpp]
     # The frame's top horizontal line uses the same Lowlight colour as
     # the pattern editor's separator glyph (168).
-    offset = 7 * stride + (5 * 8 - 8) * bpp
+    offset = 7 * stride + ((centered_origin(width, size) + 4) * 8 - 8) * bpp
     lowlight = pixels[offset:offset + bpp]
     assert lowlight != background
     font = (Path(__file__).resolve().parents[1] / 'skins/default/font.fnt').read_bytes()
-    count = min(64, (width // 8 - 6) // size)
+    count = min(64, (width // 8 - 5) // size)
     for track in range(count):
-        x = (5 + (track + 1) * size - 1) * 8 - 8
+        x = (centered_origin(width, size) + 4 + (track + 1) * size - 1) * 8 - 8
         for y in range(8, height - 64 - 88):
-            glyph = font[168 * 8 + y % 8] if track < count - 1 else 0
+            glyph = font[(168 if track < count - 1 else 0x83) * 8 + y % 8]
             for bit in range(8):
                 offset = y * stride + (x + bit) * bpp
+                pixel = pixels[offset:offset + bpp]
                 expected = lowlight if glyph & (128 >> bit) else background
-                assert pixels[offset:offset + bpp] == expected, \
+                correct = (pixel == expected) if track < count - 1 else (
+                    (pixel != background) == bool(glyph & (128 >> bit)))
+                assert correct, \
                     f'{path.name}: incorrect separator at track {track + 1}, row {y // 8}'
 
 
@@ -185,7 +196,7 @@ with tempfile.TemporaryDirectory(prefix='zt-playback-focus-') as tmp:
     comparisons.append(('mode-3', shot('full-wrap')))
     for _ in range(65):
         key('right')
-    cells.append((shot('last-track-full'), 5 + 3 * 20, 'A-5 02 21 999 NBEEF'))
+    cells.append((shot('last-track-full'), 5 + 4 * 20, 'A-5 02 21 999 NBEEF'))
     key('pagedown'); key('pagedown')  # Full -> VU -> Compact.
     cells.append((shot('last-track-compact'), 5 + 11 * 8, 'A-5 02N'))
     key('m')

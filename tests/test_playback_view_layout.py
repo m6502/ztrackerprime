@@ -51,6 +51,8 @@ struct PatternDisplay {
     void disp_track_headers(Drawable *);
 };
 '''
+fixture += '#include "pattern_display_layout.h"\n'
+fixture += function('src/pattern_display_layout.cpp', 'PatternDisplayHorizontalLayout pattern_display_horizontal_layout(')
 fixture += function('src/PatternDisplay.cpp', 'void PatternDisplay::update_frame(')
 fixture += function('src/PatternDisplay.cpp', 'void PatternDisplay::disp_track_headers(')
 fixture += r'''
@@ -58,7 +60,7 @@ int main() {
     PatternDisplay view;
     view.cur_pat_view = 3;
     view.update_frame();
-    assert(view.tracks == 4 && view.tracksize == 20);
+    assert(view.tracks == 5 && view.tracksize == 20);
     view.cur_pat_view = 2;
     view.update_frame();
     assert(view.tracks == 7 && view.tracksize == 14);
@@ -77,7 +79,9 @@ int main() {
                     assert(view.starttrack + view.tracks <= MAX_TRACKS);
                     assert(view.cur_track >= view.starttrack);
                     assert(view.cur_track < view.starttrack + view.tracks);
-                    assert(view.frame->xsize == view.tracks * view.tracksize);
+                    assert(view.frame->xsize == view.tracks * view.tracksize - 1);
+                    const int right = width / FONT_SIZE_X - (view.x + 4 + view.frame->xsize + 1);
+                    assert(view.x - right >= -1 && view.x - right <= 1);
                     assert((view.frame->x + view.frame->xsize + 1) * FONT_SIZE_X <= width);
                 }
                 // Resizing while scrolled to the right also keeps selection.
@@ -124,5 +128,6 @@ with tempfile.TemporaryDirectory(prefix='zt-playback-layout-') as tmp:
     source.write_text(fixture)
     subprocess.run(shlex.split(os.environ.get('CXX', 'c++')) +
                    ['-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
+                    '-I' + str(Path(__file__).resolve().parents[1] / 'src'),
                     str(source), '-o', str(binary)], check=True)
     subprocess.run([str(binary)], check=True)

@@ -309,9 +309,11 @@ void PatternDisplay::update_frame(void)
     break ;
   } ;
   
-  // Leave room for row numbers, the left border and the right border.
-  const int available = INTERNAL_RESOLUTION_X / FONT_SIZE_X - (x + 4) - 1;
-  tracks = (std::max)(1, (std::min)(MAX_TRACKS, available / tracksize));
+  // Count and position channels together, before applying the centered origin.
+  const auto layout = pattern_display_horizontal_layout(
+      INTERNAL_RESOLUTION_X / FONT_SIZE_X, tracksize, MAX_TRACKS);
+  tracks = layout.tracks;
+  x = layout.x;
 
   // Reconcile the viewport after navigation, format changes and resizing.
   cur_track = (std::max)(0, (std::min)(MAX_TRACKS - 1, cur_track));
@@ -322,7 +324,8 @@ void PatternDisplay::update_frame(void)
   frame->x = x+4;
   frame->y = y;
   frame->ysize=ysize;
-  frame->xsize=tracks*tracksize;
+  // Reuse the last separator cell for the frame, as the editor does.
+  frame->xsize=tracks*tracksize-1;
   
 }
 
