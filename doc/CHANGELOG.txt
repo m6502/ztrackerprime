@@ -4,6 +4,16 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_11_17 (Window icon on Linux)
+------------------------------------
+
+        * Linux/Windows: the zTracker "Z" icon is now built into the
+          program, so the window title bar and the taskbar show it no
+          matter which folder zt is started from. Before, it was only
+          found when zt was started from its own folder, and KDE and other
+          desktops showed a generic icon instead. The window_icon setting
+          in zt.conf still overrides it.
+
 zt 2026_11_11 (macOS: one universal app, runs on macOS 10.15 and newer, Modernized file browser on the Load and Save pages)
 -------------------------------------------------------------------------
 

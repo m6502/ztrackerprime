@@ -238,6 +238,18 @@ else()
   add_executable(zt ${ZT_SOURCES})
 endif()
 target_include_directories(zt PRIVATE src extlibs/libpng extlibs/zlib extlibs/lua)
+
+# Window icon embedded in the executable (Linux/Windows; macOS uses the bundle icon).
+set(ZT_ICON_PNG "${CMAKE_SOURCE_DIR}/assets/icon/zt_icon_32.png")
+set(ZT_ICON_HEADER "${CMAKE_BINARY_DIR}/generated/zt_icon_png.h")
+add_custom_command(
+  OUTPUT "${ZT_ICON_HEADER}"
+  COMMAND "${CMAKE_COMMAND}" -DINPUT=${ZT_ICON_PNG} -DOUTPUT=${ZT_ICON_HEADER}
+          -DSYMBOL=zt_icon_png -P "${CMAKE_SOURCE_DIR}/cmake/EmbedFile.cmake"
+  DEPENDS "${ZT_ICON_PNG}" "${CMAKE_SOURCE_DIR}/cmake/EmbedFile.cmake"
+  COMMENT "Embedding window icon")
+target_sources(zt PRIVATE "${ZT_ICON_HEADER}")
+target_include_directories(zt PRIVATE "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(zt PRIVATE lua_static zt_zlib_static)
 
 # --- Ableton Link ------------------------------------------------------------

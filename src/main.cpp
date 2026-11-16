@@ -3699,6 +3699,32 @@ static void zt_fit_window_to_display(void)
   }
 }
 
+#if !defined(__APPLE__)
+#include "zt_icon_png.h"
+
+// The embedded icon is 32x32 pixel art; nearest-neighbour alternates keep it
+// crisp where the window manager / taskbar wants a larger size.
+static void zt_set_window_icon(SDL_Window *window, const char *override_path)
+{
+  SDL_Surface *icon = NULL;
+  if (override_path && override_path[0])
+    icon = SDL_LoadPNG(override_path);
+  if (!icon) {
+    icon = SDL_LoadPNG_IO(SDL_IOFromConstMem(zt_icon_png, zt_icon_png_size), true);
+    if (!icon) return;
+    for (int scale = 2; scale <= 8; scale *= 2) {
+      SDL_Surface *big = SDL_ScaleSurface(icon, icon->w * scale, icon->h * scale, SDL_SCALEMODE_NEAREST);
+      if (big) {
+        SDL_AddSurfaceAlternateImage(icon, big);
+        SDL_DestroySurface(big);
+      }
+    }
+  }
+  SDL_SetWindowIcon(window, icon);
+  SDL_DestroySurface(icon);
+}
+#endif
+
 static int zt_backend_set_video_mode(char *errstr)
 {
   // HIGH_PIXEL_DENSITY: render at the display's native pixel resolution instead
@@ -3740,21 +3766,11 @@ static int zt_backend_set_video_mode(char *errstr)
       ZT_DEBUG_LOG("Warning: couldn't enable renderer vsync: %s\n", SDL_GetError());
     }
 
-    // Load window icon (configurable via zt.conf 'window_icon'; default 'zt_icon.png').
-    // Ignore on macOS, which uses the built-in zt.icon/zt.icns
-    {
+    // Window icon: zt.conf 'window_icon' overrides the embedded one.
+    // macOS uses the bundle's zt.icon/zt.icns instead.
 #if !defined(__APPLE__)
-      const char *icon_path = zt_config_globals.window_icon[0]
-        ? zt_config_globals.window_icon
-        : NULL;
-      if (!icon_path) icon_path = "zt_icon.png";
-      SDL_Surface *icon = icon_path ? SDL_LoadPNG(icon_path) : NULL;
-      if (icon) {
-        SDL_SetWindowIcon(zt_main_window, icon);
-        SDL_DestroySurface(icon);
-      }
+    zt_set_window_icon(zt_main_window, zt_config_globals.window_icon);
 #endif
-    }
   }
 
   // Apply an explicit windowed mode change. Not on first creation (the window
