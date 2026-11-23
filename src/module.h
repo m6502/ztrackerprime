@@ -74,6 +74,8 @@ class InflateStream ;
 #define ZTM_MAX_PATTERNS                    256
 
 #define ZTM_ORDERLIST_LEN                   256
+#define ZTM_PATTERN_MIN_LEN                 32
+#define ZTM_PATTERN_MAX_LEN                 999
 #define ZTM_SONGTITLE_MAXLEN                26
 #define ZTM_INSTTITLE_MAXLEN                26
 #define ZTM_FILENAME_MAXLEN                 256

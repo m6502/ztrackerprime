@@ -107,7 +107,7 @@ ins.name = "Bass"
 
 -- patterns (zt.pattern(p); p defaults to the current pattern)
 local pat = zt.pattern(0)
-pat.length                       -- property (read/write); also .index, .empty
+pat.length                       -- property (read/write, 32..999); also .index, .empty
 pat:set_note(0, 0, 60)           -- :set_note(track, row, note [,inst [,vol]])
 print(pat:note(0, 0))            --> 60   :note(track, row)
 local trk = pat:track(0)         -- a track bound to this pattern
@@ -206,12 +206,12 @@ All functions are in the `zt` table (call them with `()`):
 zt.get_note(pattern, track, row)           -> note_value
 zt.set_note(pattern, track, row, note [, inst, vol])
 zt.get_pattern_length(pattern)             -> length
-zt.set_pattern_length(pattern, length)
+zt.set_pattern_length(pattern, length)   -- 32..999, else a Lua error
 ```
 
 ### Playback
 ```lua
-zt.play()           -- play song from current pattern
+zt.play()           -- play the song (order list); nothing if it is empty
 zt.stop()
 zt.play_pattern()   -- loop current pattern
 zt.get_bpm()        -> bpm

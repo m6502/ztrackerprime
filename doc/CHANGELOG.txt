@@ -21,6 +21,14 @@ zt 2026_11_23 (J command: jump to order position)
 
         * The B command (old GBA loop marker) no longer does anything.
 
+        * Lua: zt.play() and zt.transport:play() now play the song, and
+          zt.play_pattern() / zt.transport:play_pattern() loop the current
+          pattern, as documented. The two were swapped.
+
+        * Lua: setting a pattern length outside 32..999 (pat.length,
+          zt.set_pattern_length) now raises an error. It used to be
+          silently ignored, so the pattern kept its old length.
+
 zt 2026_11_17 (Window icon on Linux)
 ------------------------------------
 

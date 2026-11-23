@@ -441,7 +441,7 @@ event* track::get_next_event(unsigned short int row) {
 
 void pattern::resize(int newsize) {
     int j;
-    if (newsize<32 || newsize>999) return;
+    if (newsize<ZTM_PATTERN_MIN_LEN || newsize>ZTM_PATTERN_MAX_LEN) return;
     if (newsize == this->length) return;
     file_changed++;
 

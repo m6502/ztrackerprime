@@ -95,23 +95,42 @@ static int l_get_pattern_length(lua_State *L)
     return 1;
 }
 
+static int check_pattern_length(lua_State *L, int arg)
+{
+    lua_Integer len = luaL_checkinteger(L, arg);
+    if (len < ZTM_PATTERN_MIN_LEN || len > ZTM_PATTERN_MAX_LEN)
+        return luaL_error(L, "pattern length %d out of range (%d..%d)",
+                          (int)len, ZTM_PATTERN_MIN_LEN, ZTM_PATTERN_MAX_LEN);
+    return (int)len;
+}
+
 // zt.set_pattern_length(pattern, length)
 static int l_set_pattern_length(lua_State *L)
 {
     int p   = (int)luaL_checkinteger(L, 1);
-    int len = (int)luaL_checkinteger(L, 2);
+    int len = check_pattern_length(L, 2);
     if (!song || p < 0 || p >= ZTM_MAX_PATTERNS || !song->patterns[p]) return 0;
-    if (len < 1) len = 1;
     song->patterns[p]->resize(len);
+    need_refresh++;
     return 0;
 }
 
 // --- Playback ---------------------------------------------------------------
 
+static void play_song(void)
+{
+    if (ztPlayer && song && song->orderlist[0] != 0x100) ztPlayer->play(0, cur_edit_pattern, 1);
+}
+
+static void play_current_pattern(void)
+{
+    if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 0);
+}
+
 static int l_play(lua_State *L)
 {
     (void)L;
-    if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 0);
+    play_song();
     return 0;
 }
 
@@ -125,7 +144,7 @@ static int l_stop(lua_State *L)
 static int l_play_pattern(lua_State *L)
 {
     (void)L;
-    if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 1);
+    play_current_pattern();
     return 0;
 }
 
@@ -636,8 +655,7 @@ static int pat_newindex(lua_State *L)
     int p = *(int *)luaL_checkudata(L, 1, ZT_MT_PATTERN);
     const char *k = luaL_checkstring(L, 2);
     if (!strcmp(k, "length")) {
-        int len = (int)luaL_checkinteger(L, 3);
-        if (len < 1) len = 1;
+        int len = check_pattern_length(L, 3);
         if (song && song->patterns[p]) { song->patterns[p]->resize(len); need_refresh++; }
         return 0;
     }
@@ -662,9 +680,9 @@ static int l_pattern(lua_State *L)
 }
 
 // ---- zt.transport (singleton) ---------------------------------------------
-static int trans_play(lua_State *L)         { (void)L; if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 0); return 0; }
+static int trans_play(lua_State *L)         { (void)L; play_song(); return 0; }
 static int trans_stop(lua_State *L)         { (void)L; if (ztPlayer) ztPlayer->stop(); return 0; }
-static int trans_play_pattern(lua_State *L) { (void)L; if (ztPlayer) ztPlayer->play(0, cur_edit_pattern, 1); return 0; }
+static int trans_play_pattern(lua_State *L) { (void)L; play_current_pattern(); return 0; }
 static int trans_panic(lua_State *L)        { (void)L; if (MidiOut) MidiOut->panic(); return 0; }
 static int trans_index(lua_State *L)
 {
@@ -1409,8 +1427,8 @@ bool ZtLuaEngine::init()
         "    {'get_note','get_note(pattern, track, row) -> note   read a note cell (0 = empty)'},\n"
         "    {'set_note','set_note(pattern, track, row, note [,inst [,vol]])   write a note cell'},\n"
         "    {'get_pattern_length','get_pattern_length(pattern) -> rows'},\n"
-        "    {'set_pattern_length','set_pattern_length(pattern, rows)'},\n"
-        "    {'play','play()   start playback from the current pattern'},\n"
+        "    {'set_pattern_length','set_pattern_length(pattern, rows)   rows 32..999'},\n"
+        "    {'play','play()   play the song (order list)'},\n"
         "    {'stop','stop()   stop playback'},\n"
         "    {'play_pattern','play_pattern()   loop the current pattern'},\n"
         "    {'get_bpm','get_bpm() -> bpm'},\n"

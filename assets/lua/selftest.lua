@@ -79,6 +79,12 @@ eq("instrument.index", ins.index, 1)
 
 -- ── zt.pattern(p) ────────────────────────────────────────────────────
 local pat = zt.pattern(0)
+pat.length = 48 ;          eq("pattern.length", pat.length, 48)
+check("pattern.length < 32 errors", not pcall(function() pat.length = 16 end))
+check("pattern.length > 999 errors", not pcall(function() pat.length = 1000 end))
+eq("bad pattern.length leaves it", pat.length, 48)
+zt.set_pattern_length(0, 96) ;     eq("set_pattern_length", zt.get_pattern_length(0), 96)
+check("set_pattern_length < 32 errors", not pcall(zt.set_pattern_length, 0, 16))
 pat.length = 64 ;          eq("pattern.length", pat.length, 64)
 eq("pattern.index", pat.index, 0)
 pat:set_note(1, 4, 62) ;   eq("pattern:note", pat:note(1, 4), 62)
