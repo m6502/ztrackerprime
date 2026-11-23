@@ -1645,10 +1645,12 @@ void global_keys(Drawable *S)
                         strcpy(midfn, "export.mid");
                     }
                     ZTImportExport zie;
-                    if (zie.ExportMID(midfn, 1) == 0) {
-                        sprintf(szStatmsg, "Exported MIDI: %s", midfn);
-                    } else {
+                    if (!zie.ExportMID(midfn, 1)) {
                         sprintf(szStatmsg, "MIDI export failed");
+                    } else if (const char *warning = zt_export_jump_warning()) {
+                        snprintf(szStatmsg, sizeof(szStatmsg), "Exported MIDI: %s. %s", midfn, warning);
+                    } else {
+                        sprintf(szStatmsg, "Exported MIDI: %s", midfn);
                     }
                     statusmsg = szStatmsg;
                     status_change = 1;

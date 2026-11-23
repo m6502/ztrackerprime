@@ -270,6 +270,8 @@ if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
                 "${CMAKE_SOURCE_DIR}/tests/test_position_notes.py" "$<TARGET_FILE:zt>")
             add_test(NAME jump_export COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_jump_export.py" "$<TARGET_FILE:zt>")
+            add_test(NAME jump_loop_releases COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/tests/test_jump_loop_releases.py" "$<TARGET_FILE:zt>")
             add_test(NAME it_short_pattern COMMAND "${Python3_EXECUTABLE}"
                 "${CMAKE_SOURCE_DIR}/tests/test_it_short_pattern.py" "$<TARGET_FILE:zt>")
             add_test(NAME songconfig_focus COMMAND "${Python3_EXECUTABLE}"
@@ -304,7 +306,7 @@ endif()
 
 # Virtual MIDI graph changes must not occur during other app screenshot tests.
 if(TARGET test_midi_monitor)
-    foreach(name midi_monitor midi_hotplug_ui lua_api sysconfig_focus songconfig_focus position_notes jump_export it_short_pattern
+    foreach(name midi_monitor midi_hotplug_ui lua_api sysconfig_focus songconfig_focus position_notes jump_export jump_loop_releases it_short_pattern
                  song_tools_ui playback_focus pattern_undo_ui default_directory file_browser_ui)
         if(TEST ${name})
             set_tests_properties(${name} PROPERTIES RESOURCE_LOCK midi_graph)

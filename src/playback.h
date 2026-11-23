@@ -45,6 +45,7 @@
 //#include "zt.h"
 #include "module.h"
 #include <atomic>
+#include <set>
 
 struct row_audition;
 class zt_module ;
@@ -223,8 +224,10 @@ class player {
         int light_counter;
         int skip;
         int jump_order;
-        int pending_jump_marker;
-        bool ignore_jumps;
+        int jump_mode;                  // zt_jump_mode
+        std::set<int> followed_jumps;   // zt_jump_site()s, for ZT_JUMPS_FOLLOW_ONCE
+        unsigned int row_serial;        // bumped every time a row starts
+        struct { int target, order, row, followed; } pending_jump;
         int loop_mode;
         // Wall-clock timestamp (SDL_GetTicks ms) when play() was invoked.
         // Used by the status display to show real elapsed time, immune

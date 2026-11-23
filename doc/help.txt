@@ -298,7 +298,12 @@
          plays the song once, straight through, and writes text markers
          so a game or player can loop the region itself: "[xxxx" at the
          start of order position xxxx, "]xxxx" at the end of the J row
-         (where the tracker jumps).
+         (where the tracker jumps).  Notes still sounding at the jump
+         keep sounding into the loop, as in the tracker, and the export
+         releases them inside the loop exactly where the tracker does
+         (cut by the track's next note, a note-off, or the end of their
+         length).  If such a note-off would also cut a note that is
+         playing there on the first pass, export shows a warning.
          ex: J0002 on the last row of the pattern at order 0005 loops
          orders 0002-0005; the export has "[0002" ... "]0002".
  P.... : Send program change message for the current instrument.

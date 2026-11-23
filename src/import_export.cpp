@@ -47,6 +47,11 @@
 #include "jump_command.h"
 
 #include <string.h>
+#include <algorithm>
+#include <map>
+#include <set>
+#include <tuple>
+#include <vector>
 
 
 //// .MID/.SMF FILE EXPORTER 
@@ -157,6 +162,218 @@ static void collect_jump_targets(zt_module *song, bool targets[ZT_JUMP_MAX_ORDER
 
 
 // ------------------------------------------------------------------------------------------------
+// Note releases caused by J loops.
+//
+// Export never follows a jump, but a game looping on the markers does: a note
+// still held at "]" goes on sounding into the loop body, and the tracker
+// releases it there (a later note on its track cuts it, a note-off cell, or
+// its length running out). The straight pass never writes those releases, so
+// a probe pass follows every J once and records, for each note held at a jump,
+// where in the loop body it was released: an order/row position plus the
+// export ticks into that row. The write pass puts those NOTE_OFFs there.
+//
+static int  zt_export_jump_conflicts = 0;
+static char zt_export_jump_conflict_where[64] = "";
+
+const char *zt_export_jump_warning(void)
+{
+  static char msg[160];
+  if (!zt_export_jump_conflicts) return NULL;
+  snprintf(msg, sizeof(msg), "Warning: %d J loop note-off(s) also cut a note on the first pass (first: %s)",
+           zt_export_jump_conflicts, zt_export_jump_conflict_where);
+  return msg;
+}
+
+typedef std::tuple<unsigned int, int, int, int> note_key;        // device, channel, note, track
+typedef std::tuple<unsigned int, int, int> voice_key;            // device, channel, note
+struct jump_release { int ticks_into_row; midi_event note_off; };
+typedef std::map<std::pair<int, int>, std::vector<jump_release>> release_plan;   // (order, row)
+
+static bool is_note_on(const midi_event *e)  { return e->type == ET_NOTE_ON && e->data2 > 0; }
+static bool is_note_off(const midi_event *e) { return e->type == ET_NOTE_OFF || (e->type == ET_NOTE_ON && e->data2 == 0); }
+static note_key  key_of(const midi_event *e)   { return note_key(e->device, e->data1 & 0x0F, e->command, e->track); }
+static voice_key voice_of(const midi_event *e) { return voice_key(e->device, e->data1 & 0x0F, e->command); }
+
+// Tracks the export tick within the current row across playback(buf, 1) calls.
+struct export_row_clock {
+  unsigned int serial = ~0u;
+  int ticks_into_row = 0;
+  bool new_row = false;
+  void step() {
+    new_row = ztPlayer->row_serial != serial;
+    serial = ztPlayer->row_serial;
+    ticks_into_row = new_row ? 0 : ticks_into_row + 1;
+  }
+};
+
+static const long EXPORT_TICK_LIMIT = 50000000;
+
+static int export_tempo_event(midi_event *e);
+
+static release_plan probe_jump_releases()
+{
+  release_plan plan;
+  std::multimap<note_key, midi_event> sounding;
+  std::map<int, std::multiset<note_key>> held_at_jump;   // jump site -> notes held when it jumped
+  export_row_clock clock;
+  midi_buf *buf = new midi_buf;
+  midi_event *e;
+
+  ztPlayer->jump_mode = ZT_JUMPS_FOLLOW_ONCE;
+  ztPlayer->prepare_play(0, 0, 1, 0);
+
+  for (long n = 0; ztPlayer->pinit && n < EXPORT_TICK_LIMIT; n++) {
+    buf->reset();
+    ztPlayer->playback(buf, 1);
+    clock.step();
+    const std::pair<int, int> pos(ztPlayer->cur_order, ztPlayer->cur_row);
+
+    while ((e = buf->get_next_event())) {
+      export_tempo_event(e);
+
+      if (e->type == ET_JUMP) {
+        const int site = zt_jump_site(e->data2, e->extra);
+        // Back at a J already followed: what is still held rings through the
+        // whole loop in the tracker too.
+        held_at_jump.erase(site);
+        if (e->command) {
+          std::multiset<note_key> &held = held_at_jump[site];
+          for (auto &s : sounding) held.insert(s.first);
+        }
+      }
+      else if (is_note_on(e)) {
+        sounding.insert(std::make_pair(key_of(e), *e));
+      }
+      else if (is_note_off(e)) {
+        const note_key key = key_of(e);
+        auto s = sounding.find(key);
+        if (s != sounding.end()) sounding.erase(s);
+
+        bool released = false;
+        for (auto &h : held_at_jump) {
+          auto it = h.second.find(key);
+          if (it != h.second.end()) { h.second.erase(it); released = true; }
+        }
+        if (released) plan[pos].push_back({clock.ticks_into_row, *e});
+      }
+    }
+  }
+
+  delete buf;
+
+  for (auto &p : plan)
+    std::stable_sort(p.second.begin(), p.second.end(),
+                     [](const jump_release &a, const jump_release &b) { return a.ticks_into_row < b.ticks_into_row; });
+  return plan;
+}
+
+// Plays the song once, straight through, for a MIDI export. Hands every event
+// to on_event() in file order and calls end_of_tick() after each export tick.
+// On top of the player's own events it adds the loop releases from
+// probe_jump_releases() and, at the end, a NOTE_OFF for every note still held.
+// Returns the number of loop releases that also cut a note sounding there on
+// the first pass (see zt_export_jump_conflict_where).
+template <class OnEvent, class EndOfTick>
+static int play_for_export(OnEvent on_event, EndOfTick end_of_tick)
+{
+  const release_plan plan = probe_jump_releases();
+
+  std::multimap<voice_key, midi_event> sounding;
+  std::vector<midi_event> tick_events;
+  std::vector<midi_event> releases;
+  const std::vector<jump_release> *row_releases = NULL;
+  size_t next_release = 0;
+  export_row_clock clock;
+  midi_buf *buf = new midi_buf;
+  midi_event *e;
+  int conflicts = 0;
+
+  zt_export_jump_conflict_where[0] = 0;
+
+  auto emit = [&](midi_event *ev) {
+    if (is_note_on(ev)) sounding.insert(std::make_pair(voice_of(ev), *ev));
+    else if (is_note_off(ev)) {
+      auto s = sounding.find(voice_of(ev));
+      if (s != sounding.end()) sounding.erase(s);
+    }
+    on_event(ev);
+  };
+
+  ztPlayer->jump_mode = ZT_JUMPS_IGNORE;
+  ztPlayer->prepare_play(0, 0, 1, 0);
+
+  for (long n = 0; ztPlayer->pinit && n < EXPORT_TICK_LIMIT; n++) {
+    buf->reset();
+    ztPlayer->playback(buf, 1);
+    clock.step();
+
+    tick_events.clear();
+    while ((e = buf->get_next_event())) tick_events.push_back(*e);
+
+    releases.clear();
+    if (clock.new_row) {
+      // Releases timed past the end of the row they belong to (a tempo change
+      // inside the loop) are written at the start of the next one.
+      while (row_releases && next_release < row_releases->size())
+        releases.push_back((*row_releases)[next_release++].note_off);
+      auto it = plan.find(std::make_pair(ztPlayer->cur_order, ztPlayer->cur_row));
+      row_releases = (it == plan.end()) ? NULL : &it->second;
+      next_release = 0;
+    }
+    while (row_releases && next_release < row_releases->size() &&
+           (*row_releases)[next_release].ticks_into_row <= clock.ticks_into_row)
+      releases.push_back((*row_releases)[next_release++].note_off);
+
+    // File order: the player's events up to its last loop marker (so a
+    // release on the "[" row is inside the loop), the loop releases, the rest.
+    size_t split = 0;
+    for (size_t i = 0; i < tick_events.size(); i++)
+      if (tick_events[i].type == ET_JUMP || tick_events[i].type == ET_ORDER) split = i + 1;
+
+    for (size_t i = 0; i < split; i++) emit(&tick_events[i]);
+
+    std::set<voice_key> written;
+    for (midi_event &off : releases) {
+      const voice_key voice = voice_of(&off);
+      bool already_released = !written.insert(voice).second;
+      for (size_t i = split; i < tick_events.size() && !already_released; i++)
+        already_released = is_note_off(&tick_events[i]) && voice_of(&tick_events[i]) == voice;
+      if (already_released) continue;
+
+      if (sounding.count(voice)) {
+        if (!conflicts++)
+          snprintf(zt_export_jump_conflict_where, sizeof(zt_export_jump_conflict_where),
+                   "order %d row %d track %d", ztPlayer->cur_order, ztPlayer->cur_row, off.track + 1);
+        fprintf(stderr, "MIDI export: the J loop release of note %d (track %d) at order %d row %d "
+                "also cuts that note on the first pass\n",
+                off.command, off.track + 1, ztPlayer->cur_order, ztPlayer->cur_row);
+      }
+      emit(&off);
+    }
+
+    for (size_t i = split; i < tick_events.size(); i++) emit(&tick_events[i]);
+
+    end_of_tick();
+  }
+
+  for (auto &s : sounding) {
+    midi_event off = s.second;
+    off.type = ET_NOTE_OFF;
+    off.data1 &= 0x0F;
+    off.data2 = 0;
+    on_event(&off);
+  }
+
+  delete buf;
+  ztPlayer->jump_mode = ZT_JUMPS_FOLLOW;
+  zt_export_jump_conflicts = conflicts;
+  return conflicts;
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
 //
 //
 void push_text(CDataBuf *buf, unsigned char type, char *str, int len=-1) 
@@ -254,10 +471,8 @@ int ZTImportExport::ExportMID(const char *fn, int format)
 {
   (void)format;
   CDataBuf buffer, mtrk[MAX_INSTS+1], *mp;
-  midi_buf *buf;
   int bpm, i, rstatus[MAX_INSTS+1], stat;
   FILE *fp;
-  midi_event *e;
   int dtime[MAX_INSTS+1], total_mtrks=1, trk;
   int mtrk_imap[MAX_INSTS];
   unsigned char iflag[MAX_INSTS];
@@ -367,16 +582,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
   bool jump_targets[ZT_JUMP_MAX_ORDERS];
   collect_jump_targets(song, jump_targets);
 
-  ztPlayer->ignore_jumps = true;
-  ztPlayer->prepare_play(0,0,1,0); // start row 1, playmode: song, loop: off
-  buf = new midi_buf;
-  
-  while(ztPlayer->pinit) {
-    
-    buf->reset();
-    ztPlayer->playback(buf,1);
-    
-    while((e = buf->get_next_event())) {
+  play_for_export([&](midi_event *e) {
 
       { // T / A: tempo into the conductor track (mtrk[0]), row length into the player
         int us = export_tempo_event(e);
@@ -510,17 +716,10 @@ int ZTImportExport::ExportMID(const char *fn, int format)
       }
 
       } // Llave de mi if
-
-    }
-        
-    for (trk=0;trk<MAX_INSTS+1;trk++) {
-          
-      dtime[trk]++ ;
-    }
-  }
-    
-  delete buf;
-  ztPlayer->ignore_jumps = false;
+  },
+  [&]() {
+    for (trk=0;trk<MAX_INSTS+1;trk++) dtime[trk]++;
+  });
     
   // END MTrk         
   for (i=0;i<total_mtrks;i++) {
@@ -681,8 +880,6 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
 {
   CDataBuf buffer;
   CDataBuf mtrk[MAX_TRACKS + 1]; // track 0 = conductor, 1..N = per-track
-  midi_buf *buf;
-  midi_event *e;
   FILE *fp;
   int dtime[MAX_TRACKS + 1];
   int mtrk_tmap[MAX_TRACKS]; // zt track idx -> mtrk idx (0 if unused)
@@ -731,42 +928,27 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
   collect_jump_targets(song, jump_targets);
 
   // Play through song, routing events by e->track.
-  ztPlayer->ignore_jumps = true;
-  ztPlayer->prepare_play(0, 0, 1, 0);
-  buf = new midi_buf;
-
-  while (ztPlayer->pinit) {
-
-    buf->reset();
-    ztPlayer->playback(buf, 1);
-
-    while ((e = buf->get_next_event())) {
-
-      { // T / A: tempo into the conductor track (mtrk[0]), row length into the player
-        int us = export_tempo_event(e);
-        if (us) push_tempo(&mtrk[0], dtime[0], us);
-      }
-
-      if (int kind = jump_marker_kind(e, jump_targets)) {
-        push_jump_marker(&mtrk[0], dtime[0], kind == '[', e->data1);
-        continue;
-      }
-      if (e->inst >= MAX_INSTS) continue;
-      if (e->track >= MAX_TRACKS) continue;
-
-      int ztrk = e->track;
-      int trk = mtrk_tmap[ztrk];
-      if (trk == 0) continue; // track wasn't tagged as used
-
-      CDataBuf *mp = &mtrk[trk];
-      push_midi_event(mp, e, dtime[trk]);
+  play_for_export([&](midi_event *e) {
+    { // T / A: tempo into the conductor track (mtrk[0]), row length into the player
+      int us = export_tempo_event(e);
+      if (us) push_tempo(&mtrk[0], dtime[0], us);
     }
 
-    for (int i = 0; i < MAX_TRACKS + 1; i++) dtime[i]++;
-  }
+    if (int kind = jump_marker_kind(e, jump_targets)) {
+      push_jump_marker(&mtrk[0], dtime[0], kind == '[', e->data1);
+      return;
+    }
+    if (e->inst >= MAX_INSTS) return;
+    if (e->track >= MAX_TRACKS) return;
 
-  delete buf;
-  ztPlayer->ignore_jumps = false;
+    int trk = mtrk_tmap[e->track];
+    if (trk == 0) return; // track wasn't tagged as used
+
+    push_midi_event(&mtrk[trk], e, dtime[trk]);
+  },
+  [&]() {
+    for (int i = 0; i < MAX_TRACKS + 1; i++) dtime[i]++;
+  });
 
   // End-of-track + assemble chunks.
   //
@@ -860,43 +1042,29 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
   bool jump_targets[ZT_JUMP_MAX_ORDERS];
   collect_jump_targets(song, jump_targets);
 
-  ztPlayer->ignore_jumps = true;
-  ztPlayer->prepare_play(0, 0, 1, 0);
-  midi_buf *buf = new midi_buf;
-
-  while (ztPlayer->pinit) {
-
-    buf->reset();
-    ztPlayer->playback(buf, 1);
-
-    midi_event *e;
-    while ((e = buf->get_next_event())) {
-
-      { // T / A: every file is played on its own, so each one carries the tempo
-        int us = export_tempo_event(e);
-        if (us) {
-          for (int t = 0; t < MAX_TRACKS; t++)
-            if (tflag[t]) push_tempo(&mtrk[t], dtime[t], us);
-        }
-      }
-
-      if (int kind = jump_marker_kind(e, jump_targets)) {
+  play_for_export([&](midi_event *e) {
+    { // T / A: every file is played on its own, so each one carries the tempo
+      int us = export_tempo_event(e);
+      if (us) {
         for (int t = 0; t < MAX_TRACKS; t++)
-          if (tflag[t]) push_jump_marker(&mtrk[t], dtime[t], kind == '[', e->data1);
-        continue;
+          if (tflag[t]) push_tempo(&mtrk[t], dtime[t], us);
       }
-      if (e->inst >= MAX_INSTS) continue;
-      if (e->track >= MAX_TRACKS) continue;
-      if (!tflag[e->track]) continue;
-
-      push_midi_event(&mtrk[e->track], e, dtime[e->track]);
     }
 
-    for (int i = 0; i < MAX_TRACKS; i++) dtime[i]++;
-  }
+    if (int kind = jump_marker_kind(e, jump_targets)) {
+      for (int t = 0; t < MAX_TRACKS; t++)
+        if (tflag[t]) push_jump_marker(&mtrk[t], dtime[t], kind == '[', e->data1);
+      return;
+    }
+    if (e->inst >= MAX_INSTS) return;
+    if (e->track >= MAX_TRACKS) return;
+    if (!tflag[e->track]) return;
 
-  delete buf;
-  ztPlayer->ignore_jumps = false;
+    push_midi_event(&mtrk[e->track], e, dtime[e->track]);
+  },
+  [&]() {
+    for (int i = 0; i < MAX_TRACKS; i++) dtime[i]++;
+  });
 
   // Write each used track to its own file.
   int exported = 0;

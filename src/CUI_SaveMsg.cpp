@@ -61,14 +61,23 @@ unsigned long ZT_THREAD_CALL save_thread(void *) {
             break;
         case 2: {
             ZTImportExport zie;
-            zie.ExportMID(export_filename,0);
+            if (zie.ExportMID(export_filename,0)) {
+                if (const char *warning = zt_export_jump_warning()) {
+                    snprintf(szStatmsg, sizeof(szStatmsg), "%s", warning);
+                    statusmsg = szStatmsg;
+                    status_change = 1;
+                }
+            }
             break;
         }
         case 3: {
             ZTImportExport zie;
             if (zie.ExportMultitrackMID(export_filename)) {
-                sprintf(szStatmsg, "Exported multitrack MIDI to %s",
-                        export_filename);
+                if (const char *warning = zt_export_jump_warning())
+                    snprintf(szStatmsg, sizeof(szStatmsg), "%s", warning);
+                else
+                    sprintf(szStatmsg, "Exported multitrack MIDI to %s",
+                            export_filename);
             } else {
                 sprintf(szStatmsg,
                         "Multitrack MIDI export failed (no tracks with events)");
@@ -81,9 +90,12 @@ unsigned long ZT_THREAD_CALL save_thread(void *) {
             ZTImportExport zie;
             int n = zie.ExportPerTrackMID(export_filename);
             if (n > 0) {
-                sprintf(szStatmsg,
-                        "Exported %d per-track .MID files (e.g. *_track01.mid)",
-                        n);
+                if (const char *warning = zt_export_jump_warning())
+                    snprintf(szStatmsg, sizeof(szStatmsg), "%s", warning);
+                else
+                    sprintf(szStatmsg,
+                            "Exported %d per-track .MID files (e.g. *_track01.mid)",
+                            n);
             } else {
                 sprintf(szStatmsg,
                         "Per-track MIDI export failed (no tracks with events)");

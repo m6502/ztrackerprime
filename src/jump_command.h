@@ -14,6 +14,14 @@
 
 #define ZT_JUMP_MAX_ORDERS 256
 
+enum zt_jump_mode {
+    ZT_JUMPS_FOLLOW,        // tracker playback
+    ZT_JUMPS_IGNORE,        // MIDI export: one straight pass
+    ZT_JUMPS_FOLLOW_ONCE,   // MIDI export probe: each J followed the first time only
+};
+
+inline int zt_jump_site(int order, int row) { return order * 1024 + row; }
+
 inline bool zt_jump_target_valid(const int *orderlist, int orderlist_len, int target)
 {
     return target >= 0 && target < orderlist_len && orderlist[target] >= 0 && orderlist[target] <= 0xFF;

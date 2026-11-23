@@ -262,8 +262,9 @@ player::player(int res,int prebuffer_rows, zt_module *ztm, bool enable_timer) {
     this->chase_adj = 0;
     this->ztTimerID = 0;
     this->jump_order = -1;
-    this->pending_jump_marker = -1;
-    this->ignore_jumps = false;
+    this->jump_mode = ZT_JUMPS_FOLLOW;
+    this->row_serial = 0;
+    this->pending_jump.target = -1;
     this->playback_start_ms = 0;
 //  this->hr_timer = new hires_timer;
     this->playing_cur_row = 1;
@@ -589,7 +590,8 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
 
     skip = 0xFFF;
     jump_order = -1;
-    pending_jump_marker = -1;
+    pending_jump.target = -1;
+    followed_jumps.clear();
     this->tpb = song->tpb;
     this->bpm = song->bpm;
     set_speed();
@@ -1518,6 +1520,7 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
 
         if (audition_track == -2 && cur_subtick == 0) {
           cur_row++;
+          row_serial++;
           if (jump_order >= 0) {
             buffer->insert(p_tick,ET_PATT,0,cur_pattern);
             cur_order = jump_order;
@@ -1635,9 +1638,10 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
         if (cur_subtick == 0) {
 
           // After process_noel(): the J row's note-offs must precede its "]".
-          if (pending_jump_marker >= 0) {
-            buffer->insert(p_tick, ET_JUMP, 0, 0, pending_jump_marker);
-            pending_jump_marker = -1;
+          if (pending_jump.target >= 0) {
+            buffer->insert(p_tick, ET_JUMP, 0, pending_jump.followed, pending_jump.target,
+                           pending_jump.order, MAX_TRACKS, MAX_INSTS, pending_jump.row);
+            pending_jump.target = -1;
           }
 
           if (die==0 && audition_track == -2 && playmode > 0 && cur_row == 0)
@@ -1676,10 +1680,17 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
 
                   case 'J':
                     {
-                      if (audition_track == -2) pending_jump_marker = evento->effect_data;
+                      const int site = zt_jump_site(cur_order, cur_row);
+                      const bool ignore = audition_track != -2 || jump_mode == ZT_JUMPS_IGNORE ||
+                                          (jump_mode == ZT_JUMPS_FOLLOW_ONCE && followed_jumps.count(site));
                       int target = zt_jump_resolve(song->orderlist, ZTM_ORDERLIST_LEN, evento->effect_data,
-                                                   playmode, ignore_jumps || audition_track != -2);
-                      if (target >= 0) jump_order = target;
+                                                   playmode, ignore);
+                      if (target >= 0) {
+                        jump_order = target;
+                        if (jump_mode == ZT_JUMPS_FOLLOW_ONCE) followed_jumps.insert(site);
+                      }
+                      if (audition_track == -2)
+                        pending_jump = { evento->effect_data, cur_order, cur_row, target >= 0 };
                     }
                     break;
 

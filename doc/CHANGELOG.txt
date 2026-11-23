@@ -19,6 +19,21 @@ zt 2026_11_23 (J command: jump to order position)
           J row, where the tracker jumps. The J row plays in full, and
           notes that end with it are released before the "]".
 
+        + MIDI export and J loops: a note still sounding at the "]" keeps
+          sounding into the loop in a game, as it does in the tracker. The
+          export now also writes the note-off the tracker sends for it
+          inside the loop (where the track's next note cuts it, at a
+          note-off, or when its length runs out). Before, those notes were
+          never released, and every pass of the loop stacked another
+          voice. If such a note-off would also cut a note that plays
+          there on the first pass, the export shows a warning.
+
+        * MIDI export: notes still sounding at the end of the song now get
+          a note-off.
+
+        * Ctrl-Shift-M (quick MIDI export) said "MIDI export failed" when
+          the export worked, and the other way round.
+
         * The B command (old GBA loop marker) no longer does anything.
 
         * Lua: zt.play() and zt.transport:play() now play the song, and

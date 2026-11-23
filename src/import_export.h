@@ -27,6 +27,10 @@ public:
     int ExportPerTrackMID(const char *fn);
 };
 
+// After a MIDI export: a status line if some J loop note-off also cuts a note
+// that is sounding at that point on the first pass, else NULL.
+const char *zt_export_jump_warning(void);
+
 #endif
 
 
