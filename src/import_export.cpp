@@ -270,7 +270,8 @@ static release_plan probe_jump_releases()
 // Plays the song once, straight through, for a MIDI export. Hands every event
 // to on_event() in file order and calls end_of_tick() after each export tick.
 // On top of the player's own events it adds the loop releases from
-// probe_jump_releases() and, at the end, a NOTE_OFF for every note still held.
+// probe_jump_releases() and, at the end, a NOTE_OFF for every note still held
+// (unless the song ends on a "]").
 // Returns the number of loop releases that also cut a note sounding there on
 // the first pass (see zt_export_jump_conflict_where).
 template <class OnEvent, class EndOfTick>
@@ -287,6 +288,7 @@ static int play_for_export(OnEvent on_event, EndOfTick end_of_tick)
   midi_buf *buf = new midi_buf;
   midi_event *e;
   int conflicts = 0;
+  bool ends_on_loop = false;
 
   zt_export_jump_conflict_where[0] = 0;
 
@@ -353,15 +355,24 @@ static int play_for_export(OnEvent on_event, EndOfTick end_of_tick)
 
     for (size_t i = split; i < tick_events.size(); i++) emit(&tick_events[i]);
 
-    end_of_tick();
+    ends_on_loop = false;
+    for (const midi_event &ev : tick_events) ends_on_loop |= ev.type == ET_JUMP;
+
+    // The tick the song stops on is its end, not one more tick of song.
+    if (ztPlayer->pinit) end_of_tick();
   }
 
-  for (auto &s : sounding) {
-    midi_event off = s.second;
-    off.type = ET_NOTE_OFF;
-    off.data1 &= 0x0F;
-    off.data2 = 0;
-    on_event(&off);
+  // A song that ends on a "]" never gets past it in a looping game: its held
+  // notes ring into the loop and are released there by the loop releases.
+  // A NOTE_OFF here would sit on the "]" tick and cut them before the jump.
+  if (!ends_on_loop) {
+    for (auto &s : sounding) {
+      midi_event off = s.second;
+      off.type = ET_NOTE_OFF;
+      off.data1 &= 0x0F;
+      off.data2 = 0;
+      on_event(&off);
+    }
   }
 
   delete buf;

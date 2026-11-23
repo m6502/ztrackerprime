@@ -121,6 +121,23 @@ with tempfile.TemporaryDirectory(prefix='zt-jump-loop-') as tmp:
         assert evs[-1] == (song_end, 'END'), evs
     assert not any(held.values()), held
 
+    # A song that ends on the J: the file ends exactly at the "]", and the
+    # notes held there get no end-of-song NOTE_OFF on that tick (it would cut
+    # them right before the jump); the loop releases them instead.
+    trk, stderr = export(tmp, 'ends_on_loop', SETUP + [
+        'zt.orders[2] = zt.BREAK',
+        'put(1, 0, 47, 36, 0)',
+        'put(1, 1, 0, 72, 1)',
+    ])
+    loop_start = next(t for t, w in trk[0] if w == '[0001')
+    loop_end = next(t for t, w in trk[0] if w == ']0001')
+    row = loop_start // 64
+    assert trk[0][-1] == (loop_end, 'END'), trk[0]
+    for evs in trk[1:]:
+        assert [w for t, w in evs if t == loop_end] == ['END'], evs
+    released_before(1, loop_start + 47 * row, 'off36c0', 'on36c0')
+    released_before(2, loop_start, 'off72c1', 'on72c1')
+
     # Another track holding note 36 on channel 0 when the loop release of
     # track 0's note 36 is written: on the first pass that release cuts it.
     _, stderr = export(tmp, 'conflict', SETUP + [
@@ -130,4 +147,4 @@ with tempfile.TemporaryDirectory(prefix='zt-jump-loop-') as tmp:
     assert 'also cuts that note on the first pass' in stderr, stderr
 
 print('jump loop releases: held notes released where the tracker releases them; '
-      'nothing left sounding; first-pass conflict reported')
+      'nothing left sounding; no cut on a final "]"; first-pass conflict reported')

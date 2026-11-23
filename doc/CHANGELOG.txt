@@ -29,7 +29,10 @@ zt 2026_11_23 (J command: jump to order position)
           there on the first pass, the export shows a warning.
 
         * MIDI export: notes still sounding at the end of the song now get
-          a note-off.
+          a note-off, except when the song ends on a J loop: there they
+          keep ringing into the loop, as in the tracker.
+
+        * MIDI export: the file was one tick longer than the song.
 
         * Ctrl-Shift-M (quick MIDI export) said "MIDI export failed" when
           the export worked, and the other way round.
