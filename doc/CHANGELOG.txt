@@ -15,7 +15,9 @@ zt 2026_11_23 (J command: jump to order position)
         + MIDI export does not follow J jumps, so a looping song still
           exports once, from start to end. Instead it writes text markers
           for games and other players that loop MIDI files: "[xxxx" at
-          the start of order position xxxx and "]xxxx" where the J is.
+          the start of order position xxxx, and "]xxxx" at the end of the
+          J row, where the tracker jumps. The J row plays in full, and
+          notes that end with it are released before the "]".
 
         * The B command (old GBA loop marker) no longer does anything.
 

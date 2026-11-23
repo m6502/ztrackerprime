@@ -223,6 +223,7 @@ class player {
         int light_counter;
         int skip;
         int jump_order;
+        int pending_jump_marker;
         bool ignore_jumps;
         int loop_mode;
         // Wall-clock timestamp (SDL_GetTicks ms) when play() was invoked.

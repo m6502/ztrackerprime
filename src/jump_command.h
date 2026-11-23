@@ -8,7 +8,7 @@
 // one straight pass, so a backwards jump would never finish). Export instead
 // writes text markers so a game engine can loop the region itself:
 //   "[nnnn" at row 0 of every order position some J targets
-//   "]nnnn" where the J itself is
+//   "]nnnn" at the end of the J row, where the tracker jumps
 
 #include <cstdio>
 

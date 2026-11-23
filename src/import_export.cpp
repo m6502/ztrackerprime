@@ -121,7 +121,7 @@ void push_marker(CDataBuf *buf, unsigned char type, char *str, int len=-1)
 
 
 // ------------------------------------------------------------------------------------------------
-// Jnnnn export: "[nnnn" at row 0 of every jump target order, "]nnnn" at the J.
+// Jnnnn export: "[nnnn" at row 0 of every jump target order, "]nnnn" at the end of the J row.
 // Returns '[' or ']' for a marker event, 0 otherwise.
 //
 static int jump_marker_kind(const midi_event *e, const bool targets[ZT_JUMP_MAX_ORDERS])

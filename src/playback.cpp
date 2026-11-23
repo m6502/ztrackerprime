@@ -262,6 +262,7 @@ player::player(int res,int prebuffer_rows, zt_module *ztm, bool enable_timer) {
     this->chase_adj = 0;
     this->ztTimerID = 0;
     this->jump_order = -1;
+    this->pending_jump_marker = -1;
     this->ignore_jumps = false;
     this->playback_start_ms = 0;
 //  this->hr_timer = new hires_timer;
@@ -588,6 +589,7 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
 
     skip = 0xFFF;
     jump_order = -1;
+    pending_jump_marker = -1;
     this->tpb = song->tpb;
     this->bpm = song->bpm;
     set_speed();
@@ -1632,6 +1634,12 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
 
         if (cur_subtick == 0) {
 
+          // After process_noel(): the J row's note-offs must precede its "]".
+          if (pending_jump_marker >= 0) {
+            buffer->insert(p_tick, ET_JUMP, 0, 0, pending_jump_marker);
+            pending_jump_marker = -1;
+          }
+
           if (die==0 && audition_track == -2 && playmode > 0 && cur_row == 0)
             buffer->insert(p_tick, ET_ORDER, 0, 0, cur_order);
 
@@ -1668,7 +1676,7 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
 
                   case 'J':
                     {
-                      buffer->insert(p_tick, ET_JUMP, 0, 0, evento->effect_data, 0, t);
+                      if (audition_track == -2) pending_jump_marker = evento->effect_data;
                       int target = zt_jump_resolve(song->orderlist, ZTM_ORDERLIST_LEN, evento->effect_data,
                                                    playmode, ignore_jumps || audition_track != -2);
                       if (target >= 0) jump_order = target;

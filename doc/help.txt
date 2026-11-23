@@ -297,7 +297,8 @@
          empty order position does nothing.  MIDI export never jumps: it
          plays the song once, straight through, and writes text markers
          so a game or player can loop the region itself: "[xxxx" at the
-         start of order position xxxx, "]xxxx" where the J is.
+         start of order position xxxx, "]xxxx" at the end of the J row
+         (where the tracker jumps).
          ex: J0002 on the last row of the pattern at order 0005 loops
          orders 0002-0005; the export has "[0002" ... "]0002".
  P.... : Send program change message for the current instrument.
