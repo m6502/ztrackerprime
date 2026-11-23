@@ -285,12 +285,9 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
       break;
 
 
-  case 'B':
-
-    // <Manu> Nuevo comando B para hacer loops en la GBA; pintamos la informacion [EN: new B command for GBA loops; we draw the info]
-    sprintf(str,"Command: Write GBA loop marker to pattern %d when exporting MIDI", effect_data);
-
-    break ;
+  case 'J':
+    sprintf(str,"Command: Jump to order position %d (%.4X)",effect_data,effect_data);
+    break;
 
     
   case 'D':

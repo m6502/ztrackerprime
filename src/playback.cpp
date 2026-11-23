@@ -41,6 +41,7 @@
 #include "ccenv_advance.h"
 #include "sysex_macro.h"
 #include "ableton_link.h"
+#include "jump_command.h"
 #include <algorithm>
 #include <stdint.h>
 #include <vector>
@@ -260,6 +261,8 @@ player::player(int res,int prebuffer_rows, zt_module *ztm, bool enable_timer) {
     this->chase_err_us = 0;
     this->chase_adj = 0;
     this->ztTimerID = 0;
+    this->jump_order = -1;
+    this->ignore_jumps = false;
     this->playback_start_ms = 0;
 //  this->hr_timer = new hires_timer;
     this->playing_cur_row = 1;
@@ -584,6 +587,7 @@ void player::prepare_play(int row, int pattern, int pm, int loopmode)
     chase_adj = 0;
 
     skip = 0xFFF;
+    jump_order = -1;
     this->tpb = song->tpb;
     this->bpm = song->bpm;
     set_speed();
@@ -1256,8 +1260,8 @@ bool player::dispatch_event(midi_event *e, bool ignore_mute)
     unsigned short int usi;
     const bool muted = e->track < MAX_TRACKS && song->track_mute[e->track] && !ignore_mute;
     switch(e->type) {
-        case ET_LOOP:
-            // loop markers are consumed by the pattern loop logic elsewhere
+        case ET_JUMP:
+        case ET_ORDER:
             break;
         case ET_MSTART:
             if (song->flag_SendMidiStopStart)
@@ -1512,7 +1516,15 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
 
         if (audition_track == -2 && cur_subtick == 0) {
           cur_row++;
-          if (skip<0xFFF) {
+          if (jump_order >= 0) {
+            buffer->insert(p_tick,ET_PATT,0,cur_pattern);
+            cur_order = jump_order;
+            cur_pattern = song->orderlist[cur_order];
+            cur_row = 0;
+            jump_order = -1;
+            skip = 0xFFF;
+          }
+          else if (skip<0xFFF) {
             if (playmode > 0) {
               if (this->next_order() && !loop_mode)
                 die++;
@@ -1620,6 +1632,9 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
 
         if (cur_subtick == 0) {
 
+          if (die==0 && audition_track == -2 && playmode > 0 && cur_row == 0)
+            buffer->insert(p_tick, ET_ORDER, 0, 0, cur_order);
+
           if (die==0)
 
             for(t=0;t<MAX_TRACKS;t++) {
@@ -1651,14 +1666,14 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
                     break;
 
 
-                  case 'B': // <Manu> No se si hace falta poner aqui el evento de loop [EN: not sure whether the loop event needs to be placed here]
-
+                  case 'J':
                     {
-                      //                                  buffer->insert(p_tick,ET_LOOP,0,0,evento->effect_data,0,t);
-                      buffer->insert( p_tick, ET_LOOP, 0, 0 , evento->effect_data, 0, t, inst, 0) ;
+                      buffer->insert(p_tick, ET_JUMP, 0, 0, evento->effect_data, 0, t);
+                      int target = zt_jump_resolve(song->orderlist, ZTM_ORDERLIST_LEN, evento->effect_data,
+                                                   playmode, ignore_jumps || audition_track != -2);
+                      if (target >= 0) jump_order = target;
                     }
-
-                    break ;
+                    break;
 
 
 
@@ -1723,20 +1738,6 @@ void player::playback(midi_buf *buffer, int ticks, int audition_track)
                         buffer->insert(p_tick,ET_TPB,0,0,evento->effect_data,0,t);
                     }
                     break;
-
-                    /*
-                    case 'B': // <Manu> No se si hace falta poner aqui el evento de loop
-
-                    {
-                    int pollo ;
-
-                    pollo=40 ;
-                    //                                  buffer->insert(p_tick,ET_LOOP,0,0,evento->effect_data,0,t);
-                    buffer->insert( p_tick, ET_LOOP, 0, 0 , evento->effect_data, 0, t, inst, 0) ;
-                    }
-                    */
-
-                    break ;
 
                   case 'D':
 

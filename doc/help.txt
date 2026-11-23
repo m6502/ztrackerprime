@@ -278,8 +278,6 @@
          this row on.  Only 02, 04, 06, 08, 0C (12), 18 (24) and 30 (48)
          are accepted; anything else is ignored.  Play resets it to the
          song's TPB.
- B  00 : Set "[" in the midi file.
- B  01 : Set "]" in the midi file.
  Cxxxx : Pattern break - setting the C marker denotes the end of a
          pattern.  ex: C0000 will skip to the next pattern, row 0
  D..xx : Delay note/volume/cut - by xxxx sub-ticks.
@@ -293,6 +291,15 @@
          semitones, see "Pitch bend range" below); with that range 1000
          is one semitone, and F00AB rises about one semitone per beat.
          To glide from one note to another, use Portamento (below).
+ Jxxxx : Jump to song order position xxxx (hex) at the end of this row.
+         Followed when playing the song (F5) or from the cursor (F7);
+         F6 plays only the current pattern and ignores it.  A jump to an
+         empty order position does nothing.  MIDI export never jumps: it
+         plays the song once, straight through, and writes text markers
+         so a game or player can loop the region itself: "[xxxx" at the
+         start of order position xxxx, "]xxxx" where the J is.
+         ex: J0002 on the last row of the pattern at order 0005 loops
+         orders 0002-0005; the export has "[0002" ... "]0002".
  P.... : Send program change message for the current instrument.
  Q..xx : Retrig note every xx subticks
  R..xx : Start arpeggio xx.  R0000 will continue the last arpeggio

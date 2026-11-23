@@ -56,6 +56,11 @@ target_include_directories(test_save_key PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_compile_features(test_save_key PRIVATE cxx_std_17)
 add_test(NAME save_key COMMAND test_save_key)
 
+add_executable(test_jump_command test_jump_command.cpp)
+target_include_directories(test_jump_command PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_compile_features(test_jump_command PRIVATE cxx_std_17)
+add_test(NAME jump_command COMMAND test_jump_command)
+
 # Real KeyBuffer (src/keybuffer.{h,cpp}) compiled under sdl_stub.h with
 # the ZT_TEST_NO_SDL guard. Exercises the actual SDL_KMOD -> KS_*
 # translation, FIFO ordering, peek-vs-consume semantics, macOS Cmd ->

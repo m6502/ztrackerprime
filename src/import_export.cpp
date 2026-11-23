@@ -44,6 +44,7 @@
 
 #include "import_export.h"
 #include "CDataBuf.h"
+#include "jump_command.h"
 
 #include <string.h>
 
@@ -114,6 +115,42 @@ void push_marker(CDataBuf *buf, unsigned char type, char *str, int len=-1)
   buf->pushc(type);               // Tipo del evento
   push_varlen(buf, len);          // Tamanyo de los datos
   buf->write(str,len);            // Cadena de texto
+}
+
+
+
+
+// ------------------------------------------------------------------------------------------------
+// Jnnnn export: "[nnnn" at row 0 of every jump target order, "]nnnn" at the J.
+// Returns '[' or ']' for a marker event, 0 otherwise.
+//
+static int jump_marker_kind(const midi_event *e, const bool targets[ZT_JUMP_MAX_ORDERS])
+{
+  if (e->type == ET_JUMP) return ']';
+  if (e->type == ET_ORDER && e->data1 < ZT_JUMP_MAX_ORDERS && targets[e->data1]) return '[';
+  return 0;
+}
+
+static void push_jump_marker(CDataBuf *buf, int &dtime, bool loop_start, unsigned short value)
+{
+  char text[8];
+  int len = zt_jump_marker_text(text, loop_start, value);
+  push_varlen(buf, dtime);
+  dtime = 0;
+  buf->pushuc(0xFF);
+  buf->pushuc(0x06);               // Marker meta-event
+  push_varlen(buf, len);
+  buf->write(text, len);
+}
+
+static void collect_jump_targets(zt_module *song, bool targets[ZT_JUMP_MAX_ORDERS])
+{
+  zt_jump_collect_targets(song->orderlist, ZTM_ORDERLIST_LEN, targets,
+    [song](int p, auto fn) {
+      for (int t = 0; t < MAX_TRACKS; t++)
+        for (event *e = song->patterns[p]->tracks[t]->event_list; e; e = e->next_event)
+          fn(e->effect, e->effect_data);
+    });
 }
 
 
@@ -327,6 +364,10 @@ int ZTImportExport::ExportMID(const char *fn, int format)
   
   // Enough of that tomfoolery
   
+  bool jump_targets[ZT_JUMP_MAX_ORDERS];
+  collect_jump_targets(song, jump_targets);
+
+  ztPlayer->ignore_jumps = true;
   ztPlayer->prepare_play(0,0,1,0); // start row 1, playmode: song, loop: off
   buf = new midi_buf;
   
@@ -335,8 +376,6 @@ int ZTImportExport::ExportMID(const char *fn, int format)
     buf->reset();
     ztPlayer->playback(buf,1);
     
-    //        buf->insert(0, ET_LOOP, 1, 0 , 0, 0, 0, 0, 0) ;
-    
     while((e = buf->get_next_event())) {
 
       { // T / A: tempo into the conductor track (mtrk[0]), row length into the player
@@ -344,34 +383,8 @@ int ZTImportExport::ExportMID(const char *fn, int format)
         if (us) push_tempo(&mtrk[0], dtime[0], us);
       }
 
-      if(0 && e->type == ET_LOOP) {     // <Manu> Por ahora lo dejo asi para evitar problemas [EN: leaving it like this for now to avoid issues]
-      
-        // ¿Esto no puede estar abajo porque no tiene nota?
-      
-          // ------------------------------------------------------------------
-          // ------------------------------------------------------------------
-          // ------------------------------------------------------------------
-          
-//        case ET_LOOP: // <Manu> Exportamos el evento de loop [EN: export the loop event] ------------------ [EN: export the loop event]
-          
-          push_varlen(&mtrk[0], dtime[0]) ;     // Delta time
-          dtime[0] = 0 ;
-
-          mtrk[0].pushuc(0xFF) ;                // Es un meta-evento
-          mtrk[0].pushuc(0x06) ;                // Marker
-
-          push_varlen(&mtrk[0], 1) ;            // Tiene un dato de 1 byte
-
-          if(e->data1==0) {
-            
-            mtrk[0].pushuc('[') ; // Dato
-          }
-          else {
-            
-            mtrk[0].pushuc(']') ;
-          }
-
-//          break ; 
+      if (int kind = jump_marker_kind(e, jump_targets)) {
+        push_jump_marker(&mtrk[0], dtime[0], kind == '[', e->data1);
       }
       else {
           
@@ -507,6 +520,7 @@ int ZTImportExport::ExportMID(const char *fn, int format)
   }
     
   delete buf;
+  ztPlayer->ignore_jumps = false;
     
   // END MTrk         
   for (i=0;i<total_mtrks;i++) {
@@ -713,7 +727,11 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
   mtrk[0].pushc((bpm >> 8) & 0xff);
   mtrk[0].pushc((bpm) & 0xff);
 
+  bool jump_targets[ZT_JUMP_MAX_ORDERS];
+  collect_jump_targets(song, jump_targets);
+
   // Play through song, routing events by e->track.
+  ztPlayer->ignore_jumps = true;
   ztPlayer->prepare_play(0, 0, 1, 0);
   buf = new midi_buf;
 
@@ -729,7 +747,10 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
         if (us) push_tempo(&mtrk[0], dtime[0], us);
       }
 
-      if (e->type == ET_LOOP) continue; // skip, same as ExportMID
+      if (int kind = jump_marker_kind(e, jump_targets)) {
+        push_jump_marker(&mtrk[0], dtime[0], kind == '[', e->data1);
+        continue;
+      }
       if (e->inst >= MAX_INSTS) continue;
       if (e->track >= MAX_TRACKS) continue;
 
@@ -745,6 +766,7 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
   }
 
   delete buf;
+  ztPlayer->ignore_jumps = false;
 
   // End-of-track + assemble chunks.
   //
@@ -835,6 +857,10 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
     mtrk[t].pushc((bpm) & 0xff);
   }
 
+  bool jump_targets[ZT_JUMP_MAX_ORDERS];
+  collect_jump_targets(song, jump_targets);
+
+  ztPlayer->ignore_jumps = true;
   ztPlayer->prepare_play(0, 0, 1, 0);
   midi_buf *buf = new midi_buf;
 
@@ -854,7 +880,11 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
         }
       }
 
-      if (e->type == ET_LOOP) continue;
+      if (int kind = jump_marker_kind(e, jump_targets)) {
+        for (int t = 0; t < MAX_TRACKS; t++)
+          if (tflag[t]) push_jump_marker(&mtrk[t], dtime[t], kind == '[', e->data1);
+        continue;
+      }
       if (e->inst >= MAX_INSTS) continue;
       if (e->track >= MAX_TRACKS) continue;
       if (!tflag[e->track]) continue;
@@ -866,6 +896,7 @@ int ZTImportExport::ExportPerTrackMID(const char *fn)
   }
 
   delete buf;
+  ztPlayer->ignore_jumps = false;
 
   // Write each used track to its own file.
   int exported = 0;

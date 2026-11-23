@@ -103,7 +103,8 @@ enum Emeventtypes {
     ET_PATT,
     ET_PITCH,
     ET_MSTART,
-    ET_LOOP,                  // <Manu> definimos el evento de loop [EN: define the loop event]
+    ET_JUMP,                  // Jnnnn reached: data1 = target order position
+    ET_ORDER,                 // row 0 of an order position: data1 = order
     ET_RAW                    // raw 3-byte short MIDI msg packed in command|data1|data2
 };
 
@@ -221,6 +222,8 @@ class player {
         int fillbuff;
         int light_counter;
         int skip;
+        int jump_order;
+        bool ignore_jumps;
         int loop_mode;
         // Wall-clock timestamp (SDL_GetTicks ms) when play() was invoked.
         // Used by the status display to show real elapsed time, immune

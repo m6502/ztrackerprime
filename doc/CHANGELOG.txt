@@ -4,6 +4,21 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_11_23 (J command: jump to order position)
+-------------------------------------------------
+
+        + New pattern command Jxxxx: at the end of the row, playback
+          jumps to song order position xxxx. Use it to loop part of a
+          song. It works when playing the song (F5) or from the cursor
+          (F7); F6, which plays only the current pattern, ignores it.
+
+        + MIDI export does not follow J jumps, so a looping song still
+          exports once, from start to end. Instead it writes text markers
+          for games and other players that loop MIDI files: "[xxxx" at
+          the start of order position xxxx and "]xxxx" where the J is.
+
+        * The B command (old GBA loop marker) no longer does anything.
+
 zt 2026_11_17 (Window icon on Linux)
 ------------------------------------
 
