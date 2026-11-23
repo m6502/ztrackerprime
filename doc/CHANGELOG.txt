@@ -29,6 +29,11 @@ zt 2026_11_23 (J command: jump to order position)
           zt.set_pattern_length) now raises an error. It used to be
           silently ignored, so the pattern kept its old length.
 
+        * IT import: patterns shorter than 32 rows (zTracker's minimum)
+          kept the default 64 rows, adding silence after every short
+          pattern. They are now padded to 32 rows with a C0000 pattern
+          break on their last row, so they play for their real length.
+
 zt 2026_11_17 (Window icon on Linux)
 ------------------------------------
 

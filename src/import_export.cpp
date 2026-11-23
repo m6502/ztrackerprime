@@ -1190,6 +1190,26 @@ int ZTImportExport::ExportMID(char *fn, int format) {
 // ------------------------------------------------------------------------------------------------
 //
 //
+// ------------------------------------------------------------------------------------------------
+// IT patterns can be 1..200 rows, zTracker's are 32..999. A short pattern is
+// padded to 32 rows with a pattern break on its last real row, so it still
+// plays for its original length.
+//
+static void end_pattern_at_row(pattern *p, int row)
+{
+  for (int t = 0; t < MAX_TRACKS; t++) {
+    event *e = p->tracks[t]->get_event(row);
+    if (e && e->effect == 'C') return;
+  }
+  for (int t = 0; t < MAX_TRACKS; t++) {
+    event *e = p->tracks[t]->get_event(row);
+    if (!e || e->effect == 0xFF) {
+      p->tracks[t]->update_event_safe(row, -1, -1, -1, -1, 'C', 0);
+      return;
+    }
+  }
+}
+
 int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
 {
   int note, ins, volpan, cmnd, cmndvalue, deflength ;
@@ -1219,10 +1239,10 @@ int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
   // import pattern sequences
   for (i = 0; i < mod.patterns->numPatterns; i++) {
     
-    zt->patterns[i]->resize(mod.Patterns(i).numRows);
+    const int rows = mod.Patterns(i).numRows;
+    zt->patterns[i]->resize(rows < ZTM_PATTERN_MIN_LEN ? ZTM_PATTERN_MIN_LEN : rows);
     
-    for (int row = 0; row < mod.Patterns(i).numRows; row++) {
-      zt->patterns[i]->resize(mod.Patterns(i).numRows);
+    for (int row = 0; row < rows; row++) {
       for (int chan = 0; chan < mod.Patterns(i).numChannels; chan++) {
   
         note = mod.Patterns(i).Note(chan, row) ;
@@ -1251,6 +1271,8 @@ int ZTImportExport::ImportIT(const char *fn, zt_module* zt)
         zt->patterns[i]->tracks[chan]->update_event_safe(row, note, ins, volpan, deflength, cmnd, cmndvalue);               
       }
     }
+
+    if (rows > 0 && rows < ZTM_PATTERN_MIN_LEN) end_pattern_at_row(zt->patterns[i], rows - 1);
   }
   
   // set order list
