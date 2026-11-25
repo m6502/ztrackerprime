@@ -406,6 +406,10 @@ void push_text(CDataBuf *buf, unsigned char type, char *str, int len=-1)
 // ------------------------------------------------------------------------------------------------
 //
 //
+extern int zt_export_muted_tracks;
+
+// The instruments a plain (one track per instrument) export writes. A muted
+// track does not count unless --export-muted (see zt_export_muted_tracks).
 void find_insts(unsigned char iflag[MAX_INSTS], zt_module *song) 
 {
   int i,j;
@@ -415,6 +419,8 @@ void find_insts(unsigned char iflag[MAX_INSTS], zt_module *song)
   for (i=0;i<256;i++) {
 
     for (j=0;j<MAX_TRACKS;j++){
+
+      if (!zt_export_muted_tracks && song->track_mute[j]) continue;
 
       e = song->patterns[i]->tracks[j]->event_list;
 
@@ -609,7 +615,10 @@ int ZTImportExport::ExportMID(const char *fn, int format)
           // ------------------------------------------------------------------
           // ------------------------------------------------------------------
       
-      if (e->inst < MAX_INSTS) {
+      // A muted track is left out, as in the multitrack exports (find_insts
+      // gave its instruments no MTrk if nothing else plays them).
+      if (e->inst < MAX_INSTS &&
+          (zt_export_muted_tracks || e->track >= MAX_TRACKS || !song->track_mute[e->track])) {
         
         trk = mtrk_imap[e->inst+1];
         mp = &mtrk[trk];
@@ -751,10 +760,11 @@ int ZTImportExport::ExportMID(const char *fn, int format)
   
   // Grabamos el buffer al disco, cerramos el fichero y volvemos sin error
   
-  fwrite(buffer.getbuffer(),buffer.getsize(),1,fp) ;
-  fclose(fp) ;
+  // A short write (full disk) or a failed close is a failed export.
+  bool written = fwrite(buffer.getbuffer(),buffer.getsize(),1,fp) == 1 ;
+  if (fclose(fp) != 0) written = false ;
 
-  return(1) ;
+  return written ? 1 : 0 ;
 }
 
 
@@ -982,8 +992,10 @@ int ZTImportExport::ExportMultitrackMID(const char *fn)
     buffer.write(mtrk[i].getbuffer(), mtrk[i].getsize());
   }
 
-  fwrite(buffer.getbuffer(), buffer.getsize(), 1, fp);
-  fclose(fp);
+  // A short write (full disk) or a failed close is a failed export.
+  bool written = fwrite(buffer.getbuffer(), buffer.getsize(), 1, fp) == 1;
+  if (fclose(fp) != 0) written = false;
+  if (!written) return 0;
 
   return 1;
 }

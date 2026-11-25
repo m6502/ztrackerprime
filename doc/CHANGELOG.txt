@@ -37,6 +37,18 @@ zt 2026_11_23 (J command: jump to order position)
         * Ctrl-Shift-M (quick MIDI export) said "MIDI export failed" when
           the export worked, and the other way round.
 
+        + Command line: zt song.zt --export-midi song.mid writes exactly
+          what the plain "Export MIDI" writes (one MIDI track per
+          instrument) and exits, without opening a window, like
+          --export-multitrack-midi. --export-muted works with it too.
+
+        * Plain "Export MIDI" (and Ctrl-Shift-M) now leaves MUTED tracks
+          out, as the multitrack exports already did. Before, their notes
+          were exported. From the command line, --export-muted puts them
+          back.
+
+        * MIDI export reports a failed write (full disk) as a failure.
+
         * The B command (old GBA loop marker) no longer does anything.
 
         * Lua: zt.play() and zt.transport:play() now play the song, and

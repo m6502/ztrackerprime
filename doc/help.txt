@@ -396,14 +396,21 @@
                               tempo so the song tempo follows incoming
                               F8 MIDI clock from that port).
        --export-multitrack-midi <file.mid>
-                              Export the specified zt song to a MIDI file
-                              and return.
+                              Export the specified zt song to a MIDI file,
+                              one MIDI track per zTracker track, and return.
+       --export-midi <file.mid>
+                              Export the specified zt song exactly as the
+                              plain "Export MIDI" does (one MIDI track per
+                              instrument) and return.
+       --export-muted         Put MUTED tracks back into either export
+                              (they are left out by default).
 
  Examples:
    zt mysong.zt
    zt --midi-in "IAC Driver Bus 1"
    zt --midi-clock 0 mysong.zt
    zt mysong.zt --export-multitrack-midi mysong.mid
+   zt mysong.zt --export-midi mysong.mid
 
 |L|%==|H|Ableton Link|L|==%|U|
 
