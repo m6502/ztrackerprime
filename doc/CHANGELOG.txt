@@ -28,6 +28,13 @@ zt 2026_11_23 (J command: jump to order position)
           voice. If such a note-off would also cut a note that plays
           there on the first pass, the export shows a warning.
 
+        * A J that jumps to an order position with no pattern (past the
+          end of the song, for example) does nothing in the tracker, but
+          MIDI export still wrote its "]" marker, a loop end with no loop
+          start. Export now leaves it out and shows a warning naming the
+          J. The pattern editor's status line for a J now shows the
+          pattern it jumps to, or that there is none.
+
         * MIDI export: notes still sounding at the end of the song now get
           a note-off, except when the song ends on a J loop: there they
           keep ringing into the loop, as in the tracker.

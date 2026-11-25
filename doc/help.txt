@@ -293,8 +293,11 @@
          To glide from one note to another, use Portamento (below).
  Jxxxx : Jump to song order position xxxx (hex) at the end of this row.
          Followed when playing the song (F5) or from the cursor (F7);
-         F6 plays only the current pattern and ignores it.  A jump to an
-         empty order position does nothing.  MIDI export never jumps: it
+         F6 plays only the current pattern and ignores it.  The number is
+         an order position, not a pattern: the status line shows the
+         pattern it jumps to.  A jump to an empty order position does
+         nothing (MIDI export warns about it and writes no markers for
+         it).  MIDI export never jumps: it
          plays the song once, straight through, and writes text markers
          so a game or player can loop the region itself: "[xxxx" at the
          start of order position xxxx, "]xxxx" at the end of the J row

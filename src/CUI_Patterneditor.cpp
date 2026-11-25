@@ -286,7 +286,12 @@ void set_effect_data_msg(char *str, unsigned char effect, unsigned short int eff
 
 
   case 'J':
-    sprintf(str,"Command: Jump to order position %d (%.4X)",effect_data,effect_data);
+    if (effect_data < ZTM_ORDERLIST_LEN && song->orderlist[effect_data] <= 0xFF)
+      sprintf(str,"Command: Jump to order position %d (%.4X), pattern %d",
+              effect_data,effect_data,song->orderlist[effect_data]);
+    else
+      sprintf(str,"Command: Jump to order position %d (%.4X): no pattern there, does nothing",
+              effect_data,effect_data);
     break;
 
     

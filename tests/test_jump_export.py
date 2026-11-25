@@ -55,11 +55,13 @@ with tempfile.TemporaryDirectory(prefix='zt-jump-') as tmp:
     song, mid = tmp / 'jump.zt', tmp / 'jump.mid'
     # Orders 0,1,2 -> patterns 0,1,2 (64 rows each). Pattern 1: J0001 on
     # row 15 (loop orders 1..1), with a note on that same row. Pattern 2:
-    # J0000 on its last row, the last row of the song.
+    # J0000 on its last row, the last row of the song. Pattern 0: J0003 on row 5,
+# an order position past the end of the song.
     (tmp / 'mk.script').write_text(f'''\
 lua for p=0,2 do zt.song.cur_pattern = p; local c = zt.cell(0, 0); c.note = 60 + p; c.instrument = 0 end
 lua zt.song.cur_pattern = 1; local c = zt.cell(1, 15); c.effect = 0x4A; c.effect_data = 1; c = zt.cell(2, 15); c.note = 72; c.instrument = 0; c.length = 1
 lua zt.song.cur_pattern = 2; local c = zt.cell(1, 63); c.effect = 0x4A; c.effect_data = 0
+lua zt.song.cur_pattern = 0; local c = zt.cell(3, 5); c.effect = 0x4A; c.effect_data = 3
 lua zt.orders[0] = 0; zt.orders[1] = 1; zt.orders[2] = 2; zt.orders[3] = zt.BREAK
 lua assert(zt.save("{song}"))
 quit
@@ -68,7 +70,12 @@ quit
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run([str(zt), '--headless', '--script', str(tmp / 'mk.script')], **run)
     assert song.exists(), 'song was not saved'
-    subprocess.run([str(zt), str(song), '--export-multitrack-midi', str(mid)], **run)
+    run.update(stderr=subprocess.PIPE, text=True)
+    stderr = subprocess.run([str(zt), str(song), '--export-multitrack-midi', str(mid)], **run).stderr
+
+    # J0003 on order 0 row 5 jumps past the end of the song: the tracker does
+    # not jump, so no "]0003" is written, and the export says why.
+    assert 'J0003 at order 0 row 5 jumps to an order position with no pattern' in stderr, stderr
 
     all_tracks = list(tracks(mid.read_bytes()))
     markers = [(t, p.decode()) for t, k, p in all_tracks[0] if k == 'meta06']
@@ -93,4 +100,5 @@ quit
     # One straight pass: the export did not follow either jump.
     assert max(t for tr in all_tracks for t, _, _ in tr) <= song_end + 1
 
-print('jump export: markers placed at the jump points, single pass, J-row note released')
+print('jump export: markers placed at the jump points, single pass, J-row note released, '
+      'J to nowhere reported and not exported')

@@ -174,14 +174,26 @@ static void collect_jump_targets(zt_module *song, bool targets[ZT_JUMP_MAX_ORDER
 //
 static int  zt_export_jump_conflicts = 0;
 static char zt_export_jump_conflict_where[64] = "";
+static int  zt_export_jump_dead = 0;
+static char zt_export_jump_dead_where[96] = "";
 
 const char *zt_export_jump_warning(void)
 {
-  static char msg[160];
-  if (!zt_export_jump_conflicts) return NULL;
-  snprintf(msg, sizeof(msg), "Warning: %d J loop note-off(s) also cut a note on the first pass (first: %s)",
-           zt_export_jump_conflicts, zt_export_jump_conflict_where);
+  static char msg[192];
+  if (zt_export_jump_dead)
+    snprintf(msg, sizeof(msg), "Warning: %d J command(s) jump to an order position with no pattern, "
+             "no loop exported (first: %s)", zt_export_jump_dead, zt_export_jump_dead_where);
+  else if (zt_export_jump_conflicts)
+    snprintf(msg, sizeof(msg), "Warning: %d J loop note-off(s) also cut a note on the first pass (first: %s)",
+             zt_export_jump_conflicts, zt_export_jump_conflict_where);
+  else
+    return NULL;
   return msg;
+}
+
+static bool jump_goes_somewhere(const midi_event *e)
+{
+  return zt_jump_target_valid(song->orderlist, ZTM_ORDERLIST_LEN, e->data1);
 }
 
 typedef std::tuple<unsigned int, int, int, int> note_key;        // device, channel, note, track
@@ -291,8 +303,19 @@ static int play_for_export(OnEvent on_event, EndOfTick end_of_tick)
   bool ends_on_loop = false;
 
   zt_export_jump_conflict_where[0] = 0;
+  zt_export_jump_dead = 0;
 
   auto emit = [&](midi_event *ev) {
+    // The tracker does not jump to an order position with no pattern, so
+    // there is no loop: no "]" either.
+    if (ev->type == ET_JUMP && !jump_goes_somewhere(ev)) {
+      if (!zt_export_jump_dead++)
+        snprintf(zt_export_jump_dead_where, sizeof(zt_export_jump_dead_where),
+                 "J%04X at order %d row %d", ev->data1, ev->data2, ev->extra);
+      fprintf(stderr, "MIDI export: J%04X at order %d row %d jumps to an order position with no pattern; "
+              "no loop exported\n", ev->data1, ev->data2, ev->extra);
+      return;
+    }
     if (is_note_on(ev)) sounding.insert(std::make_pair(voice_of(ev), *ev));
     else if (is_note_off(ev)) {
       auto s = sounding.find(voice_of(ev));
@@ -356,7 +379,7 @@ static int play_for_export(OnEvent on_event, EndOfTick end_of_tick)
     for (size_t i = split; i < tick_events.size(); i++) emit(&tick_events[i]);
 
     ends_on_loop = false;
-    for (const midi_event &ev : tick_events) ends_on_loop |= ev.type == ET_JUMP;
+    for (const midi_event &ev : tick_events) ends_on_loop |= ev.type == ET_JUMP && jump_goes_somewhere(&ev);
 
     // The tick the song stops on is its end, not one more tick of song.
     if (ztPlayer->pinit) end_of_tick();
