@@ -8,7 +8,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-zt = Path(sys.argv[1]).resolve()
+from app_fixture import create_test_app
+
+# A scratch copy of the app: zt saves zt.conf beside itself on exit, which
+# inside the real macOS bundle breaks its code signature.
+_app_dir = tempfile.TemporaryDirectory(prefix='zt-app-')
+app, zt = create_test_app(Path(sys.argv[1]), Path(_app_dir.name))
 
 
 def it_pattern(rows, note):
@@ -72,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='zt-it-') as tmp:
 lua assert(zt.load("{it}")); local c = zt.pattern(0):cell(0, 15); local f = io.open("{report}", "w"); f:write(zt.get_pattern_length(0), " ", zt.get_pattern_length(1), " ", c.effect, " ", c.effect_data); f:close()
 quit
 ''')
-    run = dict(cwd=zt.parent, timeout=60, check=True,
+    run = dict(cwd=app, timeout=60, check=True,
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run([str(zt), '--headless', '--script', str(tmp / 'check.script')], **run)
     len0, len1, effect, data = map(int, report.read_text().split())

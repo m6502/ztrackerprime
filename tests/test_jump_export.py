@@ -7,7 +7,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-zt = Path(sys.argv[1]).resolve()
+from app_fixture import create_test_app
+
+# A scratch copy of the app: zt saves zt.conf beside itself on exit, which
+# inside the real macOS bundle breaks its code signature.
+_app_dir = tempfile.TemporaryDirectory(prefix='zt-app-')
+app, zt = create_test_app(Path(sys.argv[1]), Path(_app_dir.name))
 
 
 def varlen(d, i):
@@ -59,7 +64,7 @@ lua zt.orders[0] = 0; zt.orders[1] = 1; zt.orders[2] = 2; zt.orders[3] = zt.BREA
 lua assert(zt.save("{song}"))
 quit
 ''')
-    run = dict(cwd=zt.parent, timeout=60, check=True,
+    run = dict(cwd=app, timeout=60, check=True,
                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run([str(zt), '--headless', '--script', str(tmp / 'mk.script')], **run)
     assert song.exists(), 'song was not saved'
