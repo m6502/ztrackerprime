@@ -171,6 +171,11 @@ void CUI_PEFindReplace::draw(Drawable *S) {
     int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
     for(;start_y % 8;start_y--) ;
 
+    vs_find->x    = (start_x / 8) + 19;
+    vs_find->y    = (start_y / 8) + 4;
+    vs_replace->x = (start_x / 8) + 19;
+    vs_replace->y = (start_y / 8) + 6;
+
     // Window frame (mirrors CUI_PENature / CUI_PEVol).
     S->fillRect(start_x, start_y,
                 start_x + window_width, start_y + window_height,

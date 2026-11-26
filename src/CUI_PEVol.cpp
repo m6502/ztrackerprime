@@ -90,6 +90,10 @@ void CUI_PEVol::draw(Drawable *S) {
         int start_y = (INTERNAL_RESOLUTION_Y / 2) - (window_height / 2);
         for(;start_y % 8;start_y--);
 
+        ValueSlider *vs = (ValueSlider *)UI->get_element(0);
+        vs->x = (start_x / 8) + 12;
+        vs->y = (start_y + (window_height / 2) ) / 8;
+
         S->fillRect(start_x,start_y,start_x + window_width,start_y + window_height,COLORS.Background);
         printline(start_x,start_y + window_height - row(1) + 1,148,window_width / 8, COLORS.Lowlight,S);
         for (i = start_y / row(1); i < (start_y + window_height) / row(1);i++) {

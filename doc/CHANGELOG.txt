@@ -4,6 +4,14 @@ Legend
    +  - Feature add
    *  - Fix/change
 
+zt 2026_11_26 (Block popups after a window resize)
+--------------------------------------------------
+
+        * The Volume Set for Block, Naturalization and Find/Replace
+          popups placed their sliders for the window size the program
+          started with, so after resizing the window the sliders were
+          drawn outside the popup. They now follow the current size.
+
 zt 2026_11_23 (J command: jump to order position)
 -------------------------------------------------
 
